@@ -80,3 +80,31 @@ Kategorien `analysis`, `model-building`, `scheduling`, `security`, `subsets`, `v
 ---
 
 ## Alle Top-5 erledigt 2026-04-30.
+
+Commit: `a3d3de3` — auf `origin/main` gepusht.
+
+---
+
+## Nächste Session — offene Punkte
+
+### Tests fehlen für neue Code-Pfade
+- `tm1-client.checkCubeRule()` — kein Unit-Test
+- `tm1-client.getSessions()` — kein Unit-Test (bestehender `getThreads`-Test als Vorlage)
+- `tm1-client.listFiles()` / `getFileContent()` — kein Unit-Test, v12→v11 Fallback ungetestet
+- `tm1-client.requestRaw()` — 401-Retry-Pfad ungetestet
+- `session-manager.authenticate()` Logout-vor-Auth — kein Test
+
+### Ideen-Verbesserungen
+- **Auto pre-write check:** `tm1_update_cube_rules` könnte intern `checkCubeRule()` aufrufen und bei Syntax-Fehlern abbrechen (aktuell muss AI das selbst kombinieren). Optional `--force` Flag für Override.
+- **Property-Test** für v12→v11 Fallback: random Pfade, beide Container-Varianten.
+- **fileops Schreib-Operation:** dev-mcp hat kein `uploadFile`, lohnt sich als Custom-Erweiterung (POST `/Contents('Files')/Contents` mit `Name` + `Content`)?
+
+### Live-Test gegen TM1
+- Connect, list-files, get-file-content vs. echtem Server probieren — v11 Blob-Fallback funktioniert?
+- check-cube-rule mit absichtlich kaputter Rule probieren — Line-Number korrekt?
+- list-sessions auf produktivem Server — Datenmenge ok für MCP-Response?
+
+### Pre-Existing Status
+- 21 Test Files, 177 Tests pass
+- `tsc --noEmit` clean
+- main branch up-to-date mit origin
