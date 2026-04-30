@@ -1,0 +1,497 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { TM1Client } from "../../src/tm1-client.js";
+import { SessionManager } from "../../src/session-manager.js";
+import type { TM1Config } from "../../src/config.js";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const mockLogger = {
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  fatal: vi.fn(),
+  trace: vi.fn(),
+  child: vi.fn().mockReturnThis(),
+  level: "silent",
+  flush: vi.fn(),
+} as unknown as import("pino").Logger;
+
+function makeConfig(): TM1Config {
+  return {
+    baseUrl: "https://tm1server:8010",
+    user: "admin",
+    password: "secret",
+    ssl: { rejectUnauthorized: true },
+    keepAliveIntervalMs: 60000,
+    requestTimeoutMs: 5000,
+    logLevel: "info",
+  };
+}
+
+function mockResponse(body: unknown): Response {
+  const bodyText = JSON.stringify(body);
+  return {
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    headers: new Headers(),
+    text: vi.fn().mockResolvedValue(bodyText),
+    json: vi.fn().mockResolvedValue(body),
+  } as unknown as Response;
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+describe("TM1Client – Cell Data Methods", () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let client: TM1Client;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const config = makeConfig();
+    const sessionManager = new SessionManager(config, mockLogger);
+    vi.spyOn(sessionManager, "ensureSession").mockResolvedValue("session123");
+    vi.spyOn(sessionManager, "authenticate").mockResolvedValue("session123");
+    vi.spyOn(sessionManager, "startKeepAlive").mockImplementation(() => {});
+    vi.spyOn(sessionManager, "stopKeepAlive").mockImplementation(() => {});
+
+    client = new TM1Client(config, sessionManager, mockLogger);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  // ── getCellValue() ─────────────────────────────────────────────────────────
+
+  describe("getCellValue()", () => {
+    it("should return a numeric cell value", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-001",
+          Cells: [{ Value: 42.5, FormattedValue: "42.50" }],
+        }),
+      );
+
+      const value = await client.getCellValue("SalesCube", ["Jan", "Germany", "Actual"]);
+
+      expect(value).toBe(42.5);
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/ExecuteMDX");
+      expect(opts.method).toBe("POST");
+      const body = JSON.parse(opts.body);
+      expect(body.MDX).toBe("SELECT {[Jan]} ON COLUMNS FROM [SalesCube] WHERE ([Germany],[Actual])");
+    });
+
+    it("should return a string cell value", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-002",
+          Cells: [{ Value: "Active", FormattedValue: "Active" }],
+        }),
+      );
+
+      const value = await client.getCellValue("StatusCube", ["Q1", "Open"]);
+      expect(value).toBe("Active");
+    });
+
+    it("should return null when cell is empty", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-003",
+          Cells: [{ Value: null, FormattedValue: "" }],
+        }),
+      );
+
+      const value = await client.getCellValue("SalesCube", ["Feb", "France", "Budget"]);
+      expect(value).toBeNull();
+    });
+
+    it("should return null when Cells array is empty", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ID: "cellset-004", Cells: [] }),
+      );
+
+      const value = await client.getCellValue("SalesCube", ["Mar", "UK", "Actual"]);
+      expect(value).toBeNull();
+    });
+
+    it("should return null when Cells is missing from response", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ID: "cellset-005" }),
+      );
+
+      const value = await client.getCellValue("SalesCube", ["Apr", "US", "Actual"]);
+      expect(value).toBeNull();
+    });
+  });
+
+  // ── executeMdx() ───────────────────────────────────────────────────────────
+
+  describe("executeMdx()", () => {
+    const sampleResponse = {
+      ID: "cellset-100",
+      Cells: [
+        { Value: 100, FormattedValue: "100.00" },
+        { Value: 200, FormattedValue: "200.00" },
+        { Value: 150, FormattedValue: "150.00" },
+        { Value: 250, FormattedValue: "250.00" },
+      ],
+      Axes: [
+        {
+          Tuples: [
+            { Members: [{ Name: "Jan", Hierarchy: { Name: "Time" } }] },
+            { Members: [{ Name: "Feb", Hierarchy: { Name: "Time" } }] },
+          ],
+        },
+        {
+          Tuples: [
+            { Members: [{ Name: "Germany", Hierarchy: { Name: "Region" } }] },
+            { Members: [{ Name: "France", Hierarchy: { Name: "Region" } }] },
+          ],
+        },
+      ],
+    };
+
+    it("should return structured MdxResult with cells and axes", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(sampleResponse));
+
+      const result = await client.executeMdx("SELECT {[Time].[Jan],[Time].[Feb]} ON COLUMNS, {[Region].[Germany],[Region].[France]} ON ROWS FROM [SalesCube]");
+
+      expect(result.cells).toEqual([
+        { value: 100, formattedValue: "100.00" },
+        { value: 200, formattedValue: "200.00" },
+        { value: 150, formattedValue: "150.00" },
+        { value: 250, formattedValue: "250.00" },
+      ]);
+
+      expect(result.axes).toHaveLength(2);
+      expect(result.axes[0].tuples).toHaveLength(2);
+      expect(result.axes[0].tuples[0].members[0]).toEqual({ name: "Jan", hierarchyName: "Time" });
+      expect(result.axes[1].tuples[1].members[0]).toEqual({ name: "France", hierarchyName: "Region" });
+
+      // totalCellCount = 2 columns * 2 rows = 4
+      expect(result.totalCellCount).toBe(4);
+    });
+
+    it("should send MDX in POST body", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(sampleResponse));
+
+      await client.executeMdx("SELECT {} ON COLUMNS FROM [TestCube]");
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/ExecuteMDX");
+      expect(opts.method).toBe("POST");
+      const body = JSON.parse(opts.body);
+      expect(body.MDX).toBe("SELECT {} ON COLUMNS FROM [TestCube]");
+    });
+
+    it("should include $top in the request when provided", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-101",
+          Cells: [{ Value: 10, FormattedValue: "10.00" }],
+          Axes: [{ Tuples: [{ Members: [{ Name: "Jan", Hierarchy: { Name: "Time" } }] }] }],
+        }),
+      );
+
+      await client.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", 10);
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("$top=10");
+    });
+
+    it("should include $skip in the request when provided", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-102",
+          Cells: [],
+          Axes: [],
+        }),
+      );
+
+      await client.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", undefined, 5);
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("$skip=5");
+      expect(url).not.toContain("$top=");
+    });
+
+    it("should include both $top and $skip when provided", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-103",
+          Cells: [{ Value: 1, FormattedValue: "1" }],
+          Axes: [{ Tuples: [{ Members: [{ Name: "X", Hierarchy: { Name: "Dim" } }] }] }],
+        }),
+      );
+
+      await client.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", 20, 10);
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("$top=20");
+      expect(url).toContain("$skip=10");
+    });
+
+    it("should handle empty result set", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ID: "cellset-104", Cells: [], Axes: [] }),
+      );
+
+      const result = await client.executeMdx("SELECT {} ON COLUMNS FROM [EmptyCube]");
+
+      expect(result.cells).toEqual([]);
+      expect(result.axes).toEqual([]);
+      expect(result.totalCellCount).toBe(0);
+    });
+
+    it("should compute totalCellCount from axes cardinality", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-105",
+          Cells: [
+            { Value: 1, FormattedValue: "1" },
+            { Value: 2, FormattedValue: "2" },
+          ],
+          Axes: [
+            {
+              Tuples: [
+                { Members: [{ Name: "A", Hierarchy: { Name: "D1" } }] },
+                { Members: [{ Name: "B", Hierarchy: { Name: "D1" } }] },
+                { Members: [{ Name: "C", Hierarchy: { Name: "D1" } }] },
+              ],
+            },
+            {
+              Tuples: [
+                { Members: [{ Name: "X", Hierarchy: { Name: "D2" } }] },
+                { Members: [{ Name: "Y", Hierarchy: { Name: "D2" } }] },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const result = await client.executeMdx("SELECT ...", 2);
+
+      // totalCellCount = 3 * 2 = 6, even though only 2 cells returned (paginated)
+      expect(result.totalCellCount).toBe(6);
+      expect(result.cells).toHaveLength(2);
+    });
+
+    it("should handle multi-member tuples", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-106",
+          Cells: [{ Value: 99, FormattedValue: "99" }],
+          Axes: [
+            {
+              Tuples: [
+                {
+                  Members: [
+                    { Name: "Jan", Hierarchy: { Name: "Time" } },
+                    { Name: "Actual", Hierarchy: { Name: "Version" } },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const result = await client.executeMdx("SELECT ...");
+
+      expect(result.axes[0].tuples[0].members).toHaveLength(2);
+      expect(result.axes[0].tuples[0].members[0]).toEqual({ name: "Jan", hierarchyName: "Time" });
+      expect(result.axes[0].tuples[0].members[1]).toEqual({ name: "Actual", hierarchyName: "Version" });
+    });
+  });
+
+  // ── getView() ──────────────────────────────────────────────────────────────
+
+  describe("getView()", () => {
+    it("should return ViewResult with cubeName, viewName, cells and axes", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ID: "cellset-200",
+          Cells: [
+            { Value: 500, FormattedValue: "500.00" },
+            { Value: 600, FormattedValue: "600.00" },
+          ],
+          Axes: [
+            {
+              Tuples: [
+                { Members: [{ Name: "Q1", Hierarchy: { Name: "Time" } }] },
+                { Members: [{ Name: "Q2", Hierarchy: { Name: "Time" } }] },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const result = await client.getView("SalesCube", "DefaultView");
+
+      expect(result.cubeName).toBe("SalesCube");
+      expect(result.viewName).toBe("DefaultView");
+      expect(result.cells).toEqual([
+        { value: 500, formattedValue: "500.00" },
+        { value: 600, formattedValue: "600.00" },
+      ]);
+      expect(result.axes).toHaveLength(1);
+      expect(result.axes[0].tuples).toHaveLength(2);
+    });
+
+    it("should call the correct view execute endpoint", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ID: "cellset-201", Cells: [], Axes: [] }),
+      );
+
+      await client.getView("MyCube", "MyView");
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain("Cubes('MyCube')");
+      expect(url).toContain("Views('MyView')");
+      expect(url).toContain("tm1.Execute");
+      expect(opts.method).toBe("POST");
+    });
+
+    it("should encode special characters in cube and view names", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ID: "cellset-202", Cells: [], Axes: [] }),
+      );
+
+      await client.getView("My Cube", "My View");
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("Cubes('My%20Cube')");
+      expect(url).toContain("Views('My%20View')");
+    });
+
+    it("should handle empty view result", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ID: "cellset-203", Cells: [], Axes: [] }),
+      );
+
+      const result = await client.getView("EmptyCube", "EmptyView");
+
+      expect(result.cells).toEqual([]);
+      expect(result.axes).toEqual([]);
+      expect(result.cubeName).toBe("EmptyCube");
+      expect(result.viewName).toBe("EmptyView");
+    });
+  });
+
+  // ── clearCube() ────────────────────────────────────────────────────────────
+
+  describe("clearCube()", () => {
+    function newClient(version: string): TM1Client {
+      const cfg = { ...makeConfig(), tm1Version: version } as TM1Config;
+      const sm = new SessionManager(cfg, mockLogger);
+      vi.spyOn(sm, "ensureSession").mockResolvedValue("s");
+      vi.spyOn(sm, "authenticate").mockResolvedValue("s");
+      return new TM1Client(cfg, sm, mockLogger);
+    }
+
+    function mock204(): Response {
+      return {
+        ok: true,
+        status: 204,
+        statusText: "No Content",
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue(""),
+        json: vi.fn().mockRejectedValue(new Error("No content")),
+      } as unknown as Response;
+    }
+
+    it("12.x: POSTs tm1.Clear with Members@odata.bind tuples", async () => {
+      const c = newClient("12.0");
+      fetchSpy.mockResolvedValueOnce(mock204());
+
+      await c.clearCube("Sales", ["Time", "Region"], [["Jan"], []]);
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/Cubes('Sales')/tm1.Clear");
+      expect(opts.method).toBe("POST");
+      const body = JSON.parse(opts.body);
+      expect(body.Tuples).toHaveLength(2);
+      expect(body.Tuples[0]["Members@odata.bind"]).toEqual([
+        "Dimensions('Time')/Hierarchies('Time')/Members('Jan')",
+      ]);
+      expect(body.Tuples[1]["Members@odata.bind"]).toEqual([]);
+    });
+
+    it("11.x full clear: deploys ephemeral TI, executes, deletes", async () => {
+      const c = newClient("11.8");
+      fetchSpy
+        .mockResolvedValueOnce(mock204())   // create process
+        .mockResolvedValueOnce(mock204())   // execute
+        .mockResolvedValueOnce(mock204());  // delete
+
+      await c.clearCube("Sales", ["Time", "Region"], [[], []]);
+
+      const [createUrl, createOpts] = fetchSpy.mock.calls[0];
+      expect(createUrl).toContain("/api/v1/Processes");
+      expect(createOpts.method).toBe("POST");
+      const createBody = JSON.parse(createOpts.body);
+      expect(createBody.Name).toMatch(/^}TempClear_Sales_\d+$/);
+      expect(createBody.PrologProcedure).toBe("CubeClearData('Sales');");
+
+      const [execUrl] = fetchSpy.mock.calls[1];
+      expect(execUrl).toMatch(/Processes\('.*'\)\/tm1\.ExecuteWithReturn$/);
+
+      const [delUrl, delOpts] = fetchSpy.mock.calls[2];
+      expect(delOpts.method).toBe("DELETE");
+      expect(delUrl).toContain("/api/v1/Processes('");
+    });
+
+    it("11.x partial clear: throws UNSUPPORTED_OPERATION", async () => {
+      const c = newClient("11.8");
+
+      await expect(
+        c.clearCube("Sales", ["Time", "Region"], [["Jan"], []]),
+      ).rejects.toMatchObject({
+        code: "UNSUPPORTED_OPERATION",
+        message: expect.stringContaining("Partial clearCube"),
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── unloadCube() ───────────────────────────────────────────────────────────
+
+  describe("unloadCube()", () => {
+    function mock204(): Response {
+      return {
+        ok: true,
+        status: 204,
+        statusText: "No Content",
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue(""),
+        json: vi.fn().mockRejectedValue(new Error("No content")),
+      } as unknown as Response;
+    }
+
+    it("POSTs to /api/v1/Cubes('X')/tm1.Unload", async () => {
+      fetchSpy.mockResolvedValueOnce(mock204());
+
+      await client.unloadCube("Sales");
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/Cubes('Sales')/tm1.Unload");
+      expect(opts.method).toBe("POST");
+    });
+
+    it("URL-encodes special characters in cube name", async () => {
+      fetchSpy.mockResolvedValueOnce(mock204());
+
+      await client.unloadCube("Sales Data");
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/Cubes('Sales%20Data')/tm1.Unload");
+    });
+  });
+});
