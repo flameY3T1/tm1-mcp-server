@@ -175,6 +175,22 @@ export interface Thread {
   function: string;
   objectName: string;
   elapsedTime?: string;
+  objectType?: string;
+  lockType?: string;
+  waitTime?: string;
+  info?: string;
+}
+
+export interface Session {
+  id: string;
+  user: string;
+  active?: boolean;
+  threads: Thread[];
+}
+
+export interface RuleSyntaxError {
+  message: string;
+  lineNumber?: number;
 }
 
 export interface MessageLogEntry {

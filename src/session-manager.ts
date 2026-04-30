@@ -19,6 +19,16 @@ export class SessionManager {
    * Extracts TM1SessionId cookie from the response.
    */
   async authenticate(): Promise<string> {
+    // Close any existing session before opening a new one — prevents
+    // orphaned sessions accumulating on the TM1 server across re-auths.
+    if (this.sessionCookie) {
+      try {
+        await this.logout();
+      } catch (err) {
+        this.logger.warn({ err }, "Failed to logout existing session before re-auth");
+      }
+    }
+
     const url = `${this.config.baseUrl}/api/v1/Configuration/ProductVersion`;
     const credentials = Buffer.from(
       `${this.config.user}:${this.config.password}`

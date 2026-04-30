@@ -62,6 +62,7 @@ import { registerUpdateCubeRules } from "./model-building/update-cube-rules.js";
 import { registerClearCube } from "./model-building/clear-cube.js";
 import { registerUnloadCube } from "./model-building/unload-cube.js";
 import { registerGetAllCubeRules } from "./model-building/get-all-cube-rules.js";
+import { registerCheckCubeRule } from "./model-building/check-cube-rule.js";
 
 // View tools
 import { registerListViews } from "./views/list-views.js";
@@ -80,6 +81,11 @@ import { registerGetMessageLog } from "./operations/get-message-log.js";
 import { registerGetThreads } from "./operations/get-threads.js";
 import { registerGetServerInfo } from "./operations/get-server-info.js";
 import { registerGetTransactionLog } from "./operations/get-transaction-log.js";
+import { registerGetSessions } from "./operations/get-sessions.js";
+
+// File operations tools
+import { registerListFiles } from "./fileops/list-files.js";
+import { registerGetFileContent } from "./fileops/get-file-content.js";
 
 // Analysis tools
 import { registerAnalyzeCallgraph } from "./analysis/analyze-callgraph.js";
@@ -159,6 +165,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerClearCube(server, tm1Client);
   registerUnloadCube(server, tm1Client);
   registerGetAllCubeRules(server, tm1Client);
+  registerCheckCubeRule(server, tm1Client);
 
   // Views
   registerListViews(server, tm1Client);
@@ -177,6 +184,11 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerGetThreads(server, tm1Client);
   registerGetServerInfo(server, tm1Client);
   registerGetTransactionLog(server, tm1Client);
+  registerGetSessions(server, tm1Client);
+
+  // File operations
+  registerListFiles(server, tm1Client);
+  registerGetFileContent(server, tm1Client);
 
   // Analysis
   registerAnalyzeCallgraph(server, tm1Client);

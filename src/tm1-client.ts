@@ -1,7 +1,7 @@
 import type { TM1Config } from "./config.js";
 import type { SessionManager } from "./session-manager.js";
 import { TM1Error, TM1ErrorCode } from "./types.js";
-import type { Cube, Dimension, Hierarchy, HierarchyElement, Process, ProcessParameter, ProcessVariable, ProcessResult, ProcessCode, DataSource, Chore, CellValue, MdxResult, MdxAxis, ViewResult, ElementCreate, ElementUpdate, Thread, MessageLogEntry, CubeRules, ChoreCreate, ServerInfo, CompileResult, CubeView, TransactionLogEntry, Subset, SubsetCreate, ElementAttributeValue, Client, ClientCreate, ClientUpdate, Group } from "./types.js";
+import type { Cube, Dimension, Hierarchy, HierarchyElement, Process, ProcessParameter, ProcessVariable, ProcessResult, ProcessCode, DataSource, Chore, CellValue, MdxResult, MdxAxis, ViewResult, ElementCreate, ElementUpdate, Thread, MessageLogEntry, CubeRules, ChoreCreate, ServerInfo, CompileResult, CubeView, TransactionLogEntry, Subset, SubsetCreate, ElementAttributeValue, Client, ClientCreate, ClientUpdate, Group, Session, RuleSyntaxError } from "./types.js";
 import type pino from "pino";
 
 const MAX_NETWORK_RETRIES = 3;
@@ -1050,6 +1050,52 @@ export class TM1Client {
     await this.request<void>("POST", `/api/v1/Threads(${threadId})/tm1.CancelOperation`, {});
   }
 
+  /**
+   * List all active sessions on the TM1 server with associated user and threads.
+   * GET /api/v1/Sessions?$expand=Threads,User($select=Name)
+   */
+  async getSessions(): Promise<Session[]> {
+    const response = await this.request<{
+      value: Array<{
+        ID: string;
+        Active?: boolean;
+        User?: { Name: string };
+        Threads?: Array<{
+          ID: number;
+          Type: number | string;
+          Name: string;
+          State: string;
+          Function: string;
+          ObjectName: string;
+          ObjectType?: string;
+          LockType?: string;
+          ElapsedTime?: string;
+          WaitTime?: string;
+          Info?: string;
+        }>;
+      }>;
+    }>("GET", "/api/v1/Sessions?$expand=Threads,User($select=Name)");
+    const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
+    return response.value.map((s) => ({
+      id: s.ID,
+      user: s.User?.Name ?? "",
+      ...(s.Active !== undefined ? { active: s.Active } : {}),
+      threads: (s.Threads ?? []).map((t) => ({
+        id: t.ID,
+        type: typeof t.Type === "number" ? (typeNames[t.Type] ?? `Type${t.Type}`) : (t.Type ?? ""),
+        name: t.Name ?? "",
+        state: t.State ?? "",
+        function: t.Function ?? "",
+        objectName: t.ObjectName ?? "",
+        ...(t.ObjectType !== undefined ? { objectType: t.ObjectType } : {}),
+        ...(t.LockType !== undefined ? { lockType: t.LockType } : {}),
+        ...(t.ElapsedTime !== undefined ? { elapsedTime: t.ElapsedTime } : {}),
+        ...(t.WaitTime !== undefined ? { waitTime: t.WaitTime } : {}),
+        ...(t.Info !== undefined ? { info: t.Info } : {}),
+      })),
+    }));
+  }
+
   // ── Scheduling methods ────────────────────────────────────────────────────
 
   /**
@@ -1283,6 +1329,71 @@ export class TM1Client {
     // PATCH/POST on /Cubes('{name}')/Rules returns 400 "not supported"
     const cubePath = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')`;
     await this.request<void>("PATCH", cubePath, { Rules: rulesText });
+  }
+
+  /**
+   * Validate cube rule syntax without applying. Returns empty array if valid,
+   * otherwise array of {message, lineNumber?} errors.
+   * POST /api/v1/Cubes('{name}')/tm1.CheckRules with { Rules: "..." }
+   */
+  async checkCubeRule(cubeName: string, ruleText: string): Promise<RuleSyntaxError[]> {
+    const path = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')/tm1.CheckRules`;
+    const response = await this.request<{
+      value?: Array<{ Message: string; LineNumber?: number }>;
+    }>("POST", path, { Rules: ruleText });
+    return (response.value ?? []).map((e) => ({
+      message: e.Message,
+      ...(e.LineNumber !== undefined ? { lineNumber: e.LineNumber } : {}),
+    }));
+  }
+
+  // ── File operations ──────────────────────────────────────────────────────
+
+  /**
+   * List files in TM1 server's blob/file storage.
+   * v12: GET /api/v1/Contents('Files')[/Contents('subdir')...]/Contents?$select=Name
+   * v11: same with 'Blobs' instead of 'Files'.
+   * Tries v12 'Files' first, falls back to v11 'Blobs'.
+   */
+  async listFiles(path?: string): Promise<string[]> {
+    const segments = path ? path.split("/").filter(Boolean) : [];
+    const buildUrl = (root: string): string => {
+      let url = `/api/v1/Contents('${encodeURIComponent(root)}')`;
+      for (const seg of segments) {
+        url += `/Contents('${encodeURIComponent(seg)}')`;
+      }
+      url += "/Contents?$select=Name";
+      return url;
+    };
+    try {
+      const r = await this.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Files"));
+      return r.value.map((f) => f.Name);
+    } catch {
+      const r = await this.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Blobs"));
+      return r.value.map((f) => f.Name);
+    }
+  }
+
+  /**
+   * Get the content of a file from TM1 server's blob/file storage.
+   * Returns raw text (CSV/TXT/etc).
+   * Tries v12 'Files' first, falls back to v11 'Blobs'.
+   */
+  async getFileContent(fileName: string): Promise<string> {
+    const parts = fileName.split("/").filter(Boolean);
+    const buildUrl = (root: string): string => {
+      let url = `/api/v1/Contents('${encodeURIComponent(root)}')`;
+      for (const p of parts) {
+        url += `/Contents('${encodeURIComponent(p)}')`;
+      }
+      url += "/Content";
+      return url;
+    };
+    try {
+      return await this.requestRaw("GET", buildUrl("Files"));
+    } catch {
+      return await this.requestRaw("GET", buildUrl("Blobs"));
+    }
   }
 
   // ── Server info ──────────────────────────────────────────────────────────
@@ -1760,6 +1871,42 @@ export class TM1Client {
       oldValue: e.OldValue ?? null,
       newValue: e.NewValue ?? null,
     }));
+  }
+
+  /**
+   * Make an authenticated HTTP request that returns raw text (not JSON).
+   * Used for file content downloads where the response is CSV/TXT/etc.
+   * Re-auths once on 401 like request().
+   */
+  private async requestRaw(method: string, path: string): Promise<string> {
+    const url = `${this.config.baseUrl}${path}`;
+    const cookie = await this.sessionManager.ensureSession();
+
+    const doFetch = async (c: string): Promise<Response> => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
+      try {
+        return await fetch(url, {
+          method,
+          headers: { Cookie: `TM1SessionId=${c}`, Accept: "*/*" },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
+    let response = await doFetch(cookie);
+    if (response.status === 401) {
+      const newCookie = await this.sessionManager.authenticate();
+      response = await doFetch(newCookie);
+    }
+    if (!response.ok) {
+      let body = "";
+      try { body = await response.text(); } catch { /* ignore */ }
+      throw this.classifyHttpError(response.status, path, body || undefined);
+    }
+    return response.text();
   }
 
   private async executeRequest(

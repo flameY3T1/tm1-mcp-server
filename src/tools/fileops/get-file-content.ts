@@ -1,0 +1,56 @@
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+import type { TM1Client } from "../../tm1-client.js";
+
+const DEFAULT_MAX_BYTES = 256 * 1024;
+const HARD_MAX_BYTES = 4 * 1024 * 1024;
+
+export function registerGetFileContent(server: McpServer, tm1Client: TM1Client): void {
+  server.tool(
+    "tm1_get_file_content",
+    [
+      "Read the content of a file from the TM1 server's data directory.",
+      "Use to inspect CSV, TXT, or other text files before building import processes.",
+      "Auto-falls back from v12 (Files) to v11 (Blobs) container.",
+      "Response is truncated to maxBytes (default 256 KB) to keep MCP messages small.",
+    ].join(" "),
+    {
+      fileName: z.string().describe(
+        "File name or path (e.g. 'data.csv' or 'imports/sales_2024.csv')",
+      ),
+      maxBytes: z.number().int().positive().max(HARD_MAX_BYTES).optional()
+        .default(DEFAULT_MAX_BYTES)
+        .describe(`Truncate response after N bytes (default ${DEFAULT_MAX_BYTES}, hard max ${HARD_MAX_BYTES}).`),
+      headLines: z.number().int().positive().max(10000).optional()
+        .describe("If set, only return the first N lines (overrides byte truncation)."),
+    },
+    async ({ fileName, maxBytes, headLines }) => {
+      try {
+        const content = await tm1Client.getFileContent(fileName);
+        const totalBytes = Buffer.byteLength(content, "utf8");
+
+        let body: string;
+        let truncationNote = "";
+
+        if (headLines !== undefined) {
+          const allLines = content.split("\n");
+          const sliced = allLines.slice(0, headLines);
+          body = sliced.join("\n");
+          if (allLines.length > headLines) {
+            truncationNote = ` | truncated to ${headLines} lines (of ${allLines.length})`;
+          }
+        } else if (totalBytes > maxBytes) {
+          body = Buffer.from(content, "utf8").subarray(0, maxBytes).toString("utf8");
+          truncationNote = ` | truncated to ${maxBytes}B`;
+        } else {
+          body = content;
+        }
+
+        const meta = `[file=${fileName} | size=${totalBytes}B${truncationNote}]`;
+        return { content: [{ type: "text", text: `${meta}\n${body}` }] };
+      } catch (err) {
+        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
+      }
+    },
+  );
+}
