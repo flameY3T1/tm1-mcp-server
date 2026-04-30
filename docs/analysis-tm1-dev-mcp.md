@@ -104,6 +104,31 @@ Commit: `a3d3de3` — auf `origin/main` gepusht.
 - check-cube-rule mit absichtlich kaputter Rule probieren — Line-Number korrekt?
 - list-sessions auf produktivem Server — Datenmenge ok für MCP-Response?
 
+### Pre-save Process-Validierung — neue Erkenntnis 2026-04-30
+
+**Frage:** Hat TM1 REST eine Möglichkeit, TI-Prozesse + Rules vor dem Speichern zu validieren?
+
+**Antwort:**
+- **Rules:** Ja, `POST /api/v1/Cubes('{name}')/tm1.CheckRules` body `{ "Rules": "..." }` — bereits umgesetzt als `tm1_check_cube_rule`.
+- **TI-Prozesse — zwei Varianten:**
+  - **Bound (bereits implementiert):** `POST /api/v1/Processes('{name}')/tm1.Compile` — Process MUSS schon gespeichert sein. Tool `tm1_compile_process`.
+  - **Unbound (FEHLT):** `POST /api/v1/CompileProcess` body `{ "Process": <volles Process-Objekt> }` — validiert OHNE Save. Returned `{ value: [<syntax errors>] }`. tm1py-Funktion: `compile_process_with_body()`.
+
+**Quellen:**
+- `tm1py/Services/ProcessService.py` — bestätigt URL `/CompileProcess` und Payload-Struktur.
+- IBM Planning Analytics REST API Docs (`SSD29G_2.0.0`).
+
+**Empfehlung — neues Tool `tm1_check_process_code`:**
+- Endpoint `POST /api/v1/CompileProcess`
+- Body: vollständiges Process-Objekt (PrologProcedure, MetadataProcedure, DataProcedure, EpilogProcedure, Parameters, Variables, DataSource).
+- Bestehendes `Process`-Schema aus `src/types.ts` reusen.
+- Gleiches Error-Format wie `tm1.Compile` (Procedure, LineNumber, Message).
+- **Verbesserung:** Auto-call vor `tm1_create_process` / `tm1_update_process_code` als Pre-Write-Gate. Optional `--force` Flag.
+
+**Priorität:** Hoch — schließt Lücke zwischen Rules-Pre-Check (vorhanden) und TI-Pre-Check (fehlt). Schöneres UX als Workaround „create-with-rollback".
+
+**Aufwand:** ~80 Zeilen Client-Methode + Tool + Registration. Tests separat.
+
 ### Pre-Existing Status
 - 21 Test Files, 177 Tests pass
 - `tsc --noEmit` clean
