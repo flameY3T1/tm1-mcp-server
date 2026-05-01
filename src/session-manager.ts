@@ -2,6 +2,8 @@ import type { TM1Config } from "./config.js";
 import { createLogger } from "./logger.js";
 import type pino from "pino";
 
+const USER_AGENT = "tm1-mcp-server/0.1.0";
+
 export class SessionManager {
   private sessionCookie: string | null = null;
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
@@ -52,6 +54,7 @@ export class SessionManager {
         headers: {
           Authorization: `Basic ${credentials}`,
           Accept: "application/json",
+          "User-Agent": USER_AGENT,
         },
         signal: controller.signal,
       });
@@ -119,6 +122,7 @@ export class SessionManager {
         method: "GET",
         headers: {
           Cookie: `TM1SessionId=${this.sessionCookie}`,
+          "User-Agent": USER_AGENT,
         },
         signal: controller.signal,
       });
@@ -231,6 +235,7 @@ export class SessionManager {
         method: "DELETE",
         headers: {
           Cookie: `TM1SessionId=${this.sessionCookie}`,
+          "User-Agent": USER_AGENT,
         },
       });
 

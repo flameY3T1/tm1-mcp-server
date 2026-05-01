@@ -6,6 +6,7 @@ import type pino from "pino";
 
 const MAX_NETWORK_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
+const USER_AGENT = "tm1-mcp-server/0.1.0";
 
 export class TM1Client {
   private readonly config: TM1Config;
@@ -1971,7 +1972,7 @@ export class TM1Client {
       try {
         return await fetch(url, {
           method,
-          headers: { Cookie: `TM1SessionId=${c}`, Accept: "*/*" },
+          headers: { Cookie: `TM1SessionId=${c}`, Accept: "*/*", "User-Agent": USER_AGENT },
           signal: controller.signal,
         });
       } finally {
@@ -2007,6 +2008,7 @@ export class TM1Client {
     const headers: Record<string, string> = {
       Cookie: `TM1SessionId=${cookie}`,
       Accept: "application/json",
+      "User-Agent": USER_AGENT,
     };
 
     // TM1 requires Content-Type for any write method, including POSTs
