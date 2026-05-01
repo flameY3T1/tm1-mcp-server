@@ -21,7 +21,12 @@ const CUBE_FN_RE =
   /\b(CellGetN|CellGetS|CellPutN|CellPutS|CellIsUpdateable|CubeExists|ViewExists|ViewCreate|ViewDestroy|SubsetCreatebyMDX|ViewSubsetAssign|DBR|DBS|DBSS|CubeProcessFeeders|CubeUnload|CubeLockOverride|CubeSetLogChanges)\s*\(\s*'([^']+)'/gi;
 
 const DIM_FN_RE =
-  /\b(DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrPutS|AttrPutN|AttrS|AttrN)\s*\(\s*'([^']+)'/gi;
+  /\b(DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN)\s*\(\s*'([^']+)'/gi;
+
+// AttrPutS/AttrPutN/ElementSecurityPut: value is arg 1, dimension is arg 2.
+// The value can be a literal, identifier, or string-concat expression with '|' — skip over until first top-level comma.
+const DIM_AT_ARG2_RE =
+  /\b(AttrPutS|AttrPutN|ElementSecurityPut)\s*\(\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+)(?:\s*\|\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+))*\s*,\s*'([^']+)'/gi;
 
 function scanCode(code: string, tab: Tab, regex: RegExp): Map<string, { tab: Tab; line: number; context: string }> {
   const found = new Map<string, { tab: Tab; line: number; context: string }>();
@@ -94,6 +99,9 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
             if (!cubeRefs.has(name)) cubeRefs.set(name, info);
           }
           for (const [name, info] of scanCode(c, tab, DIM_FN_RE)) {
+            if (!dimRefs.has(name)) dimRefs.set(name, info);
+          }
+          for (const [name, info] of scanCode(c, tab, DIM_AT_ARG2_RE)) {
             if (!dimRefs.has(name)) dimRefs.set(name, info);
           }
         }

@@ -86,8 +86,7 @@ function parseParameters(lines: string[]): ProcessParameter[] {
           const ci = dl.indexOf(",");
           if (ci === -1) continue;
           const name = dl.slice(0, ci);
-          let val = dl.slice(ci + 1);
-          if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+          const val = stripQuotes(dl.slice(ci + 1));
           if (code === "590") defaults[name] = val;
           else prompts[name] = val;
         }
