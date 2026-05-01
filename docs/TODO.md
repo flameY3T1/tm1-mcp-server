@@ -8,7 +8,7 @@ Source: `~/.claude/projects/-home-user-tm1-ai-dev/memory/` (project_mcp_tool_gap
 - [x] **`tm1_diff_process_with_file`** — Installed vs `.pro` Datei: Param-Diff + Code-Diff. Heute manuell via Read+Vergleich. _Done 2026-05-01 (items 4-8 batch)._
 - [x] **`tm1_search_code`** — Regex über alle TI-Code (Wrapper auf `tm1_get_all_processes_code` + lokaler Grep). Heute: bulk-load + Bash-grep. _Done 2026-05-01 (commit 21ddee1)._
 - [x] **`tm1_callgraph_summary`** — `mode: "summary"` für `tm1_analyze_callgraph` (Caller-Counts + flache Liste statt full Tree). Vermeidet 1.8 MB OOM-Output bei großen Trees. _Done 2026-05-01 (commit 21ddee1, integrated into tm1_analyze_callgraph)._
-- [ ] **`tm1_install_pro_bundle`** — Verzeichnis `.pro`-Files → bulk install. Für Rest-Bedrock-Install ohne Hand-Push.
+- [x] **`tm1_install_pro_bundle`** — Verzeichnis `.pro`-Files → bulk install. _Done 2026-05-01. Recursive-Flag, Pattern-Filter, dryRun, continueOnError, mode (create/update/upsert) + Preflight per File._
 - [x] **`tm1_upsert_process`** — Atomar Code+Params+Datasource in 1 Call (heute 2-3 Calls, nicht atomar). _Done 2026-05-01 (items 4-8 batch). NOTE: TM1 selbst kennt keine echte Transaktion; Tool dokumentiert partial-apply-trail bei Fehler._
 - [ ] **Bedrock-Version-Detection** — `Ver 4.0` Marker im Prolog-Tail als Process-Property exposen.
 

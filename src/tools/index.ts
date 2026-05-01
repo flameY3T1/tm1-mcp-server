@@ -37,6 +37,7 @@ import { registerImportProFile } from "./ti-development/import-pro-file.js";
 import { registerDiffProcessWithFile } from "./ti-development/diff-process-with-file.js";
 import { registerValidateProcessRefs } from "./ti-development/validate-process-refs.js";
 import { registerUpsertProcess } from "./ti-development/upsert-process.js";
+import { registerInstallProBundle } from "./ti-development/install-pro-bundle.js";
 import { registerCheckWritableCoords } from "./celldata/check-writable-coords.js";
 
 // Dimension management tools
@@ -147,6 +148,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerDiffProcessWithFile(server, tm1Client);
   registerValidateProcessRefs(server, tm1Client);
   registerUpsertProcess(server, tm1Client);
+  registerInstallProBundle(server, tm1Client);
   registerCheckWritableCoords(server, tm1Client);
 
   // Dimension management
