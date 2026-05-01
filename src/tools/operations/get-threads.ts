@@ -15,7 +15,8 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
         }
         const lines = threads.map((t) => {
           const elapsed = t.elapsedTime ? ` | ${t.elapsedTime}` : "";
-          return `ID:${t.id} [${t.type}] ${t.state} | ${t.name} | ${t.objectName} | ${t.function}${elapsed}`;
+          const ctx = t.context ? ` | ctx=${t.context}` : "";
+          return `ID:${t.id} [${t.type}] ${t.state} | ${t.name} | ${t.objectName} | ${t.function}${ctx}${elapsed}`;
         });
         return { content: [{ type: "text", text: `${threads.length} thread(s):\n${lines.join("\n")}` }] };
       } catch (err) {

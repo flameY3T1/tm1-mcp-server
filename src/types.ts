@@ -179,6 +179,7 @@ export interface Thread {
   lockType?: string;
   waitTime?: string;
   info?: string;
+  context?: string;
 }
 
 export interface Session {

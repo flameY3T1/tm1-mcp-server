@@ -1025,6 +1025,7 @@ export class TM1Client {
         ID: number;
         Type: number;
         Name: string;
+        Context?: string;
         State: string;
         Function: string;
         ObjectName: string;
@@ -1040,6 +1041,7 @@ export class TM1Client {
       function: t.Function,
       objectName: t.ObjectName,
       elapsedTime: t.ElapsedTime,
+      context: t.Context,
     }));
   }
 
