@@ -5,18 +5,18 @@ Source: `~/.claude/projects/-home-user-tm1-ai-dev/memory/` (project_mcp_tool_gap
 ## High-Impact Tools (Token-burn / Workflow-Reibung)
 
 - [x] **`tm1_import_pro_file`** — Parse `.pro` (Tabs/Params/DataSource) + 1-Call deploy. Heute: 4 Tabs als Inline-String (1600+ Zeilen) via `tm1_update_process_code` + separate `tm1_update_process_parameters`. _Done 2026-05-01 (commit 21ddee1)._
-- [ ] **`tm1_diff_process_with_file`** — Installed vs `.pro` Datei: Param-Diff + Code-Diff. Heute manuell via Read+Vergleich.
+- [x] **`tm1_diff_process_with_file`** — Installed vs `.pro` Datei: Param-Diff + Code-Diff. Heute manuell via Read+Vergleich. _Done 2026-05-01 (items 4-8 batch)._
 - [x] **`tm1_search_code`** — Regex über alle TI-Code (Wrapper auf `tm1_get_all_processes_code` + lokaler Grep). Heute: bulk-load + Bash-grep. _Done 2026-05-01 (commit 21ddee1)._
 - [x] **`tm1_callgraph_summary`** — `mode: "summary"` für `tm1_analyze_callgraph` (Caller-Counts + flache Liste statt full Tree). Vermeidet 1.8 MB OOM-Output bei großen Trees. _Done 2026-05-01 (commit 21ddee1, integrated into tm1_analyze_callgraph)._
 - [ ] **`tm1_install_pro_bundle`** — Verzeichnis `.pro`-Files → bulk install. Für Rest-Bedrock-Install ohne Hand-Push.
-- [ ] **`tm1_upsert_process`** — Atomar Code+Params+Datasource in 1 Call (heute 2-3 Calls, nicht atomar).
+- [x] **`tm1_upsert_process`** — Atomar Code+Params+Datasource in 1 Call (heute 2-3 Calls, nicht atomar). _Done 2026-05-01 (items 4-8 batch). NOTE: TM1 selbst kennt keine echte Transaktion; Tool dokumentiert partial-apply-trail bei Fehler._
 - [ ] **Bedrock-Version-Detection** — `Ver 4.0` Marker im Prolog-Tail als Process-Property exposen.
 
 ## Quality-Gates pre-execute (verhindert Runtime-Crashes)
 
-- [ ] **Pre-Write Rule-Check** — vor jedem `CellPutN` prüfen ob Ziel-Coord (Cube + Element + Slice) bereits Rule-berechnet ist. Bei Konflikt Architektur-Frage erzwingen (Rules behalten / TI ablöst Rules / Acceptance).
-- [ ] **Dim-Name-Verifikation** — TI-Prolog-Subset/View-Targets gegen aktuelle Cube-Dim-Liste abgleichen vor Compile. TM1 erlaubt syntaktisch validen Code mit nicht-existierenden Dims; Fehler erst zur Runtime.
-- [ ] **N-Level vs Consolidated Element-Check** — vor `CellPutN` prüfen ob Ziel-Element N-Level ist. Konsolidierungs-Coord → silent fail oder Error.
+- [x] **Pre-Write Rule-Check (Light)** — vor jedem `CellPutN` prüfen ob Ziel-Coord (Cube + Element + Slice) bereits Rule-berechnet ist. _Done 2026-05-01 als `tm1_check_writable_coords` (light: Cube hat Rules ja/nein-Warning + ruleLines Count; voller LHS-Pattern-Match weiterhin skipped wegen Komplexität)._
+- [x] **Dim-Name-Verifikation** — TI-Prolog-Subset/View-Targets gegen aktuelle Cube-Dim-Liste abgleichen vor Compile. TM1 erlaubt syntaktisch validen Code mit nicht-existierenden Dims; Fehler erst zur Runtime. _Done 2026-05-01 als `tm1_validate_process_refs` — scannt TI-Code für Cube/Dim refs in well-known Funktionen + verifiziert gegen Live-Modell._
+- [x] **N-Level vs Consolidated Element-Check** — vor `CellPutN` prüfen ob Ziel-Element N-Level ist. _Done 2026-05-01 als `tm1_check_writable_coords` (per-coord Type + isNLevel)._
 - [ ] **Output-Coord-Drift-Detektion** — TI per (Linie, Baureihe) loop vs Rules RHS auf (`ohne_*`, `ohne_*`) → Storage-Explosion oder Lookup-Fehlschlag.
 
 ## Skill / Workflow-Lücken (vorgelagert, kein MCP-Tool)
