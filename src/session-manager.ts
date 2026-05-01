@@ -55,6 +55,8 @@ export class SessionManager {
           Authorization: `Basic ${credentials}`,
           Accept: "application/json",
           "User-Agent": USER_AGENT,
+          "TM1-SessionContext": USER_AGENT,
+          "TM1-Session-Context": USER_AGENT,
         },
         signal: controller.signal,
       });
@@ -123,6 +125,8 @@ export class SessionManager {
         headers: {
           Cookie: `TM1SessionId=${this.sessionCookie}`,
           "User-Agent": USER_AGENT,
+          "TM1-SessionContext": USER_AGENT,
+          "TM1-Session-Context": USER_AGENT,
         },
         signal: controller.signal,
       });
@@ -236,6 +240,8 @@ export class SessionManager {
         headers: {
           Cookie: `TM1SessionId=${this.sessionCookie}`,
           "User-Agent": USER_AGENT,
+          "TM1-SessionContext": USER_AGENT,
+          "TM1-Session-Context": USER_AGENT,
         },
       });
 

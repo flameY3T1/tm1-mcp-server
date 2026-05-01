@@ -1031,7 +1031,7 @@ export class TM1Client {
         ObjectName: string;
         ElapsedTime?: string;
       }>;
-    }>("GET", "/api/v1/Threads");
+    }>("GET", "/api/v1/Threads?$select=ID,Type,Name,Context,State,Function,ObjectName,ElapsedTime");
     const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
     return response.value.map((t) => ({
       id: t.ID,
@@ -1974,7 +1974,13 @@ export class TM1Client {
       try {
         return await fetch(url, {
           method,
-          headers: { Cookie: `TM1SessionId=${c}`, Accept: "*/*", "User-Agent": USER_AGENT },
+          headers: {
+            Cookie: `TM1SessionId=${c}`,
+            Accept: "*/*",
+            "User-Agent": USER_AGENT,
+            "TM1-SessionContext": USER_AGENT,
+            "TM1-Session-Context": USER_AGENT,
+          },
           signal: controller.signal,
         });
       } finally {
@@ -2011,6 +2017,8 @@ export class TM1Client {
       Cookie: `TM1SessionId=${cookie}`,
       Accept: "application/json",
       "User-Agent": USER_AGENT,
+      "TM1-SessionContext": USER_AGENT,
+      "TM1-Session-Context": USER_AGENT,
     };
 
     // TM1 requires Content-Type for any write method, including POSTs
