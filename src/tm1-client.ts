@@ -1,7 +1,7 @@
 import type { TM1Config } from "./config.js";
 import type { SessionManager } from "./session-manager.js";
 import { TM1Error, TM1ErrorCode } from "./types.js";
-import type { Cube, Dimension, Hierarchy, HierarchyElement, Process, ProcessParameter, ProcessVariable, ProcessResult, ProcessCode, DataSource, Chore, CellValue, MdxResult, MdxAxis, ViewResult, ElementCreate, ElementUpdate, Thread, MessageLogEntry, CubeRules, ChoreCreate, ServerInfo, CompileResult, CubeView, TransactionLogEntry, Subset, SubsetCreate, ElementAttributeValue, Client, ClientCreate, ClientUpdate, Group, Session, RuleSyntaxError } from "./types.js";
+import type { Cube, Dimension, Hierarchy, HierarchyElement, Process, ProcessParameter, ProcessVariable, ProcessResult, ProcessCode, DataSource, Chore, CellValue, MdxResult, MdxAxis, ViewResult, ElementCreate, ElementUpdate, Thread, MessageLogEntry, CubeRules, ChoreCreate, ServerInfo, CompileResult, ProcessCheckInput, CubeView, TransactionLogEntry, Subset, SubsetCreate, ElementAttributeValue, Client, ClientCreate, ClientUpdate, Group, Session, RuleSyntaxError } from "./types.js";
 import type pino from "pino";
 
 const MAX_NETWORK_RETRIES = 3;
@@ -1435,6 +1435,89 @@ export class TM1Client {
       const response = await this.request<{
         value?: Array<{ LineNumber?: number; Procedure?: string; Message?: string }>;
       }>("POST", path, {});
+      const errors = (response?.value ?? []).map((e) => ({
+        lineNumber: e.LineNumber,
+        procedure: e.Procedure,
+        message: e.Message ?? "",
+      }));
+      return { success: errors.length === 0, errors };
+    } catch (err) {
+      if (err instanceof TM1Error) {
+        return {
+          success: false,
+          errors: [{ message: err.details ?? err.message }],
+        };
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Validate a TI process WITHOUT saving it on the server.
+   * POST /api/v1/CompileProcess body { Process: <full process body> }.
+   * Mirrors tm1py's compile_process_with_body. Returns CompileResult identical
+   * to compileProcess() for callers that already handle that shape.
+   */
+  async checkProcessCode(input: ProcessCheckInput): Promise<CompileResult> {
+    const path = "/api/v1/CompileProcess";
+
+    const processBody: Record<string, unknown> = {
+      Name: input.name ?? "_compile_check",
+      PrologProcedure: input.prolog ?? "",
+      MetadataProcedure: input.metadata ?? "",
+      DataProcedure: input.data ?? "",
+      EpilogProcedure: input.epilog ?? "",
+    };
+
+    if (input.parameters) {
+      processBody.Parameters = input.parameters.map((p) => ({
+        Name: p.name,
+        Type: p.type === "Numeric" ? 1 : 2,
+        Value: p.defaultValue,
+        ...(p.prompt ? { Prompt: p.prompt } : {}),
+      }));
+    }
+
+    if (input.variables) {
+      processBody.Variables = input.variables.map((v) => ({
+        Name: v.name,
+        Type: v.type,
+        Position: v.position,
+        StartByte: v.startByte ?? 0,
+        EndByte: v.endByte ?? 0,
+      }));
+    }
+
+    if (input.dataSource) {
+      const ds = input.dataSource;
+      const dsBody: Record<string, unknown> = { Type: ds.type };
+      if (ds.dataSourceNameForServer !== undefined) dsBody.dataSourceNameForServer = ds.dataSourceNameForServer;
+      if (ds.dataSourceNameForClient !== undefined) dsBody.dataSourceNameForClient = ds.dataSourceNameForClient;
+      if (ds.asciiDelimiterType !== undefined) dsBody.asciiDelimiterType = ds.asciiDelimiterType;
+      if (ds.asciiDelimiterChar !== undefined) dsBody.asciiDelimiterChar = ds.asciiDelimiterChar;
+      if (ds.asciiQuoteCharacter !== undefined) dsBody.asciiQuoteCharacter = ds.asciiQuoteCharacter;
+      if (ds.asciiHeaderRecords !== undefined) dsBody.asciiHeaderRecords = ds.asciiHeaderRecords;
+      if (ds.asciiDecimalSeparator !== undefined) dsBody.asciiDecimalSeparator = ds.asciiDecimalSeparator;
+      if (ds.asciiThousandSeparator !== undefined) dsBody.asciiThousandSeparator = ds.asciiThousandSeparator;
+      // usesUnicode: same v11 quirk as updateProcessDataSource — drop on TM1 11.x.
+      if (ds.usesUnicode !== undefined && !this.config.tm1Version.startsWith("11")) {
+        dsBody.usesUnicode = ds.usesUnicode;
+      }
+      if (ds.userName !== undefined) dsBody.userName = ds.userName;
+      if (ds.password !== undefined) dsBody.password = ds.password;
+      if (ds.oDBCConnection !== undefined) dsBody.oDBCConnection = ds.oDBCConnection;
+      if (ds.query !== undefined) dsBody.query = ds.query;
+      if (ds.view !== undefined) dsBody.view = ds.view;
+      if (ds.subset !== undefined) dsBody.subset = ds.subset;
+      processBody.DataSource = dsBody;
+    } else {
+      processBody.DataSource = { Type: "None" };
+    }
+
+    try {
+      const response = await this.request<{
+        value?: Array<{ LineNumber?: number; Procedure?: string; Message?: string }>;
+      }>("POST", path, { Process: processBody });
       const errors = (response?.value ?? []).map((e) => ({
         lineNumber: e.LineNumber,
         procedure: e.Procedure,

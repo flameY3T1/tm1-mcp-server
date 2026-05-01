@@ -30,6 +30,7 @@ import { registerUpdateProcessVariables } from "./ti-development/update-process-
 import { registerDeleteProcess } from "./ti-development/delete-process.js";
 import { registerCopyProcess } from "./ti-development/copy-process.js";
 import { registerCompileProcess } from "./ti-development/compile-process.js";
+import { registerCheckProcessCode } from "./ti-development/check-process-code.js";
 import { registerGetAllProcessesCode } from "./ti-development/get-all-processes-code.js";
 
 // Dimension management tools
@@ -133,6 +134,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerDeleteProcess(server, tm1Client);
   registerCopyProcess(server, tm1Client);
   registerCompileProcess(server, tm1Client);
+  registerCheckProcessCode(server, tm1Client);
   registerGetAllProcessesCode(server, tm1Client);
 
   // Dimension management

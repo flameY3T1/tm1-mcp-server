@@ -253,6 +253,17 @@ export interface CompileResult {
   }>;
 }
 
+export interface ProcessCheckInput {
+  name?: string;
+  prolog?: string;
+  metadata?: string;
+  data?: string;
+  epilog?: string;
+  parameters?: ProcessParameter[];
+  variables?: ProcessVariable[];
+  dataSource?: DataSource;
+}
+
 export interface CubeView {
   name: string;
   mdx?: string;
