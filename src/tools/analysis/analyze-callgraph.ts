@@ -27,6 +27,77 @@ function serializeNode(node: CallGraphNode): unknown {
   };
 }
 
+interface SummaryEntry {
+  process: string;
+  depthMin: number;
+  depthMax: number;
+  occurrences: number;
+  cycle: boolean;
+  depthLimitReached: boolean;
+}
+
+function summarize(root: CallGraphNode): {
+  root: string;
+  totalNodes: number;
+  uniqueProcesses: number;
+  maxDepth: number;
+  cyclesDetected: number;
+  depthLimitsHit: number;
+  processes: SummaryEntry[];
+} {
+  const map = new Map<string, SummaryEntry>();
+  let totalNodes = 0;
+  let maxDepth = 0;
+  let cyclesDetected = 0;
+  let depthLimitsHit = 0;
+
+  function walk(node: CallGraphNode, depth: number): void {
+    totalNodes++;
+    if (depth > maxDepth) maxDepth = depth;
+    const isCycle = !!node.cycle;
+    const isDepthLimit = !!node.depthLimitReached;
+    if (isCycle) cyclesDetected++;
+    if (isDepthLimit) depthLimitsHit++;
+
+    const existing = map.get(node.process);
+    if (existing) {
+      existing.occurrences++;
+      if (depth < existing.depthMin) existing.depthMin = depth;
+      if (depth > existing.depthMax) existing.depthMax = depth;
+      existing.cycle = existing.cycle || isCycle;
+      existing.depthLimitReached = existing.depthLimitReached || isDepthLimit;
+    } else {
+      map.set(node.process, {
+        process: node.process,
+        depthMin: depth,
+        depthMax: depth,
+        occurrences: 1,
+        cycle: isCycle,
+        depthLimitReached: isDepthLimit,
+      });
+    }
+
+    for (const child of node.children) walk(child, depth + 1);
+  }
+
+  walk(root, 0);
+
+  const processes = Array.from(map.values()).sort((a, b) => {
+    if (a.depthMin !== b.depthMin) return a.depthMin - b.depthMin;
+    return b.occurrences - a.occurrences;
+  });
+
+  return {
+    root: root.process,
+    totalNodes,
+    uniqueProcesses: map.size,
+    maxDepth,
+    cyclesDetected,
+    depthLimitsHit,
+    processes,
+  };
+}
+
 export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_analyze_callgraph",
@@ -45,8 +116,15 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
         .optional()
         .default(false)
         .describe("Index control processes/cubes/chores (broader graph). Default: false."),
+      mode: z
+        .enum(["full", "summary"])
+        .optional()
+        .default("full")
+        .describe(
+          "Output mode. 'full' returns nested tree (large for deep graphs). 'summary' returns flat per-process aggregates (occurrences, depthMin/Max, cycle/depthLimit flags) — use for triage before pulling a full tree.",
+        ),
     },
-    async ({ start, direction, maxDepth, includeSystem, includeControl }) => {
+    async ({ start, direction, maxDepth, includeSystem, includeControl, mode }) => {
       try {
         const index = await buildIndexFromTM1(tm1Client, { includeControl });
         const lc = start.toLowerCase();
@@ -68,11 +146,15 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
           };
         }
         const tree = buildCallGraph(index, start, { direction, maxDepth, includeSystem });
+        const payload =
+          mode === "summary"
+            ? { start, direction, mode, summary: summarize(tree) }
+            : { start, direction, mode, tree: serializeNode(tree) };
         return {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({ start, direction, tree: serializeNode(tree) }, null, 2),
+              text: JSON.stringify(payload, null, 2),
             },
           ],
         };

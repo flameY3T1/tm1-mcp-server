@@ -32,6 +32,8 @@ import { registerCopyProcess } from "./ti-development/copy-process.js";
 import { registerCompileProcess } from "./ti-development/compile-process.js";
 import { registerCheckProcessCode } from "./ti-development/check-process-code.js";
 import { registerGetAllProcessesCode } from "./ti-development/get-all-processes-code.js";
+import { registerSearchCode } from "./ti-development/search-code.js";
+import { registerImportProFile } from "./ti-development/import-pro-file.js";
 
 // Dimension management tools
 import { registerCreateElement } from "./dimension-management/create-element.js";
@@ -136,6 +138,8 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerCompileProcess(server, tm1Client);
   registerCheckProcessCode(server, tm1Client);
   registerGetAllProcessesCode(server, tm1Client);
+  registerSearchCode(server, tm1Client);
+  registerImportProFile(server, tm1Client);
 
   // Dimension management
   registerCreateDimension(server, tm1Client);
