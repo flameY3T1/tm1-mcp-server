@@ -32,7 +32,7 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
     async ({ id }) => {
       try {
         await tm1Client.cancelThread(id);
-        return { content: [{ type: "text", text: `Cancel operation sent for thread ${id}.` }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, threadId: id }, null, 2) }] };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
       }

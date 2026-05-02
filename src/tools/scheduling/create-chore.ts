@@ -36,8 +36,8 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
         await tm1Client.createChore({ name, startTime, active, dstSensitive, executionMode, frequency, steps });
         return {
           content: [{
-            type: "text",
-            text: `Chore "${name}" created with ${steps.length} step(s). Active: ${active}.`,
+            type: "text" as const,
+            text: JSON.stringify({ success: true, name, stepCount: steps.length, active }, null, 2),
           }],
         };
       } catch (err) {

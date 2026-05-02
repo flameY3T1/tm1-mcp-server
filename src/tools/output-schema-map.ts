@@ -27,8 +27,10 @@ import {
   HierarchySchema,
   ImportProFileResultSchema,
   InstallProBundleResultSchema,
+  InvalidateCallgraphCacheResultSchema,
   MdxResultSchema,
   MessageLogEntrySchema,
+  MutationResultSchema,
   ObjectUsageResultSchema,
   ProcessCodeSchema,
   ProcessItemSchema,
@@ -157,4 +159,32 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
     entries: z.array(TransactionLogEntrySchema),
   },
   tm1_get_file_content: FileContentResultSchema.shape,
+
+  // ── Phase 2h: mutations (already-JSON + 5 refactored to JSON) ─────────────
+  // Generic MutationResultSchema (success + passthrough) covers per-tool extras
+  // like cellsWritten, parameterCount, updatedTabs without bespoke schemas.
+  tm1_assign_client_group: MutationResultSchema.shape,
+  tm1_cancel_thread: MutationResultSchema.shape,
+  tm1_clear_cube: MutationResultSchema.shape,
+  tm1_create_chore: MutationResultSchema.shape,
+  tm1_create_client: MutationResultSchema.shape,
+  tm1_create_element: MutationResultSchema.shape,
+  tm1_create_element_attribute: MutationResultSchema.shape,
+  tm1_create_process: MutationResultSchema.shape,
+  tm1_create_subset: MutationResultSchema.shape,
+  tm1_delete_element: MutationResultSchema.shape,
+  tm1_delete_process: MutationResultSchema.shape,
+  tm1_delete_subset: MutationResultSchema.shape,
+  tm1_move_element: MutationResultSchema.shape,
+  tm1_update_element: MutationResultSchema.shape,
+  tm1_update_element_attribute_value: MutationResultSchema.shape,
+  tm1_update_process_code: MutationResultSchema.shape,
+  tm1_update_process_datasource: MutationResultSchema.shape,
+  tm1_update_process_parameters: MutationResultSchema.shape,
+  tm1_update_process_variables: MutationResultSchema.shape,
+  tm1_update_subset: MutationResultSchema.shape,
+  tm1_write_cells: MutationResultSchema.shape,
+
+  // Bespoke shape: cleared/entriesBefore counters, no `success` field.
+  tm1_invalidate_callgraph_cache: InvalidateCallgraphCacheResultSchema.shape,
 };

@@ -14,7 +14,7 @@ export function registerAssignClientGroup(server: McpServer, tm1Client: TM1Clien
     async ({ clientName, groupName }) => {
       try {
         await tm1Client.assignClientGroup(clientName, groupName);
-        return { content: [{ type: "text" as const, text: `Client ${clientName} assigned to group ${groupName}.` }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, clientName, groupName }, null, 2) }] };
       } catch (error) {
         const msg = error instanceof TM1Error
           ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }

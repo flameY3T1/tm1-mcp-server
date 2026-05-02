@@ -16,7 +16,7 @@ export function registerCreateClient(server: McpServer, tm1Client: TM1Client) {
     async (args) => {
       try {
         await tm1Client.createClient(args);
-        return { content: [{ type: "text" as const, text: `Client ${args.name} created.` }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, name: args.name }, null, 2) }] };
       } catch (error) {
         const msg = error instanceof TM1Error
           ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }

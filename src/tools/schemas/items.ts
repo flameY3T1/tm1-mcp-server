@@ -81,6 +81,34 @@ export const FileContentResultSchema = z.object({
   content: z.string(),
 });
 
+// ── Phase 2h: uniform mutation envelope ──────────────────────────────────────
+// Every create/update/delete/execute tool returns {success: true, ...identifying fields}
+// on success. Passthrough so per-tool extras (cellsWritten, parameterCount,
+// updatedTabs etc.) flow through without bespoke schemas.
+export const MutationResultSchema = z
+  .object({
+    success: z.boolean(),
+  })
+  .passthrough();
+
+// Bespoke shapes for mutations whose payload is rich enough to type explicitly.
+export const InvalidateCallgraphCacheResultSchema = z.object({
+  cleared: z.boolean(),
+  entriesBefore: z.number().int(),
+});
+
+export const BulkUpsertElementsResultSchema = z.object({
+  success: z.boolean(),
+  dimension: z.string(),
+  hierarchy: z.string(),
+  totalElements: z.number().int(),
+  counts: z.object({
+    N: z.number().int(),
+    C: z.number().int(),
+    S: z.number().int(),
+  }),
+});
+
 export const ProcessItemSchema = z.object({
   name: z.string(),
   parameters: z.array(ProcessParameterSchema),

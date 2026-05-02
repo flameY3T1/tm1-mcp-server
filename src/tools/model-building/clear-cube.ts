@@ -28,7 +28,7 @@ export function registerClearCube(server: McpServer, tm1Client: TM1Client): void
         const summary = dimensions
           .map((d, i) => `${d}=${tuples[i].length === 0 ? "*" : tuples[i].join("|")}`)
           .join(", ");
-        return { content: [{ type: "text", text: `Cube "${cubeName}" cleared for: ${summary}` }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, cubeName, summary }, null, 2) }] };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
       }

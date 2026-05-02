@@ -54,17 +54,29 @@ const SAMPLES: Record<string, unknown[]> = {
 };
 
 describe("OUTPUT_SCHEMA_MAP", () => {
-  it("declares output schemas for Phase 1 + Phase 2a–2g tools", () => {
+  it("declares output schemas for Phase 1 + Phase 2a–2h tools", () => {
     expect(Object.keys(OUTPUT_SCHEMA_MAP).sort()).toEqual(
       [
         "tm1_analyze_callgraph",
         "tm1_analyze_chore_graph",
         "tm1_analyze_object_usage",
+        "tm1_assign_client_group",
+        "tm1_cancel_thread",
         "tm1_check_cube_rule",
         "tm1_check_process_code",
         "tm1_check_writable_coords",
+        "tm1_clear_cube",
         "tm1_compile_process",
         "tm1_copy_process",
+        "tm1_create_chore",
+        "tm1_create_client",
+        "tm1_create_element",
+        "tm1_create_element_attribute",
+        "tm1_create_process",
+        "tm1_create_subset",
+        "tm1_delete_element",
+        "tm1_delete_process",
+        "tm1_delete_subset",
         "tm1_diff_process_with_file",
         "tm1_execute_mdx",
         "tm1_execute_process",
@@ -87,6 +99,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_get_view",
         "tm1_import_pro_file",
         "tm1_install_pro_bundle",
+        "tm1_invalidate_callgraph_cache",
         "tm1_list_chores",
         "tm1_list_clients",
         "tm1_list_cubes",
@@ -99,9 +112,18 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_list_subsets",
         "tm1_list_threads",
         "tm1_list_views",
+        "tm1_move_element",
         "tm1_search_code",
+        "tm1_update_element",
+        "tm1_update_element_attribute_value",
+        "tm1_update_process_code",
+        "tm1_update_process_datasource",
+        "tm1_update_process_parameters",
+        "tm1_update_process_variables",
+        "tm1_update_subset",
         "tm1_upsert_process",
         "tm1_validate_process_refs",
+        "tm1_write_cells",
       ],
     );
   });
@@ -363,6 +385,36 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       truncated: false,
       content: "a,b,c\n1,2,3",
     },
+    // Generic mutation envelope: success + per-tool extras flow through
+    // passthrough. One fixture per shape variant is enough to lock behavior.
+    tm1_assign_client_group: { success: true, clientName: "admin", groupName: "ADMIN" },
+    tm1_cancel_thread: { success: true, threadId: 42 },
+    tm1_clear_cube: { success: true, cubeName: "Sales", summary: "Region=*, Period=Jan" },
+    tm1_create_chore: { success: true, name: "Daily.Load", stepCount: 2, active: true },
+    tm1_create_client: { success: true, name: "newuser" },
+    tm1_create_element: { success: true, elementName: "DE" },
+    tm1_create_element_attribute: { success: true, attributeName: "Currency", attributeType: "String" },
+    tm1_create_process: { success: true, processName: "Load.Sales" },
+    tm1_create_subset: { success: true, subsetName: "EU", kind: "static" },
+    tm1_delete_element: { success: true, elementName: "DE" },
+    tm1_delete_process: { success: true, processName: "Load.Sales" },
+    tm1_delete_subset: { success: true, subsetName: "EU" },
+    tm1_move_element: { success: true, elementName: "DE", newParent: "EU" },
+    tm1_update_element: { success: true, elementName: "DE" },
+    tm1_update_element_attribute_value: {
+      success: true,
+      dimensionName: "Region",
+      elementName: "DE",
+      attributeName: "Currency",
+      value: "EUR",
+    },
+    tm1_update_process_code: { success: true, updatedTabs: ["prolog", "data"] },
+    tm1_update_process_datasource: { success: true, processName: "Load.Sales" },
+    tm1_update_process_parameters: { success: true, processName: "Load.Sales", parameterCount: 2 },
+    tm1_update_process_variables: { success: true, processName: "Load.Sales", variableCount: 5 },
+    tm1_update_subset: { success: true, subsetName: "EU" },
+    tm1_write_cells: { success: true, cellsWritten: 100 },
+    tm1_invalidate_callgraph_cache: { cleared: true, entriesBefore: 12 },
   };
 
   for (const [toolName, payload] of Object.entries(PHASE2_SAMPLES)) {
