@@ -1,12 +1,48 @@
 import "dotenv/config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import type pino from "pino";
 import { loadConfig } from "./config.js";
 import { createLogger } from "./logger.js";
 import { SessionManager } from "./session-manager.js";
 import { TM1Client } from "./tm1-client.js";
+import { ANNOTATION_MAP } from "./tools/annotation-map.js";
 import { registerAllTools } from "./tools/index.js";
 import { NAME, VERSION } from "./version.js";
+
+// Wrap McpServer so every server.tool(name, desc, schema, cb) call injects
+// the matching annotation hint from ANNOTATION_MAP as the SDK's 5-arg
+// overload. Avoids editing all 84 register* call sites. Tools missing from
+// the map register normally and emit a warn so new tools surface during dev.
+function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
+  const originalTool = server.tool.bind(server) as (
+    ...args: unknown[]
+  ) => unknown;
+  return new Proxy(server, {
+    get(target, prop, receiver) {
+      if (prop !== "tool") return Reflect.get(target, prop, receiver);
+      return (...args: unknown[]) => {
+        const isFourArg =
+          args.length === 4 &&
+          typeof args[0] === "string" &&
+          typeof args[1] === "string" &&
+          typeof args[3] === "function";
+        if (isFourArg) {
+          const name = args[0] as string;
+          const annot = ANNOTATION_MAP[name];
+          if (annot) {
+            return originalTool(args[0], args[1], args[2], annot, args[3]);
+          }
+          logger.warn(
+            { tool: name },
+            "Tool registered without annotation — add to ANNOTATION_MAP",
+          );
+        }
+        return originalTool(...args);
+      };
+    },
+  }) as McpServer;
+}
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -37,8 +73,9 @@ async function main(): Promise<void> {
     version: VERSION,
   });
 
-  // Register all tools
-  registerAllTools(server, tm1Client);
+  // Register all tools — wrap server so each registration receives the
+  // annotation hint from ANNOTATION_MAP without editing call sites.
+  registerAllTools(withAnnotations(server, logger), tm1Client);
   logger.info("All MCP tools registered");
 
   // Start stdio transport
