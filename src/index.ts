@@ -7,17 +7,43 @@ import { createLogger } from "./logger.js";
 import { SessionManager } from "./session-manager.js";
 import { TM1Client } from "./tm1-client.js";
 import { ANNOTATION_MAP } from "./tools/annotation-map.js";
+import {
+  formatTm1ErrorResult,
+  normalizeErrorResult,
+  type McpToolResult,
+} from "./tools/error-format.js";
 import { registerAllTools } from "./tools/index.js";
 import { NAME, VERSION } from "./version.js";
 
-// Wrap McpServer so every server.tool(name, desc, schema, cb) call injects
-// the matching annotation hint from ANNOTATION_MAP as the SDK's 5-arg
-// overload. Avoids editing all 84 register* call sites. Tools missing from
-// the map register normally and emit a warn so new tools surface during dev.
+// Wrap McpServer so every server.tool(name, desc, schema, cb) call:
+//   1) injects the matching annotation from ANNOTATION_MAP via SDK 5-arg
+//      overload (audit gap 1)
+//   2) wraps the callback so thrown errors become uniform JSON results
+//      and existing isError results get reshaped to include `hint`
+//      (audit gaps 5 + 6)
+// Centralized so we don't touch 84 register* call sites.
 function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
   const originalTool = server.tool.bind(server) as (
     ...args: unknown[]
   ) => unknown;
+
+  type ToolCallback = (...cbArgs: unknown[]) => Promise<unknown> | unknown;
+
+  const wrapCb = (toolName: string, cb: ToolCallback): ToolCallback => {
+    return async (...cbArgs: unknown[]) => {
+      try {
+        const result = (await cb(...cbArgs)) as McpToolResult | undefined;
+        if (result && result.isError) {
+          return normalizeErrorResult(result);
+        }
+        return result;
+      } catch (err) {
+        logger.error({ err, tool: toolName }, "Tool handler threw");
+        return formatTm1ErrorResult(err);
+      }
+    };
+  };
+
   return new Proxy(server, {
     get(target, prop, receiver) {
       if (prop !== "tool") return Reflect.get(target, prop, receiver);
@@ -30,13 +56,15 @@ function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
         if (isFourArg) {
           const name = args[0] as string;
           const annot = ANNOTATION_MAP[name];
+          const wrappedCb = wrapCb(name, args[3] as ToolCallback);
           if (annot) {
-            return originalTool(args[0], args[1], args[2], annot, args[3]);
+            return originalTool(args[0], args[1], args[2], annot, wrappedCb);
           }
           logger.warn(
             { tool: name },
             "Tool registered without annotation — add to ANNOTATION_MAP",
           );
+          return originalTool(args[0], args[1], args[2], wrappedCb);
         }
         return originalTool(...args);
       };

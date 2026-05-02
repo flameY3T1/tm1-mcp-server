@@ -35,6 +35,53 @@ export class TM1Error extends Error {
     this.endpoint = opts.endpoint;
     this.details = opts.details;
   }
+
+  // Actionable next-step suggestion for an LLM agent. Maps the code to a
+  // concrete follow-up tool call rather than a vague "check your input".
+  get hint(): string {
+    return hintForCode(this.code);
+  }
+
+  toErrorPayload(): {
+    code: TM1ErrorCode;
+    message: string;
+    httpStatus?: number;
+    endpoint?: string;
+    details?: string;
+    hint: string;
+  } {
+    return {
+      code: this.code,
+      message: this.message,
+      httpStatus: this.httpStatus,
+      endpoint: this.endpoint,
+      details: this.details,
+      hint: this.hint,
+    };
+  }
+}
+
+export function hintForCode(code: TM1ErrorCode | string): string {
+  switch (code) {
+    case TM1ErrorCode.AUTH_FAILED:
+      return "Re-check TM1_USER/TM1_PASSWORD env vars; call tm1_get_server_info to verify reach.";
+    case TM1ErrorCode.PERMISSION_DENIED:
+      return "Caller lacks rights for this object/operation. Inspect membership via tm1_list_groups and assign with tm1_assign_client_group.";
+    case TM1ErrorCode.NOT_FOUND:
+      return "Object does not exist. Use the matching list_* or get_* tool to enumerate available names before retrying.";
+    case TM1ErrorCode.CONFLICT:
+      return "Object already exists or version mismatch. Fetch current state with the matching get_* tool, then retry.";
+    case TM1ErrorCode.VALIDATION_ERROR:
+      return "Input failed validation. Inspect the `details` field for the offending value and correct it.";
+    case TM1ErrorCode.UNSUPPORTED_OPERATION:
+      return "TM1 server version may not support this. Call tm1_get_server_info to check the version.";
+    case TM1ErrorCode.CONNECTION_FAILED:
+      return "TM1 server unreachable. Verify TM1_BASE_URL/TM1_HOST/TM1_PORT and that the service is running.";
+    case TM1ErrorCode.TM1_ERROR:
+      return "Generic TM1 error. Inspect `details` for the raw server message.";
+    default:
+      return "Unexpected error. Inspect `message`/`details` and retry with corrected input.";
+  }
 }
 
 // ── Domain models ────────────────────────────────────────────────────────────
