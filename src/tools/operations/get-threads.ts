@@ -1,24 +1,22 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 
 export function registerGetThreads(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
     "tm1_list_threads",
-    "List all active threads on the TM1 server (running processes, chores, MDX queries, etc.).",
-    {},
-    async () => {
+    "List active threads on the TM1 server (running processes, chores, MDX queries, etc.). Paginated (default 50/page).",
+    { ...PAGINATION_SCHEMA },
+    async ({ limit, offset }) => {
       try {
         const threads = await tm1Client.getThreads();
-        if (threads.length === 0) {
-          return { content: [{ type: "text", text: "No active threads." }] };
-        }
-        const lines = threads.map((t) => {
-          const elapsed = t.elapsedTime ? ` | ${t.elapsedTime}` : "";
-          const ctx = t.context ? ` | ctx=${t.context}` : "";
-          return `ID:${t.id} [${t.type}] ${t.state} | ${t.name} | ${t.objectName} | ${t.function}${ctx}${elapsed}`;
-        });
-        return { content: [{ type: "text", text: `${threads.length} thread(s):\n${lines.join("\n")}` }] };
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(paginate(threads, limit, offset), null, 2),
+          }],
+        };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
       }

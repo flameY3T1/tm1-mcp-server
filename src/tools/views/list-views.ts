@@ -1,28 +1,23 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 
 export function registerListViews(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
     "tm1_list_views",
-    "List all public and private views defined on a cube. Returns view name, visibility, and MDX (when available).",
+    "List public and private views defined on a cube. Returns view name, visibility, and MDX (when available). Paginated (default 50/page).",
     {
       cubeName: z.string().describe("Cube name"),
+      ...PAGINATION_SCHEMA,
     },
-    async ({ cubeName }) => {
+    async ({ cubeName, limit, offset }) => {
       try {
         const views = await tm1Client.listViews(cubeName);
-        if (views.length === 0) {
-          return { content: [{ type: "text", text: `No views defined on cube "${cubeName}".` }] };
-        }
-        const lines = views.map((v) => {
-          const scope = v.private ? "private" : "public";
-          return `- ${v.name} [${scope}]${v.mdx ? ` — MDX: ${v.mdx.slice(0, 80)}${v.mdx.length > 80 ? "…" : ""}` : ""}`;
-        });
         return {
           content: [{
             type: "text",
-            text: `${views.length} view(s) on "${cubeName}":\n${lines.join("\n")}`,
+            text: JSON.stringify(paginate(views, limit, offset), null, 2),
           }],
         };
       } catch (err) {
