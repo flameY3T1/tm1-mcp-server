@@ -54,7 +54,7 @@ const SAMPLES: Record<string, unknown[]> = {
 };
 
 describe("OUTPUT_SCHEMA_MAP", () => {
-  it("declares output schemas for Phase 1 + Phase 2a–2f tools", () => {
+  it("declares output schemas for Phase 1 + Phase 2a–2g tools", () => {
     expect(Object.keys(OUTPUT_SCHEMA_MAP).sort()).toEqual(
       [
         "tm1_analyze_callgraph",
@@ -71,13 +71,19 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_get_all_cube_rules",
         "tm1_get_all_processes_code",
         "tm1_get_cell_value",
+        "tm1_get_client",
+        "tm1_get_cube_rules",
         "tm1_get_element_attribute_values",
+        "tm1_get_file_content",
         "tm1_get_hierarchy",
+        "tm1_get_message_log",
         "tm1_get_process_code",
         "tm1_get_process_datasource",
         "tm1_get_process_parameters",
         "tm1_get_process_variables",
+        "tm1_get_server_info",
         "tm1_get_subset",
+        "tm1_get_transaction_log",
         "tm1_get_view",
         "tm1_import_pro_file",
         "tm1_install_pro_bundle",
@@ -319,6 +325,43 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       variables: [
         { name: "v1", type: "String", position: 1 },
       ],
+    },
+    tm1_get_client: { Name: "admin", Enabled: true },
+    tm1_get_cube_rules: {
+      cubeName: "Sales",
+      rulesText: "[]=N:1;",
+      skipCheck: false,
+    },
+    tm1_get_server_info: {
+      serverName: "tm1srv",
+      productVersion: "11.8",
+      extra: {},
+    },
+    tm1_get_message_log: {
+      count: 1,
+      entries: [
+        { timestamp: "2026-05-02T10:00:00", level: "INFO", message: "ok" },
+      ],
+    },
+    tm1_get_transaction_log: {
+      count: 1,
+      entries: [
+        {
+          timestamp: "2026-05-02T10:00:00",
+          user: "admin",
+          cubeName: "Sales",
+          elements: ["EU", "Jan"],
+          oldValue: 100,
+          newValue: 200,
+        },
+      ],
+    },
+    tm1_get_file_content: {
+      fileName: "data.csv",
+      totalBytes: 1024,
+      returnedBytes: 1024,
+      truncated: false,
+      content: "a,b,c\n1,2,3",
     },
   };
 

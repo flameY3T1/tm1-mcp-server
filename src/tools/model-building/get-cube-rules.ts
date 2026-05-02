@@ -12,14 +12,8 @@ export function registerGetCubeRules(server: McpServer, tm1Client: TM1Client): v
     async ({ cube }) => {
       try {
         const rules = await tm1Client.getCubeRules(cube);
-        if (!rules.rulesText) {
-          return { content: [{ type: "text", text: `Cube "${cube}" has no rules.` }] };
-        }
         return {
-          content: [{
-            type: "text",
-            text: `Rules for cube "${cube}" (SkipCheck: ${rules.skipCheck}):\n\n${rules.rulesText}`,
-          }],
+          content: [{ type: "text" as const, text: JSON.stringify(rules, null, 2) }],
         };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };

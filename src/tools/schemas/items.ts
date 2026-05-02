@@ -10,6 +10,9 @@ import { z } from "zod";
 export const ELEMENT_TYPE = z.enum(["Numeric", "String", "Consolidated"]);
 export const PARAM_TYPE = z.enum(["String", "Numeric"]);
 
+// Hoisted: shared by transaction-log entries and MDX/cell tools below.
+export const CellValueSchema = z.union([z.string(), z.number(), z.null()]);
+
 export const CubeItemSchema = z.object({
   name: z.string(),
   dimensions: z.array(z.string()),
@@ -39,6 +42,43 @@ export const CompileErrorSchema = z.object({
   lineNumber: z.number().int().optional(),
   procedure: z.string().optional(),
   message: z.string(),
+});
+
+export const ServerInfoSchema = z
+  .object({
+    serverName: z.string(),
+    productVersion: z.string(),
+    productEdition: z.string().optional(),
+    adminHost: z.string().optional(),
+    dataDirectory: z.string().optional(),
+    timeZoneId: z.string().optional(),
+    integratedSecurityMode: z.string().optional(),
+    extra: z.record(z.string(), z.unknown()),
+  })
+  .passthrough();
+
+export const MessageLogEntrySchema = z.object({
+  timestamp: z.string(),
+  level: z.string(),
+  message: z.string(),
+});
+
+export const TransactionLogEntrySchema = z.object({
+  timestamp: z.string(),
+  user: z.string(),
+  cubeName: z.string(),
+  elements: z.array(z.string()),
+  oldValue: CellValueSchema,
+  newValue: CellValueSchema,
+});
+
+export const FileContentResultSchema = z.object({
+  fileName: z.string(),
+  totalBytes: z.number().int(),
+  returnedBytes: z.number().int(),
+  truncated: z.boolean(),
+  truncationReason: z.string().optional(),
+  content: z.string(),
 });
 
 export const ProcessItemSchema = z.object({
@@ -179,8 +219,6 @@ export const CubeRulesSchema = z.object({
   rulesText: z.string(),
   skipCheck: z.boolean(),
 });
-
-export const CellValueSchema = z.union([z.string(), z.number(), z.null()]);
 
 export const MdxAxisSchema = z.object({
   tuples: z.array(

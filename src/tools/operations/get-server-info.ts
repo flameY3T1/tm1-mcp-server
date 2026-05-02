@@ -9,15 +9,9 @@ export function registerGetServerInfo(server: McpServer, tm1Client: TM1Client): 
     async () => {
       try {
         const info = await tm1Client.getServerInfo();
-        const lines = [
-          `Server: ${info.serverName}`,
-          `Version: ${info.productVersion}${info.productEdition ? ` (${info.productEdition})` : ""}`,
-        ];
-        if (info.adminHost) lines.push(`AdminHost: ${info.adminHost}`);
-        if (info.dataDirectory) lines.push(`DataDirectory: ${info.dataDirectory}`);
-        if (info.timeZoneId) lines.push(`TimeZone: ${info.timeZoneId}`);
-        if (info.integratedSecurityMode) lines.push(`SecurityMode: ${info.integratedSecurityMode}`);
-        return { content: [{ type: "text", text: lines.join("\n") }] };
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(info, null, 2) }],
+        };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
       }

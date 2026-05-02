@@ -30,24 +30,35 @@ export function registerGetFileContent(server: McpServer, tm1Client: TM1Client):
         const totalBytes = Buffer.byteLength(content, "utf8");
 
         let body: string;
-        let truncationNote = "";
+        let truncated = false;
+        let truncationReason: string | undefined;
 
         if (headLines !== undefined) {
           const allLines = content.split("\n");
-          const sliced = allLines.slice(0, headLines);
-          body = sliced.join("\n");
+          body = allLines.slice(0, headLines).join("\n");
           if (allLines.length > headLines) {
-            truncationNote = ` | truncated to ${headLines} lines (of ${allLines.length})`;
+            truncated = true;
+            truncationReason = `headLines=${headLines} (of ${allLines.length})`;
           }
         } else if (totalBytes > maxBytes) {
           body = Buffer.from(content, "utf8").subarray(0, maxBytes).toString("utf8");
-          truncationNote = ` | truncated to ${maxBytes}B`;
+          truncated = true;
+          truncationReason = `maxBytes=${maxBytes}`;
         } else {
           body = content;
         }
 
-        const meta = `[file=${fileName} | size=${totalBytes}B${truncationNote}]`;
-        return { content: [{ type: "text", text: `${meta}\n${body}` }] };
+        const payload = {
+          fileName,
+          totalBytes,
+          returnedBytes: Buffer.byteLength(body, "utf8"),
+          truncated,
+          ...(truncationReason ? { truncationReason } : {}),
+          content: body,
+        };
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+        };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
       }

@@ -18,16 +18,10 @@ export function registerGetMessageLog(server: McpServer, tm1Client: TM1Client): 
         const filtered = filter
           ? entries.filter((e) => e.message.toLowerCase().includes(filter.toLowerCase()))
           : entries;
-
-        if (filtered.length === 0) {
-          return { content: [{ type: "text", text: "No log entries found." }] };
-        }
-
-        const lines = filtered.map((e) => `[${e.timestamp}] [${e.level}] ${e.message}`);
         return {
           content: [{
-            type: "text",
-            text: `${filtered.length} log entr${filtered.length === 1 ? "y" : "ies"}:\n${lines.join("\n")}`,
+            type: "text" as const,
+            text: JSON.stringify({ count: filtered.length, entries: filtered }, null, 2),
           }],
         };
       } catch (err) {

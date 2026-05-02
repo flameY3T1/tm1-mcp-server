@@ -13,15 +13,9 @@ export function registerGetClient(server: McpServer, tm1Client: TM1Client) {
     async ({ name }) => {
       try {
         const client = await tm1Client.getClient(name);
-        const groups = client.Groups?.map((g) => g.Name).join(", ") ?? "";
-        const lines = [
-          `Name: ${client.Name}`,
-          client.FriendlyName ? `FriendlyName: ${client.FriendlyName}` : null,
-          client.Type ? `Type: ${client.Type}` : null,
-          `Enabled: ${client.Enabled !== false}`,
-          `Groups: [${groups}]`,
-        ].filter(Boolean);
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(client, null, 2) }],
+        };
       } catch (error) {
         const msg = error instanceof TM1Error
           ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }

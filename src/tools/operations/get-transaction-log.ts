@@ -17,17 +17,10 @@ export function registerGetTransactionLog(server: McpServer, tm1Client: TM1Clien
     async ({ top, cubeName, user, since }) => {
       try {
         const entries = await tm1Client.getTransactionLog({ top, cubeName, user, since });
-        if (entries.length === 0) {
-          return { content: [{ type: "text", text: "No transaction log entries found." }] };
-        }
-        const lines = entries.map((e) => {
-          const tuple = e.elements.join("|");
-          return `[${e.timestamp}] ${e.user} ${e.cubeName}(${tuple}): ${e.oldValue} → ${e.newValue}`;
-        });
         return {
           content: [{
-            type: "text",
-            text: `${entries.length} entr${entries.length === 1 ? "y" : "ies"}:\n${lines.join("\n")}`,
+            type: "text" as const,
+            text: JSON.stringify({ count: entries.length, entries }, null, 2),
           }],
         };
       } catch (err) {
