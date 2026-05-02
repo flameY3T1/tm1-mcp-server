@@ -13,6 +13,7 @@ import {
   type McpToolResult,
 } from "./tools/error-format.js";
 import { registerAllTools } from "./tools/index.js";
+import { OUTPUT_SCHEMA_MAP } from "./tools/output-schema-map.js";
 import { NAME, VERSION } from "./version.js";
 
 // Wrap McpServer so every server.tool(name, desc, schema, cb) call:
@@ -21,20 +22,49 @@ import { NAME, VERSION } from "./version.js";
 //   2) wraps the callback so thrown errors become uniform JSON results
 //      and existing isError results get reshaped to include `hint`
 //      (audit gaps 5 + 6)
+//   3) when OUTPUT_SCHEMA_MAP has an entry for the tool, routes the
+//      registration through `server.registerTool` so the SDK can publish
+//      `outputSchema` to clients, and parses the JSON text body back into
+//      `structuredContent` for typed consumption (audit gap 2)
 // Centralized so we don't touch 84 register* call sites.
 function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
   const originalTool = server.tool.bind(server) as (
     ...args: unknown[]
   ) => unknown;
+  const originalRegisterTool = server.registerTool.bind(server) as (
+    ...args: unknown[]
+  ) => unknown;
 
   type ToolCallback = (...cbArgs: unknown[]) => Promise<unknown> | unknown;
 
-  const wrapCb = (toolName: string, cb: ToolCallback): ToolCallback => {
+  const attachStructured = (result: McpToolResult): McpToolResult => {
+    const first = result.content?.[0];
+    if (!first || first.type !== "text" || typeof first.text !== "string") {
+      return result;
+    }
+    const raw = first.text.trim();
+    if (!raw.startsWith("{") && !raw.startsWith("[")) return result;
+    try {
+      const parsed = JSON.parse(raw);
+      return { ...result, structuredContent: parsed };
+    } catch {
+      return result;
+    }
+  };
+
+  const wrapCb = (
+    toolName: string,
+    cb: ToolCallback,
+    hasOutputSchema: boolean,
+  ): ToolCallback => {
     return async (...cbArgs: unknown[]) => {
       try {
         const result = (await cb(...cbArgs)) as McpToolResult | undefined;
         if (result && result.isError) {
           return normalizeErrorResult(result);
+        }
+        if (result && hasOutputSchema) {
+          return attachStructured(result);
         }
         return result;
       } catch (err) {
@@ -55,16 +85,37 @@ function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
           typeof args[3] === "function";
         if (isFourArg) {
           const name = args[0] as string;
+          const description = args[1] as string;
+          const inputSchema = args[2];
           const annot = ANNOTATION_MAP[name];
-          const wrappedCb = wrapCb(name, args[3] as ToolCallback);
+          const outputSchema = OUTPUT_SCHEMA_MAP[name];
+          const wrappedCb = wrapCb(
+            name,
+            args[3] as ToolCallback,
+            Boolean(outputSchema),
+          );
+
+          if (outputSchema) {
+            // registerTool publishes outputSchema to clients; the wrapped
+            // callback parses the existing text body into structuredContent
+            // so call sites stay unchanged.
+            const config: Record<string, unknown> = {
+              description,
+              inputSchema,
+              outputSchema,
+            };
+            if (annot) config.annotations = annot;
+            return originalRegisterTool(name, config, wrappedCb);
+          }
+
           if (annot) {
-            return originalTool(args[0], args[1], args[2], annot, wrappedCb);
+            return originalTool(name, description, inputSchema, annot, wrappedCb);
           }
           logger.warn(
             { tool: name },
             "Tool registered without annotation — add to ANNOTATION_MAP",
           );
-          return originalTool(args[0], args[1], args[2], wrappedCb);
+          return originalTool(name, description, inputSchema, wrappedCb);
         }
         return originalTool(...args);
       };

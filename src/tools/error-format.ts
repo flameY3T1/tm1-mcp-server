@@ -22,6 +22,7 @@ interface UniformErrorPayload {
 interface McpToolResult {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
+  structuredContent?: unknown;
 }
 
 const DEFAULT_CODE: TM1ErrorCode = TM1ErrorCode.TM1_ERROR;
