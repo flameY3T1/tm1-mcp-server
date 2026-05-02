@@ -6,6 +6,7 @@ import { createLogger } from "./logger.js";
 import { SessionManager } from "./session-manager.js";
 import { TM1Client } from "./tm1-client.js";
 import { registerAllTools } from "./tools/index.js";
+import { NAME, VERSION } from "./version.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -32,8 +33,8 @@ async function main(): Promise<void> {
 
   // Create MCP server
   const server = new McpServer({
-    name: "tm1-mcp-server",
-    version: "1.0.0",
+    name: NAME,
+    version: VERSION,
   });
 
   // Register all tools
