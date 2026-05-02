@@ -13,6 +13,7 @@ import {
   ChoreGraphResultSchema,
   ChoreItemSchema,
   ClientItemSchema,
+  CompileErrorSchema,
   CopyProcessResultSchema,
   CubeItemSchema,
   CubeRulesSchema,
@@ -29,7 +30,9 @@ import {
   ObjectUsageResultSchema,
   ProcessCodeSchema,
   ProcessItemSchema,
+  ProcessParameterSchema,
   ProcessResultSchema,
+  ProcessVariableSchema,
   SearchCodeResultSchema,
   SessionItemSchema,
   SubsetItemSchema,
@@ -102,4 +105,38 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   tm1_analyze_chore_graph: ChoreGraphResultSchema.shape,
   tm1_analyze_object_usage: ObjectUsageResultSchema.shape,
   tm1_search_code: SearchCodeResultSchema.shape,
+
+  // ── Phase 2f: validators (refactored from prose) and array-root wraps ─────
+  tm1_check_cube_rule: {
+    ok: z.boolean(),
+    cube: z.string(),
+    lineCount: z.number().int(),
+    errorCount: z.number().int(),
+    errors: z.array(
+      z.object({
+        lineNumber: z.number().int().optional(),
+        message: z.string(),
+      }),
+    ),
+  },
+  tm1_check_process_code: {
+    ok: z.boolean(),
+    processName: z.string(),
+    errorCount: z.number().int(),
+    errors: z.array(CompileErrorSchema),
+  },
+  tm1_compile_process: {
+    ok: z.boolean(),
+    processName: z.string(),
+    errorCount: z.number().int(),
+    errors: z.array(CompileErrorSchema),
+  },
+  tm1_get_process_parameters: {
+    processName: z.string(),
+    parameters: z.array(ProcessParameterSchema),
+  },
+  tm1_get_process_variables: {
+    processName: z.string(),
+    variables: z.array(ProcessVariableSchema),
+  },
 };

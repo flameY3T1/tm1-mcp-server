@@ -14,7 +14,7 @@ export function registerGetProcessParameters(server: McpServer, tm1Client: TM1Cl
       try {
         const params = await tm1Client.getProcessParameters(processName);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(params, null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ processName, parameters: params }, null, 2) }],
         };
       } catch (error) {
         const msg =

@@ -54,13 +54,16 @@ const SAMPLES: Record<string, unknown[]> = {
 };
 
 describe("OUTPUT_SCHEMA_MAP", () => {
-  it("declares output schemas for Phase 1 + Phase 2a/2b/2c/2d/2e tools", () => {
+  it("declares output schemas for Phase 1 + Phase 2a–2f tools", () => {
     expect(Object.keys(OUTPUT_SCHEMA_MAP).sort()).toEqual(
       [
         "tm1_analyze_callgraph",
         "tm1_analyze_chore_graph",
         "tm1_analyze_object_usage",
+        "tm1_check_cube_rule",
+        "tm1_check_process_code",
         "tm1_check_writable_coords",
+        "tm1_compile_process",
         "tm1_copy_process",
         "tm1_diff_process_with_file",
         "tm1_execute_mdx",
@@ -72,6 +75,8 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_get_hierarchy",
         "tm1_get_process_code",
         "tm1_get_process_datasource",
+        "tm1_get_process_parameters",
+        "tm1_get_process_variables",
         "tm1_get_subset",
         "tm1_get_view",
         "tm1_import_pro_file",
@@ -282,6 +287,37 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       matches: [
         { process: "Load.Sales", tab: "data", line: 12, text: "CellPutN(...)" },
         { process: "Load.Costs", tab: "data", line: 8, text: "CellPutN(...)" },
+      ],
+    },
+    tm1_check_cube_rule: {
+      ok: true,
+      cube: "Sales",
+      lineCount: 5,
+      errorCount: 0,
+      errors: [],
+    },
+    tm1_check_process_code: {
+      ok: false,
+      processName: "_compile_check",
+      errorCount: 1,
+      errors: [{ procedure: "Prolog", lineNumber: 3, message: "syntax" }],
+    },
+    tm1_compile_process: {
+      ok: true,
+      processName: "Load.Sales",
+      errorCount: 0,
+      errors: [],
+    },
+    tm1_get_process_parameters: {
+      processName: "Load.Sales",
+      parameters: [
+        { name: "p", type: "String", defaultValue: "x" },
+      ],
+    },
+    tm1_get_process_variables: {
+      processName: "Load.Sales",
+      variables: [
+        { name: "v1", type: "String", position: 1 },
       ],
     },
   };

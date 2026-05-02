@@ -17,24 +17,20 @@ export function registerCheckCubeRule(server: McpServer, tm1Client: TM1Client): 
     async ({ cube, rules }) => {
       try {
         const errors = await tm1Client.checkCubeRule(cube, rules);
-        if (errors.length === 0) {
-          const lineCount = rules.split("\n").length;
-          return {
-            content: [{
-              type: "text",
-              text: `Rule syntax valid for cube "${cube}" (${lineCount} lines). Safe to apply with tm1_update_cube_rules.`,
-            }],
-          };
-        }
-        const errorList = errors
-          .map((e) => (e.lineNumber !== undefined ? `Line ${e.lineNumber}: ${e.message}` : e.message))
-          .join("\n");
+        const ok = errors.length === 0;
+        const payload = {
+          ok,
+          cube,
+          lineCount: rules.split("\n").length,
+          errorCount: errors.length,
+          errors: errors.map((e) => ({
+            lineNumber: e.lineNumber,
+            message: e.message,
+          })),
+        };
         return {
-          isError: true,
-          content: [{
-            type: "text",
-            text: `Rule syntax errors in cube "${cube}":\n${errorList}`,
-          }],
+          isError: !ok || undefined,
+          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
         };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };

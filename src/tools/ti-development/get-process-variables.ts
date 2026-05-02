@@ -14,7 +14,7 @@ export function registerGetProcessVariables(server: McpServer, tm1Client: TM1Cli
       try {
         const variables = await tm1Client.getProcessVariables(processName);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(variables) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ processName, variables }, null, 2) }],
         };
       } catch (error) {
         const msg =

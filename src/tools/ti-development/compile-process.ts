@@ -12,21 +12,15 @@ export function registerCompileProcess(server: McpServer, tm1Client: TM1Client):
     async ({ name }) => {
       try {
         const result = await tm1Client.compileProcess(name);
-        if (result.success) {
-          return { content: [{ type: "text", text: `Process "${name}" compiled successfully (no errors).` }] };
-        }
-        const lines = result.errors.map((e) => {
-          const loc = [e.procedure, e.lineNumber ? `line ${e.lineNumber}` : undefined]
-            .filter(Boolean)
-            .join(" ");
-          return loc ? `[${loc}] ${e.message}` : e.message;
-        });
+        const payload = {
+          ok: result.success,
+          processName: name,
+          errorCount: result.errors.length,
+          errors: result.errors,
+        };
         return {
-          isError: true,
-          content: [{
-            type: "text",
-            text: `Compile errors (${result.errors.length}):\n${lines.join("\n")}`,
-          }],
+          isError: !result.success || undefined,
+          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
         };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };

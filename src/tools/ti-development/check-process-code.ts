@@ -68,21 +68,15 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
           ...(variables !== undefined ? { variables: variables as ProcessVariable[] } : {}),
           ...(dataSource !== undefined ? { dataSource: dataSource as DataSource } : {}),
         });
-        if (result.success) {
-          return { content: [{ type: "text", text: `Process code valid (no syntax errors). Safe to apply with tm1_create_process / tm1_update_process_code.` }] };
-        }
-        const lines = result.errors.map((e) => {
-          const loc = [e.procedure, e.lineNumber !== undefined ? `line ${e.lineNumber}` : undefined]
-            .filter(Boolean)
-            .join(" ");
-          return loc ? `[${loc}] ${e.message}` : e.message;
-        });
+        const payload = {
+          ok: result.success,
+          processName: name ?? "_compile_check",
+          errorCount: result.errors.length,
+          errors: result.errors,
+        };
         return {
-          isError: true,
-          content: [{
-            type: "text",
-            text: `Compile errors (${result.errors.length}):\n${lines.join("\n")}`,
-          }],
+          isError: !result.success || undefined,
+          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
         };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };

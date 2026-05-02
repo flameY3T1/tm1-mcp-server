@@ -27,6 +27,20 @@ export const ProcessParameterSchema = z.object({
   prompt: z.string().optional(),
 });
 
+export const ProcessVariableSchema = z.object({
+  name: z.string(),
+  type: PARAM_TYPE,
+  position: z.number().int(),
+  startByte: z.number().int().optional(),
+  endByte: z.number().int().optional(),
+});
+
+export const CompileErrorSchema = z.object({
+  lineNumber: z.number().int().optional(),
+  procedure: z.string().optional(),
+  message: z.string(),
+});
+
 export const ProcessItemSchema = z.object({
   name: z.string(),
   parameters: z.array(ProcessParameterSchema),
