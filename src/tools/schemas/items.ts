@@ -221,3 +221,69 @@ export const ProcessResultSchema = z.object({
   processErrorStatus: z.string(),
   errorLogFile: z.string().optional(),
 });
+
+// ── Phase 2d: diff/bundle/upsert ─────────────────────────────────────────────
+
+export const DiffProcessResultSchema = z
+  .object({
+    processName: z.string(),
+    identical: z.boolean(),
+    tabs: z.unknown(),
+    parameters: z.unknown(),
+    variables: z.unknown(),
+    dataSource: z.unknown(),
+  })
+  .passthrough();
+
+export const UpsertProcessResultSchema = z.object({
+  processName: z.string(),
+  action: z.enum(["created", "updated"]),
+  appliedSteps: z.array(z.string()),
+});
+
+const InstallBundleEntrySchema = z
+  .object({
+    file: z.string().optional(),
+    processName: z.string().optional(),
+    status: z.string(),
+  })
+  .passthrough();
+
+export const InstallProBundleResultSchema = z
+  .object({
+    directory: z.string(),
+    filesFound: z.number().int(),
+    dryRun: z.boolean().optional(),
+    mode: z.string().optional(),
+    counts: z
+      .object({
+        created: z.number().int(),
+        updated: z.number().int(),
+        preflight_failed: z.number().int(),
+        error: z.number().int(),
+        skipped: z.number().int(),
+      })
+      .optional(),
+    results: z.array(InstallBundleEntrySchema),
+  })
+  .passthrough();
+
+export const ImportProFileResultSchema = z.object({
+  action: z.string(),
+  processName: z.string(),
+  parsed: z.object({
+    prologLines: z.number().int(),
+    metadataLines: z.number().int(),
+    dataLines: z.number().int(),
+    epilogLines: z.number().int(),
+    parameterCount: z.number().int(),
+    variableCount: z.number().int(),
+    dataSourceType: z.string(),
+  }),
+});
+
+export const CopyProcessResultSchema = z.object({
+  success: z.boolean(),
+  sourceName: z.string(),
+  targetName: z.string(),
+});

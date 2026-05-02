@@ -54,10 +54,12 @@ const SAMPLES: Record<string, unknown[]> = {
 };
 
 describe("OUTPUT_SCHEMA_MAP", () => {
-  it("declares output schemas for Phase 1 + Phase 2a/2b/2c tools", () => {
+  it("declares output schemas for Phase 1 + Phase 2a/2b/2c/2d tools", () => {
     expect(Object.keys(OUTPUT_SCHEMA_MAP).sort()).toEqual(
       [
         "tm1_check_writable_coords",
+        "tm1_copy_process",
+        "tm1_diff_process_with_file",
         "tm1_execute_mdx",
         "tm1_execute_process",
         "tm1_get_all_cube_rules",
@@ -69,6 +71,8 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_get_process_datasource",
         "tm1_get_subset",
         "tm1_get_view",
+        "tm1_import_pro_file",
+        "tm1_install_pro_bundle",
         "tm1_list_chores",
         "tm1_list_clients",
         "tm1_list_cubes",
@@ -81,6 +85,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_list_subsets",
         "tm1_list_threads",
         "tm1_list_views",
+        "tm1_upsert_process",
         "tm1_validate_process_refs",
       ],
     );
@@ -191,6 +196,54 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_execute_process: {
       success: true,
       processErrorStatus: "CompletedSuccessfully",
+    },
+    tm1_diff_process_with_file: {
+      processName: "Load.Sales",
+      identical: true,
+      tabs: [],
+      parameters: [],
+      variables: [],
+      dataSource: [],
+    },
+    tm1_upsert_process: {
+      processName: "Load.Sales",
+      action: "updated",
+      appliedSteps: ["compile", "save"],
+    },
+    tm1_install_pro_bundle: {
+      directory: "bundle/",
+      filesFound: 2,
+      dryRun: false,
+      mode: "upsert",
+      counts: {
+        created: 1,
+        updated: 1,
+        preflight_failed: 0,
+        error: 0,
+        skipped: 0,
+      },
+      results: [
+        { file: "a.pro", processName: "A", status: "created" },
+        { file: "b.pro", processName: "B", status: "updated" },
+      ],
+    },
+    tm1_import_pro_file: {
+      action: "created",
+      processName: "Load.Sales",
+      parsed: {
+        prologLines: 5,
+        metadataLines: 0,
+        dataLines: 10,
+        epilogLines: 2,
+        parameterCount: 1,
+        variableCount: 3,
+        dataSourceType: "ASCII",
+      },
+    },
+    tm1_copy_process: {
+      success: true,
+      sourceName: "Load.Sales",
+      targetName: "Load.Sales.Copy",
     },
   };
 

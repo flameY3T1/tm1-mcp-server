@@ -11,14 +11,18 @@ import {
   CellValueSchema,
   ChoreItemSchema,
   ClientItemSchema,
+  CopyProcessResultSchema,
   CubeItemSchema,
   CubeRulesSchema,
   DataSourceSchema,
+  DiffProcessResultSchema,
   DimensionItemSchema,
   ElementAttributeValueSchema,
   FilenameItemSchema,
   GroupItemSchema,
   HierarchySchema,
+  ImportProFileResultSchema,
+  InstallProBundleResultSchema,
   MdxResultSchema,
   ProcessCodeSchema,
   ProcessItemSchema,
@@ -26,6 +30,7 @@ import {
   SessionItemSchema,
   SubsetItemSchema,
   ThreadItemSchema,
+  UpsertProcessResultSchema,
   ValidateProcessRefsResultSchema,
   ViewItemSchema,
   ViewResultSchema,
@@ -80,4 +85,11 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   // ── Phase 2c: execute_* (JSON-returning subset) ───────────────────────────
   tm1_execute_mdx: MdxResultSchema.shape,
   tm1_execute_process: ProcessResultSchema.shape,
+
+  // ── Phase 2d: diff/bundle/upsert ──────────────────────────────────────────
+  tm1_diff_process_with_file: DiffProcessResultSchema.shape,
+  tm1_upsert_process: UpsertProcessResultSchema.shape,
+  tm1_install_pro_bundle: InstallProBundleResultSchema.shape,
+  tm1_import_pro_file: ImportProFileResultSchema.shape,
+  tm1_copy_process: CopyProcessResultSchema.shape,
 };
