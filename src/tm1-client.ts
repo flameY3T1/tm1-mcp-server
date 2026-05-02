@@ -364,10 +364,13 @@ export class TM1Client extends TM1HttpClient {
   async getProcessParameters(processName: string): Promise<ProcessParameter[]> {
     const path = `/api/v1/Processes('${encodeURIComponent(processName)}')/Parameters`;
 
+    // TM1 v11 returns Type as the decoded string "Numeric" / "String"
+    // (not the legacy int code 1 / 2). The old `=== 1` check silently
+    // classified every Numeric parameter as String.
     const response = await this.request<{
       value: Array<{
         Name: string;
-        Type: number;
+        Type: string;
         Value: string | number;
         Prompt?: string;
       }>;
@@ -375,7 +378,7 @@ export class TM1Client extends TM1HttpClient {
 
     return response.value.map((param): ProcessParameter => ({
       name: param.Name,
-      type: param.Type === 1 ? "Numeric" : "String",
+      type: param.Type === "Numeric" ? "Numeric" : "String",
       defaultValue: param.Value,
       ...(param.Prompt ? { prompt: param.Prompt } : {}),
     }));
@@ -662,6 +665,12 @@ export class TM1Client extends TM1HttpClient {
    */
   async updateProcessParameters(processName: string, params: ProcessParameter[]): Promise<void> {
     const path = `/api/v1/Processes('${encodeURIComponent(processName)}')`;
+    // FIXME: write-direction Type encoding is INVERTED relative to OData metadata
+    // (tm1.ProcessVariableType maps String=1, Numeric=2 — opposite of below).
+    // TM1 v11 currently accepts both because of enum coercion leniency, but
+    // this could silently mis-classify params. Tracked for follow-up; needs
+    // a live PATCH+read roundtrip test before the safer string-name encoding
+    // can be shipped without behavior risk.
     const body = {
       Parameters: params.map((p) => ({
         Name: p.name,

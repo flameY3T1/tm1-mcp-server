@@ -26,7 +26,7 @@ describe("Property 8: Prozessparameter-Roundtrip", () => {
     });
 
     await fc.assert(fc.asyncProperty(fc.array(paramArb, { minLength: 0, maxLength: 5 }), async (params) => {
-      const apiReadResponse = { value: params.map((p) => ({ Name: p.name, Type: p.type === "Numeric" ? 1 : 2, Value: p.defaultValue })) };
+      const apiReadResponse = { value: params.map((p) => ({ Name: p.name, Type: p.type, Value: p.defaultValue })) };
       let callIdx = 0;
       const f = vi.fn().mockImplementation((_url: string, opts: { method?: string }) => {
         callIdx++;

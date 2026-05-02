@@ -191,8 +191,8 @@ describe("TM1Client – Process Execution Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           value: [
-            { Name: "pFilePath", Type: 2, Value: "/data/input.csv", Prompt: "Enter file path" },
-            { Name: "pYear", Type: 1, Value: 2024 },
+            { Name: "pFilePath", Type: "String", Value: "/data/input.csv", Prompt: "Enter file path" },
+            { Name: "pYear", Type: "Numeric", Value: 2024 },
           ],
         }),
       );
@@ -215,12 +215,12 @@ describe("TM1Client – Process Execution Methods", () => {
       expect(params).toEqual([]);
     });
 
-    it("should map Type 1 to Numeric and Type 2 to String", async () => {
+    it("should map Type 'Numeric' / 'String' from TM1 v11 API", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           value: [
-            { Name: "numParam", Type: 1, Value: 0 },
-            { Name: "strParam", Type: 2, Value: "" },
+            { Name: "numParam", Type: "Numeric", Value: 0 },
+            { Name: "strParam", Type: "String", Value: "" },
           ],
         }),
       );
@@ -234,7 +234,7 @@ describe("TM1Client – Process Execution Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           value: [
-            { Name: "pParam", Type: 2, Value: "default" },
+            { Name: "pParam", Type: "String", Value: "default" },
           ],
         }),
       );
