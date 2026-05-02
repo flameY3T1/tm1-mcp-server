@@ -108,3 +108,102 @@ export const ElementAttributeValueSchema = z.object({
 
 // listFiles returns bare strings (file/folder names).
 export const FilenameItemSchema = z.string();
+
+// ── Phase 2 domain schemas ───────────────────────────────────────────────────
+
+export const HierarchyElementSchema = z.object({
+  name: z.string(),
+  type: ELEMENT_TYPE,
+  level: z.number().int(),
+  parents: z.array(z.string()),
+  children: z.array(z.object({ name: z.string(), weight: z.number() })),
+});
+
+export const HierarchySchema = z.object({
+  name: z.string(),
+  dimensionName: z.string(),
+  elements: z.array(HierarchyElementSchema),
+});
+
+export const ProcessCodeSchema = z.object({
+  prolog: z.string(),
+  metadata: z.string(),
+  data: z.string(),
+  epilog: z.string(),
+});
+
+export const DataSourceSchema = z
+  .object({
+    type: z.enum([
+      "None",
+      "TM1CubeView",
+      "TM1DimensionSubset",
+      "ASCII",
+      "ODBC",
+      "TM1Process",
+    ]),
+    dataSourceNameForServer: z.string().optional(),
+    dataSourceNameForClient: z.string().optional(),
+    asciiDelimiterType: z.string().optional(),
+    asciiDelimiterChar: z.string().optional(),
+    asciiQuoteCharacter: z.string().optional(),
+    asciiHeaderRecords: z.number().int().optional(),
+    asciiDecimalSeparator: z.string().optional(),
+    asciiThousandSeparator: z.string().optional(),
+    usesUnicode: z.boolean().optional(),
+    userName: z.string().optional(),
+    password: z.string().optional(),
+    oDBCConnection: z.string().optional(),
+    query: z.string().optional(),
+    view: z.string().optional(),
+    subset: z.string().optional(),
+  })
+  .passthrough();
+
+export const CubeRulesSchema = z.object({
+  cubeName: z.string(),
+  rulesText: z.string(),
+  skipCheck: z.boolean(),
+});
+
+export const CellValueSchema = z.union([z.string(), z.number(), z.null()]);
+
+export const MdxAxisSchema = z.object({
+  tuples: z.array(
+    z.object({
+      members: z.array(
+        z.object({ name: z.string(), hierarchyName: z.string() }),
+      ),
+    }),
+  ),
+});
+
+export const ViewResultSchema = z.object({
+  cubeName: z.string(),
+  viewName: z.string(),
+  cells: z.array(
+    z.object({ value: CellValueSchema, formattedValue: z.string() }),
+  ),
+  axes: z.array(MdxAxisSchema),
+});
+
+// Composite results emitted by validation/check tools.
+
+export const WritableCoordsResultSchema = z
+  .object({
+    cube: z.string(),
+    writable: z.boolean(),
+    allElementsExist: z.boolean(),
+    allElementsNLevel: z.boolean(),
+    coords: z.array(z.unknown()),
+    ruleOverlapWarn: z.unknown().optional(),
+  })
+  .passthrough();
+
+export const ValidateProcessRefsResultSchema = z.object({
+  processName: z.string().nullable(),
+  cubeRefsScanned: z.number().int(),
+  dimensionRefsScanned: z.number().int(),
+  unresolved: z.number().int(),
+  issues: z.array(z.unknown()),
+});

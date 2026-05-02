@@ -8,18 +8,26 @@ import type { ZodRawShape } from "zod";
 import { z } from "zod";
 import { pageShapeFor } from "./schemas/common.js";
 import {
+  CellValueSchema,
   ChoreItemSchema,
   ClientItemSchema,
   CubeItemSchema,
+  CubeRulesSchema,
+  DataSourceSchema,
   DimensionItemSchema,
   ElementAttributeValueSchema,
   FilenameItemSchema,
   GroupItemSchema,
+  HierarchySchema,
+  ProcessCodeSchema,
   ProcessItemSchema,
   SessionItemSchema,
   SubsetItemSchema,
   ThreadItemSchema,
+  ValidateProcessRefsResultSchema,
   ViewItemSchema,
+  ViewResultSchema,
+  WritableCoordsResultSchema,
 } from "./schemas/items.js";
 
 // tm1_list_files prefixes a `path` field on top of the page envelope.
@@ -41,4 +49,29 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   tm1_list_threads: pageShapeFor(ThreadItemSchema),
   tm1_list_sessions: pageShapeFor(SessionItemSchema),
   tm1_list_element_attributes: pageShapeFor(ElementAttributeValueSchema),
+
+  // ── Phase 2a: validation/check tools ──────────────────────────────────────
+  tm1_check_writable_coords: WritableCoordsResultSchema.shape,
+  tm1_validate_process_refs: ValidateProcessRefsResultSchema.shape,
+
+  // ── Phase 2b: get_* single entity (JSON-returning subset) ─────────────────
+  tm1_get_subset: SubsetItemSchema.shape,
+  tm1_get_view: ViewResultSchema.shape,
+  tm1_get_hierarchy: HierarchySchema.shape,
+  tm1_get_process_code: ProcessCodeSchema.shape,
+  tm1_get_process_datasource: DataSourceSchema.shape,
+  tm1_get_cell_value: { value: CellValueSchema.describe("Cell value (string, number, or null)") },
+  tm1_get_all_cube_rules: {
+    count: z.number().int().describe("Number of cubes returned"),
+    cubes: z.array(CubeRulesSchema).describe("Per-cube rule bundles"),
+  },
+  tm1_get_all_processes_code: {
+    count: z.number().int().describe("Number of processes returned"),
+    processes: z.array(z.unknown()).describe("Per-process code bundles"),
+  },
+  tm1_get_element_attribute_values: {
+    dimensionName: z.string(),
+    elementName: z.string(),
+    attributes: z.array(ElementAttributeValueSchema),
+  },
 };

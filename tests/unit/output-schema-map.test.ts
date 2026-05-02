@@ -54,9 +54,19 @@ const SAMPLES: Record<string, unknown[]> = {
 };
 
 describe("OUTPUT_SCHEMA_MAP", () => {
-  it("declares output schemas for the 12 paginated list_* tools", () => {
+  it("declares output schemas for paginated list_* (Phase 1) and 11 Phase-2 tools", () => {
     expect(Object.keys(OUTPUT_SCHEMA_MAP).sort()).toEqual(
       [
+        "tm1_check_writable_coords",
+        "tm1_get_all_cube_rules",
+        "tm1_get_all_processes_code",
+        "tm1_get_cell_value",
+        "tm1_get_element_attribute_values",
+        "tm1_get_hierarchy",
+        "tm1_get_process_code",
+        "tm1_get_process_datasource",
+        "tm1_get_subset",
+        "tm1_get_view",
         "tm1_list_chores",
         "tm1_list_clients",
         "tm1_list_cubes",
@@ -69,6 +79,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_list_subsets",
         "tm1_list_threads",
         "tm1_list_views",
+        "tm1_validate_process_refs",
       ],
     );
   });
@@ -95,4 +106,87 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     const result = schema.safeParse(payload);
     expect(result.success).toBe(true);
   });
+
+  // ── Phase 2 fixtures ────────────────────────────────────────────────────
+  const PHASE2_SAMPLES: Record<string, unknown> = {
+    tm1_check_writable_coords: {
+      cube: "Sales",
+      writable: true,
+      allElementsExist: true,
+      allElementsNLevel: true,
+      coords: [],
+    },
+    tm1_validate_process_refs: {
+      processName: "Load.Sales",
+      cubeRefsScanned: 3,
+      dimensionRefsScanned: 5,
+      unresolved: 0,
+      issues: [],
+    },
+    tm1_get_subset: {
+      name: "EU",
+      dimensionName: "Region",
+      hierarchyName: "Region",
+      private: false,
+      elements: ["DE", "FR"],
+    },
+    tm1_get_view: {
+      cubeName: "Sales",
+      viewName: "Default",
+      cells: [{ value: 100, formattedValue: "100.00" }],
+      axes: [
+        {
+          tuples: [
+            { members: [{ name: "EU", hierarchyName: "Region" }] },
+          ],
+        },
+      ],
+    },
+    tm1_get_hierarchy: {
+      name: "Region",
+      dimensionName: "Region",
+      elements: [
+        {
+          name: "EU",
+          type: "Consolidated",
+          level: 1,
+          parents: [],
+          children: [{ name: "DE", weight: 1 }],
+        },
+      ],
+    },
+    tm1_get_process_code: {
+      prolog: "# pro",
+      metadata: "",
+      data: "",
+      epilog: "",
+    },
+    tm1_get_process_datasource: { type: "None" },
+    tm1_get_cell_value: { value: 42 },
+    tm1_get_all_cube_rules: {
+      count: 1,
+      cubes: [{ cubeName: "Sales", rulesText: "[]=N:1;", skipCheck: false }],
+    },
+    tm1_get_all_processes_code: { count: 0, processes: [] },
+    tm1_get_element_attribute_values: {
+      dimensionName: "Region",
+      elementName: "EU",
+      attributes: [
+        { elementName: "EU", attributeName: "Currency", value: "EUR" },
+      ],
+    },
+  };
+
+  for (const [toolName, payload] of Object.entries(PHASE2_SAMPLES)) {
+    it(`${toolName}: structured output validates against schema`, () => {
+      const shape = OUTPUT_SCHEMA_MAP[toolName];
+      expect(shape, `missing schema for ${toolName}`).toBeDefined();
+      const result = z.object(shape).safeParse(payload);
+      if (!result.success) {
+        throw new Error(
+          `${toolName} validation failed: ${JSON.stringify(result.error.issues, null, 2)}`,
+        );
+      }
+    });
+  }
 });
