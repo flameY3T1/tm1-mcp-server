@@ -198,8 +198,34 @@ export class TM1Client extends TM1HttpClient {
     if (elements.length === 0) {
       return null;
     }
-    const colMember = `[${elements[0]}]`;
-    const whereParts = elements.slice(1).map((e) => `[${e}]`);
+
+    // Qualify each element with its dimension. Plain `[Element]` MDX is
+    // ambiguous when the same name exists in multiple dimensions (common in
+    // control cubes like `}ElementAttributes_*`, where attribute member
+    // `DisplayName` collides with the attribute dimension's element of the
+    // same name) and TM1 returns rte 77 "object not found".
+    const cubePath = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')?$expand=Dimensions($select=Name)`;
+    const cubeMeta = await this.request<{ Name: string; Dimensions: Array<{ Name: string }> }>(
+      "GET",
+      cubePath,
+    );
+    const dims = cubeMeta.Dimensions.map((d) => d.Name);
+    if (elements.length !== dims.length) {
+      throw new Error(
+        `Cube '${cubeName}' has ${dims.length} dimension(s) (${dims.join(", ")}) but ${elements.length} element(s) were given`,
+      );
+    }
+    const qualify = (dim: string, element: string): string => {
+      // Pre-qualified MDX member reference — pass through.
+      if (element.startsWith("[") && element.includes("].[")) return element;
+      // Single bracketed member like `[Foo]` — prepend dimension.
+      if (element.startsWith("[") && element.endsWith("]")) return `[${dim}].${element}`;
+      return `[${dim}].[${element}]`;
+    };
+    const qualified = dims.map((d, i) => qualify(d, elements[i]));
+
+    const colMember = qualified[0];
+    const whereParts = qualified.slice(1);
     const mdx =
       whereParts.length === 0
         ? `SELECT {${colMember}} ON COLUMNS FROM [${cubeName}]`

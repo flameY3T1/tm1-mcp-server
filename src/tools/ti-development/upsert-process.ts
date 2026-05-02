@@ -8,6 +8,7 @@ const dataSourceSchema = z
     type: z.enum(["None", "TM1CubeView", "TM1DimensionSubset", "ASCII", "ODBC", "TM1Process"]),
     dataSourceNameForServer: z.string().optional(),
     dataSourceNameForClient: z.string().optional(),
+    asciiDelimiterType: z.string().optional().describe("ASCII delimiter type (e.g. 'Character' or 'FixedWidth')"),
     asciiDelimiterChar: z.string().optional(),
     asciiQuoteCharacter: z.string().optional(),
     asciiHeaderRecords: z.number().optional(),

@@ -262,6 +262,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       results: [
         { file: "a.pro", processName: "A", status: "created" },
         { file: "b.pro", processName: "B", status: "updated" },
+        { file: "c.pro", processName: null, status: "preflight_failed" },
       ],
     },
     tm1_import_pro_file: {
@@ -414,7 +415,12 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_update_process_variables: { success: true, processName: "Load.Sales", variableCount: 5 },
     tm1_update_subset: { success: true, subsetName: "EU" },
     tm1_write_cells: { success: true, cellsWritten: 100 },
-    tm1_invalidate_callgraph_cache: { cleared: true, entriesBefore: 12 },
+    tm1_invalidate_callgraph_cache: {
+      cleared: 3,
+      entriesBefore: [
+        { key: "tm1://server/refs", ageMs: 1234, ttlRemainingMs: 60_000, buildMs: 250 },
+      ],
+    },
   };
 
   for (const [toolName, payload] of Object.entries(PHASE2_SAMPLES)) {

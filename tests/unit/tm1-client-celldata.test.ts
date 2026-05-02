@@ -69,65 +69,114 @@ describe("TM1Client – Cell Data Methods", () => {
   // ── getCellValue() ─────────────────────────────────────────────────────────
 
   describe("getCellValue()", () => {
-    it("should return a numeric cell value", async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockResponse({
-          ID: "cellset-001",
-          Cells: [{ Value: 42.5, FormattedValue: "42.50" }],
-        }),
-      );
+    const salesCubeMeta = {
+      Name: "SalesCube",
+      Dimensions: [{ Name: "Time" }, { Name: "Region" }, { Name: "Scenario" }],
+    };
+    const statusCubeMeta = {
+      Name: "StatusCube",
+      Dimensions: [{ Name: "Time" }, { Name: "Status" }],
+    };
+
+    it("should return a numeric cell value with hierarchically qualified MDX", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(salesCubeMeta))
+        .mockResolvedValueOnce(
+          mockResponse({
+            ID: "cellset-001",
+            Cells: [{ Value: 42.5, FormattedValue: "42.50" }],
+          }),
+        );
 
       const value = await client.getCellValue("SalesCube", ["Jan", "Germany", "Actual"]);
 
       expect(value).toBe(42.5);
 
-      const [url, opts] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/ExecuteMDX");
-      expect(opts.method).toBe("POST");
-      const body = JSON.parse(opts.body);
-      expect(body.MDX).toBe("SELECT {[Jan]} ON COLUMNS FROM [SalesCube] WHERE ([Germany],[Actual])");
+      const [cubeUrl, cubeOpts] = fetchSpy.mock.calls[0];
+      expect(cubeUrl).toContain("/api/v1/Cubes('SalesCube')");
+      expect(cubeUrl).toContain("$expand=Dimensions");
+      expect(cubeOpts.method).toBe("GET");
+
+      const [mdxUrl, mdxOpts] = fetchSpy.mock.calls[1];
+      expect(mdxUrl).toContain("/api/v1/ExecuteMDX");
+      expect(mdxOpts.method).toBe("POST");
+      const body = JSON.parse(mdxOpts.body);
+      expect(body.MDX).toBe(
+        "SELECT {[Time].[Jan]} ON COLUMNS FROM [SalesCube] WHERE ([Region].[Germany],[Scenario].[Actual])",
+      );
     });
 
     it("should return a string cell value", async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockResponse({
-          ID: "cellset-002",
-          Cells: [{ Value: "Active", FormattedValue: "Active" }],
-        }),
-      );
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(statusCubeMeta))
+        .mockResolvedValueOnce(
+          mockResponse({
+            ID: "cellset-002",
+            Cells: [{ Value: "Active", FormattedValue: "Active" }],
+          }),
+        );
 
       const value = await client.getCellValue("StatusCube", ["Q1", "Open"]);
       expect(value).toBe("Active");
     });
 
     it("should return null when cell is empty", async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockResponse({
-          ID: "cellset-003",
-          Cells: [{ Value: null, FormattedValue: "" }],
-        }),
-      );
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(salesCubeMeta))
+        .mockResolvedValueOnce(
+          mockResponse({
+            ID: "cellset-003",
+            Cells: [{ Value: null, FormattedValue: "" }],
+          }),
+        );
 
       const value = await client.getCellValue("SalesCube", ["Feb", "France", "Budget"]);
       expect(value).toBeNull();
     });
 
     it("should return null when Cells array is empty", async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockResponse({ ID: "cellset-004", Cells: [] }),
-      );
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(salesCubeMeta))
+        .mockResolvedValueOnce(mockResponse({ ID: "cellset-004", Cells: [] }));
 
       const value = await client.getCellValue("SalesCube", ["Mar", "UK", "Actual"]);
       expect(value).toBeNull();
     });
 
     it("should return null when Cells is missing from response", async () => {
-      fetchSpy.mockResolvedValueOnce(
-        mockResponse({ ID: "cellset-005" }),
-      );
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(salesCubeMeta))
+        .mockResolvedValueOnce(mockResponse({ ID: "cellset-005" }));
 
       const value = await client.getCellValue("SalesCube", ["Apr", "US", "Actual"]);
       expect(value).toBeNull();
+    });
+
+    it("should pass through pre-qualified `[Dim].[Element]` element strings", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(salesCubeMeta))
+        .mockResolvedValueOnce(
+          mockResponse({ ID: "cellset-006", Cells: [{ Value: 1, FormattedValue: "1" }] }),
+        );
+
+      await client.getCellValue("SalesCube", [
+        "[Time].[Jan]",
+        "[Region].[Germany]",
+        "[Scenario].[Actual]",
+      ]);
+
+      const body = JSON.parse(fetchSpy.mock.calls[1][1].body);
+      expect(body.MDX).toBe(
+        "SELECT {[Time].[Jan]} ON COLUMNS FROM [SalesCube] WHERE ([Region].[Germany],[Scenario].[Actual])",
+      );
+    });
+
+    it("should throw on dimension/element count mismatch", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(salesCubeMeta));
+
+      await expect(
+        client.getCellValue("SalesCube", ["Jan", "Germany"]),
+      ).rejects.toThrow(/3 dimension\(s\).*2 element\(s\)/);
     });
   });
 

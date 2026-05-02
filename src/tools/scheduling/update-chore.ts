@@ -28,6 +28,9 @@ export function registerUpdateChore(server: McpServer, tm1Client: TM1Client): vo
     },
     async ({ name, ...updates }) => {
       try {
+        if (updates.startTime !== undefined && !/(?:Z|[+-]\d{2}:?\d{2})$/.test(updates.startTime)) {
+          updates.startTime = `${updates.startTime}Z`;
+        }
         await tm1Client.updateChore(name, updates);
         return { content: [{ type: "text", text: `Chore "${name}" updated.` }] };
       } catch (err) {

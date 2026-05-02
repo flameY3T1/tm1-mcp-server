@@ -93,8 +93,15 @@ export const MutationResultSchema = z
 
 // Bespoke shapes for mutations whose payload is rich enough to type explicitly.
 export const InvalidateCallgraphCacheResultSchema = z.object({
-  cleared: z.boolean(),
-  entriesBefore: z.number().int(),
+  cleared: z.number().int(),
+  entriesBefore: z.array(
+    z.object({
+      key: z.string(),
+      ageMs: z.number(),
+      ttlRemainingMs: z.number(),
+      buildMs: z.number(),
+    }),
+  ),
 });
 
 export const BulkUpsertElementsResultSchema = z.object({
@@ -324,7 +331,7 @@ export const UpsertProcessResultSchema = z.object({
 const InstallBundleEntrySchema = z
   .object({
     file: z.string().optional(),
-    processName: z.string().optional(),
+    processName: z.string().nullable().optional(),
     status: z.string(),
   })
   .passthrough();

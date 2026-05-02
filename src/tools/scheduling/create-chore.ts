@@ -2,6 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 
+function coerceUtc(iso: string): string {
+  return /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`;
+}
+
 const ChoreStepSchema = z.object({
   process: z.string().describe("TI process name"),
   parameters: z.array(z.object({
@@ -16,7 +20,9 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
     "Create a new TM1 chore with a schedule and list of TI processes to run.",
     {
       name: z.string().describe("Chore name"),
-      startTime: z.string().describe("Start time in ISO 8601 format, e.g. '2025-01-01T06:00:00'"),
+      startTime: z.string().describe(
+        "Start time in ISO 8601 format with timezone (Z or ±HH:MM). If no offset is given, UTC ('Z') is auto-appended. Example: '2025-01-01T06:00:00Z'.",
+      ),
       active: z.boolean().optional().default(false)
         .describe("Whether to activate the chore immediately (default: false)"),
       dstSensitive: z.boolean().optional().default(true)
@@ -33,7 +39,7 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
     },
     async ({ name, startTime, active, dstSensitive, executionMode, frequency, steps }) => {
       try {
-        await tm1Client.createChore({ name, startTime, active, dstSensitive, executionMode, frequency, steps });
+        await tm1Client.createChore({ name, startTime: coerceUtc(startTime), active, dstSensitive, executionMode, frequency, steps });
         return {
           content: [{
             type: "text" as const,
