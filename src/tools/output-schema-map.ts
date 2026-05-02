@@ -8,7 +8,9 @@ import type { ZodRawShape } from "zod";
 import { z } from "zod";
 import { pageShapeFor } from "./schemas/common.js";
 import {
+  CallgraphResultSchema,
   CellValueSchema,
+  ChoreGraphResultSchema,
   ChoreItemSchema,
   ClientItemSchema,
   CopyProcessResultSchema,
@@ -24,9 +26,11 @@ import {
   ImportProFileResultSchema,
   InstallProBundleResultSchema,
   MdxResultSchema,
+  ObjectUsageResultSchema,
   ProcessCodeSchema,
   ProcessItemSchema,
   ProcessResultSchema,
+  SearchCodeResultSchema,
   SessionItemSchema,
   SubsetItemSchema,
   ThreadItemSchema,
@@ -92,4 +96,10 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   tm1_install_pro_bundle: InstallProBundleResultSchema.shape,
   tm1_import_pro_file: ImportProFileResultSchema.shape,
   tm1_copy_process: CopyProcessResultSchema.shape,
+
+  // ── Phase 2e: analysis tools ──────────────────────────────────────────────
+  tm1_analyze_callgraph: CallgraphResultSchema.shape,
+  tm1_analyze_chore_graph: ChoreGraphResultSchema.shape,
+  tm1_analyze_object_usage: ObjectUsageResultSchema.shape,
+  tm1_search_code: SearchCodeResultSchema.shape,
 };

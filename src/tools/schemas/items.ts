@@ -287,3 +287,60 @@ export const CopyProcessResultSchema = z.object({
   sourceName: z.string(),
   targetName: z.string(),
 });
+
+// ── Phase 2e: analysis tools ─────────────────────────────────────────────────
+
+// analyze_callgraph emits one of:
+//   - warning shape {warning, indexedProcessCount}
+//   - tree shape    {start, direction, mode, tree}
+//   - summary shape {start, direction, mode, summary}
+// Modeled as one passthrough schema with all fields optional except none.
+export const CallgraphResultSchema = z
+  .object({
+    warning: z.string().optional(),
+    indexedProcessCount: z.number().int().optional(),
+    start: z.string().optional(),
+    direction: z.string().optional(),
+    mode: z.string().optional(),
+    summary: z.unknown().optional(),
+    tree: z.unknown().optional(),
+  })
+  .passthrough();
+
+export const ChoreGraphResultSchema = z.object({
+  choreName: z.string(),
+  tasks: z.array(
+    z
+      .object({
+        step: z.number().int(),
+        processName: z.string(),
+        choreParams: z.unknown(),
+        tree: z.unknown(),
+      })
+      .passthrough(),
+  ),
+});
+
+export const ObjectUsageResultSchema = z.object({
+  kind: z.string(),
+  name: z.string(),
+  count: z.number().int(),
+  usages: z.array(z.unknown()),
+});
+
+export const SearchCodeResultSchema = z.object({
+  pattern: z.string(),
+  caseSensitive: z.boolean(),
+  tabsSearched: z.array(z.string()),
+  processesScanned: z.number().int(),
+  matchCount: z.number().int(),
+  truncated: z.boolean(),
+  matches: z.array(
+    z.object({
+      process: z.string(),
+      tab: z.string(),
+      line: z.number().int(),
+      text: z.string(),
+    }),
+  ),
+});

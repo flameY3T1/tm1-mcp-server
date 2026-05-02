@@ -54,9 +54,12 @@ const SAMPLES: Record<string, unknown[]> = {
 };
 
 describe("OUTPUT_SCHEMA_MAP", () => {
-  it("declares output schemas for Phase 1 + Phase 2a/2b/2c/2d tools", () => {
+  it("declares output schemas for Phase 1 + Phase 2a/2b/2c/2d/2e tools", () => {
     expect(Object.keys(OUTPUT_SCHEMA_MAP).sort()).toEqual(
       [
+        "tm1_analyze_callgraph",
+        "tm1_analyze_chore_graph",
+        "tm1_analyze_object_usage",
         "tm1_check_writable_coords",
         "tm1_copy_process",
         "tm1_diff_process_with_file",
@@ -85,6 +88,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_list_subsets",
         "tm1_list_threads",
         "tm1_list_views",
+        "tm1_search_code",
         "tm1_upsert_process",
         "tm1_validate_process_refs",
       ],
@@ -244,6 +248,41 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       success: true,
       sourceName: "Load.Sales",
       targetName: "Load.Sales.Copy",
+    },
+    tm1_analyze_callgraph: {
+      start: "Load.Sales",
+      direction: "downstream",
+      mode: "tree",
+      tree: { name: "Load.Sales", children: [] },
+    },
+    tm1_analyze_chore_graph: {
+      choreName: "Daily.Load",
+      tasks: [
+        {
+          step: 0,
+          processName: "Load.Sales",
+          choreParams: {},
+          tree: { name: "Load.Sales", children: [] },
+        },
+      ],
+    },
+    tm1_analyze_object_usage: {
+      kind: "cube",
+      name: "Sales",
+      count: 2,
+      usages: [{ process: "Load.Sales" }, { process: "Clear.Sales" }],
+    },
+    tm1_search_code: {
+      pattern: "CellPutN",
+      caseSensitive: false,
+      tabsSearched: ["prolog", "data"],
+      processesScanned: 50,
+      matchCount: 2,
+      truncated: false,
+      matches: [
+        { process: "Load.Sales", tab: "data", line: 12, text: "CellPutN(...)" },
+        { process: "Load.Costs", tab: "data", line: 8, text: "CellPutN(...)" },
+      ],
     },
   };
 
