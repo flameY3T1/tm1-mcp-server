@@ -207,3 +207,17 @@ export const ValidateProcessRefsResultSchema = z.object({
   unresolved: z.number().int(),
   issues: z.array(z.unknown()),
 });
+
+export const MdxResultSchema = z.object({
+  cells: z.array(
+    z.object({ value: CellValueSchema, formattedValue: z.string() }),
+  ),
+  axes: z.array(MdxAxisSchema),
+  totalCellCount: z.number().int(),
+});
+
+export const ProcessResultSchema = z.object({
+  success: z.boolean(),
+  processErrorStatus: z.string(),
+  errorLogFile: z.string().optional(),
+});

@@ -54,10 +54,12 @@ const SAMPLES: Record<string, unknown[]> = {
 };
 
 describe("OUTPUT_SCHEMA_MAP", () => {
-  it("declares output schemas for paginated list_* (Phase 1) and 11 Phase-2 tools", () => {
+  it("declares output schemas for Phase 1 + Phase 2a/2b/2c tools", () => {
     expect(Object.keys(OUTPUT_SCHEMA_MAP).sort()).toEqual(
       [
         "tm1_check_writable_coords",
+        "tm1_execute_mdx",
+        "tm1_execute_process",
         "tm1_get_all_cube_rules",
         "tm1_get_all_processes_code",
         "tm1_get_cell_value",
@@ -174,6 +176,21 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       attributes: [
         { elementName: "EU", attributeName: "Currency", value: "EUR" },
       ],
+    },
+    tm1_execute_mdx: {
+      cells: [{ value: 100, formattedValue: "100.00" }],
+      axes: [
+        {
+          tuples: [
+            { members: [{ name: "EU", hierarchyName: "Region" }] },
+          ],
+        },
+      ],
+      totalCellCount: 1,
+    },
+    tm1_execute_process: {
+      success: true,
+      processErrorStatus: "CompletedSuccessfully",
     },
   };
 

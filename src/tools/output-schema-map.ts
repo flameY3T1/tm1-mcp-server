@@ -19,8 +19,10 @@ import {
   FilenameItemSchema,
   GroupItemSchema,
   HierarchySchema,
+  MdxResultSchema,
   ProcessCodeSchema,
   ProcessItemSchema,
+  ProcessResultSchema,
   SessionItemSchema,
   SubsetItemSchema,
   ThreadItemSchema,
@@ -74,4 +76,8 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
     elementName: z.string(),
     attributes: z.array(ElementAttributeValueSchema),
   },
+
+  // ── Phase 2c: execute_* (JSON-returning subset) ───────────────────────────
+  tm1_execute_mdx: MdxResultSchema.shape,
+  tm1_execute_process: ProcessResultSchema.shape,
 };
