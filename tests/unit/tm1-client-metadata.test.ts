@@ -223,8 +223,8 @@ describe("TM1Client – Metadata Methods", () => {
             {
               Name: "ImportData",
               Parameters: [
-                { Name: "pFilePath", Type: 2, Value: "/data/input.csv", Prompt: "File path" },
-                { Name: "pYear", Type: 1, Value: 2024 },
+                { Name: "pFilePath", Type: "String", Value: "/data/input.csv", Prompt: "File path" },
+                { Name: "pYear", Type: "Numeric", Value: 2024 },
               ],
             },
             {
@@ -252,18 +252,18 @@ describe("TM1Client – Metadata Methods", () => {
       ]);
 
       const [url] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/Processes?$expand=Parameters");
+      expect(url).toContain("/api/v1/Processes?$select=Name,Parameters");
     });
 
-    it("should map Type 1 to Numeric and Type 2 to String", async () => {
+    it("should map Type 'Numeric' / 'String' from TM1 v11 API", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           value: [
             {
               Name: "TestProc",
               Parameters: [
-                { Name: "numParam", Type: 1, Value: 42 },
-                { Name: "strParam", Type: 2, Value: "hello" },
+                { Name: "numParam", Type: "Numeric", Value: 42 },
+                { Name: "strParam", Type: "String", Value: "hello" },
               ],
             },
           ],

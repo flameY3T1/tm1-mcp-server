@@ -111,31 +111,33 @@ export class TM1Client extends TM1HttpClient {
    * GET /api/v1/Processes?$expand=Parameters
    */
   async getProcesses(): Promise<Process[]> {
-    // First try with $expand=Parameters, fall back to plain list if server doesn't support it
+    // Parameters is a structural (complex) property, not a navigation property
+    // — TM1 v11 rejects $expand=Parameters with a syntax error. Use $select
+    // instead, which returns Parameters inline. Param.Type comes back as the
+    // already-decoded string "Numeric" / "String" (not the legacy int code).
     try {
       const response = await this.request<{
         value: Array<{
           Name: string;
-          Parameters: Array<{
+          Parameters?: Array<{
             Name: string;
-            Type: number;
+            Type: string;
             Value: string | number;
             Prompt?: string;
           }>;
         }>;
-      }>("GET", "/api/v1/Processes?$expand=Parameters");
+      }>("GET", "/api/v1/Processes?$select=Name,Parameters");
 
       return response.value.map((p) => ({
         name: p.Name,
-        parameters: p.Parameters.map((param): ProcessParameter => ({
+        parameters: (p.Parameters ?? []).map((param): ProcessParameter => ({
           name: param.Name,
-          type: param.Type === 1 ? "Numeric" : "String",
+          type: param.Type === "Numeric" ? "Numeric" : "String",
           defaultValue: param.Value,
           ...(param.Prompt ? { prompt: param.Prompt } : {}),
         })),
       }));
     } catch {
-      // Fallback: load processes without parameters (for servers that don't support $expand on Parameters)
       const response = await this.request<{
         value: Array<{ Name: string }>;
       }>("GET", "/api/v1/Processes?$select=Name");

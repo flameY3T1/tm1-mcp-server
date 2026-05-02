@@ -79,7 +79,7 @@ describe("Property 4: Metadaten-Antwort-Vollständigkeit", () => {
   });
 
   it("getProcesses returns all processes with name and parameters", async () => {
-    const paramArb = fc.record({ Name: fc.string({ minLength: 1, maxLength: 20 }), Type: fc.constantFrom(1, 2), Value: fc.oneof(fc.string({ maxLength: 30 }), fc.integer()) });
+    const paramArb = fc.record({ Name: fc.string({ minLength: 1, maxLength: 20 }), Type: fc.constantFrom("Numeric", "String"), Value: fc.oneof(fc.string({ maxLength: 30 }), fc.integer()) });
     const processArb = fc.record({ Name: fc.string({ minLength: 1, maxLength: 30 }), Parameters: fc.array(paramArb, { minLength: 0, maxLength: 5 }) });
     await fc.assert(fc.asyncProperty(fc.array(processArb, { minLength: 0, maxLength: 10 }), async (apiProcs) => {
       const f = vi.fn().mockResolvedValue(mockResp({ value: apiProcs }));
@@ -91,7 +91,7 @@ describe("Property 4: Metadaten-Antwort-Vollständigkeit", () => {
         expect(procs[i].parameters).toHaveLength(apiProcs[i].Parameters.length);
         for (let j = 0; j < apiProcs[i].Parameters.length; j++) {
           expect(procs[i].parameters[j].name).toBe(apiProcs[i].Parameters[j].Name);
-          expect(procs[i].parameters[j].type).toBe(apiProcs[i].Parameters[j].Type === 1 ? "Numeric" : "String");
+          expect(procs[i].parameters[j].type).toBe(apiProcs[i].Parameters[j].Type);
           expect(procs[i].parameters[j].defaultValue).toBe(apiProcs[i].Parameters[j].Value);
         }
       }
