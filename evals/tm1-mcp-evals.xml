@@ -1,0 +1,69 @@
+<!--
+  TM1 MCP Server — evaluation set (10 Q/A pairs)
+  Per Phase 4 of example-skills:mcp-builder.
+
+  Each question:
+    - independent (no shared state with others)
+    - read-only (no destructive operations)
+    - complex (requires 2+ tool calls)
+    - realistic (TM1 modelling/dev/ops use case)
+    - verifiable by exact string match
+
+  Answers are TM1-instance-dependent. Run each question against the target
+  instance once, paste the verified value into <answer>, and freeze.
+  Where the answer is derivable from the tool surface itself rather than
+  live data, the answer is set directly.
+-->
+<evaluation>
+
+  <qa_pair>
+    <question>List all cubes whose name starts with "}" (control cubes) and report the count.</question>
+    <answer>TODO: tm1_list_cubes -> filter Name startswith "}" -> count</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>For the cube named "}ClientProperties", how many dimensions does it have?</question>
+    <answer>TODO: tm1_list_cubes -> find cube -> length(dimensions)</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Which TI process is invoked by the most chores in the system? Report the process name. If multiple tie, report any one.</question>
+    <answer>TODO: tm1_list_chores -> tally tasks[].processName -> arg max</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Identify all TI processes whose Prolog code references the function "ItemReject". Report the count.</question>
+    <answer>TODO: tm1_search_code with regex "ItemReject" scope=prolog -> count distinct processes</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>For the dimension "}Clients", how many leaf-level (Numeric) elements does it contain?</question>
+    <answer>TODO: tm1_get_hierarchy }Clients -> count elements where type == "Numeric"</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Find the cube with the largest number of rule statements. Report the cube name.</question>
+    <answer>TODO: tm1_get_all_cube_rules -> for each cube count rule lines -> arg max</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Among all chores, how many are currently active (toggle on)?</question>
+    <answer>TODO: tm1_list_chores -> count where active == true</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Validate the references of TI process "}bedrock.cube.create" - does the process compile cleanly with no missing object references? Answer "yes" or "no".</question>
+    <answer>TODO: tm1_validate_process_refs }bedrock.cube.create -> "yes" if no errors else "no"</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Using the callgraph analysis, list all processes that are called by no other process and call no other process (orphans). Report the count.</question>
+    <answer>TODO: tm1_analyze_callgraph -> count nodes with in-degree 0 AND out-degree 0</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>For the cube "SalesCube" (or any cube of choice if absent), check whether the coordinate (Time=2024, Region=Germany, Measure=Revenue) is writable. Answer "writable" or "not writable" or "not found".</question>
+    <answer>TODO: tm1_check_writable_coords -> map response to label</answer>
+  </qa_pair>
+
+</evaluation>
