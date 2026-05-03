@@ -28,11 +28,21 @@ export function registerUpdateChore(server: McpServer, tm1Client: TM1Client): vo
     },
     async ({ name, ...updates }) => {
       try {
+        let coerced = false;
         if (updates.startTime !== undefined && !/(?:Z|[+-]\d{2}:?\d{2})$/.test(updates.startTime)) {
           updates.startTime = `${updates.startTime}Z`;
+          coerced = true;
         }
         await tm1Client.updateChore(name, updates);
-        return { content: [{ type: "text", text: `Chore "${name}" updated.` }] };
+        const payload = {
+          success: true,
+          name,
+          ...(updates.startTime !== undefined ? { startTime: updates.startTime } : {}),
+          ...(coerced ? {
+            warning: `startTime had no timezone offset; auto-appended 'Z' → '${updates.startTime}'. Pass an explicit offset to silence this.`,
+          } : {}),
+        };
+        return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
       }

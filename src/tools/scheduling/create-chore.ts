@@ -2,8 +2,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 
-function coerceUtc(iso: string): string {
-  return /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`;
+// TM1's chore endpoint rejects DateTimeOffset strings without a UTC marker. If the caller
+// omits the offset we append 'Z' and report it back so they can fix the input upstream.
+function coerceUtc(iso: string): { value: string; coerced: boolean } {
+  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso);
+  return hasOffset ? { value: iso, coerced: false } : { value: `${iso}Z`, coerced: true };
 }
 
 const ChoreStepSchema = z.object({
@@ -39,11 +42,21 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
     },
     async ({ name, startTime, active, dstSensitive, executionMode, frequency, steps }) => {
       try {
-        await tm1Client.createChore({ name, startTime: coerceUtc(startTime), active, dstSensitive, executionMode, frequency, steps });
+        const { value: normalizedStartTime, coerced } = coerceUtc(startTime);
+        await tm1Client.createChore({ name, startTime: normalizedStartTime, active, dstSensitive, executionMode, frequency, steps });
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ success: true, name, stepCount: steps.length, active }, null, 2),
+            text: JSON.stringify({
+              success: true,
+              name,
+              stepCount: steps.length,
+              active,
+              startTime: normalizedStartTime,
+              ...(coerced ? {
+                warning: `startTime had no timezone offset; auto-appended 'Z' → '${normalizedStartTime}'. Pass an explicit offset to silence this.`,
+              } : {}),
+            }, null, 2),
           }],
         };
       } catch (err) {
