@@ -66,12 +66,35 @@ export class TM1Client extends TM1HttpClient {
   /**
    * Get a specific hierarchy with its elements, including parent/child relationships.
    * GET /api/v1/Dimensions('{dimensionName}')/Hierarchies('{hierarchyName}')?$expand=Elements(...)
+   *
+   * Optional opts apply server-side filters (level, levelMax, elementType) and topN
+   * truncation. Filtered-out elements are removed from parents/children arrays of
+   * remaining elements to avoid dangling references.
    */
-  async getHierarchy(dimensionName: string, hierarchyName: string): Promise<Hierarchy> {
+  async getHierarchy(
+    dimensionName: string,
+    hierarchyName: string,
+    opts?: {
+      level?: number;
+      levelMax?: number;
+      elementType?: "Numeric" | "String" | "Consolidated" | "All";
+      topN?: number;
+    },
+  ): Promise<Hierarchy> {
     // TM1 11.8 does not expose `Children` on Element — only `Parents`. Fetch Parents
     // and derive children server-side. Weight defaults to 1 (actual weights live on
     // /Edges; not fetched here to keep the query cheap).
-    const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')?$expand=Elements($select=Name,Type,Level;$expand=Parents($select=Name))`;
+    const elementClauses: string[] = ["$select=Name,Type,Level", "$expand=Parents($select=Name)"];
+    const filters: string[] = [];
+    if (opts?.level !== undefined) filters.push(`Level eq ${opts.level}`);
+    if (opts?.levelMax !== undefined) filters.push(`Level le ${opts.levelMax}`);
+    if (opts?.elementType && opts.elementType !== "All") {
+      filters.push(`Type eq '${opts.elementType}'`);
+    }
+    if (filters.length > 0) elementClauses.push(`$filter=${filters.join(" and ")}`);
+    if (opts?.topN !== undefined) elementClauses.push(`$top=${opts.topN}`);
+
+    const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')?$expand=Elements(${elementClauses.join(";")})`;
     const response = await this.request<{
       Name: string;
       Elements: Array<{
@@ -82,9 +105,11 @@ export class TM1Client extends TM1HttpClient {
       }>;
     }>("GET", path);
 
+    const keptNames = new Set(response.Elements.map((e) => e.Name));
     const childrenByParent = new Map<string, Array<{ name: string; weight: number }>>();
     for (const e of response.Elements) {
       for (const p of e.Parents ?? []) {
+        if (!keptNames.has(p.Name)) continue;
         const list = childrenByParent.get(p.Name) ?? [];
         list.push({ name: e.Name, weight: 1 });
         childrenByParent.set(p.Name, list);
@@ -95,7 +120,7 @@ export class TM1Client extends TM1HttpClient {
       name: e.Name,
       type: e.Type as HierarchyElement["type"],
       level: e.Level,
-      parents: (e.Parents ?? []).map((p) => p.Name),
+      parents: (e.Parents ?? []).filter((p) => keptNames.has(p.Name)).map((p) => p.Name),
       children: childrenByParent.get(e.Name) ?? [],
     }));
 
