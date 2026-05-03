@@ -118,7 +118,8 @@ export const BulkUpsertElementsResultSchema = z.object({
 
 export const ProcessItemSchema = z.object({
   name: z.string(),
-  parameters: z.array(ProcessParameterSchema),
+  // Omitted when caller passes fields=['name'] to tm1_list_processes for compact output.
+  parameters: z.array(ProcessParameterSchema).optional(),
 });
 
 export const ChoreItemSchema = z.object({
