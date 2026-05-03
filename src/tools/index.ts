@@ -89,6 +89,7 @@ import { registerGetMessageLog } from "./operations/get-message-log.js";
 import { registerGetThreads } from "./operations/get-threads.js";
 import { registerGetServerInfo } from "./operations/get-server-info.js";
 import { registerGetServerCapabilities } from "./operations/get-server-capabilities.js";
+import { registerGetServerState } from "./operations/get-server-state.js";
 import { registerGetTransactionLog } from "./operations/get-transaction-log.js";
 import { registerGetSessions } from "./operations/get-sessions.js";
 
@@ -201,6 +202,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerGetThreads(server, tm1Client);
   registerGetServerInfo(server, tm1Client);
   registerGetServerCapabilities(server, tm1Client);
+  registerGetServerState(server, tm1Client);
   registerGetTransactionLog(server, tm1Client);
   registerGetSessions(server, tm1Client);
 
