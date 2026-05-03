@@ -34,6 +34,7 @@ import { registerCheckProcessCode } from "./ti-development/check-process-code.js
 import { registerGetAllProcessesCode } from "./ti-development/get-all-processes-code.js";
 import { registerSearchCode } from "./ti-development/search-code.js";
 import { registerImportProFile } from "./ti-development/import-pro-file.js";
+import { registerExportProcessToPro } from "./ti-development/export-process-to-pro.js";
 import { registerDiffProcessWithFile } from "./ti-development/diff-process-with-file.js";
 import { registerValidateProcessRefs } from "./ti-development/validate-process-refs.js";
 import { registerUpsertProcess } from "./ti-development/upsert-process.js";
@@ -147,6 +148,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerGetAllProcessesCode(server, tm1Client);
   registerSearchCode(server, tm1Client);
   registerImportProFile(server, tm1Client);
+  registerExportProcessToPro(server, tm1Client);
   registerDiffProcessWithFile(server, tm1Client);
   registerValidateProcessRefs(server, tm1Client);
   registerUpsertProcess(server, tm1Client);
