@@ -88,14 +88,16 @@ export class TM1Client extends TM1HttpClient {
     const filters: string[] = [];
     if (opts?.level !== undefined) filters.push(`Level eq ${opts.level}`);
     if (opts?.levelMax !== undefined) filters.push(`Level le ${opts.levelMax}`);
-    if (opts?.elementType && opts.elementType !== "All") {
-      filters.push(`Type eq '${opts.elementType}'`);
-    }
+    // elementType filter is applied client-side (TM1 OData rejects `Type eq 'Consolidated'`
+    // — the property is an enum, not a string. Type filter happens before topN/server-side
+    // filters because we cannot reliably express it in $filter without an enum-cast that
+    // varies between TM1 versions.) When elementType is set, $top must also move client-side.
+    const filterByType = opts?.elementType && opts.elementType !== "All";
     if (filters.length > 0) elementClauses.push(`$filter=${filters.join(" and ")}`);
-    if (opts?.topN !== undefined) elementClauses.push(`$top=${opts.topN}`);
+    if (opts?.topN !== undefined && !filterByType) elementClauses.push(`$top=${opts.topN}`);
 
     const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')?$expand=Elements(${elementClauses.join(";")})`;
-    const response = await this.request<{
+    const rawResponse = await this.request<{
       Name: string;
       Elements: Array<{
         Name: string;
@@ -104,6 +106,13 @@ export class TM1Client extends TM1HttpClient {
         Parents?: Array<{ Name: string }>;
       }>;
     }>("GET", path);
+
+    let filteredElements = rawResponse.Elements;
+    if (filterByType) {
+      filteredElements = filteredElements.filter((e) => e.Type === opts!.elementType);
+      if (opts?.topN !== undefined) filteredElements = filteredElements.slice(0, opts.topN);
+    }
+    const response = { Name: rawResponse.Name, Elements: filteredElements };
 
     const keptNames = new Set(response.Elements.map((e) => e.Name));
     const childrenByParent = new Map<string, Array<{ name: string; weight: number }>>();
