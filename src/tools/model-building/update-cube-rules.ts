@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 
 export function registerUpdateCubeRules(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -20,10 +21,12 @@ export function registerUpdateCubeRules(server: McpServer, tm1Client: TM1Client)
       try {
         await tm1Client.updateCubeRules(cube, rules, skipCheck);
         const lineCount = rules.split("\n").length;
+        // Rule changes shift call edges (DB(), feeders) — drop callgraph TTL early.
+        const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
         return {
           content: [{
             type: "text",
-            text: `Rules for cube "${cube}" updated (${lineCount} lines, SkipCheck: ${skipCheck}).`,
+            text: `Rules for cube "${cube}" updated (${lineCount} lines, SkipCheck: ${skipCheck}, callgraph cleared: ${callgraphEntriesCleared}).`,
           }],
         };
       } catch (err) {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
+import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 
 const dataSourceSchema = z
   .object({
@@ -96,12 +97,21 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
           trail.push("updateProcessDataSource");
         }
 
+        // Process body/parameters/datasource may have changed call sites — drop the
+        // 60s callgraph TTL so the next analysis sees fresh references instead of stale graph.
+        const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
+
         return {
           content: [
             {
               type: "text" as const,
               text: JSON.stringify(
-                { processName: name, action: exists ? "updated" : "created", appliedSteps: trail },
+                {
+                  processName: name,
+                  action: exists ? "updated" : "created",
+                  appliedSteps: trail,
+                  callgraphEntriesCleared,
+                },
                 null,
                 2,
               ),
