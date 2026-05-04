@@ -1,5 +1,5 @@
 import { TM1Error, TM1ErrorCode } from "./types.js";
-import type { Cube, Dimension, Hierarchy, HierarchyElement, Process, ProcessParameter, ProcessVariable, ProcessResult, ProcessCode, DataSource, Chore, CellValue, MdxResult, MdxAxis, ViewResult, ElementCreate, ElementUpdate, Thread, MessageLogEntry, CubeRules, ChoreCreate, ServerInfo, CompileResult, ProcessCheckInput, CubeView, TransactionLogEntry, Subset, SubsetCreate, ElementAttributeValue, Client, ClientCreate, ClientUpdate, Group, Session, RuleSyntaxError } from "./types.js";
+import type { Cube, Dimension, Hierarchy, HierarchyElement, Process, ProcessParameter, ProcessVariable, ProcessResult, ProcessCode, DataSource, Chore, CellValue, MdxResult, MdxAxis, ViewResult, ElementCreate, ElementUpdate, Thread, MessageLogEntry, CubeRules, ChoreCreate, ServerInfo, CompileResult, ProcessCheckInput, CubeView, TransactionLogEntry, Subset, SubsetCreate, ElementAttributeValue, Client, ClientCreate, ClientUpdate, Group, Session, RuleSyntaxError, ErrorLogFile } from "./types.js";
 import { TM1HttpClient } from "./tm1-client/http.js";
 
 export class TM1Client extends TM1HttpClient {
@@ -974,6 +974,58 @@ export class TM1Client extends TM1HttpClient {
       level: (e.Level ?? "").toUpperCase(),
       message: e.Message ?? e.Text ?? "",
     }));
+  }
+
+  /**
+   * List TI process error log files.
+   * GET /api/v1/ErrorLogFiles
+   * TM1 v11 OData exposes only `Filename` on this entity set (no LastUpdated/$select/$orderby
+   * support). Sorting is filename-descending — filenames embed a yyyymmddhhmmss timestamp,
+   * so lexical desc sort matches chronological newest-first.
+   */
+  async getErrorLogFiles(opts: { processName?: string; since?: string; top?: number } = {}): Promise<ErrorLogFile[]> {
+    const top = opts.top ?? 50;
+    const response = await this.request<{ value: Array<{ Filename?: string }> }>(
+      "GET",
+      "/api/v1/ErrorLogFiles",
+    );
+    let entries = response.value
+      .map((e): ErrorLogFile => ({ filename: e.Filename ?? "" }))
+      .filter((e) => e.filename);
+
+    if (opts.processName) {
+      const proc = opts.processName;
+      // TM1 pattern: TM1ProcessError_<ts>_<id>_<proc>.log (proc at end before .log)
+      // Legacy/manual pattern: <proc>_<ts>.log (proc at start)
+      const suffix = `_${proc}.log`;
+      const prefix = `${proc}_`;
+      entries = entries.filter(
+        (e) => e.filename.endsWith(suffix) || e.filename.startsWith(prefix) || e.filename === proc,
+      );
+    }
+    if (opts.since) {
+      const sinceCompact = opts.since.replace(/[^0-9]/g, "").slice(0, 14);
+      if (sinceCompact.length >= 8) {
+        entries = entries.filter((e) => {
+          // TM1 pattern: TM1ProcessError_YYYYMMDDHHMMSS_... — timestamp after first underscore.
+          // Fallback: any embedded YYYYMMDDHHMMSS-style group.
+          const m = e.filename.match(/(?:TM1ProcessError_|_)(\d{14})/) ?? e.filename.match(/_(\d{8,14})\.log$/i);
+          return m ? m[1] >= sinceCompact.slice(0, m[1].length) : true;
+        });
+      }
+    }
+    // Filename embeds yyyymmddhhmmss → lexical desc ≈ chronological newest-first.
+    entries.sort((a, b) => (a.filename < b.filename ? 1 : a.filename > b.filename ? -1 : 0));
+    return entries.slice(0, top);
+  }
+
+  /**
+   * Fetch the raw text content of a single TI error log file.
+   * GET /api/v1/ErrorLogFiles('<filename>')/Content
+   */
+  async getErrorLogContent(filename: string): Promise<string> {
+    const path = `/api/v1/ErrorLogFiles('${encodeURIComponent(filename)}')/Content`;
+    return await this.requestRaw("GET", path);
   }
 
   /**

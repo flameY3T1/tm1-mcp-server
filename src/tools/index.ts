@@ -93,6 +93,8 @@ import { registerGetServerCapabilities } from "./operations/get-server-capabilit
 import { registerGetServerState } from "./operations/get-server-state.js";
 import { registerGetTransactionLog } from "./operations/get-transaction-log.js";
 import { registerGetSessions } from "./operations/get-sessions.js";
+import { registerListErrorLogs } from "./operations/list-error-logs.js";
+import { registerGetErrorLogContent } from "./operations/get-error-log-content.js";
 
 // File operations tools
 import { registerListFiles } from "./fileops/list-files.js";
@@ -207,6 +209,8 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerGetServerState(server, tm1Client);
   registerGetTransactionLog(server, tm1Client);
   registerGetSessions(server, tm1Client);
+  registerListErrorLogs(server, tm1Client);
+  registerGetErrorLogContent(server, tm1Client);
 
   // File operations
   registerListFiles(server, tm1Client);

@@ -72,6 +72,20 @@ export const TransactionLogEntrySchema = z.object({
   newValue: CellValueSchema,
 });
 
+export const ErrorLogFileSchema = z.object({
+  filename: z.string(),
+  lastUpdated: z.string().optional(),
+});
+
+export const ErrorLogContentResultSchema = z.object({
+  filename: z.string(),
+  totalBytes: z.number().int(),
+  returnedBytes: z.number().int(),
+  truncated: z.boolean(),
+  truncationReason: z.string().optional(),
+  content: z.string(),
+});
+
 export const FileContentResultSchema = z.object({
   fileName: z.string(),
   totalBytes: z.number().int(),

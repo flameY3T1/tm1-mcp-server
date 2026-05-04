@@ -327,6 +327,11 @@ export interface TransactionLogEntry {
   newValue: CellValue;
 }
 
+export interface ErrorLogFile {
+  filename: string;
+  lastUpdated?: string;
+}
+
 export interface Subset {
   name: string;
   dimensionName: string;

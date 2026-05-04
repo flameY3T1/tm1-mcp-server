@@ -21,6 +21,8 @@ import {
   DiffProcessResultSchema,
   DimensionItemSchema,
   ElementAttributeValueSchema,
+  ErrorLogContentResultSchema,
+  ErrorLogFileSchema,
   FileContentResultSchema,
   FilenameItemSchema,
   GroupItemSchema,
@@ -158,6 +160,11 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
     count: z.number().int(),
     entries: z.array(TransactionLogEntrySchema),
   },
+  tm1_list_error_logs: {
+    count: z.number().int(),
+    files: z.array(ErrorLogFileSchema),
+  },
+  tm1_get_error_log_content: ErrorLogContentResultSchema.shape,
   tm1_get_file_content: FileContentResultSchema.shape,
 
   // ── Phase 2h: mutations (already-JSON + 5 refactored to JSON) ─────────────

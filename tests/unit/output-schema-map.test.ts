@@ -86,6 +86,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_get_client",
         "tm1_get_cube_rules",
         "tm1_get_element_attribute_values",
+        "tm1_get_error_log_content",
         "tm1_get_file_content",
         "tm1_get_hierarchy",
         "tm1_get_message_log",
@@ -105,6 +106,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_list_cubes",
         "tm1_list_dimensions",
         "tm1_list_element_attributes",
+        "tm1_list_error_logs",
         "tm1_list_files",
         "tm1_list_groups",
         "tm1_list_processes",
@@ -385,6 +387,19 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       returnedBytes: 1024,
       truncated: false,
       content: "a,b,c\n1,2,3",
+    },
+    tm1_list_error_logs: {
+      count: 1,
+      files: [
+        { filename: "Load.Sales_20260504_123045.log", lastUpdated: "2026-05-04T12:30:45Z" },
+      ],
+    },
+    tm1_get_error_log_content: {
+      filename: "Load.Sales_20260504_123045.log",
+      totalBytes: 256,
+      returnedBytes: 256,
+      truncated: false,
+      content: "ERROR: Process 'Load.Sales' line 12 — Invalid dimension 'Foo'\n",
     },
     // Generic mutation envelope: success + per-tool extras flow through
     // passthrough. One fixture per shape variant is enough to lock behavior.
