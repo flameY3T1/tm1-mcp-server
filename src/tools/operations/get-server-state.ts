@@ -22,18 +22,19 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
     [
       "Health-check style snapshot of the TM1 server in one call.",
       "Returns: connection state, version, key capability flags (MTQ, JobQueuing, EnableNewHierarchyCreation),",
-      "and object counts for cubes, dimensions, processes, and chores.",
+      "and object counts for cubes, dimensions, processes, chores, and clients.",
       "All fetches run in parallel; per-bucket failures are reported as count: null with an error message instead of failing the whole call.",
     ].join(" "),
     {},
     async () => {
       try {
-        const [infoRes, cubesRes, dimsRes, procsRes, choresRes] = await Promise.allSettled([
+        const [infoRes, cubesRes, dimsRes, procsRes, choresRes, clientsRes] = await Promise.allSettled([
           tm1Client.getServerInfo(),
           tm1Client.getCubes(),
           tm1Client.getDimensions(),
           tm1Client.getProcesses(),
           tm1Client.getChores(),
+          tm1Client.listClients(),
         ]);
 
         const info = infoRes.status === "fulfilled" ? infoRes.value : null;
@@ -66,6 +67,7 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
             dimensions: settleCount(dimsRes),
             processes: settleCount(procsRes),
             chores: settleCount(choresRes),
+            clients: settleCount(clientsRes),
           },
         };
 

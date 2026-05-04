@@ -10,12 +10,15 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
     "tm1_list_processes",
     [
       "List TurboIntegrator processes in the TM1 server with their parameters.",
+      "Control processes (names starting with '}') are excluded by default — set includeControl=true to include them.",
       "Filters: nameContains (case-insensitive substring), nameRegex (JS RegExp).",
       "Projection: fields=['name'] drops parameters[] for compact output (recommended for >100 procs).",
       "Paginated (default 50/page). Returns {total, count, offset, has_more, next_offset, items}.",
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,
+      includeControl: z.boolean().optional().default(false)
+        .describe("Include TM1 control processes whose names start with '}' (default: false)"),
       nameContains: z.string().optional()
         .describe("Case-insensitive substring filter on process name."),
       nameRegex: z.string().optional()
@@ -23,9 +26,11 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
       fields: z.array(z.enum(["name", "parameters"])).optional()
         .describe("Projection. Default: all fields. Use ['name'] to skip parameters[] and shrink payload ~10x."),
     },
-    async ({ limit, offset, nameContains, nameRegex, fields }) => {
+    async ({ limit, offset, includeControl, nameContains, nameRegex, fields }) => {
       try {
         let processes: Process[] = await tm1Client.getProcesses();
+
+        if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
 
         if (nameContains) {
           const needle = nameContains.toLowerCase();

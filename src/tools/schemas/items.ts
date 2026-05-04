@@ -219,8 +219,9 @@ export const HierarchyElementSchema = z.object({
   name: z.string(),
   type: ELEMENT_TYPE,
   level: z.number().int(),
-  parents: z.array(z.string()),
-  children: z.array(z.object({ name: z.string(), weight: z.number() })),
+  // parents/children omitted when caller passes compact=true to tm1_get_hierarchy.
+  parents: z.array(z.string()).optional(),
+  children: z.array(z.object({ name: z.string(), weight: z.number() })).optional(),
 });
 
 export const HierarchySchema = z.object({

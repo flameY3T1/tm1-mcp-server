@@ -22,6 +22,18 @@ export function registerUpdateProcessCode(server: McpServer, tm1Client: TM1Clien
         if (data !== undefined) code.data = data;
         if (epilog !== undefined) code.epilog = epilog;
 
+        if (Object.keys(code).length === 0) {
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({
+                error: "No code tab provided. Specify at least one of: prolog, metadata, data, epilog.",
+              }),
+            }],
+            isError: true,
+          };
+        }
+
         await tm1Client.updateProcessCode(processName, code);
         return {
           content: [{ type: "text" as const, text: JSON.stringify({ success: true, updatedTabs: Object.keys(code) }) }],
