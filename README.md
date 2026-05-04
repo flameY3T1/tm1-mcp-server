@@ -50,26 +50,51 @@ TM1_VERSION=11.8
 
 ## Use with Claude Code
 
-Add to `.mcp.json` or `~/.claude/settings.json`:
+Credentials live in `.env` (loaded via `dotenv` at startup). The MCP client
+config only points at the binary — **do not put `TM1_PASSWORD` in `.mcp.json`
+or `settings.json`**.
+
+Copy `mcp.json.example` to `.mcp.json` (project-local) or merge into
+`~/.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "tm1": {
       "command": "node",
-      "args": ["/absolute/path/to/tm1-mcp-server/dist/index.js"],
-      "env": {
-        "TM1_BASE_URL": "https://your-tm1-server:8010",
-        "TM1_USER": "admin",
-        "TM1_PASSWORD": "your-password",
-        "TM1_VERSION": "11.8"
-      }
+      "args": ["/absolute/path/to/tm1-mcp-server/dist/index.js"]
     }
   }
 }
 ```
 
 Restart Claude Code → server name `tm1` available.
+
+### Security
+
+- Keep `TM1_PASSWORD` and any other secret only in `.env` (gitignored).
+- `.mcp.json` and `~/.claude/settings.json` are often shared/committed —
+  passing `env: { TM1_PASSWORD: "..." }` there leaks the credential into
+  team configs, dotfile repos, and Claude Code session logs.
+- If you must override per-host, use a per-host `.env` file rather than
+  inline `env` blocks in client config.
+- Need multiple TM1 environments? Run multiple server instances, each with
+  its own working directory and `.env`. Distinguish by `mcpServers` key
+  (e.g. `tm1-prod`, `tm1-dev`).
+
+### autoApprove
+
+`mcp.json.example` ships an `autoApprove` list of **read-only** tools only —
+analyze/list/get/search/check/compile/diff. Destructive tools
+(`delete_*`, `clear_*`, `unload_*`, `cancel_*`, `execute_*`,
+`remove_*`, `invalidate_*`) and writes (`create_*`, `update_*`,
+`upsert_*`, `write_cells`, `import_pro_file`, …) deliberately stay
+**off** the allowlist and require manual approval per call.
+
+Each tool also publishes MCP `readOnlyHint` / `destructiveHint` /
+`idempotentHint` annotations (see `src/tools/annotation-map.ts`) so
+clients that surface those hints can warn before invoking destructive
+tools.
 
 ## Development
 
