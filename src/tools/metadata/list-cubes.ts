@@ -26,7 +26,7 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .describe("Projection. Default: all fields. Use ['name'] to skip dimensions[] and shrink payload ~5x for wide cubes."),
     },
-    async ({ limit, offset, includeControl, fields }) => {
+    async ({ limit, offset, fetchAll, includeControl, fields }) => {
       try {
         let cubes: Cube[] = await tm1Client.getCubes();
         if (!includeControl) cubes = cubes.filter((c) => !c.name.startsWith("}"));
@@ -35,7 +35,7 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
             ? cubes.map((c) => ({ name: c.name }))
             : cubes;
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(paginate(projected, limit, offset), null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2) }],
         };
       } catch (error) {
         const msg =

@@ -8,13 +8,13 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
     "tm1_list_threads",
     "List active threads on the TM1 server (running processes, chores, MDX queries, etc.). Paginated (default 50/page).",
     { ...PAGINATION_SCHEMA },
-    async ({ limit, offset }) => {
+    async ({ limit, offset, fetchAll }) => {
       try {
         const threads = await tm1Client.getThreads();
         return {
           content: [{
             type: "text",
-            text: JSON.stringify(paginate(threads, limit, offset), null, 2),
+            text: JSON.stringify(paginate(threads, limit, offset, fetchAll), null, 2),
           }],
         };
       } catch (err) {

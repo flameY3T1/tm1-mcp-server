@@ -20,12 +20,12 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
         .default(false)
         .describe("Include TM1 control dimensions whose names start with '}' (default: false)"),
     },
-    async ({ limit, offset, includeControl }) => {
+    async ({ limit, offset, fetchAll, includeControl }) => {
       try {
         let dimensions = await tm1Client.getDimensions();
         if (!includeControl) dimensions = dimensions.filter((d) => !d.name.startsWith("}"));
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(paginate(dimensions, limit, offset), null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify(paginate(dimensions, limit, offset, fetchAll), null, 2) }],
         };
       } catch (error) {
         const msg =

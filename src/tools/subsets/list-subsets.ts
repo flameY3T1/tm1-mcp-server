@@ -13,13 +13,13 @@ export function registerListSubsets(server: McpServer, tm1Client: TM1Client) {
       hierarchyName: z.string().describe("Hierarchy name (commonly equal to the dimension name)"),
       ...PAGINATION_SCHEMA,
     },
-    async ({ dimensionName, hierarchyName, limit, offset }) => {
+    async ({ dimensionName, hierarchyName, limit, offset, fetchAll }) => {
       try {
         const subsets = await tm1Client.listSubsets(dimensionName, hierarchyName);
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify(paginate(subsets, limit, offset), null, 2),
+            text: JSON.stringify(paginate(subsets, limit, offset, fetchAll), null, 2),
           }],
         };
       } catch (error) {

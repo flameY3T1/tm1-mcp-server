@@ -19,13 +19,13 @@ export function registerListFiles(server: McpServer, tm1Client: TM1Client): void
       ),
       ...PAGINATION_SCHEMA,
     },
-    async ({ path, limit, offset }) => {
+    async ({ path, limit, offset, fetchAll }) => {
       try {
         const files = await tm1Client.listFiles(path);
         return {
           content: [{
             type: "text",
-            text: JSON.stringify({ path: path ?? "", ...paginate(files, limit, offset) }, null, 2),
+            text: JSON.stringify({ path: path ?? "", ...paginate(files, limit, offset, fetchAll) }, null, 2),
           }],
         };
       } catch (err) {

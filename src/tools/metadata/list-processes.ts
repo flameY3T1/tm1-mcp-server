@@ -30,7 +30,7 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
       fields: z.array(z.enum(["name", "parameters"])).optional()
         .describe("Projection. Default: all fields. Use ['name'] to skip parameters[] and shrink payload ~10x."),
     },
-    async ({ limit, offset, includeControl, nameContains, nameRegex, nameNotContains, excludePattern, fields }) => {
+    async ({ limit, offset, fetchAll, includeControl, nameContains, nameRegex, nameNotContains, excludePattern, fields }) => {
       try {
         let processes: Process[] = await tm1Client.getProcesses();
 
@@ -75,7 +75,7 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
             : processes;
 
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(paginate(projected, limit, offset), null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2) }],
         };
       } catch (error) {
         const msg =

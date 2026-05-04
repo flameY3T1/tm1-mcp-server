@@ -29,7 +29,7 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
         .default(false)
         .describe("Replace processes[] with processCount (default: false)."),
     },
-    async ({ limit, offset, compact }) => {
+    async ({ limit, offset, fetchAll, compact }) => {
       try {
         const chores = await tm1Client.getChores();
         const projected: Array<Chore | ChoreCompact> = compact
@@ -42,7 +42,7 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
             }))
           : chores;
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(paginate(projected, limit, offset), null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2) }],
         };
       } catch (error) {
         const msg =

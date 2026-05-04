@@ -4,9 +4,54 @@ import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { buildChoreGraph } from "../../lib/callgraph/choreGraph.js";
-import type { CallGraphNode } from "../../lib/callgraph/callGraph.js";
+import type { CallGraphNode, EffectiveValue } from "../../lib/callgraph/callGraph.js";
+import type { CallParam } from "../../lib/callgraph/referenceIndex.js";
+import { isSecretName, MASK, maskCodeLine } from "../../lib/mask-secrets.js";
 
-function serializeNode(node: CallGraphNode): unknown {
+function maskParams(params: readonly CallParam[]): CallParam[] {
+  return params.map((p) =>
+    isSecretName(p.name)
+      ? {
+          ...p,
+          valueRaw: MASK,
+          resolution:
+            p.resolution.kind === "literal" ? { kind: "literal" as const, value: MASK } : p.resolution,
+        }
+      : p,
+  );
+}
+
+function maskEffective(
+  eff: ReadonlyArray<{ name: string; effective: EffectiveValue; valueRaw: string }>,
+): Array<{ name: string; effective: EffectiveValue; valueRaw: string }> {
+  return eff.map((e) =>
+    isSecretName(e.name)
+      ? {
+          ...e,
+          valueRaw: MASK,
+          effective: e.effective.kind === "literal" ? { kind: "literal" as const, value: MASK } : e.effective,
+        }
+      : e,
+  );
+}
+
+function maskEnv(env: Map<string, EffectiveValue>): Record<string, EffectiveValue> {
+  const out: Record<string, EffectiveValue> = {};
+  for (const [k, v] of env.entries()) {
+    out[k] = isSecretName(k) && v.kind === "literal" ? { kind: "literal", value: MASK } : v;
+  }
+  return out;
+}
+
+function maskChoreParams<T extends Record<string, unknown>>(params: readonly T[] | undefined): T[] | undefined {
+  if (!params) return params as T[] | undefined;
+  return params.map((p) => {
+    const name = (p.Name ?? p.name) as string | undefined;
+    return name && isSecretName(name) ? ({ ...p, Value: MASK, value: MASK } as T) : p;
+  });
+}
+
+function serializeNode(node: CallGraphNode, mask: boolean): unknown {
   return {
     process: node.process,
     cycle: node.cycle,
@@ -18,13 +63,17 @@ function serializeNode(node: CallGraphNode): unknown {
           section: node.incomingEdge.section,
           line: node.incomingEdge.line,
           funcName: node.incomingEdge.funcName,
-          snippet: node.incomingEdge.snippet,
-          params: node.incomingEdge.params,
-          effectiveParams: node.incomingEdge.effectiveParams,
+          snippet: mask ? maskCodeLine(node.incomingEdge.snippet) : node.incomingEdge.snippet,
+          params: mask ? maskParams(node.incomingEdge.params) : node.incomingEdge.params,
+          effectiveParams: node.incomingEdge.effectiveParams
+            ? mask
+              ? maskEffective(node.incomingEdge.effectiveParams)
+              : node.incomingEdge.effectiveParams
+            : undefined,
         }
       : null,
-    env: node.env ? Object.fromEntries(node.env.entries()) : undefined,
-    children: node.children.map(serializeNode),
+    env: node.env ? (mask ? maskEnv(node.env) : Object.fromEntries(node.env.entries())) : undefined,
+    children: node.children.map((c) => serializeNode(c, mask)),
   };
 }
 
@@ -44,8 +93,15 @@ export function registerAnalyzeChoreGraph(server: McpServer, tm1Client: TM1Clien
         .optional()
         .default(false)
         .describe("Index control objects when building the index. Default: false."),
+      maskSecrets: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Redact param values whose name matches /pass|pwd|secret|token|key|credential|auth/i to '***'. Includes chore-task params, edge params, env, and snippet. Default: true.",
+        ),
     },
-    async ({ chore, includeSystem, includeControl }) => {
+    async ({ chore, includeSystem, includeControl, maskSecrets }) => {
       try {
         const index = await buildIndexFromTM1(tm1Client, { includeControl });
         const graph = buildChoreGraph(index, chore, { includeSystem });
@@ -69,11 +125,14 @@ export function registerAnalyzeChoreGraph(server: McpServer, tm1Client: TM1Clien
               text: JSON.stringify(
                 {
                   choreName: graph.choreName,
+                  maskSecrets,
                   tasks: graph.tasks.map((t) => ({
                     step: t.step,
                     processName: t.processName,
-                    choreParams: t.choreParams,
-                    tree: serializeNode(t.tree),
+                    choreParams: maskSecrets
+                      ? maskChoreParams(t.choreParams as unknown as Record<string, unknown>[])
+                      : t.choreParams,
+                    tree: serializeNode(t.tree, maskSecrets),
                   })),
                 },
                 null,

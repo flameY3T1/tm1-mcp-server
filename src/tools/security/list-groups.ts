@@ -8,13 +8,13 @@ export function registerListGroups(server: McpServer, tm1Client: TM1Client) {
     "tm1_list_groups",
     "List TM1 groups with assigned client names. Paginated (default 50/page).",
     { ...PAGINATION_SCHEMA },
-    async ({ limit, offset }) => {
+    async ({ limit, offset, fetchAll }) => {
       try {
         const groups = await tm1Client.listGroups();
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify(paginate(groups, limit, offset), null, 2),
+            text: JSON.stringify(paginate(groups, limit, offset, fetchAll), null, 2),
           }],
         };
       } catch (error) {

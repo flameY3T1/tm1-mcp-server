@@ -2,9 +2,12 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
+import { maskCodeLine } from "../../lib/mask-secrets.js";
 
 type Tab = "prolog" | "metadata" | "data" | "epilog";
 const ALL_TABS: Tab[] = ["prolog", "metadata", "data", "epilog"];
+
+const COMMENT_RE = /^\s*(?:#|\/\/)/;
 
 interface Match {
   process: string;
@@ -43,8 +46,29 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(500)
         .describe("Hard cap on total matches across all processes (default 500)"),
+      maskSecrets: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Redact credential literals in match text. Masks the password arg of ODBCOpen() and quoted values assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
+        ),
+      excludeCommented: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Skip lines beginning with '#' or '//' (TI comment markers). Default: false."),
     },
-    async ({ pattern, tabs, caseSensitive, includeControl, maxMatchesPerProcess, maxTotalMatches }) => {
+    async ({
+      pattern,
+      tabs,
+      caseSensitive,
+      includeControl,
+      maxMatchesPerProcess,
+      maxTotalMatches,
+      maskSecrets,
+      excludeCommented,
+    }) => {
       try {
         const flags = caseSensitive ? "g" : "gi";
         let regex: RegExp;
@@ -71,8 +95,11 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
             const lines = code.split(/\r?\n/);
             for (let i = 0; i < lines.length; i++) {
               regex.lastIndex = 0;
-              if (regex.test(lines[i])) {
-                matches.push({ process: proc.name, tab, line: i + 1, text: lines[i].trim().slice(0, 240) });
+              const raw = lines[i];
+              if (excludeCommented && COMMENT_RE.test(raw)) continue;
+              if (regex.test(raw)) {
+                const text = (maskSecrets ? maskCodeLine(raw) : raw).trim().slice(0, 240);
+                matches.push({ process: proc.name, tab, line: i + 1, text });
                 perProcess++;
                 if (matches.length >= maxTotalMatches) {
                   truncated = true;
@@ -92,6 +119,8 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
           processesScanned: all.length,
           matchCount: matches.length,
           truncated,
+          maskSecrets,
+          excludeCommented,
           matches,
         };
         return { content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }] };

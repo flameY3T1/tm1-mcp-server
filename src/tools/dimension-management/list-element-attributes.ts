@@ -13,11 +13,11 @@ export function registerListElementAttributes(server: McpServer, tm1Client: TM1C
       hierarchyName: z.string().describe("Name of the hierarchy within the dimension"),
       ...PAGINATION_SCHEMA,
     },
-    async ({ dimensionName, hierarchyName, limit, offset }) => {
+    async ({ dimensionName, hierarchyName, limit, offset, fetchAll }) => {
       try {
         const attributes = await tm1Client.listElementAttributes(dimensionName, hierarchyName);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(paginate(attributes, limit, offset), null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify(paginate(attributes, limit, offset, fetchAll), null, 2) }],
         };
       } catch (error) {
         const msg =

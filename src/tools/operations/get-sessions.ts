@@ -18,7 +18,7 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
         .describe("Include thread details per session (default: true)"),
       ...PAGINATION_SCHEMA,
     },
-    async ({ activeOnly, withThreads, limit, offset }) => {
+    async ({ activeOnly, withThreads, limit, offset, fetchAll }) => {
       try {
         const sessions = await tm1Client.getSessions();
         const filtered = activeOnly ? sessions.filter((s) => s.active !== false) : sessions;
@@ -28,7 +28,7 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
         return {
           content: [{
             type: "text",
-            text: JSON.stringify(paginate(projected, limit, offset), null, 2),
+            text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2),
           }],
         };
       } catch (err) {

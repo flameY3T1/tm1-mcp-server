@@ -3,9 +3,46 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
-import { buildCallGraph, type CallGraphNode } from "../../lib/callgraph/callGraph.js";
+import { buildCallGraph, type CallGraphNode, type EffectiveValue } from "../../lib/callgraph/callGraph.js";
+import type { CallParam } from "../../lib/callgraph/referenceIndex.js";
+import { isSecretName, MASK, maskCodeLine } from "../../lib/mask-secrets.js";
 
-function serializeNode(node: CallGraphNode): unknown {
+function maskParams(params: readonly CallParam[]): CallParam[] {
+  return params.map((p) =>
+    isSecretName(p.name)
+      ? {
+          ...p,
+          valueRaw: MASK,
+          resolution:
+            p.resolution.kind === "literal" ? { kind: "literal" as const, value: MASK } : p.resolution,
+        }
+      : p,
+  );
+}
+
+function maskEffective(
+  eff: ReadonlyArray<{ name: string; effective: EffectiveValue; valueRaw: string }>,
+): Array<{ name: string; effective: EffectiveValue; valueRaw: string }> {
+  return eff.map((e) =>
+    isSecretName(e.name)
+      ? {
+          ...e,
+          valueRaw: MASK,
+          effective: e.effective.kind === "literal" ? { kind: "literal" as const, value: MASK } : e.effective,
+        }
+      : e,
+  );
+}
+
+function maskEnv(env: Map<string, EffectiveValue>): Record<string, EffectiveValue> {
+  const out: Record<string, EffectiveValue> = {};
+  for (const [k, v] of env.entries()) {
+    out[k] = isSecretName(k) && v.kind === "literal" ? { kind: "literal", value: MASK } : v;
+  }
+  return out;
+}
+
+function serializeNode(node: CallGraphNode, mask: boolean): unknown {
   return {
     process: node.process,
     cycle: node.cycle,
@@ -17,13 +54,17 @@ function serializeNode(node: CallGraphNode): unknown {
           section: node.incomingEdge.section,
           line: node.incomingEdge.line,
           funcName: node.incomingEdge.funcName,
-          snippet: node.incomingEdge.snippet,
-          params: node.incomingEdge.params,
-          effectiveParams: node.incomingEdge.effectiveParams,
+          snippet: mask ? maskCodeLine(node.incomingEdge.snippet) : node.incomingEdge.snippet,
+          params: mask ? maskParams(node.incomingEdge.params) : node.incomingEdge.params,
+          effectiveParams: node.incomingEdge.effectiveParams
+            ? mask
+              ? maskEffective(node.incomingEdge.effectiveParams)
+              : node.incomingEdge.effectiveParams
+            : undefined,
         }
       : null,
-    env: node.env ? Object.fromEntries(node.env.entries()) : undefined,
-    children: node.children.map(serializeNode),
+    env: node.env ? (mask ? maskEnv(node.env) : Object.fromEntries(node.env.entries())) : undefined,
+    children: node.children.map((c) => serializeNode(c, mask)),
   };
 }
 
@@ -123,8 +164,15 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
         .describe(
           "Output mode. 'full' returns nested tree (large for deep graphs). 'summary' returns flat per-process aggregates (occurrences, depthMin/Max, cycle/depthLimit flags) — use for triage before pulling a full tree.",
         ),
+      maskSecrets: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Redact param values whose name matches /pass|pwd|secret|token|key|credential|auth/i to '***'. Also masks the inline snippet. Default: true. Set false only when debugging credential propagation locally.",
+        ),
     },
-    async ({ start, direction, maxDepth, includeSystem, includeControl, mode }) => {
+    async ({ start, direction, maxDepth, includeSystem, includeControl, mode, maskSecrets }) => {
       try {
         const index = await buildIndexFromTM1(tm1Client, { includeControl });
         const lc = start.toLowerCase();
@@ -148,8 +196,8 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
         const tree = buildCallGraph(index, start, { direction, maxDepth, includeSystem });
         const payload =
           mode === "summary"
-            ? { start, direction, mode, summary: summarize(tree) }
-            : { start, direction, mode, tree: serializeNode(tree) };
+            ? { start, direction, mode, maskSecrets, summary: summarize(tree) }
+            : { start, direction, mode, maskSecrets, tree: serializeNode(tree, maskSecrets) };
         return {
           content: [
             {

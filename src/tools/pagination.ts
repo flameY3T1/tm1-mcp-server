@@ -17,14 +17,21 @@ export const PAGINATION_SCHEMA = {
     .max(500)
     .optional()
     .default(50)
-    .describe("Max items to return per page (default 50, max 500)"),
+    .describe("Max items to return per page (default 50, max 500). Ignored when fetchAll=true."),
   offset: z
     .number()
     .int()
     .min(0)
     .optional()
     .default(0)
-    .describe("Number of items to skip from the start (default 0)"),
+    .describe("Number of items to skip from the start (default 0). Ignored when fetchAll=true."),
+  fetchAll: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      "Return every item in one response, ignoring limit/offset. Use when you need the full set for an audit and want to avoid the multi-page agent loop that drops 'has_more: true'. Risk: large payloads — prefer projection/filters first.",
+    ),
 };
 
 export interface Page<T> {
@@ -40,7 +47,18 @@ export function paginate<T>(
   items: readonly T[],
   limit: number,
   offset: number,
+  fetchAll = false,
 ): Page<T> {
+  if (fetchAll) {
+    return {
+      total: items.length,
+      count: items.length,
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [...items],
+    };
+  }
   const safeOffset = Math.max(0, Math.min(offset, items.length));
   const slice = items.slice(safeOffset, safeOffset + limit);
   const has_more = safeOffset + slice.length < items.length;

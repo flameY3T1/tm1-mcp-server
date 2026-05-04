@@ -11,13 +11,13 @@ export function registerListViews(server: McpServer, tm1Client: TM1Client): void
       cubeName: z.string().describe("Cube name"),
       ...PAGINATION_SCHEMA,
     },
-    async ({ cubeName, limit, offset }) => {
+    async ({ cubeName, limit, offset, fetchAll }) => {
       try {
         const views = await tm1Client.listViews(cubeName);
         return {
           content: [{
             type: "text",
-            text: JSON.stringify(paginate(views, limit, offset), null, 2),
+            text: JSON.stringify(paginate(views, limit, offset, fetchAll), null, 2),
           }],
         };
       } catch (err) {
