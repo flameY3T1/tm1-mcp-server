@@ -449,6 +449,45 @@ export const ObjectUsageResultSchema = z.object({
   usages: z.array(z.unknown()),
 });
 
+// ── tm1_get_cube_stats result schemas ────────────────────────────────────────
+// Stats elements differ between TM1 v11 and v12. We expose well-known names
+// as typed fields (best-effort match) and the entire raw element-name → value
+// map under `raw` so callers can read whatever the server actually returned
+// — no version drift breaks the tool, only renames new well-known fields.
+export const CubeStatsItemSchema = z
+  .object({
+    cubeName: z.string(),
+    // Cell counts
+    populatedNumeric: z.number().optional(),
+    populatedString: z.number().optional(),
+    storedCalculated: z.number().optional(),
+    storedViews: z.number().optional(),
+    fedCells: z.number().optional(),
+    // Memory (bytes)
+    memoryViews: z.number().optional(),
+    memoryInput: z.number().optional(),
+    memoryFeeders: z.number().optional(),
+    memoryCalculations: z.number().optional(),
+    memoryTotal: z.number().optional(),
+    // Performance
+    avgCalculationSteps: z.number().optional(),
+    cacheMissRate: z.number().optional(),
+    // Derived
+    feederEfficiency: z.number().optional(),
+    // Always present: full element-name → value map (carries everything,
+    // including v12-only or new-build metrics that aren't in KNOWN_METRICS).
+    raw: z.record(z.string(), z.union([z.number(), z.null()])),
+    error: z.string().optional(),
+  })
+  .passthrough();
+
+export const CubeStatsResultSchema = z
+  .object({
+    count: z.number().int(),
+    items: z.array(CubeStatsItemSchema),
+  })
+  .passthrough();
+
 export const SearchCodeResultSchema = z.object({
   pattern: z.string(),
   caseSensitive: z.boolean(),

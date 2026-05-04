@@ -51,8 +51,15 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
       variables: z.array(variableSchema).optional(),
       dataSource: dataSourceSchema.optional(),
       mode: z.enum(["create", "update", "upsert"]).optional().default("upsert"),
+      autoCompile: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "After deploy, run tm1.Compile and include the result in the response (compile: {ok, errorCount, errors}). Off by default — compile holds a brief lock on the process and serializes badly under bulk-deploy.",
+        ),
     },
-    async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, mode }) => {
+    async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, mode, autoCompile }) => {
       const trail: string[] = [];
       try {
         const procs = await tm1Client.getProcesses();
@@ -101,6 +108,17 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
         // 60s callgraph TTL so the next analysis sees fresh references instead of stale graph.
         const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
 
+        let compile: { ok: boolean; errorCount: number; errors: unknown[] } | undefined;
+        if (autoCompile) {
+          const result = await tm1Client.compileProcess(name);
+          compile = {
+            ok: result.success,
+            errorCount: result.errors.length,
+            errors: result.errors,
+          };
+          trail.push("compileProcess");
+        }
+
         return {
           content: [
             {
@@ -111,6 +129,7 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
                   action: exists ? "updated" : "created",
                   appliedSteps: trail,
                   callgraphEntriesCleared,
+                  ...(compile !== undefined ? { compile } : {}),
                 },
                 null,
                 2,

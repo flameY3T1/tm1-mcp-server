@@ -95,6 +95,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_get_cell_value",
         "tm1_get_client",
         "tm1_get_cube_rules",
+        "tm1_get_cube_stats",
         "tm1_get_element_attribute_values",
         "tm1_get_error_log_content",
         "tm1_get_file_content",
@@ -365,6 +366,26 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       cubeName: "Sales",
       rulesText: "[]=N:1;",
       skipCheck: false,
+    },
+    tm1_get_cube_stats: {
+      count: 1,
+      items: [
+        {
+          cubeName: "Sales",
+          populatedNumeric: 12500,
+          populatedString: 0,
+          fedCells: 18000,
+          memoryFeeders: 524288,
+          memoryTotal: 8912896,
+          feederEfficiency: 1.44,
+          raw: {
+            "Memory Used for Feeders": 524288,
+            "Number of Populated Numeric Cells": 12500,
+            "Number of Fed Cells": 18000,
+            "Total Memory Used": 8912896,
+          },
+        },
+      ],
     },
     tm1_get_server_info: {
       serverName: "tm1srv",

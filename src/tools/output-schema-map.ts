@@ -22,6 +22,7 @@ import {
   CopyProcessResultSchema,
   CubeItemSchema,
   CubeRulesSchema,
+  CubeStatsResultSchema,
   DataSourceSchema,
   DiffProcessResultSchema,
   DimensionItemSchema,
@@ -163,6 +164,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   // ClientItemSchema and ServerInfoSchema use .passthrough() — pass full schema.
   tm1_get_client: ClientItemSchema,
   tm1_get_cube_rules: CubeRulesSchema.shape,
+  tm1_get_cube_stats: CubeStatsResultSchema,
   tm1_get_server_info: ServerInfoSchema,
   tm1_get_message_log: {
     count: z.number().int(),
