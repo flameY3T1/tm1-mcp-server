@@ -15,7 +15,8 @@ export const CellValueSchema = z.union([z.string(), z.number(), z.null()]);
 
 export const CubeItemSchema = z.object({
   name: z.string(),
-  dimensions: z.array(z.string()),
+  // Omitted when caller passes fields=['name'] to tm1_list_cubes for compact output.
+  dimensions: z.array(z.string()).optional(),
 });
 
 export const DimensionItemSchema = z.object({
@@ -141,12 +142,18 @@ export const ChoreItemSchema = z.object({
   active: z.boolean(),
   startTime: z.string(),
   frequency: z.string(),
-  processes: z.array(
-    z.object({
-      name: z.string(),
-      parameters: z.record(z.string(), z.union([z.string(), z.number()])),
-    }),
-  ),
+  // In compact mode (tm1_list_chores compact=true) the full processes[] array
+  // is replaced by processCount. Both fields are therefore optional at schema
+  // level; the tool guarantees exactly one is present.
+  processes: z
+    .array(
+      z.object({
+        name: z.string(),
+        parameters: z.record(z.string(), z.union([z.string(), z.number()])),
+      }),
+    )
+    .optional(),
+  processCount: z.number().int().optional(),
 });
 
 export const ClientItemSchema = z
@@ -267,8 +274,17 @@ export const DataSourceSchema = z
 
 export const CubeRulesSchema = z.object({
   cubeName: z.string(),
-  rulesText: z.string(),
   skipCheck: z.boolean(),
+  // Full mode (default): rulesText carries the verbatim TM1 rule body.
+  // Summary mode (tm1_get_all_cube_rules summary=true): rulesText is replaced
+  // by aggregate metrics so analysis agents can survey rule landscapes
+  // without paying full token cost.
+  rulesText: z.string().optional(),
+  lineCount: z.number().int().optional(),
+  ruleCount: z.number().int().optional(),
+  feederCount: z.number().int().optional(),
+  commentLineCount: z.number().int().optional(),
+  referencedCubes: z.array(z.string()).optional(),
 });
 
 export const MdxAxisSchema = z.object({
