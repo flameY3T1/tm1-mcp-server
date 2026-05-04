@@ -42,6 +42,23 @@ function maskEnv(env: Map<string, EffectiveValue>): Record<string, EffectiveValu
   return out;
 }
 
+interface CompactNode {
+  process: string;
+  cycle?: boolean;
+  depthLimitReached?: boolean;
+  children: CompactNode[];
+}
+
+function serializeCompact(node: CallGraphNode): CompactNode {
+  const out: CompactNode = {
+    process: node.process,
+    children: node.children.map(serializeCompact),
+  };
+  if (node.cycle) out.cycle = true;
+  if (node.depthLimitReached) out.depthLimitReached = true;
+  return out;
+}
+
 function serializeNode(node: CallGraphNode, mask: boolean): unknown {
   return {
     process: node.process,
@@ -158,11 +175,11 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
         .default(false)
         .describe("Index control processes/cubes/chores (broader graph). Default: false."),
       mode: z
-        .enum(["full", "summary"])
+        .enum(["full", "summary", "compact"])
         .optional()
         .default("full")
         .describe(
-          "Output mode. 'full' returns nested tree (large for deep graphs). 'summary' returns flat per-process aggregates (occurrences, depthMin/Max, cycle/depthLimit flags) — use for triage before pulling a full tree.",
+          "Output mode. 'full' returns nested tree with incomingEdge/env/effectiveParams (large for deep graphs). 'summary' returns flat per-process aggregates (occurrences, depthMin/Max, cycle/depthLimit flags) for triage. 'compact' returns the nested tree but only {process, cycle?, depthLimitReached?, children[]} — drops params, env, snippets, effectiveParams. Use compact for structural overviews where call shape matters but param values do not.",
         ),
       maskSecrets: z
         .boolean()
@@ -194,10 +211,14 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
           };
         }
         const tree = buildCallGraph(index, start, { direction, maxDepth, includeSystem });
-        const payload =
-          mode === "summary"
-            ? { start, direction, mode, maskSecrets, summary: summarize(tree) }
-            : { start, direction, mode, maskSecrets, tree: serializeNode(tree, maskSecrets) };
+        let payload: Record<string, unknown>;
+        if (mode === "summary") {
+          payload = { start, direction, mode, maskSecrets, summary: summarize(tree) };
+        } else if (mode === "compact") {
+          payload = { start, direction, mode, tree: serializeCompact(tree) };
+        } else {
+          payload = { start, direction, mode, maskSecrets, tree: serializeNode(tree, maskSecrets) };
+        }
         return {
           content: [
             {

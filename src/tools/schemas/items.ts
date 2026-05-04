@@ -163,6 +163,7 @@ export const ClientItemSchema = z
     Type: z.string().optional(),
     Enabled: z.boolean().optional(),
     Groups: z.array(z.object({ Name: z.string() })).optional(),
+    groupCount: z.number().int().optional(),
   })
   .passthrough();
 
@@ -170,6 +171,7 @@ export const GroupItemSchema = z
   .object({
     Name: z.string(),
     Clients: z.array(z.object({ Name: z.string() })).optional(),
+    clientCount: z.number().int().optional(),
   })
   .passthrough();
 
