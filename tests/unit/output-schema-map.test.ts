@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
+import { z, type ZodRawShape, type ZodTypeAny } from "zod";
 import { paginate } from "../../src/tools/pagination.js";
 import { OUTPUT_SCHEMA_MAP } from "../../src/tools/output-schema-map.js";
+
+// OUTPUT_SCHEMA_MAP entries are either a ZodRawShape (legacy) or a full
+// ZodTypeAny (used when the schema relies on .passthrough() / .catchall(),
+// since `.shape` extraction would discard those flags). Wrap shapes back into
+// an object schema for parsing; pass full schemas through unchanged.
+function asSchema(entry: ZodRawShape | ZodTypeAny): ZodTypeAny {
+  return typeof entry === "object" && entry !== null && "_def" in entry
+    ? (entry as ZodTypeAny)
+    : z.object(entry as ZodRawShape);
+}
 
 // Minimal fixtures matching each item schema. Kept inline so the test fails
 // loud if a schema field changes underneath us.
@@ -132,9 +142,9 @@ describe("OUTPUT_SCHEMA_MAP", () => {
 
   for (const [toolName, items] of Object.entries(SAMPLES)) {
     it(`${toolName}: paginated output validates against schema`, () => {
-      const shape = OUTPUT_SCHEMA_MAP[toolName];
-      expect(shape, `missing schema for ${toolName}`).toBeDefined();
-      const schema = z.object(shape);
+      const entry = OUTPUT_SCHEMA_MAP[toolName];
+      expect(entry, `missing schema for ${toolName}`).toBeDefined();
+      const schema = asSchema(entry);
       const page = paginate(items, 50, 0);
       const result = schema.safeParse(page);
       if (!result.success) {
@@ -146,8 +156,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
   }
 
   it("tm1_list_files: paginated output (with `path`) validates against schema", () => {
-    const shape = OUTPUT_SCHEMA_MAP.tm1_list_files;
-    const schema = z.object(shape);
+    const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_list_files);
     const payload = { path: "Subdir", ...paginate(["a.csv", "b.csv"], 50, 0) };
     const result = schema.safeParse(payload);
     expect(result.success).toBe(true);
@@ -440,9 +449,9 @@ describe("OUTPUT_SCHEMA_MAP", () => {
 
   for (const [toolName, payload] of Object.entries(PHASE2_SAMPLES)) {
     it(`${toolName}: structured output validates against schema`, () => {
-      const shape = OUTPUT_SCHEMA_MAP[toolName];
-      expect(shape, `missing schema for ${toolName}`).toBeDefined();
-      const result = z.object(shape).safeParse(payload);
+      const entry = OUTPUT_SCHEMA_MAP[toolName];
+      expect(entry, `missing schema for ${toolName}`).toBeDefined();
+      const result = asSchema(entry).safeParse(payload);
       if (!result.success) {
         throw new Error(
           `${toolName} validation failed: ${JSON.stringify(result.error.issues, null, 2)}`,

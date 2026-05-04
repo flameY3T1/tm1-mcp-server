@@ -1073,7 +1073,8 @@ export class TM1Client extends TM1HttpClient {
   async getSessions(): Promise<Session[]> {
     const response = await this.request<{
       value: Array<{
-        ID: string;
+        // TM1 v11.8 returns ID as number; v12 as string. Coerce below.
+        ID: string | number;
         Active?: boolean;
         User?: { Name: string };
         Threads?: Array<{
@@ -1093,7 +1094,7 @@ export class TM1Client extends TM1HttpClient {
     }>("GET", "/api/v1/Sessions?$expand=Threads,User($select=Name)");
     const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
     return response.value.map((s) => ({
-      id: s.ID,
+      id: String(s.ID),
       user: s.User?.Name ?? "",
       ...(s.Active !== undefined ? { active: s.Active } : {}),
       threads: (s.Threads ?? []).map((t) => ({
@@ -2027,11 +2028,17 @@ export class TM1Client extends TM1HttpClient {
   // --- Security: Groups ---
 
   async listGroups(): Promise<Group[]> {
-    const res = await this.request<{ value: Group[] }>(
+    // TM1 REST: Groups expose their members under the `Users` navigation
+    // property (not `Clients`, despite TM1's user-facing "Client" terminology).
+    // Verified on TM1 v11.8 — using `$expand=Clients` returns HTTP 400.
+    const res = await this.request<{ value: Array<{ Name: string; Users?: Array<{ Name: string }> }> }>(
       "GET",
-      "/api/v1/Groups",
+      "/api/v1/Groups?$expand=Users($select=Name)",
     );
-    return res.value;
+    return res.value.map((g) => ({
+      Name: g.Name,
+      Clients: g.Users ?? [],
+    }));
   }
 
   async assignClientGroup(clientName: string, groupName: string): Promise<void> {

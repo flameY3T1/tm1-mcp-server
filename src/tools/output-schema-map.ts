@@ -1,10 +1,15 @@
-// Maps tool name → outputSchema raw shape. The McpServer Proxy in index.ts
-// injects these into `server.registerTool` and wraps callbacks so the
-// JSON-stringified text payload is also surfaced as `structuredContent`.
+// Maps tool name → outputSchema (raw shape OR full Zod schema). The McpServer
+// Proxy in index.ts injects these into `server.registerTool` and wraps callbacks
+// so the JSON-stringified text payload is also surfaced as `structuredContent`.
+//
+// Use a full ZodTypeAny entry (not `.shape`) when the schema relies on
+// `.passthrough()` / `.catchall()` semantics — extracting `.shape` discards
+// those flags, causing the SDK to publish JSON Schema with
+// `additionalProperties: false` and reject legitimate per-tool extras.
 //
 // Phase 1: 12 paginated list_* tools. Adding more tools is a one-line
 // addition here plus an item schema in ./schemas/items.ts.
-import type { ZodRawShape } from "zod";
+import type { ZodRawShape, ZodTypeAny } from "zod";
 import { z } from "zod";
 import { pageShapeFor } from "./schemas/common.js";
 import {
@@ -58,7 +63,7 @@ const filePageShape = {
   ...pageShapeFor(FilenameItemSchema),
 };
 
-export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
+export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_list_cubes: pageShapeFor(CubeItemSchema),
   tm1_list_dimensions: pageShapeFor(DimensionItemSchema),
   tm1_list_processes: pageShapeFor(ProcessItemSchema),
@@ -73,7 +78,8 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   tm1_list_element_attributes: pageShapeFor(ElementAttributeValueSchema),
 
   // ── Phase 2a: validation/check tools ──────────────────────────────────────
-  tm1_check_writable_coords: WritableCoordsResultSchema.shape,
+  // WritableCoordsResultSchema uses .passthrough() — pass full schema, not .shape.
+  tm1_check_writable_coords: WritableCoordsResultSchema,
   tm1_validate_process_refs: ValidateProcessRefsResultSchema.shape,
 
   // ── Phase 2b: get_* single entity (JSON-returning subset) ─────────────────
@@ -81,7 +87,8 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   tm1_get_view: ViewResultSchema.shape,
   tm1_get_hierarchy: HierarchySchema.shape,
   tm1_get_process_code: ProcessCodeSchema.shape,
-  tm1_get_process_datasource: DataSourceSchema.shape,
+  // DataSourceSchema uses .passthrough() — TM1 returns version-dependent extras.
+  tm1_get_process_datasource: DataSourceSchema,
   tm1_get_cell_value: { value: CellValueSchema.describe("Cell value (string, number, or null)") },
   tm1_get_all_cube_rules: {
     count: z.number().int().describe("Number of cubes returned"),
@@ -102,14 +109,18 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   tm1_execute_process: ProcessResultSchema.shape,
 
   // ── Phase 2d: diff/bundle/upsert ──────────────────────────────────────────
-  tm1_diff_process_with_file: DiffProcessResultSchema.shape,
-  tm1_upsert_process: UpsertProcessResultSchema.shape,
-  tm1_install_pro_bundle: InstallProBundleResultSchema.shape,
+  // Schemas marked with .passthrough() are passed as full schemas to preserve
+  // additionalProperties:true in the published JSON Schema (extras like
+  // callgraphEntriesCleared, dataSource, etc. flow through unrejected).
+  tm1_diff_process_with_file: DiffProcessResultSchema,
+  tm1_upsert_process: UpsertProcessResultSchema,
+  tm1_install_pro_bundle: InstallProBundleResultSchema,
   tm1_import_pro_file: ImportProFileResultSchema.shape,
   tm1_copy_process: CopyProcessResultSchema.shape,
 
   // ── Phase 2e: analysis tools ──────────────────────────────────────────────
-  tm1_analyze_callgraph: CallgraphResultSchema.shape,
+  // CallgraphResultSchema uses .passthrough() — pass full schema.
+  tm1_analyze_callgraph: CallgraphResultSchema,
   tm1_analyze_chore_graph: ChoreGraphResultSchema.shape,
   tm1_analyze_object_usage: ObjectUsageResultSchema.shape,
   tm1_search_code: SearchCodeResultSchema.shape,
@@ -149,9 +160,10 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   },
 
   // ── Phase 2g: refactored plain-text get_* (now JSON) ──────────────────────
-  tm1_get_client: ClientItemSchema.shape,
+  // ClientItemSchema and ServerInfoSchema use .passthrough() — pass full schema.
+  tm1_get_client: ClientItemSchema,
   tm1_get_cube_rules: CubeRulesSchema.shape,
-  tm1_get_server_info: ServerInfoSchema.shape,
+  tm1_get_server_info: ServerInfoSchema,
   tm1_get_message_log: {
     count: z.number().int(),
     entries: z.array(MessageLogEntrySchema),
@@ -170,27 +182,30 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape> = {
   // ── Phase 2h: mutations (already-JSON + 5 refactored to JSON) ─────────────
   // Generic MutationResultSchema (success + passthrough) covers per-tool extras
   // like cellsWritten, parameterCount, updatedTabs without bespoke schemas.
-  tm1_assign_client_group: MutationResultSchema.shape,
-  tm1_cancel_thread: MutationResultSchema.shape,
-  tm1_clear_cube: MutationResultSchema.shape,
-  tm1_create_chore: MutationResultSchema.shape,
-  tm1_create_client: MutationResultSchema.shape,
-  tm1_create_element: MutationResultSchema.shape,
-  tm1_create_element_attribute: MutationResultSchema.shape,
-  tm1_create_process: MutationResultSchema.shape,
-  tm1_create_subset: MutationResultSchema.shape,
-  tm1_delete_element: MutationResultSchema.shape,
-  tm1_delete_process: MutationResultSchema.shape,
-  tm1_delete_subset: MutationResultSchema.shape,
-  tm1_move_element: MutationResultSchema.shape,
-  tm1_update_element: MutationResultSchema.shape,
-  tm1_update_element_attribute_value: MutationResultSchema.shape,
-  tm1_update_process_code: MutationResultSchema.shape,
-  tm1_update_process_datasource: MutationResultSchema.shape,
-  tm1_update_process_parameters: MutationResultSchema.shape,
-  tm1_update_process_variables: MutationResultSchema.shape,
-  tm1_update_subset: MutationResultSchema.shape,
-  tm1_write_cells: MutationResultSchema.shape,
+  // IMPORTANT: pass the full schema (not `.shape`) — extracting `.shape`
+  // discards the .passthrough() flag, which would cause the published JSON
+  // Schema to set `additionalProperties: false` and reject the per-tool extras.
+  tm1_assign_client_group: MutationResultSchema,
+  tm1_cancel_thread: MutationResultSchema,
+  tm1_clear_cube: MutationResultSchema,
+  tm1_create_chore: MutationResultSchema,
+  tm1_create_client: MutationResultSchema,
+  tm1_create_element: MutationResultSchema,
+  tm1_create_element_attribute: MutationResultSchema,
+  tm1_create_process: MutationResultSchema,
+  tm1_create_subset: MutationResultSchema,
+  tm1_delete_element: MutationResultSchema,
+  tm1_delete_process: MutationResultSchema,
+  tm1_delete_subset: MutationResultSchema,
+  tm1_move_element: MutationResultSchema,
+  tm1_update_element: MutationResultSchema,
+  tm1_update_element_attribute_value: MutationResultSchema,
+  tm1_update_process_code: MutationResultSchema,
+  tm1_update_process_datasource: MutationResultSchema,
+  tm1_update_process_parameters: MutationResultSchema,
+  tm1_update_process_variables: MutationResultSchema,
+  tm1_update_subset: MutationResultSchema,
+  tm1_write_cells: MutationResultSchema,
 
   // Bespoke shape: cleared/entriesBefore counters, no `success` field.
   tm1_invalidate_callgraph_cache: InvalidateCallgraphCacheResultSchema.shape,

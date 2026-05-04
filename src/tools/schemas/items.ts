@@ -337,11 +337,13 @@ export const DiffProcessResultSchema = z
   })
   .passthrough();
 
-export const UpsertProcessResultSchema = z.object({
-  processName: z.string(),
-  action: z.enum(["created", "updated"]),
-  appliedSteps: z.array(z.string()),
-});
+export const UpsertProcessResultSchema = z
+  .object({
+    processName: z.string(),
+    action: z.enum(["created", "updated"]),
+    appliedSteps: z.array(z.string()),
+  })
+  .passthrough();
 
 const InstallBundleEntrySchema = z
   .object({
