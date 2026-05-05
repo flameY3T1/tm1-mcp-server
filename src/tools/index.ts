@@ -6,6 +6,7 @@ import { registerListCubes } from "./metadata/list-cubes.js";
 import { registerListDimensions } from "./metadata/list-dimensions.js";
 import { registerGetHierarchy } from "./metadata/get-hierarchy.js";
 import { registerListProcesses } from "./metadata/list-processes.js";
+import { registerListProcessesGrouped } from "./metadata/list-processes-grouped.js";
 import { registerListChores } from "./metadata/list-chores.js";
 
 // Cell data tools
@@ -123,6 +124,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerListDimensions(server, tm1Client);
   registerGetHierarchy(server, tm1Client);
   registerListProcesses(server, tm1Client);
+  registerListProcessesGrouped(server, tm1Client);
   registerListChores(server, tm1Client);
 
   // Cell data
