@@ -21,11 +21,25 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
         .describe("Add processes[] array of names to each group. Default false — summary only."),
       minCount: z.number().int().min(1).optional()
         .describe("Only return groups with at least this many processes. Useful to hide one-off processes."),
+      excludePattern: z.string().optional()
+        .describe("JS-compatible regex (case-insensitive) — drop processes whose name matches before grouping. E.g. '^Bedrock\\.' to hide Bedrock utility processes."),
     },
-    async ({ includeControl, prefixSegments, includeNames, minCount }) => {
+    async ({ includeControl, prefixSegments, includeNames, minCount, excludePattern }) => {
       try {
         let processes = await tm1Client.getProcesses();
         if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
+        if (excludePattern) {
+          let re: RegExp;
+          try {
+            re = new RegExp(excludePattern, "i");
+          } catch (e) {
+            return {
+              content: [{ type: "text" as const, text: JSON.stringify({ error: `invalid excludePattern: ${(e as Error).message}` }) }],
+              isError: true,
+            };
+          }
+          processes = processes.filter((p) => !re.test(p.name));
+        }
 
         const groupMap = new Map<string, string[]>();
         for (const p of processes) {
