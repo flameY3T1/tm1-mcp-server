@@ -96,6 +96,7 @@ import { registerGetTransactionLog } from "./operations/get-transaction-log.js";
 import { registerGetSessions } from "./operations/get-sessions.js";
 import { registerListErrorLogs } from "./operations/list-error-logs.js";
 import { registerGetErrorLogContent } from "./operations/get-error-log-content.js";
+import { registerDiagnoseProcessError } from "./operations/diagnose-process-error.js";
 import { registerGetCubeStats } from "./operations/get-cube-stats.js";
 
 // File operations tools
@@ -214,6 +215,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerGetSessions(server, tm1Client);
   registerListErrorLogs(server, tm1Client);
   registerGetErrorLogContent(server, tm1Client);
+  registerDiagnoseProcessError(server, tm1Client);
   registerGetCubeStats(server, tm1Client);
 
   // File operations
