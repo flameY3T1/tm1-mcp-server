@@ -13,11 +13,11 @@ export const PAGINATION_SCHEMA = {
   limit: z
     .number()
     .int()
-    .min(1)
+    .min(0)
     .max(500)
     .optional()
     .default(50)
-    .describe("Max items to return per page (default 50, max 500). Ignored when fetchAll=true."),
+    .describe("Max items to return per page (default 50, max 500). Use 0 to return all items (equivalent to fetchAll=true). Ignored when fetchAll=true."),
   offset: z
     .number()
     .int()
@@ -49,7 +49,7 @@ export function paginate<T>(
   offset: number,
   fetchAll = false,
 ): Page<T> {
-  if (fetchAll) {
+  if (fetchAll || limit === 0) {
     return {
       total: items.length,
       count: items.length,
