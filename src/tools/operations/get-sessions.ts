@@ -16,12 +16,23 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
         .describe("If true, return only sessions flagged Active by the server (default: false — return all)"),
       withThreads: z.boolean().optional().default(true)
         .describe("Include thread details per session (default: true)"),
+      compact: z.boolean().optional().default(false)
+        .describe("Return summary only: { total, namedUsers, anonymousCount }. Skips pagination and per-session detail. Useful for a quick headcount without flooding context."),
       ...PAGINATION_SCHEMA,
     },
-    async ({ activeOnly, withThreads, limit, offset, fetchAll }) => {
+    async ({ activeOnly, withThreads, compact, limit, offset, fetchAll }) => {
       try {
         const sessions = await tm1Client.getSessions();
         const filtered = activeOnly ? sessions.filter((s) => s.active !== false) : sessions;
+        if (compact) {
+          const namedUsers = filtered.filter((s) => s.user && s.user.trim() !== "").length;
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({ total: filtered.length, namedUsers, anonymousCount: filtered.length - namedUsers }, null, 2),
+            }],
+          };
+        }
         const projected = withThreads
           ? filtered
           : filtered.map((s) => ({ ...s, threads: [] }));

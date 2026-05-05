@@ -52,20 +52,27 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
       metadata: z.string().optional().describe("Metadata tab TI code"),
       data: z.string().optional().describe("Data tab TI code"),
       epilog: z.string().optional().describe("Epilog tab TI code"),
-      parameters: z.array(parameterSchema).optional().describe("TI parameters (Name, Type, defaultValue, optional Prompt)"),
-      variables: z.array(variableSchema).optional().describe("TI variables (column mapping for ASCII/ODBC)"),
+      parameters: z.array(parameterSchema).optional().describe("TI parameters (Name, Type, defaultValue, optional Prompt). When omitted and baseProcess is set, inherited from baseProcess."),
+      variables: z.array(variableSchema).optional().describe("TI variables (column mapping for ASCII/ODBC). When omitted and baseProcess is set, inherited from baseProcess."),
       dataSource: dataSourceSchema.optional().describe("DataSource config — defaults to { type: 'None' } when omitted"),
+      baseProcess: z.string().optional().describe("Existing process name to inherit parameters and variables from. Prevents 'undefined parameter' compile errors when validating code that references params defined on the saved process. Explicit parameters/variables override the inherited values."),
     },
-    async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource }) => {
+    async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, baseProcess }) => {
       try {
+        let resolvedParams = parameters as ProcessParameter[] | undefined;
+        let resolvedVars = variables as ProcessVariable[] | undefined;
+        if (baseProcess) {
+          if (!resolvedParams) resolvedParams = await tm1Client.getProcessParameters(baseProcess);
+          if (!resolvedVars) resolvedVars = await tm1Client.getProcessVariables(baseProcess);
+        }
         const result = await tm1Client.checkProcessCode({
           ...(name !== undefined ? { name } : {}),
           ...(prolog !== undefined ? { prolog } : {}),
           ...(metadata !== undefined ? { metadata } : {}),
           ...(data !== undefined ? { data } : {}),
           ...(epilog !== undefined ? { epilog } : {}),
-          ...(parameters !== undefined ? { parameters: parameters as ProcessParameter[] } : {}),
-          ...(variables !== undefined ? { variables: variables as ProcessVariable[] } : {}),
+          ...(resolvedParams !== undefined ? { parameters: resolvedParams } : {}),
+          ...(resolvedVars !== undefined ? { variables: resolvedVars } : {}),
           ...(dataSource !== undefined ? { dataSource: dataSource as DataSource } : {}),
         });
         const payload = {
