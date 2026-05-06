@@ -9,6 +9,7 @@ export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
     [
       "Get hierarchy elements with parent-child relationships for a given dimension.",
       "Filters reduce payload before transit: level (exact), levelMax (≤), elementType (Numeric/String/Consolidated/All), topN (truncate after filter).",
+      "Name filters: nameContains/nameStartsWith pushed server-side via OData (saves bandwidth on large dims). nameRegex applied client-side after fetch.",
       "Filtered-out parents/children are pruned from remaining elements to avoid dangling references.",
       "Use compact=true to drop the parents[] and children[] arrays and shrink large dimensions ~10x (keeps name/type/level only).",
     ].join(" "),
@@ -21,17 +22,26 @@ export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
         .describe("Keep elements with Level ≤ levelMax. Caps deep hierarchies."),
       elementType: z.enum(["Numeric", "String", "Consolidated", "All"]).optional()
         .describe("Filter by element type. Default: All."),
+      nameContains: z.string().optional()
+        .describe("Server-side OData substring filter (contains). Case-sensitive. Combine with other filters via AND."),
+      nameStartsWith: z.string().optional()
+        .describe("Server-side OData prefix filter (startswith). Case-sensitive."),
+      nameRegex: z.string().optional()
+        .describe("Client-side regex filter on element name (JS RegExp). Use for patterns OData cannot express. Invalid regex throws VALIDATION_ERROR."),
       topN: z.number().int().positive().optional()
         .describe("Truncate to first N elements after filter. Use to preview large dims."),
       compact: z.boolean().optional().default(false)
         .describe("Drop parents[] and children[] arrays from each element. Use for hierarchy overviews."),
     },
-    async ({ dimensionName, hierarchyName, level, levelMax, elementType, topN, compact }) => {
+    async ({ dimensionName, hierarchyName, level, levelMax, elementType, nameContains, nameStartsWith, nameRegex, topN, compact }) => {
       try {
         const hierarchy = await tm1Client.getHierarchy(dimensionName, hierarchyName, {
           ...(level !== undefined ? { level } : {}),
           ...(levelMax !== undefined ? { levelMax } : {}),
           ...(elementType !== undefined ? { elementType } : {}),
+          ...(nameContains !== undefined ? { nameContains } : {}),
+          ...(nameStartsWith !== undefined ? { nameStartsWith } : {}),
+          ...(nameRegex !== undefined ? { nameRegex } : {}),
           ...(topN !== undefined ? { topN } : {}),
         });
         const output = compact

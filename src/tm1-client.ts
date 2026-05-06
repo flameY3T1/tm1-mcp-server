@@ -90,6 +90,9 @@ export class TM1Client extends TM1HttpClient {
       levelMax?: number;
       elementType?: "Numeric" | "String" | "Consolidated" | "All";
       topN?: number;
+      nameContains?: string;
+      nameStartsWith?: string;
+      nameRegex?: string;
     },
   ): Promise<Hierarchy> {
     // TM1 11.8 does not expose `Children` on Element — only `Parents`. Fetch Parents
@@ -99,13 +102,29 @@ export class TM1Client extends TM1HttpClient {
     const filters: string[] = [];
     if (opts?.level !== undefined) filters.push(`Level eq ${opts.level}`);
     if (opts?.levelMax !== undefined) filters.push(`Level le ${opts.levelMax}`);
+    const escapeOdata = (s: string) => s.replace(/'/g, "''");
+    if (opts?.nameContains) filters.push(`contains(Name, '${escapeOdata(opts.nameContains)}')`);
+    if (opts?.nameStartsWith) filters.push(`startswith(Name, '${escapeOdata(opts.nameStartsWith)}')`);
     // elementType filter is applied client-side (TM1 OData rejects `Type eq 'Consolidated'`
     // — the property is an enum, not a string. Type filter happens before topN/server-side
     // filters because we cannot reliably express it in $filter without an enum-cast that
-    // varies between TM1 versions.) When elementType is set, $top must also move client-side.
+    // varies between TM1 versions.) Same for nameRegex (regex unsupported in OData).
+    // When either is set, $top must also move client-side.
     const filterByType = opts?.elementType && opts.elementType !== "All";
+    let regex: RegExp | undefined;
+    if (opts?.nameRegex !== undefined) {
+      try {
+        regex = new RegExp(opts.nameRegex);
+      } catch (e) {
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message: `Invalid nameRegex: ${(e as Error).message}`,
+        });
+      }
+    }
+    const needsClientPostFilter = filterByType || regex !== undefined;
     if (filters.length > 0) elementClauses.push(`$filter=${filters.join(" and ")}`);
-    if (opts?.topN !== undefined && !filterByType) elementClauses.push(`$top=${opts.topN}`);
+    if (opts?.topN !== undefined && !needsClientPostFilter) elementClauses.push(`$top=${opts.topN}`);
 
     const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')?$expand=Elements(${elementClauses.join(";")})`;
     const rawResponse = await this.request<{
@@ -119,9 +138,10 @@ export class TM1Client extends TM1HttpClient {
     }>("GET", path);
 
     let filteredElements = rawResponse.Elements;
-    if (filterByType) {
-      filteredElements = filteredElements.filter((e) => e.Type === opts!.elementType);
-      if (opts?.topN !== undefined) filteredElements = filteredElements.slice(0, opts.topN);
+    if (filterByType) filteredElements = filteredElements.filter((e) => e.Type === opts!.elementType);
+    if (regex !== undefined) filteredElements = filteredElements.filter((e) => regex!.test(e.Name));
+    if (needsClientPostFilter && opts?.topN !== undefined) {
+      filteredElements = filteredElements.slice(0, opts.topN);
     }
     const response = { Name: rawResponse.Name, Elements: filteredElements };
 

@@ -211,6 +211,86 @@ describe("TM1Client – Metadata Methods", () => {
       expect(url).toContain("Dimensions('My%20Dim')");
       expect(url).toContain("Hierarchies('My%20Hier')");
     });
+
+    it("should push nameContains to OData $filter as contains()", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
+      await client.getHierarchy("Region", "Region", { nameContains: "DE" });
+      const [url] = fetchSpy.mock.calls[0];
+      expect(decodeURIComponent(url as string)).toContain("contains(Name, 'DE')");
+    });
+
+    it("should push nameStartsWith to OData $filter as startswith()", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
+      await client.getHierarchy("Region", "Region", { nameStartsWith: "FY24_" });
+      const [url] = fetchSpy.mock.calls[0];
+      expect(decodeURIComponent(url as string)).toContain("startswith(Name, 'FY24_')");
+    });
+
+    it("should escape single quotes in OData name filters", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
+      await client.getHierarchy("Region", "Region", { nameContains: "Foo's" });
+      const [url] = fetchSpy.mock.calls[0];
+      expect(decodeURIComponent(url as string)).toContain("contains(Name, 'Foo''s')");
+    });
+
+    it("should apply nameRegex client-side and prune dangling parents", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          Name: "Region",
+          Elements: [
+            { Name: "Europe", Type: "Consolidated", Level: 1, Parents: [] },
+            { Name: "DE_Bayern", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+            { Name: "FR_Paris", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+          ],
+        }),
+      );
+      const hierarchy = await client.getHierarchy("Region", "Region", { nameRegex: "^DE_" });
+      expect(hierarchy.elements).toHaveLength(1);
+      expect(hierarchy.elements[0].name).toBe("DE_Bayern");
+      expect(hierarchy.elements[0].parents).toEqual([]);
+    });
+
+    it("should not push nameRegex to OData (client-side only)", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
+      await client.getHierarchy("Region", "Region", { nameRegex: "^X" });
+      const [url] = fetchSpy.mock.calls[0];
+      expect(decodeURIComponent(url as string)).not.toContain("$filter");
+    });
+
+    it("should move $top client-side when nameRegex set", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          Name: "Region",
+          Elements: [
+            { Name: "DE_1", Type: "Numeric", Level: 0 },
+            { Name: "DE_2", Type: "Numeric", Level: 0 },
+            { Name: "DE_3", Type: "Numeric", Level: 0 },
+            { Name: "FR_1", Type: "Numeric", Level: 0 },
+          ],
+        }),
+      );
+      const hierarchy = await client.getHierarchy("Region", "Region", { nameRegex: "^DE_", topN: 2 });
+      const [url] = fetchSpy.mock.calls[0];
+      expect(decodeURIComponent(url as string)).not.toContain("$top");
+      expect(hierarchy.elements).toHaveLength(2);
+      expect(hierarchy.elements.map((e) => e.name)).toEqual(["DE_1", "DE_2"]);
+    });
+
+    it("should throw VALIDATION_ERROR on invalid nameRegex", async () => {
+      await expect(
+        client.getHierarchy("Region", "Region", { nameRegex: "[unclosed" }),
+      ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    });
+
+    it("should combine server-side name filter with level filter via AND", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
+      await client.getHierarchy("Region", "Region", { nameStartsWith: "DE_", levelMax: 1 });
+      const [url] = fetchSpy.mock.calls[0];
+      const decoded = decodeURIComponent(url as string);
+      expect(decoded).toContain("Level le 1");
+      expect(decoded).toContain("startswith(Name, 'DE_')");
+      expect(decoded).toContain(" and ");
+    });
   });
 
   // ── getProcesses() ─────────────────────────────────────────────────────────
