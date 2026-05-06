@@ -293,6 +293,117 @@ describe("TM1Client – Metadata Methods", () => {
     });
   });
 
+  // ── getDescendants() ───────────────────────────────────────────────────────
+
+  describe("getDescendants()", () => {
+    const sampleHierarchy = {
+      Name: "Region",
+      Elements: [
+        { Name: "Total", Type: "Consolidated", Level: 3, Parents: [] },
+        { Name: "Europe", Type: "Consolidated", Level: 2, Parents: [{ Name: "Total" }] },
+        { Name: "DACH", Type: "Consolidated", Level: 1, Parents: [{ Name: "Europe" }] },
+        { Name: "DE", Type: "Numeric", Level: 0, Parents: [{ Name: "DACH" }] },
+        { Name: "AT", Type: "Numeric", Level: 0, Parents: [{ Name: "DACH" }] },
+        { Name: "FR", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+      ],
+    };
+
+    it("should return all descendants of a consolidation", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
+      const result = await client.getDescendants("Region", "Region", "Europe");
+      const names = result.descendants.map((d) => d.name).sort();
+      expect(names).toEqual(["AT", "DACH", "DE", "FR"]);
+    });
+
+    it("should respect depth limit", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
+      const result = await client.getDescendants("Region", "Region", "Europe", { depth: 1 });
+      expect(result.descendants.map((d) => d.name).sort()).toEqual(["DACH", "FR"]);
+    });
+
+    it("should filter to leaves only when leavesOnly=true", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
+      const result = await client.getDescendants("Region", "Region", "Europe", { leavesOnly: true });
+      expect(result.descendants.map((d) => d.name).sort()).toEqual(["AT", "DE", "FR"]);
+    });
+
+    it("should return empty descendants for leaf element", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
+      const result = await client.getDescendants("Region", "Region", "DE");
+      expect(result.descendants).toEqual([]);
+    });
+
+    it("should throw NOT_FOUND for unknown element", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
+      await expect(
+        client.getDescendants("Region", "Region", "Mars"),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+  });
+
+  // ── getAncestors() ─────────────────────────────────────────────────────────
+
+  describe("getAncestors()", () => {
+    it("should walk single-parent path to root", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          Name: "Region",
+          Elements: [
+            { Name: "Total", Type: "Consolidated", Level: 2, Parents: [] },
+            { Name: "Europe", Type: "Consolidated", Level: 1, Parents: [{ Name: "Total" }] },
+            { Name: "DE", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+          ],
+        }),
+      );
+      const result = await client.getAncestors("Region", "Region", "DE");
+      expect(result.ancestors.map((a) => a.name)).toEqual(["Europe", "Total"]);
+      expect(result.paths).toEqual([["DE", "Europe", "Total"]]);
+    });
+
+    it("should return all distinct paths for multi-parent element", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          Name: "Region",
+          Elements: [
+            { Name: "Total", Type: "Consolidated", Level: 2, Parents: [] },
+            { Name: "ByGeo", Type: "Consolidated", Level: 1, Parents: [{ Name: "Total" }] },
+            { Name: "ByCurrency", Type: "Consolidated", Level: 1, Parents: [{ Name: "Total" }] },
+            // DE rolls up under both ByGeo and ByCurrency (alternate consolidations)
+            { Name: "DE", Type: "Numeric", Level: 0, Parents: [{ Name: "ByGeo" }, { Name: "ByCurrency" }] },
+          ],
+        }),
+      );
+      const result = await client.getAncestors("Region", "Region", "DE");
+      expect(result.ancestors.map((a) => a.name).sort()).toEqual(["ByCurrency", "ByGeo", "Total"]);
+      expect(result.paths).toHaveLength(2);
+      expect(result.paths).toContainEqual(["DE", "ByGeo", "Total"]);
+      expect(result.paths).toContainEqual(["DE", "ByCurrency", "Total"]);
+    });
+
+    it("should return empty ancestors for root element", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          Name: "Region",
+          Elements: [
+            { Name: "Total", Type: "Consolidated", Level: 0, Parents: [] },
+          ],
+        }),
+      );
+      const result = await client.getAncestors("Region", "Region", "Total");
+      expect(result.ancestors).toEqual([]);
+      expect(result.paths).toEqual([["Total"]]);
+    });
+
+    it("should throw NOT_FOUND for unknown element", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ Name: "Region", Elements: [] }),
+      );
+      await expect(
+        client.getAncestors("Region", "Region", "Ghost"),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+  });
+
   // ── getProcesses() ─────────────────────────────────────────────────────────
 
   describe("getProcesses()", () => {
