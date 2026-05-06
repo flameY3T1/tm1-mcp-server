@@ -89,6 +89,7 @@ export function hintForCode(code: TM1ErrorCode | string): string {
 export interface Cube {
   name: string;
   dimensions: string[];
+  hasRules?: boolean;
 }
 
 export interface Dimension {

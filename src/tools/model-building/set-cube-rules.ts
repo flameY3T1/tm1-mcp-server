@@ -3,9 +3,9 @@ import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 
-export function registerUpdateCubeRules(server: McpServer, tm1Client: TM1Client): void {
+export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
-    "tm1_update_cube_rules",
+    "tm1_set_cube_rules",
     [
       "Create or replace the rules for a TM1 cube.",
       "The rules text must include SKIPCHECK; at the top and FEEDERS; before all feeder definitions.",
@@ -26,7 +26,7 @@ export function registerUpdateCubeRules(server: McpServer, tm1Client: TM1Client)
         return {
           content: [{
             type: "text",
-            text: `Rules for cube "${cube}" updated (${lineCount} lines, SkipCheck: ${skipCheck}, callgraph cleared: ${callgraphEntriesCleared}).`,
+            text: `Rules for cube "${cube}" set (${lineCount} lines, SkipCheck: ${skipCheck}, callgraph cleared: ${callgraphEntriesCleared}).`,
           }],
         };
       } catch (err) {

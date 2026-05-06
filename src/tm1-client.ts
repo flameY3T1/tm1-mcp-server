@@ -36,16 +36,27 @@ export class TM1Client extends TM1HttpClient {
   /**
    * List all cubes with their dimension names.
    * GET /api/v1/Cubes?$expand=Dimensions($select=Name)
+   *
+   * opts.includeRules adds Rules text to the OData $select so we can
+   * derive hasRules per cube in a single round-trip (no N+1).
    */
-  async getCubes(): Promise<Cube[]> {
-    const response = await this.request<{ value: Array<{ Name: string; Dimensions: Array<{ Name: string }> }> }>(
-      "GET",
-      "/api/v1/Cubes?$expand=Dimensions($select=Name)",
-    );
-    return response.value.map((c) => ({
-      name: c.Name,
-      dimensions: c.Dimensions.map((d) => d.Name),
-    }));
+  async getCubes(opts: { includeRules?: boolean } = {}): Promise<Cube[]> {
+    const path = opts.includeRules
+      ? "/api/v1/Cubes?$select=Name,Rules&$expand=Dimensions($select=Name)"
+      : "/api/v1/Cubes?$expand=Dimensions($select=Name)";
+    const response = await this.request<{
+      value: Array<{ Name: string; Rules?: string; Dimensions: Array<{ Name: string }> }>;
+    }>("GET", path);
+    return response.value.map((c) => {
+      const cube: Cube = {
+        name: c.Name,
+        dimensions: c.Dimensions.map((d) => d.Name),
+      };
+      if (opts.includeRules) {
+        cube.hasRules = !!(c.Rules && c.Rules.trim().length > 0);
+      }
+      return cube;
+    });
   }
 
   /**

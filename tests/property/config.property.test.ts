@@ -97,7 +97,7 @@ describe("Property 1: Konfigurations-Roundtrip", () => {
           if (flags.hasUser) process.env.TM1_USER = "admin";
           if (flags.hasPassword) process.env.TM1_PASSWORD = "secret";
 
-          expect(() => loadConfig()).toThrow("Missing required environment variables");
+          expect(() => loadConfig()).toThrow("Missing or empty required environment variables");
         },
       ),
       { numRuns: 100 },

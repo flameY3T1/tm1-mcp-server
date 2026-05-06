@@ -8,7 +8,7 @@ export function registerCheckCubeRule(server: McpServer, tm1Client: TM1Client): 
     [
       "Validate the syntax of a TM1 cube rule WITHOUT applying it.",
       "Returns 'valid' or a list of syntax errors with line numbers.",
-      "Use this as a pre-flight check before tm1_update_cube_rules to avoid committing broken rules.",
+      "Use this as a pre-flight check before tm1_set_cube_rules to avoid committing broken rules.",
     ].join(" "),
     {
       cube: z.string().describe("Cube name (case-sensitive)"),

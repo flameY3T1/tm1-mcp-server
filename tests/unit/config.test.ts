@@ -40,26 +40,26 @@ describe("loadConfig", () => {
     process.env.TM1_USER = "admin";
     process.env.TM1_PASSWORD = "secret";
 
-    expect(() => loadConfig()).toThrow("Missing required environment variables: TM1_BASE_URL");
+    expect(() => loadConfig()).toThrow("Missing or empty required environment variables: TM1_BASE_URL");
   });
 
   it("should throw when TM1_USER is missing", () => {
     process.env.TM1_BASE_URL = "https://tm1server:8010";
     process.env.TM1_PASSWORD = "secret";
 
-    expect(() => loadConfig()).toThrow("Missing required environment variables: TM1_USER");
+    expect(() => loadConfig()).toThrow("Missing or empty required environment variables: TM1_USER");
   });
 
   it("should throw when TM1_PASSWORD is missing", () => {
     process.env.TM1_BASE_URL = "https://tm1server:8010";
     process.env.TM1_USER = "admin";
 
-    expect(() => loadConfig()).toThrow("Missing required environment variables: TM1_PASSWORD");
+    expect(() => loadConfig()).toThrow("Missing or empty required environment variables: TM1_PASSWORD");
   });
 
   it("should list all missing required fields in error", () => {
     expect(() => loadConfig()).toThrow(
-      "Missing required environment variables: TM1_BASE_URL, TM1_USER, TM1_PASSWORD"
+      "Missing or empty required environment variables: TM1_BASE_URL, TM1_USER, TM1_PASSWORD"
     );
   });
 

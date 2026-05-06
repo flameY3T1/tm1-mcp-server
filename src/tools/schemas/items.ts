@@ -15,8 +15,10 @@ export const CellValueSchema = z.union([z.string(), z.number(), z.null()]);
 
 export const CubeItemSchema = z.object({
   name: z.string(),
-  // Omitted when caller passes fields=['name'] to tm1_list_cubes for compact output.
+  // Omitted when caller sets includeDimensions=false on tm1_list_cubes.
   dimensions: z.array(z.string()).optional(),
+  // Present only when caller sets includeRules=true on tm1_list_cubes.
+  hasRules: z.boolean().optional(),
 });
 
 export const DimensionItemSchema = z.object({

@@ -61,7 +61,8 @@ export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
   tm1_get_cube_rules: READ_ONLY,
   tm1_get_cube_stats: READ_ONLY,
   tm1_unload_cube: DESTRUCTIVE,
-  tm1_update_cube_rules: IDEMPOTENT_WRITE,
+  tm1_set_cube_rules: IDEMPOTENT_WRITE,
+  tm1_get_knowledge: READ_ONLY,
 
   // operations
   tm1_get_error_log_content: READ_ONLY,

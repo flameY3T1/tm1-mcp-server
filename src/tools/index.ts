@@ -1,6 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../tm1-client.js";
 
+// Knowledge base
+import { registerGetKnowledge } from "./knowledge/get-knowledge.js";
+
 // Metadata tools
 import { registerListCubes } from "./metadata/list-cubes.js";
 import { registerListDimensions } from "./metadata/list-dimensions.js";
@@ -68,7 +71,7 @@ import { registerDeleteSubset } from "./subsets/delete-subset.js";
 import { registerCreateCube } from "./model-building/create-cube.js";
 import { registerDeleteCube } from "./model-building/delete-cube.js";
 import { registerGetCubeRules } from "./model-building/get-cube-rules.js";
-import { registerUpdateCubeRules } from "./model-building/update-cube-rules.js";
+import { registerSetCubeRules } from "./model-building/set-cube-rules.js";
 import { registerClearCube } from "./model-building/clear-cube.js";
 import { registerUnloadCube } from "./model-building/unload-cube.js";
 import { registerGetAllCubeRules } from "./model-building/get-all-cube-rules.js";
@@ -187,7 +190,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerCreateCube(server, tm1Client);
   registerDeleteCube(server, tm1Client);
   registerGetCubeRules(server, tm1Client);
-  registerUpdateCubeRules(server, tm1Client);
+  registerSetCubeRules(server, tm1Client);
   registerClearCube(server, tm1Client);
   registerUnloadCube(server, tm1Client);
   registerGetAllCubeRules(server, tm1Client);
@@ -237,4 +240,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerListGroups(server, tm1Client);
   registerAssignClientGroup(server, tm1Client);
   registerRemoveClientGroup(server, tm1Client);
+
+  // Knowledge base
+  registerGetKnowledge(server);
 }

@@ -4,6 +4,13 @@
     "tm1": {
       "command": "node",
       "args": ["/absolute/path/to/tm1-mcp-server/dist/index.js"],
+      "env": {
+        "TM1_BASE_URL": "https://your-tm1-host:port",
+        "TM1_USER": "admin",
+        "TM1_PASSWORD": "",
+        "TM1_SSL_REJECT_UNAUTHORIZED": "false",
+        "TM1_KNOWLEDGE_DIR": "/absolute/path/to/tm1-ai-dev/knowledge"
+      },
       "autoApprove": [
         "tm1_analyze_callgraph",
         "tm1_analyze_chore_graph",
@@ -21,6 +28,7 @@
         "tm1_get_client",
         "tm1_get_cube_rules",
         "tm1_get_cube_stats",
+        "tm1_get_knowledge",
         "tm1_get_element_attribute_values",
         "tm1_get_error_log_content",
         "tm1_get_file_content",
