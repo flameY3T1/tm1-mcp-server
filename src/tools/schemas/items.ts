@@ -329,6 +329,26 @@ export const ViewResultSchema = z.object({
   axes: z.array(MdxAxisSchema),
 });
 
+export const SampleCellsResultSchema = z.object({
+  cubeName: z.string(),
+  count: z.number().int(),
+  truncated: z.boolean(),
+  cells: z.array(
+    z.object({
+      coordinates: z.record(z.string(), z.string()),
+      value: CellValueSchema,
+      formattedValue: z.string(),
+    }),
+  ),
+  filtersApplied: z.record(z.string(), z.union([z.string(), z.array(z.string())])),
+  axisDimension: z.string(),
+  rowDims: z.array(z.string()),
+  whereDims: z.array(z.string()),
+  mdxUsed: z.string(),
+  elapsedMs: z.number().int(),
+  hint: z.string().optional(),
+});
+
 const ViewAxisSubsetRefSchema = z.object({
   dimensionName: z.string().optional(),
   hierarchyName: z.string().optional(),

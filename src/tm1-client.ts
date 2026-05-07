@@ -407,6 +407,19 @@ export class TM1Client extends TM1HttpClient {
   }
 
   /**
+   * Return ordered dimension-name list of a cube.
+   * GET /api/v1/Cubes('{name}')?$expand=Dimensions($select=Name)
+   */
+  async getCubeDimensionNames(cubeName: string): Promise<string[]> {
+    const path = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')?$expand=Dimensions($select=Name)`;
+    const response = await this.request<{ Name: string; Dimensions: Array<{ Name: string }> }>(
+      "GET",
+      path,
+    );
+    return response.Dimensions.map((d) => d.Name);
+  }
+
+  /**
    * Execute an MDX query and return structured results with cells and axes.
    * Supports pagination via optional top/skip parameters on the Cells expand.
    */

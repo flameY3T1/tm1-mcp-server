@@ -25,6 +25,7 @@ export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
   tm1_get_cell_value: READ_ONLY,
   tm1_get_view: READ_ONLY,
   tm1_get_view_definition: READ_ONLY,
+  tm1_sample_cells: READ_ONLY,
   tm1_write_cells: WRITE,
 
   // dimension-management
