@@ -111,11 +111,9 @@ function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
           if (annot) {
             return originalTool(name, description, inputSchema, annot, wrappedCb);
           }
-          logger.warn(
-            { tool: name },
-            "Tool registered without annotation — add to ANNOTATION_MAP",
+          throw new Error(
+            `Tool "${name}" registered without annotation — add it to ANNOTATION_MAP in src/tools/annotation-map.ts`,
           );
-          return originalTool(name, description, inputSchema, wrappedCb);
         }
         return originalTool(...args);
       };

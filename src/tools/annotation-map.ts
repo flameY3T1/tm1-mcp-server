@@ -48,11 +48,14 @@ export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
   tm1_list_files: READ_ONLY,
 
   // metadata
+  tm1_get_ancestors: READ_ONLY,
+  tm1_get_descendants: READ_ONLY,
   tm1_get_hierarchy: READ_ONLY,
   tm1_list_chores: READ_ONLY,
   tm1_list_cubes: READ_ONLY,
   tm1_list_dimensions: READ_ONLY,
   tm1_list_processes: READ_ONLY,
+  tm1_list_processes_grouped: READ_ONLY,
 
   // model-building
   tm1_check_cube_rule: READ_ONLY,
@@ -67,6 +70,7 @@ export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
   tm1_get_knowledge: READ_ONLY,
 
   // operations
+  tm1_diagnose_process_error: READ_ONLY,
   tm1_get_error_log_content: READ_ONLY,
   tm1_get_message_log: READ_ONLY,
   tm1_get_server_capabilities: READ_ONLY,

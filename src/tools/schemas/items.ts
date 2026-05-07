@@ -396,12 +396,19 @@ export const ValidateProcessRefsResultSchema = z.object({
   issues: z.array(z.unknown()),
 });
 
+// Page-envelope shape consistent with list_* tools (Page<T>).
+// `total` derives from axes (product of tuple counts) — null only when
+// axes are absent and we cannot infer cell count cheaply.
 export const MdxResultSchema = z.object({
-  cells: z.array(
+  axes: z.array(MdxAxisSchema),
+  total: z.number().int().nullable(),
+  count: z.number().int(),
+  offset: z.number().int(),
+  has_more: z.boolean(),
+  next_offset: z.number().int().nullable(),
+  items: z.array(
     z.object({ value: CellValueSchema, formattedValue: z.string() }),
   ),
-  axes: z.array(MdxAxisSchema),
-  totalCellCount: z.number().int(),
 });
 
 export const ProcessResultSchema = z.object({

@@ -21,7 +21,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "verify": "npm run typecheck && npm test",
-    "tools:list": "node scripts/gen-tool-list.mjs"
+    "tools:list": "node scripts/gen-tool-list.mjs",
+    "tools:update-readme": "node scripts/gen-tool-list.mjs --write-readme"
   },
   "keywords": [
     "mcp",

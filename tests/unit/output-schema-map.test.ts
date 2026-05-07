@@ -109,6 +109,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_get_subset",
         "tm1_get_transaction_log",
         "tm1_get_view",
+        "tm1_get_view_definition",
         "tm1_import_pro_file",
         "tm1_install_pro_bundle",
         "tm1_invalidate_callgraph_cache",
@@ -126,6 +127,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_list_threads",
         "tm1_list_views",
         "tm1_move_element",
+        "tm1_sample_cells",
         "tm1_search_code",
         "tm1_update_element",
         "tm1_update_element_attribute_value",
@@ -232,7 +234,6 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       ],
     },
     tm1_execute_mdx: {
-      cells: [{ value: 100, formattedValue: "100.00" }],
       axes: [
         {
           tuples: [
@@ -240,7 +241,12 @@ describe("OUTPUT_SCHEMA_MAP", () => {
           ],
         },
       ],
-      totalCellCount: 1,
+      total: 1,
+      count: 1,
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [{ value: 100, formattedValue: "100.00" }],
     },
     tm1_execute_process: {
       success: true,
