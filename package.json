@@ -38,6 +38,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "dotenv": "^17.4.1",
     "pino": "^10.3.1",
+    "undici": "^7.25.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

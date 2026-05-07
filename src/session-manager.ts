@@ -1,5 +1,6 @@
 import type { TM1Config } from "./config.js";
 import { createLogger } from "./logger.js";
+import { getTm1Dispatcher } from "./tm1-client/dispatcher.js";
 import type pino from "pino";
 
 const USER_AGENT = "tm1-mcp-server/0.1.0";
@@ -45,10 +46,6 @@ export class SessionManager {
     );
 
     try {
-      if (!this.config.ssl.rejectUnauthorized) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-      }
-
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -59,7 +56,8 @@ export class SessionManager {
           "TM1-Session-Context": USER_AGENT,
         },
         signal: controller.signal,
-      });
+        dispatcher: getTm1Dispatcher(this.config),
+      } as RequestInit);
 
       // Always consume body to release connection
       const responseText = await response.text();
@@ -116,10 +114,6 @@ export class SessionManager {
     );
 
     try {
-      if (!this.config.ssl.rejectUnauthorized) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-      }
-
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -129,7 +123,8 @@ export class SessionManager {
           "TM1-Session-Context": USER_AGENT,
         },
         signal: controller.signal,
-      });
+        dispatcher: getTm1Dispatcher(this.config),
+      } as RequestInit);
 
       // Always consume body to release connection
       await response.text();
@@ -231,10 +226,6 @@ export class SessionManager {
     this.logger.info("Logging out from TM1");
 
     try {
-      if (!this.config.ssl.rejectUnauthorized) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-      }
-
       const response = await fetch(url, {
         method: "DELETE",
         headers: {
@@ -243,7 +234,8 @@ export class SessionManager {
           "TM1-SessionContext": USER_AGENT,
           "TM1-Session-Context": USER_AGENT,
         },
-      });
+        dispatcher: getTm1Dispatcher(this.config),
+      } as RequestInit);
 
       // Consume body to release connection
       await response.text();

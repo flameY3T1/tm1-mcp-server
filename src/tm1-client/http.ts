@@ -5,6 +5,7 @@ import type { TM1Config } from "../config.js";
 import type { SessionManager } from "../session-manager.js";
 import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
+import { getTm1Dispatcher } from "./dispatcher.js";
 
 const MAX_NETWORK_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
@@ -136,7 +137,8 @@ export class TM1HttpClient {
             "TM1-Session-Context": USER_AGENT,
           },
           signal: controller.signal,
-        });
+          dispatcher: getTm1Dispatcher(this.config),
+        } as RequestInit);
       } finally {
         clearTimeout(timeout);
       }
@@ -186,7 +188,8 @@ export class TM1HttpClient {
         headers,
         body: body !== undefined ? JSON.stringify(body) : isWriteMethod ? "" : undefined,
         signal: controller.signal,
-      });
+        dispatcher: getTm1Dispatcher(this.config),
+      } as RequestInit);
     } finally {
       clearTimeout(timeout);
     }
