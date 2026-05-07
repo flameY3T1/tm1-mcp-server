@@ -10,12 +10,13 @@ export function registerDeleteCube(server: McpServer, tm1Client: TM1Client): voi
       name: z.string().describe("Cube name (case-sensitive)"),
     },
     async ({ name }) => {
-      try {
-        await tm1Client.deleteCube(name);
-        return { content: [{ type: "text", text: `Cube "${name}" deleted.` }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.deleteCube(name);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, cubeName: name }, null, 2),
+        }],
+      };
     },
   );
 }

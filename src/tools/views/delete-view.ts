@@ -11,12 +11,13 @@ export function registerDeleteView(server: McpServer, tm1Client: TM1Client): voi
       viewName: z.string().describe("View name to delete"),
     },
     async ({ cubeName, viewName }) => {
-      try {
-        await tm1Client.deleteView(cubeName, viewName);
-        return { content: [{ type: "text", text: `View "${viewName}" deleted from cube "${cubeName}".` }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.deleteView(cubeName, viewName);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, cubeName, viewName }, null, 2),
+        }],
+      };
     },
   );
 }

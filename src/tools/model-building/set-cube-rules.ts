@@ -18,20 +18,22 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
         .describe("Enable SKIPCHECK for performance (default: true, recommended)"),
     },
     async ({ cube, rules, skipCheck }) => {
-      try {
-        await tm1Client.updateCubeRules(cube, rules, skipCheck);
-        const lineCount = rules.split("\n").length;
-        // Rule changes shift call edges (DB(), feeders) — drop callgraph TTL early.
-        const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
-        return {
-          content: [{
-            type: "text",
-            text: `Rules for cube "${cube}" set (${lineCount} lines, SkipCheck: ${skipCheck}, callgraph cleared: ${callgraphEntriesCleared}).`,
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.updateCubeRules(cube, rules, skipCheck);
+      const lineCount = rules.split("\n").length;
+      // Rule changes shift call edges (DB(), feeders) — drop callgraph TTL early.
+      const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            success: true,
+            cubeName: cube,
+            lineCount,
+            skipCheck,
+            callgraphEntriesCleared,
+          }, null, 2),
+        }],
+      };
     },
   );
 }

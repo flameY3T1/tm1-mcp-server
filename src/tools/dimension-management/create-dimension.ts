@@ -10,12 +10,13 @@ export function registerCreateDimension(server: McpServer, tm1Client: TM1Client)
       name: z.string().describe("Dimension name"),
     },
     async ({ name }) => {
-      try {
-        await tm1Client.createDimension(name);
-        return { content: [{ type: "text", text: `Dimension "${name}" created with default hierarchy.` }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.createDimension(name);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, dimensionName: name }, null, 2),
+        }],
+      };
     },
   );
 }

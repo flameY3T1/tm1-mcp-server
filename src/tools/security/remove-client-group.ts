@@ -11,7 +11,12 @@ export function registerRemoveClientGroup(server: McpServer, tm1Client: TM1Clien
     },
     async ({ clientName, groupName }) => {
       await tm1Client.removeClientGroup(clientName, groupName);
-      return { content: [{ type: "text" as const, text: `Client ${clientName} removed from group ${groupName}.` }] };
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, clientName, groupName }, null, 2),
+        }],
+      };
     },
   );
 }

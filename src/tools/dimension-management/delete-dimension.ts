@@ -10,12 +10,13 @@ export function registerDeleteDimension(server: McpServer, tm1Client: TM1Client)
       name: z.string().describe("Dimension name (case-sensitive)"),
     },
     async ({ name }) => {
-      try {
-        await tm1Client.deleteDimension(name);
-        return { content: [{ type: "text", text: `Dimension "${name}" deleted.` }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.deleteDimension(name);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, dimensionName: name }, null, 2),
+        }],
+      };
     },
   );
 }

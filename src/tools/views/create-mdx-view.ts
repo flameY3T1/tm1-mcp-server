@@ -12,12 +12,13 @@ export function registerCreateMdxView(server: McpServer, tm1Client: TM1Client): 
       mdx: z.string().describe("MDX SELECT query defining the view"),
     },
     async ({ cubeName, viewName, mdx }) => {
-      try {
-        await tm1Client.createMdxView(cubeName, viewName, mdx);
-        return { content: [{ type: "text", text: `Public view "${viewName}" created on cube "${cubeName}".` }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.createMdxView(cubeName, viewName, mdx);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, cubeName, viewName }, null, 2),
+        }],
+      };
     },
   );
 }

@@ -10,7 +10,12 @@ export function registerDeleteClient(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ name }) => {
       await tm1Client.deleteClient(name);
-      return { content: [{ type: "text" as const, text: `Client ${name} deleted.` }] };
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, clientName: name }, null, 2),
+        }],
+      };
     },
   );
 }

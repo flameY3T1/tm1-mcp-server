@@ -10,12 +10,13 @@ export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): v
       name: z.string().describe("Chore name (case-sensitive)"),
     },
     async ({ name }) => {
-      try {
-        await tm1Client.executeChore(name);
-        return { content: [{ type: "text", text: `Chore "${name}" executed successfully.` }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.executeChore(name);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, choreName: name }, null, 2),
+        }],
+      };
     },
   );
 }

@@ -11,17 +11,13 @@ export function registerToggleChore(server: McpServer, tm1Client: TM1Client): vo
       active: z.boolean().describe("true to activate scheduling, false to deactivate"),
     },
     async ({ name, active }) => {
-      try {
-        await tm1Client.toggleChoreActive(name, active);
-        return {
-          content: [{
-            type: "text",
-            text: `Chore "${name}" ${active ? "activated" : "deactivated"} successfully.`,
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.toggleChoreActive(name, active);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, choreName: name, active }, null, 2),
+        }],
+      };
     },
   );
 }

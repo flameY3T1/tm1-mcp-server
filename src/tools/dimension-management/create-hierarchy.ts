@@ -11,12 +11,13 @@ export function registerCreateHierarchy(server: McpServer, tm1Client: TM1Client)
       hierarchyName: z.string().describe("New hierarchy name (must differ from existing hierarchies)"),
     },
     async ({ dimensionName, hierarchyName }) => {
-      try {
-        await tm1Client.createHierarchy(dimensionName, hierarchyName);
-        return { content: [{ type: "text", text: `Hierarchy "${hierarchyName}" created in dimension "${dimensionName}".` }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.createHierarchy(dimensionName, hierarchyName);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, dimensionName, hierarchyName }, null, 2),
+        }],
+      };
     },
   );
 }

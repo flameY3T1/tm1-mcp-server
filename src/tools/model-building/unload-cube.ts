@@ -10,12 +10,13 @@ export function registerUnloadCube(server: McpServer, tm1Client: TM1Client): voi
       cubeName: z.string().describe("Name of the cube to unload"),
     },
     async ({ cubeName }) => {
-      try {
-        await tm1Client.unloadCube(cubeName);
-        return { content: [{ type: "text", text: `Cube "${cubeName}" unloaded. Next query will reload it and rebuild the fed-cell index.` }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.unloadCube(cubeName);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, cubeName }, null, 2),
+        }],
+      };
     },
   );
 }

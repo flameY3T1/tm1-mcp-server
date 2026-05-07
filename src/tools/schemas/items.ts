@@ -580,3 +580,82 @@ export const SearchCodeResultSchema = z.object({
     }),
   ),
 });
+
+// ── Phase 2i: hierarchy navigation, server snapshots, diagnostics ────────────
+
+export const AncestorsResultSchema = z.object({
+  element: z.string(),
+  ancestors: z.array(
+    z.object({ name: z.string(), level: z.number().int() }),
+  ),
+  paths: z.array(z.array(z.string())),
+});
+
+export const DescendantsResultSchema = z.object({
+  element: z.string(),
+  descendants: z.array(
+    z.object({
+      name: z.string(),
+      type: z.string(),
+      level: z.number().int(),
+      depth: z.number().int(),
+    }),
+  ),
+});
+
+// Server capabilities/state snapshots curate config flags whose surface differs
+// per TM1 build — every section is permissive (.passthrough()).
+export const ServerCapabilitiesResultSchema = z
+  .object({
+    server: z.unknown(),
+    modelling: z.unknown(),
+    ti: z.unknown(),
+    rules: z.unknown(),
+    mtq: z.unknown(),
+    jobQueuing: z.unknown(),
+    memory: z.unknown(),
+    logging: z.unknown(),
+    http: z.unknown(),
+    security: z.unknown(),
+  })
+  .passthrough();
+
+export const ServerStateResultSchema = z
+  .object({
+    connected: z.boolean(),
+    server: z.unknown(),
+    capabilities: z.unknown(),
+    counts: z.unknown(),
+  })
+  .passthrough();
+
+export const ProcessesGroupedResultSchema = z.object({
+  totalProcesses: z.number().int(),
+  groupCount: z.number().int(),
+  prefixSegments: z.number().int(),
+  groups: z.array(
+    z.object({
+      prefix: z.string(),
+      count: z.number().int(),
+      processes: z.array(z.string()).optional(),
+    }),
+  ),
+});
+
+export const DiagnoseProcessErrorResultSchema = z.object({
+  processName: z.string(),
+  since: z.string().nullable(),
+  logsFound: z.number().int(),
+  logsReturned: z.number().int(),
+  logs: z.array(z.unknown()),
+});
+
+export const ExportProcessToProResultSchema = z.object({
+  processName: z.string(),
+  byteLength: z.number().int(),
+  writtenTo: z.string().nullable(),
+  parameterCount: z.number().int(),
+  variableCount: z.number().int(),
+  dataSourceType: z.string(),
+  content: z.string(),
+});

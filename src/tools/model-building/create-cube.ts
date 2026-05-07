@@ -16,20 +16,18 @@ export function registerCreateCube(server: McpServer, tm1Client: TM1Client): voi
         .describe("Ordered list of dimension names. Order affects query performance."),
     },
     async ({ name, dimensions }) => {
-      try {
-        await tm1Client.createCube(name, dimensions);
-        return {
-          content: [{
-            type: "text",
-            text: [
-              `Cube "${name}" created with ${dimensions.length} dimensions:`,
-              dimensions.map((d, i) => `  ${i + 1}. ${d}`).join("\n"),
-            ].join("\n"),
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.createCube(name, dimensions);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            success: true,
+            cubeName: name,
+            dimensionCount: dimensions.length,
+            dimensions,
+          }, null, 2),
+        }],
+      };
     },
   );
 }
