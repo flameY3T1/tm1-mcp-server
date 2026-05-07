@@ -132,6 +132,32 @@ export interface ViewResult {
   axes: MdxAxis[];
 }
 
+export interface ViewAxisSubsetRef {
+  dimensionName?: string;
+  hierarchyName?: string;
+  subsetName?: string;
+  expression?: string;
+}
+
+export interface ViewTitleRef extends ViewAxisSubsetRef {
+  selectedElement?: string;
+}
+
+export interface NativeViewDefinition {
+  titles: ViewTitleRef[];
+  columns: ViewAxisSubsetRef[];
+  rows: ViewAxisSubsetRef[];
+}
+
+export interface ViewDefinition {
+  cubeName: string;
+  viewName: string;
+  private: boolean;
+  type: "MDX" | "Native";
+  mdx?: string;
+  native?: NativeViewDefinition;
+}
+
 export interface Process {
   name: string;
   parameters: ProcessParameter[];

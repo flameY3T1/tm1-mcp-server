@@ -18,6 +18,7 @@ import { registerListChores } from "./metadata/list-chores.js";
 import { registerGetCellValue } from "./celldata/get-cell-value.js";
 import { registerExecuteMdx } from "./celldata/execute-mdx.js";
 import { registerGetView } from "./celldata/get-view.js";
+import { registerGetViewDefinition } from "./celldata/get-view-definition.js";
 import { registerWriteCells } from "./celldata/write-cells.js";
 
 // Process execution tools
@@ -139,6 +140,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerGetCellValue(server, tm1Client);
   registerExecuteMdx(server, tm1Client);
   registerGetView(server, tm1Client);
+  registerGetViewDefinition(server, tm1Client);
   registerWriteCells(server, tm1Client);
 
   // Process execution

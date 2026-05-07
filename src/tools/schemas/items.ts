@@ -80,6 +80,16 @@ export const ErrorLogFileSchema = z.object({
   lastUpdated: z.string().optional(),
 });
 
+const RelatedErrorLogFileSchema = z.object({
+  filename: z.string(),
+  deltaSec: z.number().int(),
+  totalBytes: z.number().int().optional(),
+  returnedBytes: z.number().int().optional(),
+  truncated: z.boolean().optional(),
+  content: z.string().optional(),
+  error: z.string().optional(),
+});
+
 export const ErrorLogContentResultSchema = z.object({
   filename: z.string(),
   totalBytes: z.number().int(),
@@ -87,6 +97,15 @@ export const ErrorLogContentResultSchema = z.object({
   truncated: z.boolean(),
   truncationReason: z.string().optional(),
   content: z.string(),
+  related: z
+    .object({
+      windowSec: z.number().int().optional(),
+      found: z.number().int().optional(),
+      maxFiles: z.number().int().optional(),
+      note: z.string().optional(),
+      files: z.array(RelatedErrorLogFileSchema),
+    })
+    .optional(),
 });
 
 export const FileContentResultSchema = z.object({
@@ -308,6 +327,32 @@ export const ViewResultSchema = z.object({
     z.object({ value: CellValueSchema, formattedValue: z.string() }),
   ),
   axes: z.array(MdxAxisSchema),
+});
+
+const ViewAxisSubsetRefSchema = z.object({
+  dimensionName: z.string().optional(),
+  hierarchyName: z.string().optional(),
+  subsetName: z.string().optional(),
+  expression: z.string().optional(),
+});
+
+const ViewTitleRefSchema = ViewAxisSubsetRefSchema.extend({
+  selectedElement: z.string().optional(),
+});
+
+export const ViewDefinitionResultSchema = z.object({
+  cubeName: z.string(),
+  viewName: z.string(),
+  private: z.boolean(),
+  type: z.enum(["MDX", "Native"]),
+  mdx: z.string().optional(),
+  native: z
+    .object({
+      titles: z.array(ViewTitleRefSchema),
+      columns: z.array(ViewAxisSubsetRefSchema),
+      rows: z.array(ViewAxisSubsetRefSchema),
+    })
+    .optional(),
 });
 
 // Composite results emitted by validation/check tools.

@@ -53,6 +53,7 @@ import {
   TransactionLogEntrySchema,
   UpsertProcessResultSchema,
   ValidateProcessRefsResultSchema,
+  ViewDefinitionResultSchema,
   ViewItemSchema,
   ViewResultSchema,
   WritableCoordsResultSchema,
@@ -86,6 +87,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   // ── Phase 2b: get_* single entity (JSON-returning subset) ─────────────────
   tm1_get_subset: SubsetItemSchema.shape,
   tm1_get_view: ViewResultSchema.shape,
+  tm1_get_view_definition: ViewDefinitionResultSchema.shape,
   tm1_get_hierarchy: HierarchySchema.shape,
   tm1_get_process_code: ProcessCodeSchema.shape,
   // DataSourceSchema uses .passthrough() — TM1 returns version-dependent extras.
