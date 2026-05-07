@@ -24,29 +24,18 @@ export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
         .describe("Cells to write"),
     },
     async ({ cubeName, dimensions, cells }) => {
-      try {
-        for (const c of cells) {
-          if (c.elements.length !== dimensions.length) {
-            throw new TM1Error({
-              code: "VALIDATION_ERROR",
-              message: `Cell element count (${c.elements.length}) does not match dimension count (${dimensions.length})`,
-            });
-          }
+      for (const c of cells) {
+        if (c.elements.length !== dimensions.length) {
+          throw new TM1Error({
+            code: "VALIDATION_ERROR",
+            message: `Cell element count (${c.elements.length}) does not match dimension count (${dimensions.length})`,
+          });
         }
-        await tm1Client.writeCells(cubeName, dimensions, cells);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ success: true, cellsWritten: cells.length }) }],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
       }
+      await tm1Client.writeCells(cubeName, dimensions, cells);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ success: true, cellsWritten: cells.length }) }],
+      };
     },
   );
 }

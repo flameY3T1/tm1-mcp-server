@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 
 export function registerListSubsets(server: McpServer, tm1Client: TM1Client) {
@@ -14,21 +13,13 @@ export function registerListSubsets(server: McpServer, tm1Client: TM1Client) {
       ...PAGINATION_SCHEMA,
     },
     async ({ dimensionName, hierarchyName, limit, offset, fetchAll }) => {
-      try {
-        const subsets = await tm1Client.listSubsets(dimensionName, hierarchyName);
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify(paginate(subsets, limit, offset, fetchAll), null, 2),
-          }],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return { content: [{ type: "text" as const, text: JSON.stringify(msg) }], isError: true };
-      }
+      const subsets = await tm1Client.listSubsets(dimensionName, hierarchyName);
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify(paginate(subsets, limit, offset, fetchAll), null, 2),
+        }],
+      };
     },
   );
 }

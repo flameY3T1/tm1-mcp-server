@@ -1,8 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
-
 interface CubeRuleSummary {
   lineCount: number;
   ruleCount: number;
@@ -74,29 +72,18 @@ export function registerGetAllCubeRules(server: McpServer, tm1Client: TM1Client)
         .describe("Drop rulesText, return aggregate metrics per cube instead (default: false)"),
     },
     async ({ includeControl, onlyWithRules, summary }) => {
-      try {
-        let all = await tm1Client.getAllCubeRules(includeControl);
-        if (onlyWithRules) all = all.filter((c) => c.rulesText.trim().length > 0);
-        const cubes = summary
-          ? all.map((c) => ({
-              cubeName: c.cubeName,
-              skipCheck: c.skipCheck,
-              ...summarize(c.rulesText),
-            }))
-          : all;
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ count: cubes.length, cubes }, null, 2) }],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
-      }
+      let all = await tm1Client.getAllCubeRules(includeControl);
+      if (onlyWithRules) all = all.filter((c) => c.rulesText.trim().length > 0);
+      const cubes = summary
+        ? all.map((c) => ({
+            cubeName: c.cubeName,
+            skipCheck: c.skipCheck,
+            ...summarize(c.rulesText),
+          }))
+        : all;
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ count: cubes.length, cubes }, null, 2) }],
+      };
     },
   );
 }

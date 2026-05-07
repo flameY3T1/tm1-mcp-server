@@ -1,7 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 
 export function registerListGroups(server: McpServer, tm1Client: TM1Client) {
@@ -18,27 +17,20 @@ export function registerListGroups(server: McpServer, tm1Client: TM1Client) {
         ),
     },
     async ({ limit, offset, fetchAll, compact }) => {
-      try {
-        const groups = await tm1Client.listGroups();
-        const page = paginate(groups, limit, offset, fetchAll);
-        const items = compact
-          ? page.items.map(({ Clients, ...rest }) => ({
-              ...rest,
-              clientCount: Clients?.length ?? 0,
-            }))
-          : page.items;
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({ ...page, items }, null, 2),
-          }],
-        };
-      } catch (error) {
-        const msg = error instanceof TM1Error
-          ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-          : { error: String(error) };
-        return { content: [{ type: "text" as const, text: JSON.stringify(msg) }], isError: true };
-      }
+      const groups = await tm1Client.listGroups();
+      const page = paginate(groups, limit, offset, fetchAll);
+      const items = compact
+        ? page.items.map(({ Clients, ...rest }) => ({
+            ...rest,
+            clientCount: Clients?.length ?? 0,
+          }))
+        : page.items;
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ ...page, items }, null, 2),
+        }],
+      };
     },
   );
 }

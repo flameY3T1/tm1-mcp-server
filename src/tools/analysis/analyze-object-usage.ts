@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { buildCubeOrDimUsages } from "../../lib/callgraph/callGraph.js";
 
@@ -24,27 +23,16 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
         .describe("Index control processes/cubes when building the index. Default: false."),
     },
     async ({ kind, name, includeSystem, includeControl }) => {
-      try {
-        const index = await buildIndexFromTM1(tm1Client, { includeControl });
-        const usages = buildCubeOrDimUsages(index, kind, name, { includeSystem });
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({ kind, name, count: usages.length, usages }, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
-      }
+      const index = await buildIndexFromTM1(tm1Client, { includeControl });
+      const usages = buildCubeOrDimUsages(index, kind, name, { includeSystem });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ kind, name, count: usages.length, usages }, null, 2),
+          },
+        ],
+      };
     },
   );
 }

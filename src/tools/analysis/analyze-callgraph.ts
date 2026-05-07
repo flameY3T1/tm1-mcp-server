@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { buildCallGraph, type CallGraphNode, type EffectiveValue } from "../../lib/callgraph/callGraph.js";
 import type { CallParam } from "../../lib/callgraph/referenceIndex.js";
@@ -190,53 +189,42 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
         ),
     },
     async ({ start, direction, maxDepth, includeSystem, includeControl, mode, maskSecrets }) => {
-      try {
-        const index = await buildIndexFromTM1(tm1Client, { includeControl });
-        const lc = start.toLowerCase();
-        if (
-          !index.processParams.has(lc) &&
-          !index.bySourceProcess.has(lc) &&
-          !index.byProcess.has(lc)
-        ) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: JSON.stringify({
-                  warning: `Process "${start}" not found in index.`,
-                  indexedProcessCount: index.processParams.size,
-                }),
-              },
-            ],
-          };
-        }
-        const tree = buildCallGraph(index, start, { direction, maxDepth, includeSystem });
-        let payload: Record<string, unknown>;
-        if (mode === "summary") {
-          payload = { start, direction, mode, maskSecrets, summary: summarize(tree) };
-        } else if (mode === "compact") {
-          payload = { start, direction, mode, tree: serializeCompact(tree) };
-        } else {
-          payload = { start, direction, mode, maskSecrets, tree: serializeNode(tree, maskSecrets) };
-        }
+      const index = await buildIndexFromTM1(tm1Client, { includeControl });
+      const lc = start.toLowerCase();
+      if (
+        !index.processParams.has(lc) &&
+        !index.bySourceProcess.has(lc) &&
+        !index.byProcess.has(lc)
+      ) {
         return {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(payload, null, 2),
+              text: JSON.stringify({
+                warning: `Process "${start}" not found in index.`,
+                indexedProcessCount: index.processParams.size,
+              }),
             },
           ],
         };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
       }
+      const tree = buildCallGraph(index, start, { direction, maxDepth, includeSystem });
+      let payload: Record<string, unknown>;
+      if (mode === "summary") {
+        payload = { start, direction, mode, maskSecrets, summary: summarize(tree) };
+      } else if (mode === "compact") {
+        payload = { start, direction, mode, tree: serializeCompact(tree) };
+      } else {
+        payload = { start, direction, mode, maskSecrets, tree: serializeNode(tree, maskSecrets) };
+      }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(payload, null, 2),
+          },
+        ],
+      };
     },
   );
 }

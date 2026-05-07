@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import {
   buildSampleCellsMdx,
   transformSampleCells,
@@ -41,67 +40,51 @@ export function registerSampleCells(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ cubeName, maxCells, filters, axisDimension, leavesOnly }) => {
       const startedAt = Date.now();
-      try {
-        const dimensions = await tm1Client.getCubeDimensionNames(cubeName);
+      const dimensions = await tm1Client.getCubeDimensionNames(cubeName);
 
-        const built = buildSampleCellsMdx({
-          cubeName,
-          dimensions,
-          maxCells: maxCells ?? 5,
-          filters,
-          axisDimension,
-          leavesOnly: leavesOnly ?? true,
-        });
+      const built = buildSampleCellsMdx({
+        cubeName,
+        dimensions,
+        maxCells: maxCells ?? 5,
+        filters,
+        axisDimension,
+        leavesOnly: leavesOnly ?? true,
+      });
 
-        const result = await tm1Client.executeMdx(built.mdx);
+      const result = await tm1Client.executeMdx(built.mdx);
 
-        const whereCoords: Record<string, string> = {};
-        if (filters) {
-          for (const [dim, val] of Object.entries(filters)) {
-            if (typeof val === "string") whereCoords[dim] = val;
-          }
+      const whereCoords: Record<string, string> = {};
+      if (filters) {
+        for (const [dim, val] of Object.entries(filters)) {
+          if (typeof val === "string") whereCoords[dim] = val;
         }
-        const cells = transformSampleCells({ result, whereCoords });
-
-        const hint = cells.length === 0
-          ? "No populated cells found — cube may be empty, all-consolidated, or current filters exclude data."
-          : undefined;
-
-        const elapsedMs = Date.now() - startedAt;
-        const truncated = (maxCells ?? 5) > 0 && cells.length >= (maxCells ?? 5);
-
-        const payload = {
-          cubeName,
-          count: cells.length,
-          truncated,
-          cells,
-          filtersApplied: filters ?? {},
-          axisDimension: built.columnDim,
-          rowDims: built.rowDims,
-          whereDims: built.whereDims,
-          mdxUsed: built.mdx,
-          elapsedMs,
-          ...(hint ? { hint } : {}),
-        };
-
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? {
-                code: error.code,
-                message: error.message,
-                httpStatus: error.httpStatus,
-                endpoint: error.endpoint,
-              }
-            : { error: error instanceof Error ? error.message : String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
       }
+      const cells = transformSampleCells({ result, whereCoords });
+
+      const hint = cells.length === 0
+        ? "No populated cells found — cube may be empty, all-consolidated, or current filters exclude data."
+        : undefined;
+
+      const elapsedMs = Date.now() - startedAt;
+      const truncated = (maxCells ?? 5) > 0 && cells.length >= (maxCells ?? 5);
+
+      const payload = {
+        cubeName,
+        count: cells.length,
+        truncated,
+        cells,
+        filtersApplied: filters ?? {},
+        axisDimension: built.columnDim,
+        rowDims: built.rowDims,
+        whereDims: built.whereDims,
+        mdxUsed: built.mdx,
+        elapsedMs,
+        ...(hint ? { hint } : {}),
+      };
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+      };
     },
   );
 }

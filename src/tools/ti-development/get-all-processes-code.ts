@@ -1,8 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
-
 export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_get_all_processes_code",
@@ -15,21 +13,10 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
         .describe("Include TM1 control processes whose names start with '}' (default: false)"),
     },
     async ({ includeControl }) => {
-      try {
-        const all = await tm1Client.getAllProcessesCode(includeControl);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ count: all.length, processes: all }, null, 2) }],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
-      }
+      const all = await tm1Client.getAllProcessesCode(includeControl);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ count: all.length, processes: all }, null, 2) }],
+      };
     },
   );
 }

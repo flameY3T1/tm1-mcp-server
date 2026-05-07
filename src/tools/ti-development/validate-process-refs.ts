@@ -3,7 +3,6 @@ import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
 
 interface RefIssue {
@@ -57,103 +56,92 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
       includeControl: z.boolean().optional().default(true).describe("Include control objects ('}'-prefixed) as valid targets. Default true."),
     },
     async ({ processName, filePath, content, includeControl }) => {
-      try {
-        if (!processName && !filePath && !content) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: "Provide processName, filePath, or content" }) }],
-            isError: true,
-          };
-        }
-
-        let code: { prolog: string; metadata: string; data: string; epilog: string };
-        let resolvedName = processName ?? "";
-        if (processName) {
-          code = await tm1Client.getProcessCode(processName);
-        } else {
-          let body = content ?? "";
-          if (!body && filePath) {
-            if (!path.isAbsolute(filePath)) {
-              return {
-                content: [{ type: "text" as const, text: JSON.stringify({ error: `filePath must be absolute: ${filePath}` }) }],
-                isError: true,
-              };
-            }
-            body = await fs.readFile(filePath, "utf8");
-          }
-          const parsed = parseProFile(body);
-          code = {
-            prolog: parsed.prolog,
-            metadata: parsed.metadata,
-            data: parsed.data,
-            epilog: parsed.epilog,
-          };
-          resolvedName = parsed.name ?? "(from-file)";
-        }
-
-        const cubeRefs = new Map<string, { tab: Tab; line: number; context: string }>();
-        const dimRefs = new Map<string, { tab: Tab; line: number; context: string }>();
-        for (const tab of TABS) {
-          const c = code[tab];
-          if (!c) continue;
-          for (const [name, info] of scanCode(c, tab, CUBE_FN_RE)) {
-            if (!cubeRefs.has(name)) cubeRefs.set(name, info);
-          }
-          for (const [name, info] of scanCode(c, tab, DIM_FN_RE)) {
-            if (!dimRefs.has(name)) dimRefs.set(name, info);
-          }
-          for (const [name, info] of scanCode(c, tab, DIM_AT_ARG2_RE)) {
-            if (!dimRefs.has(name)) dimRefs.set(name, info);
-          }
-        }
-
-        const [cubes, dims] = await Promise.all([tm1Client.getCubes(), tm1Client.getDimensions()]);
-        const cubeNames = new Set(
-          cubes.filter((c) => includeControl || !c.name.startsWith("}")).map((c) => c.name.toLowerCase()),
-        );
-        const dimNames = new Set(
-          dims.filter((d) => includeControl || !d.name.startsWith("}")).map((d) => d.name.toLowerCase()),
-        );
-
-        const issues: RefIssue[] = [];
-        for (const [name, info] of cubeRefs) {
-          if (!cubeNames.has(name.toLowerCase())) {
-            issues.push({ kind: "cube", name, ...info });
-          }
-        }
-        for (const [name, info] of dimRefs) {
-          if (!dimNames.has(name.toLowerCase())) {
-            issues.push({ kind: "dimension", name, ...info });
-          }
-        }
-
+      if (!processName && !filePath && !content) {
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                {
-                  processName: resolvedName,
-                  cubeRefsScanned: cubeRefs.size,
-                  dimensionRefsScanned: dimRefs.size,
-                  unresolved: issues.length,
-                  issues,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: (error as Error).message ?? String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: "Provide processName, filePath, or content" }) }],
           isError: true,
         };
       }
+
+      let code: { prolog: string; metadata: string; data: string; epilog: string };
+      let resolvedName = processName ?? "";
+      if (processName) {
+        code = await tm1Client.getProcessCode(processName);
+      } else {
+        let body = content ?? "";
+        if (!body && filePath) {
+          if (!path.isAbsolute(filePath)) {
+            return {
+              content: [{ type: "text" as const, text: JSON.stringify({ error: `filePath must be absolute: ${filePath}` }) }],
+              isError: true,
+            };
+          }
+          body = await fs.readFile(filePath, "utf8");
+        }
+        const parsed = parseProFile(body);
+        code = {
+          prolog: parsed.prolog,
+          metadata: parsed.metadata,
+          data: parsed.data,
+          epilog: parsed.epilog,
+        };
+        resolvedName = parsed.name ?? "(from-file)";
+      }
+
+      const cubeRefs = new Map<string, { tab: Tab; line: number; context: string }>();
+      const dimRefs = new Map<string, { tab: Tab; line: number; context: string }>();
+      for (const tab of TABS) {
+        const c = code[tab];
+        if (!c) continue;
+        for (const [name, info] of scanCode(c, tab, CUBE_FN_RE)) {
+          if (!cubeRefs.has(name)) cubeRefs.set(name, info);
+        }
+        for (const [name, info] of scanCode(c, tab, DIM_FN_RE)) {
+          if (!dimRefs.has(name)) dimRefs.set(name, info);
+        }
+        for (const [name, info] of scanCode(c, tab, DIM_AT_ARG2_RE)) {
+          if (!dimRefs.has(name)) dimRefs.set(name, info);
+        }
+      }
+
+      const [cubes, dims] = await Promise.all([tm1Client.getCubes(), tm1Client.getDimensions()]);
+      const cubeNames = new Set(
+        cubes.filter((c) => includeControl || !c.name.startsWith("}")).map((c) => c.name.toLowerCase()),
+      );
+      const dimNames = new Set(
+        dims.filter((d) => includeControl || !d.name.startsWith("}")).map((d) => d.name.toLowerCase()),
+      );
+
+      const issues: RefIssue[] = [];
+      for (const [name, info] of cubeRefs) {
+        if (!cubeNames.has(name.toLowerCase())) {
+          issues.push({ kind: "cube", name, ...info });
+        }
+      }
+      for (const [name, info] of dimRefs) {
+        if (!dimNames.has(name.toLowerCase())) {
+          issues.push({ kind: "dimension", name, ...info });
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              {
+                processName: resolvedName,
+                cubeRefsScanned: cubeRefs.size,
+                dimensionRefsScanned: dimRefs.size,
+                unresolved: issues.length,
+                issues,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
     },
   );
 }

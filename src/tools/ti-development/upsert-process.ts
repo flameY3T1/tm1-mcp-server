@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 
 const dataSourceSchema = z
@@ -61,106 +60,81 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, mode, autoCompile }) => {
       const trail: string[] = [];
-      try {
-        const procs = await tm1Client.getProcesses();
-        const exists = procs.some((p: { name: string }) => p.name === name);
-        if (mode === "create" && exists) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: `Process '${name}' already exists; mode=create` }) }],
-            isError: true,
-          };
-        }
-        if (mode === "update" && !exists) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: `Process '${name}' does not exist; mode=update` }) }],
-            isError: true,
-          };
-        }
-
-        if (!exists) {
-          await tm1Client.createProcess(name);
-          trail.push("createProcess");
-        }
-
-        if (prolog !== undefined || metadata !== undefined || data !== undefined || epilog !== undefined) {
-          await tm1Client.updateProcessCode(name, {
-            ...(prolog !== undefined ? { prolog } : {}),
-            ...(metadata !== undefined ? { metadata } : {}),
-            ...(data !== undefined ? { data } : {}),
-            ...(epilog !== undefined ? { epilog } : {}),
-          });
-          trail.push("updateProcessCode");
-        }
-        if (parameters !== undefined) {
-          await tm1Client.updateProcessParameters(name, parameters);
-          trail.push("updateProcessParameters");
-        }
-        if (variables !== undefined && variables.length > 0) {
-          await tm1Client.updateProcessVariables(name, variables);
-          trail.push("updateProcessVariables");
-        }
-        if (dataSource !== undefined) {
-          await tm1Client.updateProcessDataSource(name, dataSource);
-          trail.push("updateProcessDataSource");
-        }
-
-        // Process body/parameters/datasource may have changed call sites — drop the
-        // 60s callgraph TTL so the next analysis sees fresh references instead of stale graph.
-        const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
-
-        let compile: { ok: boolean; errorCount: number; errors: unknown[] } | undefined;
-        if (autoCompile) {
-          const result = await tm1Client.compileProcess(name);
-          compile = {
-            ok: result.success,
-            errorCount: result.errors.length,
-            errors: result.errors,
-          };
-          trail.push("compileProcess");
-        }
-
+      const procs = await tm1Client.getProcesses();
+      const exists = procs.some((p: { name: string }) => p.name === name);
+      if (mode === "create" && exists) {
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                {
-                  processName: name,
-                  action: exists ? "updated" : "created",
-                  appliedSteps: trail,
-                  callgraphEntriesCleared,
-                  ...(compile !== undefined ? { compile } : {}),
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: (error as Error).message ?? String(error) };
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                {
-                  processName: name,
-                  partialApply: trail,
-                  failedStep: trail.length === 0 ? "createProcess|listProcesses" : "(after-" + trail[trail.length - 1] + ")",
-                  error: msg,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: `Process '${name}' already exists; mode=create` }) }],
           isError: true,
         };
       }
+      if (mode === "update" && !exists) {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({ error: `Process '${name}' does not exist; mode=update` }) }],
+          isError: true,
+        };
+      }
+
+      if (!exists) {
+        await tm1Client.createProcess(name);
+        trail.push("createProcess");
+      }
+
+      if (prolog !== undefined || metadata !== undefined || data !== undefined || epilog !== undefined) {
+        await tm1Client.updateProcessCode(name, {
+          ...(prolog !== undefined ? { prolog } : {}),
+          ...(metadata !== undefined ? { metadata } : {}),
+          ...(data !== undefined ? { data } : {}),
+          ...(epilog !== undefined ? { epilog } : {}),
+        });
+        trail.push("updateProcessCode");
+      }
+      if (parameters !== undefined) {
+        await tm1Client.updateProcessParameters(name, parameters);
+        trail.push("updateProcessParameters");
+      }
+      if (variables !== undefined && variables.length > 0) {
+        await tm1Client.updateProcessVariables(name, variables);
+        trail.push("updateProcessVariables");
+      }
+      if (dataSource !== undefined) {
+        await tm1Client.updateProcessDataSource(name, dataSource);
+        trail.push("updateProcessDataSource");
+      }
+
+      // Process body/parameters/datasource may have changed call sites — drop the
+      // 60s callgraph TTL so the next analysis sees fresh references instead of stale graph.
+      const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
+
+      let compile: { ok: boolean; errorCount: number; errors: unknown[] } | undefined;
+      if (autoCompile) {
+        const result = await tm1Client.compileProcess(name);
+        compile = {
+          ok: result.success,
+          errorCount: result.errors.length,
+          errors: result.errors,
+        };
+        trail.push("compileProcess");
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              {
+                processName: name,
+                action: exists ? "updated" : "created",
+                appliedSteps: trail,
+                callgraphEntriesCleared,
+                ...(compile !== undefined ? { compile } : {}),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
     },
   );
 }

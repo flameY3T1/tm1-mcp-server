@@ -1,8 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
-
 export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_get_hierarchy",
@@ -34,39 +32,28 @@ export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
         .describe("Drop parents[] and children[] arrays from each element. Use for hierarchy overviews."),
     },
     async ({ dimensionName, hierarchyName, level, levelMax, elementType, nameContains, nameStartsWith, nameRegex, topN, compact }) => {
-      try {
-        const hierarchy = await tm1Client.getHierarchy(dimensionName, hierarchyName, {
-          ...(level !== undefined ? { level } : {}),
-          ...(levelMax !== undefined ? { levelMax } : {}),
-          ...(elementType !== undefined ? { elementType } : {}),
-          ...(nameContains !== undefined ? { nameContains } : {}),
-          ...(nameStartsWith !== undefined ? { nameStartsWith } : {}),
-          ...(nameRegex !== undefined ? { nameRegex } : {}),
-          ...(topN !== undefined ? { topN } : {}),
-        });
-        const output = compact
-          ? {
-              ...hierarchy,
-              elements: hierarchy.elements.map((e) => ({
-                name: e.name,
-                type: e.type,
-                level: e.level,
-              })),
-            }
-          : hierarchy;
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(output, null, 2) }],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
-      }
+      const hierarchy = await tm1Client.getHierarchy(dimensionName, hierarchyName, {
+        ...(level !== undefined ? { level } : {}),
+        ...(levelMax !== undefined ? { levelMax } : {}),
+        ...(elementType !== undefined ? { elementType } : {}),
+        ...(nameContains !== undefined ? { nameContains } : {}),
+        ...(nameStartsWith !== undefined ? { nameStartsWith } : {}),
+        ...(nameRegex !== undefined ? { nameRegex } : {}),
+        ...(topN !== undefined ? { topN } : {}),
+      });
+      const output = compact
+        ? {
+            ...hierarchy,
+            elements: hierarchy.elements.map((e) => ({
+              name: e.name,
+              type: e.type,
+              level: e.level,
+            })),
+          }
+        : hierarchy;
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(output, null, 2) }],
+      };
     },
   );
 }

@@ -4,7 +4,6 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import type { ProcessParameter, ProcessVariable, DataSource } from "../../types.js";
-import { TM1Error } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
 
 interface TabDiff {
@@ -100,78 +99,67 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
       processName: z.string().optional().describe("Override process name. Default: from .pro 602 line."),
     },
     async ({ filePath, content, processName }) => {
-      try {
-        if (!filePath && !content) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: "Provide filePath or content" }) }],
-            isError: true,
-          };
-        }
-        let body = content ?? "";
-        if (!body && filePath) {
-          if (!path.isAbsolute(filePath)) {
-            return {
-              content: [{ type: "text" as const, text: JSON.stringify({ error: `filePath must be absolute: ${filePath}` }) }],
-              isError: true,
-            };
-          }
-          body = await fs.readFile(filePath, "utf8");
-        }
-
-        const parsed = parseProFile(body);
-        const name = processName ?? parsed.name;
-        if (!name) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: "Process name not found in .pro and no override provided" }) }],
-            isError: true,
-          };
-        }
-
-        const [installedCode, installedParams, installedVars, installedDs] = await Promise.all([
-          tm1Client.getProcessCode(name),
-          tm1Client.getProcessParameters(name),
-          tm1Client.getProcessVariables(name),
-          tm1Client.getProcessDataSource(name),
-        ]);
-
-        const tabs = [
-          tabDiff("prolog", installedCode.prolog, parsed.prolog),
-          tabDiff("metadata", installedCode.metadata, parsed.metadata),
-          tabDiff("data", installedCode.data, parsed.data),
-          tabDiff("epilog", installedCode.epilog, parsed.epilog),
-        ];
-        const params = diffParams(installedParams, parsed.parameters);
-        const variables = diffVars(installedVars, parsed.variables);
-        const dataSource = diffDataSource(installedDs, parsed.dataSource);
-
-        const allIdentical =
-          tabs.every((t) => t.identical) &&
-          params.added.length === 0 && params.removed.length === 0 && params.changed.length === 0 &&
-          variables.added.length === 0 && variables.removed.length === 0 && variables.changed.length === 0 &&
-          dataSource.identical;
-
+      if (!filePath && !content) {
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                { processName: name, identical: allIdentical, tabs, parameters: params, variables, dataSource },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: (error as Error).message ?? String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ error: "Provide filePath or content" }) }],
           isError: true,
         };
       }
+      let body = content ?? "";
+      if (!body && filePath) {
+        if (!path.isAbsolute(filePath)) {
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify({ error: `filePath must be absolute: ${filePath}` }) }],
+            isError: true,
+          };
+        }
+        body = await fs.readFile(filePath, "utf8");
+      }
+
+      const parsed = parseProFile(body);
+      const name = processName ?? parsed.name;
+      if (!name) {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({ error: "Process name not found in .pro and no override provided" }) }],
+          isError: true,
+        };
+      }
+
+      const [installedCode, installedParams, installedVars, installedDs] = await Promise.all([
+        tm1Client.getProcessCode(name),
+        tm1Client.getProcessParameters(name),
+        tm1Client.getProcessVariables(name),
+        tm1Client.getProcessDataSource(name),
+      ]);
+
+      const tabs = [
+        tabDiff("prolog", installedCode.prolog, parsed.prolog),
+        tabDiff("metadata", installedCode.metadata, parsed.metadata),
+        tabDiff("data", installedCode.data, parsed.data),
+        tabDiff("epilog", installedCode.epilog, parsed.epilog),
+      ];
+      const params = diffParams(installedParams, parsed.parameters);
+      const variables = diffVars(installedVars, parsed.variables);
+      const dataSource = diffDataSource(installedDs, parsed.dataSource);
+
+      const allIdentical =
+        tabs.every((t) => t.identical) &&
+        params.added.length === 0 && params.removed.length === 0 && params.changed.length === 0 &&
+        variables.added.length === 0 && variables.removed.length === 0 && variables.changed.length === 0 &&
+        dataSource.identical;
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              { processName: name, identical: allIdentical, tabs, parameters: params, variables, dataSource },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
     },
   );
 }

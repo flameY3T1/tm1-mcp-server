@@ -1,8 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
-
 export function registerUpdateElementAttributeValue(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_update_element_attribute_value",
@@ -14,18 +12,10 @@ export function registerUpdateElementAttributeValue(server: McpServer, tm1Client
       value: z.union([z.string(), z.number()]).describe("New value (string for String/Alias attributes, number for Numeric attributes)"),
     },
     async ({ dimensionName, elementName, attributeName, value }) => {
-      try {
-        await tm1Client.updateElementAttributeValue(dimensionName, elementName, attributeName, value);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ success: true, dimensionName, elementName, attributeName, value }) }],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return { content: [{ type: "text" as const, text: JSON.stringify(msg) }], isError: true };
-      }
+      await tm1Client.updateElementAttributeValue(dimensionName, elementName, attributeName, value);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ success: true, dimensionName, elementName, attributeName, value }) }],
+      };
     },
   );
 }

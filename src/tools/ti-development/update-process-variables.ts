@@ -1,8 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
-
 const variableSchema = z.object({
   name: z.string().describe("Variable name (referenced inside Metadata/Data tabs)"),
   type: z.enum(["String", "Numeric"]).describe("Variable type"),
@@ -20,21 +18,10 @@ export function registerUpdateProcessVariables(server: McpServer, tm1Client: TM1
       variables: z.array(variableSchema).min(1).describe("Variables in source-column order"),
     },
     async ({ processName, variables }) => {
-      try {
-        await tm1Client.updateProcessVariables(processName, variables);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ success: true, processName, variableCount: variables.length }) }],
-        };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
-      }
+      await tm1Client.updateProcessVariables(processName, variables);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ success: true, processName, variableCount: variables.length }) }],
+      };
     },
   );
 }

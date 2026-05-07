@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { buildChoreGraph } from "../../lib/callgraph/choreGraph.js";
 import type { CallGraphNode, EffectiveValue } from "../../lib/callgraph/callGraph.js";
@@ -102,55 +101,44 @@ export function registerAnalyzeChoreGraph(server: McpServer, tm1Client: TM1Clien
         ),
     },
     async ({ chore, includeSystem, includeControl, maskSecrets }) => {
-      try {
-        const index = await buildIndexFromTM1(tm1Client, { includeControl });
-        const graph = buildChoreGraph(index, chore, { includeSystem });
-        if (!graph) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: JSON.stringify({
-                  warning: `Chore "${chore}" not found.`,
-                  indexedChoreCount: index.choreTasks.size,
-                }),
-              },
-            ],
-          };
-        }
+      const index = await buildIndexFromTM1(tm1Client, { includeControl });
+      const graph = buildChoreGraph(index, chore, { includeSystem });
+      if (!graph) {
         return {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(
-                {
-                  choreName: graph.choreName,
-                  maskSecrets,
-                  tasks: graph.tasks.map((t) => ({
-                    step: t.step,
-                    processName: t.processName,
-                    choreParams: maskSecrets
-                      ? maskChoreParams(t.choreParams as unknown as Record<string, unknown>[])
-                      : t.choreParams,
-                    tree: serializeNode(t.tree, maskSecrets),
-                  })),
-                },
-                null,
-                2,
-              ),
+              text: JSON.stringify({
+                warning: `Chore "${chore}" not found.`,
+                indexedChoreCount: index.choreTasks.size,
+              }),
             },
           ],
         };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
       }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              {
+                choreName: graph.choreName,
+                maskSecrets,
+                tasks: graph.tasks.map((t) => ({
+                  step: t.step,
+                  processName: t.processName,
+                  choreParams: maskSecrets
+                    ? maskChoreParams(t.choreParams as unknown as Record<string, unknown>[])
+                    : t.choreParams,
+                  tree: serializeNode(t.tree, maskSecrets),
+                })),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
     },
   );
 }
