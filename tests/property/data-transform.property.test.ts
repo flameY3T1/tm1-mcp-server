@@ -19,7 +19,8 @@ describe("Property 5: Strukturierte Datentransformation", () => {
   afterEach(() => { globalThis.fetch = originalFetch; });
 
   it("executeMdx correctly maps all cells, formatted values, and axes", async () => {
-    const cellArb = fc.record({ Value: fc.oneof(fc.integer(), fc.double({ noNaN: true, noDefaultInfinity: true }), fc.constant(null), fc.string({ maxLength: 20 })), FormattedValue: fc.string({ maxLength: 30 }) });
+    // Filter -0 out of doubles: vitest's toEqual uses Object.is, so -0 !== +0.
+    const cellArb = fc.record({ Value: fc.oneof(fc.integer(), fc.double({ noNaN: true, noDefaultInfinity: true }).filter((n) => !Object.is(n, -0)), fc.constant(null), fc.string({ maxLength: 20 })), FormattedValue: fc.string({ maxLength: 30 }) });
     const memberArb = fc.record({ Name: fc.string({ minLength: 1, maxLength: 20 }), Hierarchy: fc.record({ Name: fc.string({ minLength: 1, maxLength: 20 }) }) });
     const tupleArb = fc.record({ Members: fc.array(memberArb, { minLength: 1, maxLength: 3 }) });
     const axisArb = fc.record({ Tuples: fc.array(tupleArb, { minLength: 1, maxLength: 5 }) });

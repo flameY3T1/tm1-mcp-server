@@ -2,16 +2,17 @@
 // Proxy in index.ts injects these into `server.registerTool` and wraps callbacks
 // so the JSON-stringified text payload is also surfaced as `structuredContent`.
 //
-// Use a full ZodTypeAny entry (not `.shape`) when the schema relies on
-// `.passthrough()` / `.catchall()` semantics — extracting `.shape` discards
-// those flags, causing the SDK to publish JSON Schema with
-// `additionalProperties: false` and reject legitimate per-tool extras.
+// Named-schema entries route through `asOutputSchema(Schema)` which auto-picks
+// the correct representation (full ZodTypeAny for passthrough/catchall, raw
+// shape otherwise). This avoids the manual footgun where `.shape` silently
+// drops `additionalProperties: true` from passthrough schemas.
 //
 // Phase 1: 12 paginated list_* tools. Adding more tools is a one-line
 // addition here plus an item schema in ./schemas/items.ts.
 import type { ZodRawShape, ZodTypeAny } from "zod";
 import { z } from "zod";
 import { pageShapeFor } from "./schemas/common.js";
+import { asOutputSchema } from "./schemas/output-schema.js";
 import {
   CallgraphResultSchema,
   CellValueSchema,
@@ -88,19 +89,17 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_list_element_attributes: pageShapeFor(ElementAttributeValueSchema),
 
   // ── Phase 2a: validation/check tools ──────────────────────────────────────
-  // WritableCoordsResultSchema uses .passthrough() — pass full schema, not .shape.
-  tm1_check_writable_coords: WritableCoordsResultSchema,
-  tm1_validate_process_refs: ValidateProcessRefsResultSchema.shape,
+  tm1_check_writable_coords: asOutputSchema(WritableCoordsResultSchema),
+  tm1_validate_process_refs: asOutputSchema(ValidateProcessRefsResultSchema),
 
   // ── Phase 2b: get_* single entity (JSON-returning subset) ─────────────────
-  tm1_get_subset: SubsetItemSchema.shape,
-  tm1_get_view: ViewResultSchema.shape,
-  tm1_get_view_definition: ViewDefinitionResultSchema.shape,
-  tm1_sample_cells: SampleCellsResultSchema.shape,
-  tm1_get_hierarchy: HierarchySchema.shape,
-  tm1_get_process_code: ProcessCodeSchema.shape,
-  // DataSourceSchema uses .passthrough() — TM1 returns version-dependent extras.
-  tm1_get_process_datasource: DataSourceSchema,
+  tm1_get_subset: asOutputSchema(SubsetItemSchema),
+  tm1_get_view: asOutputSchema(ViewResultSchema),
+  tm1_get_view_definition: asOutputSchema(ViewDefinitionResultSchema),
+  tm1_sample_cells: asOutputSchema(SampleCellsResultSchema),
+  tm1_get_hierarchy: asOutputSchema(HierarchySchema),
+  tm1_get_process_code: asOutputSchema(ProcessCodeSchema),
+  tm1_get_process_datasource: asOutputSchema(DataSourceSchema),
   tm1_get_cell_value: { value: CellValueSchema.describe("Cell value (string, number, or null)") },
   tm1_get_all_cube_rules: {
     count: z.number().int().describe("Number of cubes returned"),
@@ -117,25 +116,21 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   },
 
   // ── Phase 2c: execute_* (JSON-returning subset) ───────────────────────────
-  tm1_execute_mdx: MdxResultSchema.shape,
-  tm1_execute_process: ProcessResultSchema.shape,
+  tm1_execute_mdx: asOutputSchema(MdxResultSchema),
+  tm1_execute_process: asOutputSchema(ProcessResultSchema),
 
   // ── Phase 2d: diff/bundle/upsert ──────────────────────────────────────────
-  // Schemas marked with .passthrough() are passed as full schemas to preserve
-  // additionalProperties:true in the published JSON Schema (extras like
-  // callgraphEntriesCleared, dataSource, etc. flow through unrejected).
-  tm1_diff_process_with_file: DiffProcessResultSchema,
-  tm1_upsert_process: UpsertProcessResultSchema,
-  tm1_install_pro_bundle: InstallProBundleResultSchema,
-  tm1_import_pro_file: ImportProFileResultSchema.shape,
-  tm1_copy_process: CopyProcessResultSchema.shape,
+  tm1_diff_process_with_file: asOutputSchema(DiffProcessResultSchema),
+  tm1_upsert_process: asOutputSchema(UpsertProcessResultSchema),
+  tm1_install_pro_bundle: asOutputSchema(InstallProBundleResultSchema),
+  tm1_import_pro_file: asOutputSchema(ImportProFileResultSchema),
+  tm1_copy_process: asOutputSchema(CopyProcessResultSchema),
 
   // ── Phase 2e: analysis tools ──────────────────────────────────────────────
-  // CallgraphResultSchema uses .passthrough() — pass full schema.
-  tm1_analyze_callgraph: CallgraphResultSchema,
-  tm1_analyze_chore_graph: ChoreGraphResultSchema.shape,
-  tm1_analyze_object_usage: ObjectUsageResultSchema.shape,
-  tm1_search_code: SearchCodeResultSchema.shape,
+  tm1_analyze_callgraph: asOutputSchema(CallgraphResultSchema),
+  tm1_analyze_chore_graph: asOutputSchema(ChoreGraphResultSchema),
+  tm1_analyze_object_usage: asOutputSchema(ObjectUsageResultSchema),
+  tm1_search_code: asOutputSchema(SearchCodeResultSchema),
 
   // ── Phase 2f: validators (refactored from prose) and array-root wraps ─────
   tm1_check_cube_rule: {
@@ -172,11 +167,10 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   },
 
   // ── Phase 2g: refactored plain-text get_* (now JSON) ──────────────────────
-  // ClientItemSchema and ServerInfoSchema use .passthrough() — pass full schema.
-  tm1_get_client: ClientItemSchema,
-  tm1_get_cube_rules: CubeRulesSchema.shape,
-  tm1_get_cube_stats: CubeStatsResultSchema,
-  tm1_get_server_info: ServerInfoSchema,
+  tm1_get_client: asOutputSchema(ClientItemSchema),
+  tm1_get_cube_rules: asOutputSchema(CubeRulesSchema),
+  tm1_get_cube_stats: asOutputSchema(CubeStatsResultSchema),
+  tm1_get_server_info: asOutputSchema(ServerInfoSchema),
   tm1_get_message_log: {
     count: z.number().int(),
     entries: z.array(MessageLogEntrySchema),
@@ -189,66 +183,64 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
     count: z.number().int(),
     files: z.array(ErrorLogFileSchema),
   },
-  tm1_get_error_log_content: ErrorLogContentResultSchema.shape,
-  tm1_get_file_content: FileContentResultSchema.shape,
+  tm1_get_error_log_content: asOutputSchema(ErrorLogContentResultSchema),
+  tm1_get_file_content: asOutputSchema(FileContentResultSchema),
 
   // ── Phase 2h: mutations (already-JSON + 5 refactored to JSON) ─────────────
   // Generic MutationResultSchema (success + passthrough) covers per-tool extras
   // like cellsWritten, parameterCount, updatedTabs without bespoke schemas.
-  // IMPORTANT: pass the full schema (not `.shape`) — extracting `.shape`
-  // discards the .passthrough() flag, which would cause the published JSON
-  // Schema to set `additionalProperties: false` and reject the per-tool extras.
-  tm1_assign_client_group: MutationResultSchema,
-  tm1_cancel_thread: MutationResultSchema,
-  tm1_clear_cube: MutationResultSchema,
-  tm1_create_chore: MutationResultSchema,
-  tm1_create_client: MutationResultSchema,
-  tm1_create_element: MutationResultSchema,
-  tm1_create_element_attribute: MutationResultSchema,
-  tm1_create_process: MutationResultSchema,
-  tm1_create_subset: MutationResultSchema,
-  tm1_delete_element: MutationResultSchema,
-  tm1_delete_process: MutationResultSchema,
-  tm1_delete_subset: MutationResultSchema,
-  tm1_move_element: MutationResultSchema,
-  tm1_update_element: MutationResultSchema,
-  tm1_update_element_attribute_value: MutationResultSchema,
-  tm1_update_process_code: MutationResultSchema,
-  tm1_update_process_datasource: MutationResultSchema,
-  tm1_update_process_parameters: MutationResultSchema,
-  tm1_update_process_variables: MutationResultSchema,
-  tm1_update_subset: MutationResultSchema,
-  tm1_write_cells: MutationResultSchema,
+  // asOutputSchema preserves the .passthrough() flag automatically.
+  tm1_assign_client_group: asOutputSchema(MutationResultSchema),
+  tm1_cancel_thread: asOutputSchema(MutationResultSchema),
+  tm1_clear_cube: asOutputSchema(MutationResultSchema),
+  tm1_create_chore: asOutputSchema(MutationResultSchema),
+  tm1_create_client: asOutputSchema(MutationResultSchema),
+  tm1_create_element: asOutputSchema(MutationResultSchema),
+  tm1_create_element_attribute: asOutputSchema(MutationResultSchema),
+  tm1_create_process: asOutputSchema(MutationResultSchema),
+  tm1_create_subset: asOutputSchema(MutationResultSchema),
+  tm1_delete_element: asOutputSchema(MutationResultSchema),
+  tm1_delete_process: asOutputSchema(MutationResultSchema),
+  tm1_delete_subset: asOutputSchema(MutationResultSchema),
+  tm1_move_element: asOutputSchema(MutationResultSchema),
+  tm1_update_element: asOutputSchema(MutationResultSchema),
+  tm1_update_element_attribute_value: asOutputSchema(MutationResultSchema),
+  tm1_update_process_code: asOutputSchema(MutationResultSchema),
+  tm1_update_process_datasource: asOutputSchema(MutationResultSchema),
+  tm1_update_process_parameters: asOutputSchema(MutationResultSchema),
+  tm1_update_process_variables: asOutputSchema(MutationResultSchema),
+  tm1_update_subset: asOutputSchema(MutationResultSchema),
+  tm1_write_cells: asOutputSchema(MutationResultSchema),
 
   // Bespoke shape: cleared/entriesBefore counters, no `success` field.
-  tm1_invalidate_callgraph_cache: InvalidateCallgraphCacheResultSchema.shape,
+  tm1_invalidate_callgraph_cache: asOutputSchema(InvalidateCallgraphCacheResultSchema),
 
   // ── Phase 2i: hierarchy navigation, server snapshots, diagnostics ────────
-  tm1_get_ancestors: AncestorsResultSchema.shape,
-  tm1_get_descendants: DescendantsResultSchema.shape,
-  tm1_get_server_capabilities: ServerCapabilitiesResultSchema,
-  tm1_get_server_state: ServerStateResultSchema,
-  tm1_list_processes_grouped: ProcessesGroupedResultSchema.shape,
-  tm1_diagnose_process_error: DiagnoseProcessErrorResultSchema.shape,
-  tm1_export_process_to_pro: ExportProcessToProResultSchema.shape,
+  tm1_get_ancestors: asOutputSchema(AncestorsResultSchema),
+  tm1_get_descendants: asOutputSchema(DescendantsResultSchema),
+  tm1_get_server_capabilities: asOutputSchema(ServerCapabilitiesResultSchema),
+  tm1_get_server_state: asOutputSchema(ServerStateResultSchema),
+  tm1_list_processes_grouped: asOutputSchema(ProcessesGroupedResultSchema),
+  tm1_diagnose_process_error: asOutputSchema(DiagnoseProcessErrorResultSchema),
+  tm1_export_process_to_pro: asOutputSchema(ExportProcessToProResultSchema),
 
   // ── Phase 2j: text→JSON-converted mutations ──────────────────────────────
-  tm1_bulk_upsert_elements: MutationResultSchema,
-  tm1_create_cube: MutationResultSchema,
-  tm1_create_dimension: MutationResultSchema,
-  tm1_create_hierarchy: MutationResultSchema,
-  tm1_create_mdx_view: MutationResultSchema,
-  tm1_delete_chore: MutationResultSchema,
-  tm1_delete_client: MutationResultSchema,
-  tm1_delete_cube: MutationResultSchema,
-  tm1_delete_dimension: MutationResultSchema,
-  tm1_delete_hierarchy: MutationResultSchema,
-  tm1_delete_view: MutationResultSchema,
-  tm1_execute_chore: MutationResultSchema,
-  tm1_remove_client_group: MutationResultSchema,
-  tm1_set_cube_rules: MutationResultSchema,
-  tm1_toggle_chore: MutationResultSchema,
-  tm1_unload_cube: MutationResultSchema,
-  tm1_update_chore: MutationResultSchema,
-  tm1_update_client: MutationResultSchema,
+  tm1_bulk_upsert_elements: asOutputSchema(MutationResultSchema),
+  tm1_create_cube: asOutputSchema(MutationResultSchema),
+  tm1_create_dimension: asOutputSchema(MutationResultSchema),
+  tm1_create_hierarchy: asOutputSchema(MutationResultSchema),
+  tm1_create_mdx_view: asOutputSchema(MutationResultSchema),
+  tm1_delete_chore: asOutputSchema(MutationResultSchema),
+  tm1_delete_client: asOutputSchema(MutationResultSchema),
+  tm1_delete_cube: asOutputSchema(MutationResultSchema),
+  tm1_delete_dimension: asOutputSchema(MutationResultSchema),
+  tm1_delete_hierarchy: asOutputSchema(MutationResultSchema),
+  tm1_delete_view: asOutputSchema(MutationResultSchema),
+  tm1_execute_chore: asOutputSchema(MutationResultSchema),
+  tm1_remove_client_group: asOutputSchema(MutationResultSchema),
+  tm1_set_cube_rules: asOutputSchema(MutationResultSchema),
+  tm1_toggle_chore: asOutputSchema(MutationResultSchema),
+  tm1_unload_cube: asOutputSchema(MutationResultSchema),
+  tm1_update_chore: asOutputSchema(MutationResultSchema),
+  tm1_update_client: asOutputSchema(MutationResultSchema),
 };

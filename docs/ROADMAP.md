@@ -28,12 +28,12 @@
 - **#15 `process-execution/`-dir Inkonsistenz**: nur 2 Files,
   `update-process-parameters/variables/datasource` sitzen in
   `ti-development/`. Move oder README-Note.
-- **#16 tsconfig strict-flags**: `noUncheckedIndexedAccess`,
-  `exactOptionalPropertyTypes` aktivieren. Folge-Edits potenziell hoch.
-- **#17 `asOutputSchema()` helper**: passthrough/catchall-footgun fix.
-  `_def`-check für zod-Output-Schemas.
-- **#18 Coverage-Enforcement CI**: `vitest --coverage --reporter=summary`
-  in CI. Branch-Target 70%.
+- **#16 tsconfig strict-flags**: `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`.
+  Pilot-Run 2026-05-08: `noUncheckedIndexedAccess` allein produziert 110
+  Fehler über 15 Files (Hotspots: tiParser 23, pro-parser 18,
+  referenceIndex 17, sample-cells 10, rulesLinter 8). Größtenteils
+  mechanisch (`arr[i] ?? fallback`, optional-chain, `if (!entry) continue`).
+  Nicht in dieser Combo angefasst — eigene PR mit fokussiertem Diff.
 
 ### Erledigt (Architektur)
 
@@ -47,6 +47,8 @@
 - #10 README tool-matrix auto-gen
 - #11 Backlog-MDs konsolidiert → diese Datei
 - #12 Zone.Identifier git-leak entfernt
+- #17 `asOutputSchema()` helper (passthrough/catchall-Detection via `_def.catchall`)
+- #18 Coverage-Enforcement CI (Baseline-Thresholds 21/17/20/22, ratchet zu 50% mid-term)
 
 ## Feature-Backlog
 
