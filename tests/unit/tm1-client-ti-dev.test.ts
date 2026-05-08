@@ -96,7 +96,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should POST to /api/v1/Processes with the process name", async () => {
       fetchSpy.mockResolvedValueOnce(mock201Response({ Name: "NewProcess" }));
 
-      await client.createProcess("NewProcess");
+      await client.processes.create("NewProcess");
 
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toContain("/api/v1/Processes");
@@ -113,9 +113,9 @@ describe("TM1Client – TI Development Methods", () => {
         ),
       );
 
-      await expect(client.createProcess("Existing")).rejects.toThrow(TM1Error);
+      await expect(client.processes.create("Existing")).rejects.toThrow(TM1Error);
       try {
-        await client.createProcess("Existing");
+        await client.processes.create("Existing");
       } catch (e) {
         // The first call already threw; we verify the error from the first call
       }
@@ -127,7 +127,7 @@ describe("TM1Client – TI Development Methods", () => {
         ),
       );
       try {
-        await client.createProcess("Existing");
+        await client.processes.create("Existing");
       } catch (e) {
         expect(e).toBeInstanceOf(TM1Error);
         expect((e as TM1Error).code).toBe(TM1ErrorCode.CONFLICT);
@@ -138,7 +138,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should encode special characters in process name", async () => {
       fetchSpy.mockResolvedValueOnce(mock201Response());
 
-      await client.createProcess("My New Process");
+      await client.processes.create("My New Process");
 
       const [, opts] = fetchSpy.mock.calls[0];
       const body = JSON.parse(opts.body);
@@ -160,7 +160,7 @@ describe("TM1Client – TI Development Methods", () => {
         }),
       );
 
-      const code = await client.getProcessCode("TestProcess");
+      const code = await client.processes.getCode("TestProcess");
 
       expect(code).toEqual({
         prolog: "# Prolog\nASCIIOutput('log.txt', 'start');",
@@ -184,7 +184,7 @@ describe("TM1Client – TI Development Methods", () => {
         }),
       );
 
-      const code = await client.getProcessCode("EmptyProcess");
+      const code = await client.processes.getCode("EmptyProcess");
 
       expect(code.prolog).toBe("");
       expect(code.metadata).toBe("");
@@ -202,7 +202,7 @@ describe("TM1Client – TI Development Methods", () => {
         }),
       );
 
-      await client.getProcessCode("My Process");
+      await client.processes.getCode("My Process");
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("Processes('My%20Process')");
@@ -215,7 +215,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should PATCH only the specified tabs", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessCode("TestProcess", {
+      await client.processes.updateCode("TestProcess", {
         prolog: "# New Prolog",
         data: "# New Data",
       });
@@ -235,7 +235,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should PATCH all four tabs when all are provided", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessCode("TestProcess", {
+      await client.processes.updateCode("TestProcess", {
         prolog: "p",
         metadata: "m",
         data: "d",
@@ -255,7 +255,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should PATCH a single tab", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessCode("TestProcess", { epilog: "# Epilog only" });
+      await client.processes.updateCode("TestProcess", { epilog: "# Epilog only" });
 
       const [, opts] = fetchSpy.mock.calls[0];
       const body = JSON.parse(opts.body);
@@ -274,7 +274,7 @@ describe("TM1Client – TI Development Methods", () => {
         }),
       );
 
-      const ds = await client.getProcessDataSource("TestProcess");
+      const ds = await client.processes.getDataSource("TestProcess");
 
       expect(ds).toEqual({ type: "None" });
     });
@@ -294,7 +294,7 @@ describe("TM1Client – TI Development Methods", () => {
         }),
       );
 
-      const ds = await client.getProcessDataSource("ImportCSV");
+      const ds = await client.processes.getDataSource("ImportCSV");
 
       expect(ds).toEqual({
         type: "ASCII",
@@ -318,7 +318,7 @@ describe("TM1Client – TI Development Methods", () => {
         }),
       );
 
-      const ds = await client.getProcessDataSource("ODBCProcess");
+      const ds = await client.processes.getDataSource("ODBCProcess");
 
       expect(ds.type).toBe("ODBC");
       expect(ds.oDBCConnection).toBe("DSN=MyDB");
@@ -333,7 +333,7 @@ describe("TM1Client – TI Development Methods", () => {
         }),
       );
 
-      const ds = await client.getProcessDataSource("SimpleProcess");
+      const ds = await client.processes.getDataSource("SimpleProcess");
 
       expect(ds).toEqual({ type: "None" });
       expect(ds).not.toHaveProperty("dataSourceNameForServer");
@@ -347,7 +347,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should PATCH with DataSource object for ASCII type", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessDataSource("ImportCSV", {
+      await client.processes.updateDataSource("ImportCSV", {
         type: "ASCII",
         dataSourceNameForServer: "/data/new.csv",
         asciiDelimiterChar: ";",
@@ -369,7 +369,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should PATCH with DataSource type None", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessDataSource("TestProcess", { type: "None" });
+      await client.processes.updateDataSource("TestProcess", { type: "None" });
 
       const [, opts] = fetchSpy.mock.calls[0];
       const body = JSON.parse(opts.body);
@@ -379,7 +379,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should PATCH with ODBC data source", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessDataSource("ODBCProcess", {
+      await client.processes.updateDataSource("ODBCProcess", {
         type: "ODBC",
         oDBCConnection: "DSN=NewDB",
         query: "SELECT id FROM users",
@@ -400,7 +400,7 @@ describe("TM1Client – TI Development Methods", () => {
       const c = new TM1Client(cfg, sm, mockLogger);
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await c.updateProcessDataSource("ImportCSV", {
+      await c.processes.updateDataSource("ImportCSV", {
         type: "ASCII",
         dataSourceNameForServer: "/data/x.csv",
         usesUnicode: true,
@@ -419,7 +419,7 @@ describe("TM1Client – TI Development Methods", () => {
       const c = new TM1Client(cfg, sm, mockLogger);
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await c.updateProcessDataSource("ImportCSV", {
+      await c.processes.updateDataSource("ImportCSV", {
         type: "ASCII",
         dataSourceNameForServer: "/data/x.csv",
         usesUnicode: true,
@@ -437,7 +437,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should PATCH with Parameters array", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessParameters("TestProcess", [
+      await client.processes.updateParameters("TestProcess", [
         { name: "pFile", type: "String", defaultValue: "/data/in.csv", prompt: "File path" },
         { name: "pYear", type: "Numeric", defaultValue: 2024 },
       ]);
@@ -455,7 +455,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should map Numeric type to 1 and String type to 2", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessParameters("TestProcess", [
+      await client.processes.updateParameters("TestProcess", [
         { name: "num", type: "Numeric", defaultValue: 0 },
         { name: "str", type: "String", defaultValue: "" },
       ]);
@@ -469,7 +469,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should send empty Parameters array when no params provided", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessParameters("TestProcess", []);
+      await client.processes.updateParameters("TestProcess", []);
 
       const [, opts] = fetchSpy.mock.calls[0];
       const body = JSON.parse(opts.body);
@@ -479,7 +479,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should omit Prompt when not provided", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.updateProcessParameters("TestProcess", [
+      await client.processes.updateParameters("TestProcess", [
         { name: "p1", type: "String", defaultValue: "val" },
       ]);
 
@@ -495,7 +495,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should DELETE the process by name", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.deleteProcess("OldProcess");
+      await client.processes.delete("OldProcess");
 
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toContain("/api/v1/Processes('OldProcess')");
@@ -510,7 +510,7 @@ describe("TM1Client – TI Development Methods", () => {
         ),
       );
 
-      await expect(client.deleteProcess("Ghost")).rejects.toThrow(TM1Error);
+      await expect(client.processes.delete("Ghost")).rejects.toThrow(TM1Error);
       fetchSpy.mockResolvedValueOnce(
         mockResponse(
           { error: { message: { value: "Process 'Ghost' not found" } } },
@@ -518,7 +518,7 @@ describe("TM1Client – TI Development Methods", () => {
         ),
       );
       try {
-        await client.deleteProcess("Ghost");
+        await client.processes.delete("Ghost");
       } catch (e) {
         expect((e as TM1Error).code).toBe(TM1ErrorCode.NOT_FOUND);
         expect((e as TM1Error).httpStatus).toBe(404);
@@ -528,7 +528,7 @@ describe("TM1Client – TI Development Methods", () => {
     it("should encode special characters in process name", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.deleteProcess("My Process");
+      await client.processes.delete("My Process");
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("Processes('My%20Process')");

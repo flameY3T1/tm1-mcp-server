@@ -79,7 +79,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const cubes = await client.getCubes();
+      const cubes = await client.cubes.list();
 
       expect(cubes).toEqual([
         { name: "SalesCube", dimensions: ["Region", "Product", "Time"] },
@@ -93,7 +93,7 @@ describe("TM1Client – Metadata Methods", () => {
     it("should return empty array when no cubes exist", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ value: [] }));
 
-      const cubes = await client.getCubes();
+      const cubes = await client.cubes.list();
       expect(cubes).toEqual([]);
     });
   });
@@ -111,7 +111,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const dims = await client.getDimensions();
+      const dims = await client.dimensions.list();
 
       expect(dims).toEqual([
         { name: "Region", hierarchies: ["Region", "Country"] },
@@ -125,7 +125,7 @@ describe("TM1Client – Metadata Methods", () => {
     it("should return empty array when no dimensions exist", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ value: [] }));
 
-      const dims = await client.getDimensions();
+      const dims = await client.dimensions.list();
       expect(dims).toEqual([]);
     });
 
@@ -148,7 +148,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const dims = await client.getDimensions({ includeElementCount: true });
+      const dims = await client.dimensions.list({ includeElementCount: true });
 
       expect(dims).toEqual([
         {
@@ -174,7 +174,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const dims = await client.getDimensions({ includeElementCount: true });
+      const dims = await client.dimensions.list({ includeElementCount: true });
       expect(dims[0].elementCounts).toEqual({ Empty: 0 });
     });
   });
@@ -212,7 +212,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const hierarchy = await client.getHierarchy("Region", "Region");
+      const hierarchy = await client.hierarchies.get("Region", "Region");
 
       expect(hierarchy.name).toBe("Region");
       expect(hierarchy.dimensionName).toBe("Region");
@@ -243,7 +243,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const hierarchy = await client.getHierarchy("Measures", "Measures");
+      const hierarchy = await client.hierarchies.get("Measures", "Measures");
 
       expect(hierarchy.elements[0].parents).toEqual([]);
       expect(hierarchy.elements[0].children).toEqual([]);
@@ -254,7 +254,7 @@ describe("TM1Client – Metadata Methods", () => {
         mockResponse({ Name: "My Dim", Elements: [] }),
       );
 
-      await client.getHierarchy("My Dim", "My Hier");
+      await client.hierarchies.get("My Dim", "My Hier");
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("Dimensions('My%20Dim')");
@@ -263,21 +263,21 @@ describe("TM1Client – Metadata Methods", () => {
 
     it("should push nameContains to OData $filter as contains()", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
-      await client.getHierarchy("Region", "Region", { nameContains: "DE" });
+      await client.hierarchies.get("Region", "Region", { nameContains: "DE" });
       const [url] = fetchSpy.mock.calls[0];
       expect(decodeURIComponent(url as string)).toContain("contains(Name, 'DE')");
     });
 
     it("should push nameStartsWith to OData $filter as startswith()", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
-      await client.getHierarchy("Region", "Region", { nameStartsWith: "FY24_" });
+      await client.hierarchies.get("Region", "Region", { nameStartsWith: "FY24_" });
       const [url] = fetchSpy.mock.calls[0];
       expect(decodeURIComponent(url as string)).toContain("startswith(Name, 'FY24_')");
     });
 
     it("should escape single quotes in OData name filters", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
-      await client.getHierarchy("Region", "Region", { nameContains: "Foo's" });
+      await client.hierarchies.get("Region", "Region", { nameContains: "Foo's" });
       const [url] = fetchSpy.mock.calls[0];
       expect(decodeURIComponent(url as string)).toContain("contains(Name, 'Foo''s')");
     });
@@ -293,7 +293,7 @@ describe("TM1Client – Metadata Methods", () => {
           ],
         }),
       );
-      const hierarchy = await client.getHierarchy("Region", "Region", { nameRegex: "^DE_" });
+      const hierarchy = await client.hierarchies.get("Region", "Region", { nameRegex: "^DE_" });
       expect(hierarchy.elements).toHaveLength(1);
       expect(hierarchy.elements[0].name).toBe("DE_Bayern");
       expect(hierarchy.elements[0].parents).toEqual([]);
@@ -301,7 +301,7 @@ describe("TM1Client – Metadata Methods", () => {
 
     it("should not push nameRegex to OData (client-side only)", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
-      await client.getHierarchy("Region", "Region", { nameRegex: "^X" });
+      await client.hierarchies.get("Region", "Region", { nameRegex: "^X" });
       const [url] = fetchSpy.mock.calls[0];
       expect(decodeURIComponent(url as string)).not.toContain("$filter");
     });
@@ -318,7 +318,7 @@ describe("TM1Client – Metadata Methods", () => {
           ],
         }),
       );
-      const hierarchy = await client.getHierarchy("Region", "Region", { nameRegex: "^DE_", topN: 2 });
+      const hierarchy = await client.hierarchies.get("Region", "Region", { nameRegex: "^DE_", topN: 2 });
       const [url] = fetchSpy.mock.calls[0];
       expect(decodeURIComponent(url as string)).not.toContain("$top");
       expect(hierarchy.elements).toHaveLength(2);
@@ -327,13 +327,13 @@ describe("TM1Client – Metadata Methods", () => {
 
     it("should throw VALIDATION_ERROR on invalid nameRegex", async () => {
       await expect(
-        client.getHierarchy("Region", "Region", { nameRegex: "[unclosed" }),
+        client.hierarchies.get("Region", "Region", { nameRegex: "[unclosed" }),
       ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     });
 
     it("should combine server-side name filter with level filter via AND", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
-      await client.getHierarchy("Region", "Region", { nameStartsWith: "DE_", levelMax: 1 });
+      await client.hierarchies.get("Region", "Region", { nameStartsWith: "DE_", levelMax: 1 });
       const [url] = fetchSpy.mock.calls[0];
       const decoded = decodeURIComponent(url as string);
       expect(decoded).toContain("Level le 1");
@@ -359,33 +359,33 @@ describe("TM1Client – Metadata Methods", () => {
 
     it("should return all descendants of a consolidation", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
-      const result = await client.getDescendants("Region", "Region", "Europe");
+      const result = await client.hierarchies.getDescendants("Region", "Region", "Europe");
       const names = result.descendants.map((d) => d.name).sort();
       expect(names).toEqual(["AT", "DACH", "DE", "FR"]);
     });
 
     it("should respect depth limit", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
-      const result = await client.getDescendants("Region", "Region", "Europe", { depth: 1 });
+      const result = await client.hierarchies.getDescendants("Region", "Region", "Europe", { depth: 1 });
       expect(result.descendants.map((d) => d.name).sort()).toEqual(["DACH", "FR"]);
     });
 
     it("should filter to leaves only when leavesOnly=true", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
-      const result = await client.getDescendants("Region", "Region", "Europe", { leavesOnly: true });
+      const result = await client.hierarchies.getDescendants("Region", "Region", "Europe", { leavesOnly: true });
       expect(result.descendants.map((d) => d.name).sort()).toEqual(["AT", "DE", "FR"]);
     });
 
     it("should return empty descendants for leaf element", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
-      const result = await client.getDescendants("Region", "Region", "DE");
+      const result = await client.hierarchies.getDescendants("Region", "Region", "DE");
       expect(result.descendants).toEqual([]);
     });
 
     it("should throw NOT_FOUND for unknown element", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
       await expect(
-        client.getDescendants("Region", "Region", "Mars"),
+        client.hierarchies.getDescendants("Region", "Region", "Mars"),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
   });
@@ -404,7 +404,7 @@ describe("TM1Client – Metadata Methods", () => {
           ],
         }),
       );
-      const result = await client.getAncestors("Region", "Region", "DE");
+      const result = await client.hierarchies.getAncestors("Region", "Region", "DE");
       expect(result.ancestors.map((a) => a.name)).toEqual(["Europe", "Total"]);
       expect(result.paths).toEqual([["DE", "Europe", "Total"]]);
     });
@@ -422,7 +422,7 @@ describe("TM1Client – Metadata Methods", () => {
           ],
         }),
       );
-      const result = await client.getAncestors("Region", "Region", "DE");
+      const result = await client.hierarchies.getAncestors("Region", "Region", "DE");
       expect(result.ancestors.map((a) => a.name).sort()).toEqual(["ByCurrency", "ByGeo", "Total"]);
       expect(result.paths).toHaveLength(2);
       expect(result.paths).toContainEqual(["DE", "ByGeo", "Total"]);
@@ -438,7 +438,7 @@ describe("TM1Client – Metadata Methods", () => {
           ],
         }),
       );
-      const result = await client.getAncestors("Region", "Region", "Total");
+      const result = await client.hierarchies.getAncestors("Region", "Region", "Total");
       expect(result.ancestors).toEqual([]);
       expect(result.paths).toEqual([["Total"]]);
     });
@@ -448,7 +448,7 @@ describe("TM1Client – Metadata Methods", () => {
         mockResponse({ Name: "Region", Elements: [] }),
       );
       await expect(
-        client.getAncestors("Region", "Region", "Ghost"),
+        client.hierarchies.getAncestors("Region", "Region", "Ghost"),
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
   });
@@ -475,7 +475,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const processes = await client.getProcesses();
+      const processes = await client.processes.list();
 
       expect(processes).toEqual([
         {
@@ -510,7 +510,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const processes = await client.getProcesses();
+      const processes = await client.processes.list();
       expect(processes[0].parameters[0].type).toBe("Numeric");
       expect(processes[0].parameters[1].type).toBe("String");
     });
@@ -518,7 +518,7 @@ describe("TM1Client – Metadata Methods", () => {
     it("should return empty array when no processes exist", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ value: [] }));
 
-      const processes = await client.getProcesses();
+      const processes = await client.processes.list();
       expect(processes).toEqual([]);
     });
   });
@@ -554,7 +554,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const chores = await client.getChores();
+      const chores = await client.chores.list();
 
       expect(chores).toEqual([
         {
@@ -576,7 +576,7 @@ describe("TM1Client – Metadata Methods", () => {
     it("should return empty array when no chores exist", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ value: [] }));
 
-      const chores = await client.getChores();
+      const chores = await client.chores.list();
       expect(chores).toEqual([]);
     });
 
@@ -596,7 +596,7 @@ describe("TM1Client – Metadata Methods", () => {
         }),
       );
 
-      const chores = await client.getChores();
+      const chores = await client.chores.list();
       expect(chores[0].processes).toEqual([]);
       expect(chores[0].active).toBe(false);
     });

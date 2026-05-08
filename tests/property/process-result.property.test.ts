@@ -21,7 +21,7 @@ describe("Property 7: Prozessausführungs-Ergebnis", () => {
     await fc.assert(fc.asyncProperty(fc.string({ minLength: 1, maxLength: 30 }), async (processName) => {
       const f = vi.fn().mockResolvedValue({ ok: true, status: 204, statusText: "No Content", headers: new Headers(), text: vi.fn().mockResolvedValue(""), json: vi.fn().mockRejectedValue(new Error("No content")) } as unknown as Response);
       const client = makeClient(f);
-      const result = await client.executeProcess(processName);
+      const result = await client.processes.execute(processName);
       expect(result.success).toBe(true);
       expect(result.processErrorStatus).toBe("CompletedSuccessfully");
     }), { numRuns: 100 });
@@ -34,7 +34,7 @@ describe("Property 7: Prozessausführungs-Ergebnis", () => {
       const body = JSON.stringify({ error: { message: { value: msg } } });
       const f = vi.fn().mockResolvedValue({ ok: false, status, statusText: "Error", headers: new Headers(), text: vi.fn().mockResolvedValue(body), json: vi.fn().mockResolvedValue({ error: { message: { value: msg } } }) } as unknown as Response);
       const client = makeClient(f);
-      const result = await client.executeProcess(name);
+      const result = await client.processes.execute(name);
       expect(result.success).toBe(false);
       expect(typeof result.processErrorStatus).toBe("string");
       expect(result.processErrorStatus.length).toBeGreaterThan(0);

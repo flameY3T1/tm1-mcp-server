@@ -83,7 +83,7 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should return success when process completes with 204", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      const result = await client.executeProcess("ImportData");
+      const result = await client.processes.execute("ImportData");
 
       expect(result).toEqual({
         success: true,
@@ -104,7 +104,7 @@ describe("TM1Client – Process Execution Methods", () => {
         text: vi.fn().mockResolvedValue(""),
       } as unknown as Response);
 
-      const result = await client.executeProcess("RunCalc");
+      const result = await client.processes.execute("RunCalc");
 
       expect(result.success).toBe(true);
       expect(result.processErrorStatus).toBe("CompletedSuccessfully");
@@ -113,7 +113,7 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should send parameters in the request body", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.executeProcess("ImportData", {
+      await client.processes.execute("ImportData", {
         pFilePath: "/data/input.csv",
         pYear: 2024,
       });
@@ -129,7 +129,7 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should send empty body when no parameters provided", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.executeProcess("SimpleProcess");
+      await client.processes.execute("SimpleProcess");
 
       const [, opts] = fetchSpy.mock.calls[0];
       const body = JSON.parse(opts.body);
@@ -139,7 +139,7 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should send empty body when params is an empty object", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.executeProcess("SimpleProcess", {});
+      await client.processes.execute("SimpleProcess", {});
 
       const [, opts] = fetchSpy.mock.calls[0];
       const body = JSON.parse(opts.body);
@@ -154,7 +154,7 @@ describe("TM1Client – Process Execution Methods", () => {
         ),
       );
 
-      const result = await client.executeProcess("BrokenProcess");
+      const result = await client.processes.execute("BrokenProcess");
 
       expect(result.success).toBe(false);
       expect(result.processErrorStatus).toContain("Process aborted with error in Prolog");
@@ -168,7 +168,7 @@ describe("TM1Client – Process Execution Methods", () => {
         ),
       );
 
-      const result = await client.executeProcess("NonExistent");
+      const result = await client.processes.execute("NonExistent");
 
       expect(result.success).toBe(false);
       expect(result.processErrorStatus).toContain("not found");
@@ -177,7 +177,7 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should encode special characters in process name", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.executeProcess("My Process");
+      await client.processes.execute("My Process");
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("Processes('My%20Process')");
@@ -197,7 +197,7 @@ describe("TM1Client – Process Execution Methods", () => {
         }),
       );
 
-      const params = await client.getProcessParameters("ImportData");
+      const params = await client.processes.getParameters("ImportData");
 
       expect(params).toEqual([
         { name: "pFilePath", type: "String", defaultValue: "/data/input.csv", prompt: "Enter file path" },
@@ -211,7 +211,7 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should return empty array when process has no parameters", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ value: [] }));
 
-      const params = await client.getProcessParameters("NoParamProcess");
+      const params = await client.processes.getParameters("NoParamProcess");
       expect(params).toEqual([]);
     });
 
@@ -225,7 +225,7 @@ describe("TM1Client – Process Execution Methods", () => {
         }),
       );
 
-      const params = await client.getProcessParameters("TestProc");
+      const params = await client.processes.getParameters("TestProc");
       expect(params[0].type).toBe("Numeric");
       expect(params[1].type).toBe("String");
     });
@@ -239,14 +239,14 @@ describe("TM1Client – Process Execution Methods", () => {
         }),
       );
 
-      const params = await client.getProcessParameters("TestProc");
+      const params = await client.processes.getParameters("TestProc");
       expect(params[0]).not.toHaveProperty("prompt");
     });
 
     it("should encode special characters in process name", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse({ value: [] }));
 
-      await client.getProcessParameters("My Process");
+      await client.processes.getParameters("My Process");
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("Processes('My%20Process')");

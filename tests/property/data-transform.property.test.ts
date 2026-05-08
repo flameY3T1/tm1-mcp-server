@@ -28,7 +28,7 @@ describe("Property 5: Strukturierte Datentransformation", () => {
     await fc.assert(fc.asyncProperty(fc.array(cellArb, { minLength: 1, maxLength: 10 }), fc.array(axisArb, { minLength: 1, maxLength: 2 }), async (cells, axes) => {
       const f = vi.fn().mockResolvedValue(mockResp({ ID: "cs-1", Cells: cells, Axes: axes }));
       const client = makeClient(f);
-      const result = await client.executeMdx("SELECT {} ON COLUMNS FROM [Cube]");
+      const result = await client.cells.executeMdx("SELECT {} ON COLUMNS FROM [Cube]");
       expect(result.cells).toHaveLength(cells.length);
       for (let i = 0; i < cells.length; i++) {
         expect(result.cells[i].value).toEqual(cells[i].Value);
@@ -57,7 +57,7 @@ describe("Property 5: Strukturierte Datentransformation", () => {
     await fc.assert(fc.asyncProperty(fc.array(cellArb, { minLength: 0, maxLength: 6 }), fc.array(axisArb, { minLength: 0, maxLength: 2 }), async (cells, axes) => {
       const f = vi.fn().mockResolvedValue(mockResp({ ID: "cs-2", Cells: cells, Axes: axes }));
       const client = makeClient(f);
-      const result = await client.getView("TestCube", "TestView");
+      const result = await client.views.getView("TestCube", "TestView");
       expect(result.cubeName).toBe("TestCube");
       expect(result.viewName).toBe("TestView");
       expect(result.cells).toHaveLength(cells.length);

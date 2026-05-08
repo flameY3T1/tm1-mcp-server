@@ -73,7 +73,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should create a Numeric element", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.createElement("Region", "Region", {
+      await client.elements.create("Region", "Region", {
         name: "Germany",
         type: "Numeric",
       });
@@ -89,7 +89,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should create a String element", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.createElement("Region", "Region", {
+      await client.elements.create("Region", "Region", {
         name: "Description",
         type: "String",
       });
@@ -101,7 +101,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should create a Consolidated element with components", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.createElement("Region", "Region", {
+      await client.elements.create("Region", "Region", {
         name: "Europe",
         type: "Consolidated",
         components: [
@@ -122,7 +122,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should not include Components for Consolidated with empty components array", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.createElement("Region", "Region", {
+      await client.elements.create("Region", "Region", {
         name: "EmptyTotal",
         type: "Consolidated",
         components: [],
@@ -135,7 +135,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should encode special characters in dimension and hierarchy names", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.createElement("My Dim", "My Hier", {
+      await client.elements.create("My Dim", "My Hier", {
         name: "Test",
         type: "Numeric",
       });
@@ -152,7 +152,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should update element name", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.updateElement("Region", "Region", "Germany", {
+      await client.elements.update("Region", "Region", "Germany", {
         newName: "Deutschland",
       });
 
@@ -167,7 +167,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should update element type", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.updateElement("Region", "Region", "Germany", {
+      await client.elements.update("Region", "Region", "Germany", {
         type: "Consolidated",
       });
 
@@ -178,7 +178,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should update element components", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.updateElement("Region", "Region", "Europe", {
+      await client.elements.update("Region", "Region", "Europe", {
         components: [
           { name: "Germany", weight: 1 },
           { name: "France", weight: 2 },
@@ -195,7 +195,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should update multiple fields at once", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.updateElement("Region", "Region", "Germany", {
+      await client.elements.update("Region", "Region", "Germany", {
         newName: "Deutschland",
         type: "String",
       });
@@ -207,7 +207,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should encode special characters in element name", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.updateElement("Region", "Region", "My Element", {
+      await client.elements.update("Region", "Region", "My Element", {
         newName: "New Name",
       });
 
@@ -222,7 +222,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should delete an element (204 No Content)", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.deleteElement("Region", "Region", "Germany");
+      await client.elements.delete("Region", "Region", "Germany");
 
       expect(fetchSpy).toHaveBeenCalledOnce();
       const [url, opts] = fetchSpy.mock.calls[0];
@@ -248,7 +248,7 @@ describe("TM1Client – Dimension Management Methods", () => {
       } as unknown as Response);
 
       await expect(
-        client.deleteElement("Region", "Region", "Germany"),
+        client.elements.delete("Region", "Region", "Germany"),
       ).rejects.toThrow(TM1Error);
 
       try {
@@ -267,7 +267,7 @@ describe("TM1Client – Dimension Management Methods", () => {
             }),
           ),
         } as unknown as Response);
-        await client.deleteElement("Region", "Region", "Germany");
+        await client.elements.delete("Region", "Region", "Germany");
       } catch (err) {
         expect(err).toBeInstanceOf(TM1Error);
         const tm1Err = err as TM1Error;
@@ -279,7 +279,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should encode special characters in element name", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.deleteElement("Region", "Region", "My Element");
+      await client.elements.delete("Region", "Region", "My Element");
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("Elements('My%20Element')");
@@ -292,7 +292,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should move an element to a new parent with default weight", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.moveElement("Region", "Region", "Germany", "Europe");
+      await client.elements.move("Region", "Region", "Germany", "Europe");
 
       expect(fetchSpy).toHaveBeenCalledOnce();
       const [url, opts] = fetchSpy.mock.calls[0];
@@ -306,7 +306,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should move an element with a custom weight", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.moveElement("Region", "Region", "Germany", "Europe", 2.5);
+      await client.elements.move("Region", "Region", "Germany", "Europe", 2.5);
 
       const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(body.Weight).toBe(2.5);
@@ -315,7 +315,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should encode special characters in element and parent names", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.moveElement("My Dim", "My Hier", "Child Elem", "Parent Elem");
+      await client.elements.move("My Dim", "My Hier", "Child Elem", "Parent Elem");
 
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toContain("Dimensions('My%20Dim')");
@@ -328,7 +328,7 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should use weight 0 when explicitly passed", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.moveElement("Region", "Region", "Germany", "Europe", 0);
+      await client.elements.move("Region", "Region", "Germany", "Europe", 0);
 
       const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(body.Weight).toBe(0);

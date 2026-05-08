@@ -26,7 +26,7 @@ describe("Property 9: Prozesscode-Tab-Vollständigkeit", () => {
     await fc.assert(fc.asyncProperty(codeArb, async (apiCode) => {
       const f = vi.fn().mockResolvedValue(mockResp({ Name: "TestProcess", ...apiCode }));
       const client = makeClient(f);
-      const code = await client.getProcessCode("TestProcess");
+      const code = await client.processes.getCode("TestProcess");
       const keys = Object.keys(code);
       expect(keys).toHaveLength(4);
       expect(keys.sort()).toEqual(["data", "epilog", "metadata", "prolog"]);
@@ -56,7 +56,7 @@ describe("Property 10: Partielle Tab-Aktualisierung", () => {
       const client = makeClient(f);
       const partialCode: Record<string, string> = {};
       for (const tab of tabSubset) partialCode[tab] = newCode;
-      await client.updateProcessCode("TestProcess", partialCode);
+      await client.processes.updateCode("TestProcess", partialCode);
 
       expect(f).toHaveBeenCalledOnce();
       const [, opts] = f.mock.calls[0];

@@ -43,7 +43,7 @@ describe("Property 8: Prozessparameter-Roundtrip", () => {
       const client = new TM1Client(c, sm, mockLogger);
 
       // Write
-      await client.updateProcessParameters("TestProcess", params);
+      await client.processes.updateParameters("TestProcess", params);
       if (params.length > 0) {
         const [, writeOpts] = f.mock.calls[0];
         const writeBody = JSON.parse(writeOpts.body);
@@ -56,7 +56,7 @@ describe("Property 8: Prozessparameter-Roundtrip", () => {
       }
 
       // Read
-      const readParams = await client.getProcessParameters("TestProcess");
+      const readParams = await client.processes.getParameters("TestProcess");
       expect(readParams).toHaveLength(params.length);
       for (let i = 0; i < params.length; i++) {
         expect(readParams[i].name).toBe(params[i].name);

@@ -52,7 +52,7 @@ describe("Property 4: Metadaten-Antwort-Vollständigkeit", () => {
     await fc.assert(fc.asyncProperty(fc.array(cubeArb, { minLength: 0, maxLength: 10 }), async (apiCubes) => {
       const f = vi.fn().mockResolvedValue(mockResp({ value: apiCubes }));
       const client = makeClient(f);
-      const cubes = await client.getCubes();
+      const cubes = await client.cubes.list();
       expect(cubes).toHaveLength(apiCubes.length);
       for (let i = 0; i < apiCubes.length; i++) {
         expect(cubes[i].name).toBe(apiCubes[i].Name);
@@ -69,7 +69,7 @@ describe("Property 4: Metadaten-Antwort-Vollständigkeit", () => {
     await fc.assert(fc.asyncProperty(fc.array(dimArb, { minLength: 0, maxLength: 10 }), async (apiDims) => {
       const f = vi.fn().mockResolvedValue(mockResp({ value: apiDims }));
       const client = makeClient(f);
-      const dims = await client.getDimensions();
+      const dims = await client.dimensions.list();
       expect(dims).toHaveLength(apiDims.length);
       for (let i = 0; i < apiDims.length; i++) {
         expect(dims[i].name).toBe(apiDims[i].Name);
@@ -84,7 +84,7 @@ describe("Property 4: Metadaten-Antwort-Vollständigkeit", () => {
     await fc.assert(fc.asyncProperty(fc.array(processArb, { minLength: 0, maxLength: 10 }), async (apiProcs) => {
       const f = vi.fn().mockResolvedValue(mockResp({ value: apiProcs }));
       const client = makeClient(f);
-      const procs = await client.getProcesses();
+      const procs = await client.processes.list();
       expect(procs).toHaveLength(apiProcs.length);
       for (let i = 0; i < apiProcs.length; i++) {
         expect(procs[i].name).toBe(apiProcs[i].Name);
@@ -104,7 +104,7 @@ describe("Property 4: Metadaten-Antwort-Vollständigkeit", () => {
     await fc.assert(fc.asyncProperty(fc.array(choreArb, { minLength: 0, maxLength: 5 }), async (apiChores) => {
       const f = vi.fn().mockResolvedValue(mockResp({ value: apiChores }));
       const client = makeClient(f);
-      const chores = await client.getChores();
+      const chores = await client.chores.list();
       expect(chores).toHaveLength(apiChores.length);
       for (let i = 0; i < apiChores.length; i++) {
         expect(chores[i].name).toBe(apiChores[i].Name);

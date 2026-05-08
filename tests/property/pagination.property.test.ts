@@ -32,7 +32,7 @@ describe("Property 6: Paginierungs-Invariante", () => {
 
         const f = vi.fn().mockResolvedValue(mockResp({ ID: "cs", Cells: cells, Axes: [{ Tuples: ax0 }, { Tuples: ax1 }] }));
         const client = makeClient(f);
-        const result = await client.executeMdx("SELECT ...", top, skip);
+        const result = await client.cells.executeMdx("SELECT ...", top, skip);
         expect(result.cells.length).toBeLessThanOrEqual(top);
         expect(result.cells.length).toBe(retCount);
         expect(result.totalCellCount).toBe(total);
@@ -48,7 +48,7 @@ describe("Property 6: Paginierungs-Invariante", () => {
 
       const f = vi.fn().mockResolvedValue(mockResp({ ID: "cs", Cells: [], Axes: [{ Tuples: ax0 }, { Tuples: ax1 }] }));
       const client = makeClient(f);
-      const result = await client.executeMdx("SELECT ...", 10, total);
+      const result = await client.cells.executeMdx("SELECT ...", 10, total);
       expect(result.cells).toHaveLength(0);
       expect(result.totalCellCount).toBe(total);
     }), { numRuns: 100 });

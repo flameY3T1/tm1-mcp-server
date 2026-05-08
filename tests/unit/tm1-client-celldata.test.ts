@@ -88,7 +88,7 @@ describe("TM1Client – Cell Data Methods", () => {
           }),
         );
 
-      const value = await client.getCellValue("SalesCube", ["Jan", "Germany", "Actual"]);
+      const value = await client.cells.getValue("SalesCube", ["Jan", "Germany", "Actual"]);
 
       expect(value).toBe(42.5);
 
@@ -116,7 +116,7 @@ describe("TM1Client – Cell Data Methods", () => {
           }),
         );
 
-      const value = await client.getCellValue("StatusCube", ["Q1", "Open"]);
+      const value = await client.cells.getValue("StatusCube", ["Q1", "Open"]);
       expect(value).toBe("Active");
     });
 
@@ -130,7 +130,7 @@ describe("TM1Client – Cell Data Methods", () => {
           }),
         );
 
-      const value = await client.getCellValue("SalesCube", ["Feb", "France", "Budget"]);
+      const value = await client.cells.getValue("SalesCube", ["Feb", "France", "Budget"]);
       expect(value).toBeNull();
     });
 
@@ -139,7 +139,7 @@ describe("TM1Client – Cell Data Methods", () => {
         .mockResolvedValueOnce(mockResponse(salesCubeMeta))
         .mockResolvedValueOnce(mockResponse({ ID: "cellset-004", Cells: [] }));
 
-      const value = await client.getCellValue("SalesCube", ["Mar", "UK", "Actual"]);
+      const value = await client.cells.getValue("SalesCube", ["Mar", "UK", "Actual"]);
       expect(value).toBeNull();
     });
 
@@ -148,7 +148,7 @@ describe("TM1Client – Cell Data Methods", () => {
         .mockResolvedValueOnce(mockResponse(salesCubeMeta))
         .mockResolvedValueOnce(mockResponse({ ID: "cellset-005" }));
 
-      const value = await client.getCellValue("SalesCube", ["Apr", "US", "Actual"]);
+      const value = await client.cells.getValue("SalesCube", ["Apr", "US", "Actual"]);
       expect(value).toBeNull();
     });
 
@@ -159,7 +159,7 @@ describe("TM1Client – Cell Data Methods", () => {
           mockResponse({ ID: "cellset-006", Cells: [{ Value: 1, FormattedValue: "1" }] }),
         );
 
-      await client.getCellValue("SalesCube", [
+      await client.cells.getValue("SalesCube", [
         "[Time].[Jan]",
         "[Region].[Germany]",
         "[Scenario].[Actual]",
@@ -175,7 +175,7 @@ describe("TM1Client – Cell Data Methods", () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(salesCubeMeta));
 
       await expect(
-        client.getCellValue("SalesCube", ["Jan", "Germany"]),
+        client.cells.getValue("SalesCube", ["Jan", "Germany"]),
       ).rejects.toThrow(/3 dimension\(s\).*2 element\(s\)/);
     });
   });
@@ -210,7 +210,7 @@ describe("TM1Client – Cell Data Methods", () => {
     it("should return structured MdxResult with cells and axes", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleResponse));
 
-      const result = await client.executeMdx("SELECT {[Time].[Jan],[Time].[Feb]} ON COLUMNS, {[Region].[Germany],[Region].[France]} ON ROWS FROM [SalesCube]");
+      const result = await client.cells.executeMdx("SELECT {[Time].[Jan],[Time].[Feb]} ON COLUMNS, {[Region].[Germany],[Region].[France]} ON ROWS FROM [SalesCube]");
 
       expect(result.cells).toEqual([
         { value: 100, formattedValue: "100.00" },
@@ -231,7 +231,7 @@ describe("TM1Client – Cell Data Methods", () => {
     it("should send MDX in POST body", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleResponse));
 
-      await client.executeMdx("SELECT {} ON COLUMNS FROM [TestCube]");
+      await client.cells.executeMdx("SELECT {} ON COLUMNS FROM [TestCube]");
 
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toContain("/api/v1/ExecuteMDX");
@@ -249,7 +249,7 @@ describe("TM1Client – Cell Data Methods", () => {
         }),
       );
 
-      await client.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", 10);
+      await client.cells.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", 10);
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("$top=10");
@@ -264,7 +264,7 @@ describe("TM1Client – Cell Data Methods", () => {
         }),
       );
 
-      await client.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", undefined, 5);
+      await client.cells.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", undefined, 5);
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("$skip=5");
@@ -280,7 +280,7 @@ describe("TM1Client – Cell Data Methods", () => {
         }),
       );
 
-      await client.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", 20, 10);
+      await client.cells.executeMdx("SELECT {} ON COLUMNS FROM [Cube]", 20, 10);
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("$top=20");
@@ -292,7 +292,7 @@ describe("TM1Client – Cell Data Methods", () => {
         mockResponse({ ID: "cellset-104", Cells: [], Axes: [] }),
       );
 
-      const result = await client.executeMdx("SELECT {} ON COLUMNS FROM [EmptyCube]");
+      const result = await client.cells.executeMdx("SELECT {} ON COLUMNS FROM [EmptyCube]");
 
       expect(result.cells).toEqual([]);
       expect(result.axes).toEqual([]);
@@ -305,7 +305,7 @@ describe("TM1Client – Cell Data Methods", () => {
       );
       const setTimeoutSpy = vi.spyOn(global, "setTimeout");
 
-      await client.executeMdx("SELECT {} FROM [Cube]", undefined, undefined, { timeoutMs: 120000 });
+      await client.cells.executeMdx("SELECT {} FROM [Cube]", undefined, undefined, { timeoutMs: 120000 });
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 120000);
       setTimeoutSpy.mockRestore();
@@ -317,7 +317,7 @@ describe("TM1Client – Cell Data Methods", () => {
       );
       const setTimeoutSpy = vi.spyOn(global, "setTimeout");
 
-      await client.executeMdx("SELECT {} FROM [Cube]");
+      await client.cells.executeMdx("SELECT {} FROM [Cube]");
 
       // makeConfig() sets requestTimeoutMs: 5000.
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
@@ -350,7 +350,7 @@ describe("TM1Client – Cell Data Methods", () => {
         }),
       );
 
-      const result = await client.executeMdx("SELECT ...", 2);
+      const result = await client.cells.executeMdx("SELECT ...", 2);
 
       // totalCellCount = 3 * 2 = 6, even though only 2 cells returned (paginated)
       expect(result.totalCellCount).toBe(6);
@@ -377,7 +377,7 @@ describe("TM1Client – Cell Data Methods", () => {
         }),
       );
 
-      const result = await client.executeMdx("SELECT ...");
+      const result = await client.cells.executeMdx("SELECT ...");
 
       expect(result.axes[0].tuples[0].members).toHaveLength(2);
       expect(result.axes[0].tuples[0].members[0]).toEqual({ name: "Jan", hierarchyName: "Time" });
@@ -407,7 +407,7 @@ describe("TM1Client – Cell Data Methods", () => {
         }),
       );
 
-      const result = await client.getView("SalesCube", "DefaultView");
+      const result = await client.views.getView("SalesCube", "DefaultView");
 
       expect(result.cubeName).toBe("SalesCube");
       expect(result.viewName).toBe("DefaultView");
@@ -424,7 +424,7 @@ describe("TM1Client – Cell Data Methods", () => {
         mockResponse({ ID: "cellset-201", Cells: [], Axes: [] }),
       );
 
-      await client.getView("MyCube", "MyView");
+      await client.views.getView("MyCube", "MyView");
 
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toContain("Cubes('MyCube')");
@@ -438,7 +438,7 @@ describe("TM1Client – Cell Data Methods", () => {
         mockResponse({ ID: "cellset-202", Cells: [], Axes: [] }),
       );
 
-      await client.getView("My Cube", "My View");
+      await client.views.getView("My Cube", "My View");
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("Cubes('My%20Cube')");
@@ -450,7 +450,7 @@ describe("TM1Client – Cell Data Methods", () => {
         mockResponse({ ID: "cellset-203", Cells: [], Axes: [] }),
       );
 
-      const result = await client.getView("EmptyCube", "EmptyView");
+      const result = await client.views.getView("EmptyCube", "EmptyView");
 
       expect(result.cells).toEqual([]);
       expect(result.axes).toEqual([]);
@@ -485,7 +485,7 @@ describe("TM1Client – Cell Data Methods", () => {
       const c = newClient("12.0");
       fetchSpy.mockResolvedValueOnce(mock204());
 
-      await c.clearCube("Sales", ["Time", "Region"], [["Jan"], []]);
+      await c.cubes.clear("Sales", ["Time", "Region"], [["Jan"], []]);
 
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toContain("/api/v1/Cubes('Sales')/tm1.Clear");
@@ -505,7 +505,7 @@ describe("TM1Client – Cell Data Methods", () => {
         .mockResolvedValueOnce(mock204())   // execute
         .mockResolvedValueOnce(mock204());  // delete
 
-      await c.clearCube("Sales", ["Time", "Region"], [[], []]);
+      await c.cubes.clear("Sales", ["Time", "Region"], [[], []]);
 
       const [createUrl, createOpts] = fetchSpy.mock.calls[0];
       expect(createUrl).toContain("/api/v1/Processes");
@@ -526,7 +526,7 @@ describe("TM1Client – Cell Data Methods", () => {
       const c = newClient("11.8");
 
       await expect(
-        c.clearCube("Sales", ["Time", "Region"], [["Jan"], []]),
+        c.cubes.clear("Sales", ["Time", "Region"], [["Jan"], []]),
       ).rejects.toMatchObject({
         code: "UNSUPPORTED_OPERATION",
         message: expect.stringContaining("Partial clearCube"),
@@ -552,7 +552,7 @@ describe("TM1Client – Cell Data Methods", () => {
     it("POSTs to /api/v1/Cubes('X')/tm1.Unload", async () => {
       fetchSpy.mockResolvedValueOnce(mock204());
 
-      await client.unloadCube("Sales");
+      await client.cubes.unload("Sales");
 
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toContain("/api/v1/Cubes('Sales')/tm1.Unload");
@@ -562,7 +562,7 @@ describe("TM1Client – Cell Data Methods", () => {
     it("URL-encodes special characters in cube name", async () => {
       fetchSpy.mockResolvedValueOnce(mock204());
 
-      await client.unloadCube("Sales Data");
+      await client.cubes.unload("Sales Data");
 
       const [url] = fetchSpy.mock.calls[0];
       expect(url).toContain("/api/v1/Cubes('Sales%20Data')/tm1.Unload");
