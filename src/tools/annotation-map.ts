@@ -82,7 +82,7 @@ export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
   tm1_cancel_thread: DESTRUCTIVE,
   tm1_get_transaction_log: READ_ONLY,
 
-  // process-execution
+  // ti-development (process execution / params)
   tm1_execute_process: DESTRUCTIVE,
   tm1_get_process_parameters: READ_ONLY,
 

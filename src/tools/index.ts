@@ -22,11 +22,9 @@ import { registerGetViewDefinition } from "./celldata/get-view-definition.js";
 import { registerSampleCells } from "./celldata/sample-cells.js";
 import { registerWriteCells } from "./celldata/write-cells.js";
 
-// Process execution tools
-import { registerExecuteProcess } from "./process-execution/execute-process.js";
-import { registerGetProcessParameters } from "./process-execution/get-process-parameters.js";
-
-// TI development tools
+// TI development tools (process CRUD, execution, code, params, datasource)
+import { registerExecuteProcess } from "./ti-development/execute-process.js";
+import { registerGetProcessParameters } from "./ti-development/get-process-parameters.js";
 import { registerCreateProcess } from "./ti-development/create-process.js";
 import { registerGetProcessCode } from "./ti-development/get-process-code.js";
 import { registerUpdateProcessCode } from "./ti-development/update-process-code.js";
