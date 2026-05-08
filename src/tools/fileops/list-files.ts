@@ -21,7 +21,7 @@ export function registerListFiles(server: McpServer, tm1Client: TM1Client): void
     },
     async ({ path, limit, offset, fetchAll }) => {
       try {
-        const files = await tm1Client.listFiles(path);
+        const files = await tm1Client.files.list(path);
         return {
           content: [{
             type: "text",

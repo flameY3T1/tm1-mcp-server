@@ -26,7 +26,7 @@ export function registerGetFileContent(server: McpServer, tm1Client: TM1Client):
     },
     async ({ fileName, maxBytes, headLines }) => {
       try {
-        const content = await tm1Client.getFileContent(fileName);
+        const content = await tm1Client.files.getContent(fileName);
         const totalBytes = Buffer.byteLength(content, "utf8");
 
         let body: string;
