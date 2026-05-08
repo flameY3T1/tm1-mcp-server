@@ -16,6 +16,7 @@ import { ChoreService } from "./tm1-client/services/chore-service.js";
 import { SecurityService } from "./tm1-client/services/security-service.js";
 import { ServerService } from "./tm1-client/services/server-service.js";
 import { MonitoringService } from "./tm1-client/services/monitoring-service.js";
+import { FileService } from "./tm1-client/services/file-service.js";
 
 /**
  * TM1 facade. Domain-specific OData calls live in service classes
@@ -41,6 +42,7 @@ export class TM1Client extends TM1HttpClient {
   readonly security: SecurityService;
   readonly server: ServerService;
   readonly monitoring: MonitoringService;
+  readonly files: FileService;
 
   constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
     super(config, sessionManager, logger);
@@ -56,6 +58,7 @@ export class TM1Client extends TM1HttpClient {
     this.security = new SecurityService(this);
     this.server = new ServerService(this);
     this.monitoring = new MonitoringService(this);
+    this.files = new FileService(this);
   }
 
   /**
@@ -611,45 +614,14 @@ export class TM1Client extends TM1HttpClient {
    * v11: same with 'Blobs' instead of 'Files'.
    * Tries v12 'Files' first, falls back to v11 'Blobs'.
    */
+  /** @deprecated Use `client.files.list(path)` instead. Removed in 2.0. */
   async listFiles(path?: string): Promise<string[]> {
-    const segments = path ? path.split("/").filter(Boolean) : [];
-    const buildUrl = (root: string): string => {
-      let url = `/api/v1/Contents('${encodeURIComponent(root)}')`;
-      for (const seg of segments) {
-        url += `/Contents('${encodeURIComponent(seg)}')`;
-      }
-      url += "/Contents?$select=Name";
-      return url;
-    };
-    try {
-      const r = await this.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Files"));
-      return r.value.map((f) => f.Name);
-    } catch {
-      const r = await this.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Blobs"));
-      return r.value.map((f) => f.Name);
-    }
+    return this.files.list(path);
   }
 
-  /**
-   * Get the content of a file from TM1 server's blob/file storage.
-   * Returns raw text (CSV/TXT/etc).
-   * Tries v12 'Files' first, falls back to v11 'Blobs'.
-   */
+  /** @deprecated Use `client.files.getContent(fileName)` instead. Removed in 2.0. */
   async getFileContent(fileName: string): Promise<string> {
-    const parts = fileName.split("/").filter(Boolean);
-    const buildUrl = (root: string): string => {
-      let url = `/api/v1/Contents('${encodeURIComponent(root)}')`;
-      for (const p of parts) {
-        url += `/Contents('${encodeURIComponent(p)}')`;
-      }
-      url += "/Content";
-      return url;
-    };
-    try {
-      return await this.requestRaw("GET", buildUrl("Files"));
-    } catch {
-      return await this.requestRaw("GET", buildUrl("Blobs"));
-    }
+    return this.files.getContent(fileName);
   }
 
   // ── Server info ──────────────────────────────────────────────────────────

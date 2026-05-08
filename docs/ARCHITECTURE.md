@@ -122,7 +122,7 @@ Tracked as backlog item #5 (see `docs/ROADMAP.md`).
 | 1.2   | `CellService`, `ViewService`, `SubsetService`                      | DONE 2026-05-08   |
 | 1.3   | `ProcessService`, `ChoreService`                                   | DONE 2026-05-08   |
 | 1.4   | `SecurityService`, `ServerService`, `MonitoringService`            | DONE 2026-05-08   |
-| 1.5   | `FileService`, `CallgraphService`                                  | TODO              |
+| 1.5   | `FileService` (callgraph stays as `processes.fetchForCallgraph`)   | DONE 2026-05-08   |
 | 2–8   | Migrate tool-files domain by domain to call services directly      | TODO (one PR each) |
 | 9     | Mark flat methods `@deprecated`, add ESLint warn rule              | TODO              |
 | 10    | Remove flat methods, release 2.0                                   | TODO              |
