@@ -85,7 +85,16 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_list_subsets: pageShapeFor(SubsetItemSchema),
   tm1_list_files: filePageShape,
   tm1_list_threads: pageShapeFor(ThreadItemSchema),
-  tm1_list_sessions: pageShapeFor(SessionItemSchema),
+  tm1_list_sessions: {
+    ...pageShapeFor(SessionItemSchema),
+    summary: z
+      .object({
+        namedUsers: z.number().int(),
+        anonymousCount: z.number().int(),
+      })
+      .optional()
+      .describe("Present only when compact=true: aggregate headcount, items[] is empty in that mode"),
+  },
   tm1_list_element_attributes: pageShapeFor(ElementAttributeValueSchema),
 
   // ── Phase 2a: validation/check tools ──────────────────────────────────────

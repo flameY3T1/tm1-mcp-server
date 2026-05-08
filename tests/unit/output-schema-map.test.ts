@@ -190,6 +190,23 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     expect(result.success).toBe(true);
   });
 
+  it("tm1_list_sessions: compact-mode summary output validates against schema", () => {
+    const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_list_sessions);
+    const payload = {
+      total: 3,
+      count: 0,
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [],
+      summary: { namedUsers: 2, anonymousCount: 1 },
+    };
+    const result = schema.safeParse(payload);
+    if (!result.success) {
+      throw new Error(`compact validation failed: ${JSON.stringify(result.error.issues, null, 2)}`);
+    }
+  });
+
   // ── Phase 2 fixtures ────────────────────────────────────────────────────
   const PHASE2_SAMPLES: Record<string, unknown> = {
     tm1_check_writable_coords: {

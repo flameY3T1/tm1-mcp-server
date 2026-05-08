@@ -29,7 +29,15 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
           return {
             content: [{
               type: "text",
-              text: JSON.stringify({ total: filtered.length, namedUsers, anonymousCount: filtered.length - namedUsers }, null, 2),
+              text: JSON.stringify({
+                total: filtered.length,
+                count: 0,
+                offset: 0,
+                has_more: false,
+                next_offset: null,
+                items: [],
+                summary: { namedUsers, anonymousCount: filtered.length - namedUsers },
+              }, null, 2),
             }],
           };
         }
