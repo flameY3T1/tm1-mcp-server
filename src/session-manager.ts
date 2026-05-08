@@ -3,7 +3,35 @@ import { createLogger } from "./logger.js";
 import { getTm1Dispatcher } from "./tm1-client/dispatcher.js";
 import type pino from "pino";
 
-const USER_AGENT = "tm1-mcp-server/0.1.0";
+const USER_AGENT = "tm1-mcp-server/1.0.0";
+
+export class TimeoutError extends Error {
+  readonly timeoutMs: number;
+  constructor(label: string, timeoutMs: number) {
+    super(`${label} request timed out after ${timeoutMs}ms`);
+    this.name = "TimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+async function withTimeout<T>(
+  ms: number,
+  label: string,
+  fn: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fn(controller.signal);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new TimeoutError(label, ms);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export class SessionManager {
   private sessionCookie: string | null = null;
@@ -39,57 +67,47 @@ export class SessionManager {
 
     this.logger.info({ endpoint: url }, "Authenticating with TM1");
 
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      this.config.requestTimeoutMs
+    const response = await withTimeout(
+      this.config.requestTimeoutMs,
+      "Authentication",
+      (signal) =>
+        fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Basic ${credentials}`,
+            Accept: "application/json",
+            "User-Agent": USER_AGENT,
+            "TM1-SessionContext": USER_AGENT,
+            "TM1-Session-Context": USER_AGENT,
+          },
+          signal,
+          dispatcher: getTm1Dispatcher(this.config),
+        } as RequestInit),
     );
 
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          Accept: "application/json",
-          "User-Agent": USER_AGENT,
-          "TM1-SessionContext": USER_AGENT,
-          "TM1-Session-Context": USER_AGENT,
-        },
-        signal: controller.signal,
-        dispatcher: getTm1Dispatcher(this.config),
-      } as RequestInit);
+    // Always consume body to release connection
+    await response.text();
 
-      // Always consume body to release connection
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        this.logger.error(
-          { endpoint: url, status: response.status },
-          "Authentication failed"
-        );
-        throw new Error(
-          `Authentication failed with status ${response.status}: ${response.statusText}`
-        );
-      }
-
-      const cookie = this.extractSessionCookie(response);
-      if (!cookie) {
-        throw new Error(
-          "Authentication succeeded but no TM1SessionId cookie found in response"
-        );
-      }
-
-      this.sessionCookie = cookie;
-      this.logger.info("Authentication successful, session established");
-      return cookie;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw new Error(`Authentication request timed out after ${this.config.requestTimeoutMs}ms`);
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeout);
+    if (!response.ok) {
+      this.logger.error(
+        { endpoint: url, status: response.status },
+        "Authentication failed"
+      );
+      throw new Error(
+        `Authentication failed with status ${response.status}: ${response.statusText}`
+      );
     }
+
+    const cookie = this.extractSessionCookie(response);
+    if (!cookie) {
+      throw new Error(
+        "Authentication succeeded but no TM1SessionId cookie found in response"
+      );
+    }
+
+    this.sessionCookie = cookie;
+    this.logger.info("Authentication successful, session established");
+    return cookie;
   }
 
   /**
@@ -107,55 +125,53 @@ export class SessionManager {
     const url = `${this.config.baseUrl}/api/v1/ActiveSession`;
     this.logger.debug({ endpoint: url }, "Sending keep-alive");
 
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      this.config.requestTimeoutMs
-    );
-
+    let response: Response;
     try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Cookie: `TM1SessionId=${this.sessionCookie}`,
-          "User-Agent": USER_AGENT,
-          "TM1-SessionContext": USER_AGENT,
-          "TM1-Session-Context": USER_AGENT,
-        },
-        signal: controller.signal,
-        dispatcher: getTm1Dispatcher(this.config),
-      } as RequestInit);
-
-      // Always consume body to release connection
-      await response.text();
-
-      if (response.status === 401) {
-        this.logger.warn("Session expired during keep-alive, re-authenticating");
-        this.sessionCookie = null;
-        await this.authenticate();
-        return;
-      }
-
-      if (!response.ok) {
-        this.logger.error(
-          { endpoint: url, status: response.status },
-          "Keep-alive request failed"
-        );
-        throw new Error(
-          `Keep-alive failed with status ${response.status}: ${response.statusText}`
-        );
-      }
-
-      this.logger.debug("Keep-alive successful");
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
+      response = await withTimeout(
+        this.config.requestTimeoutMs,
+        "Keep-alive",
+        (signal) =>
+          fetch(url, {
+            method: "GET",
+            headers: {
+              Cookie: `TM1SessionId=${this.sessionCookie}`,
+              "User-Agent": USER_AGENT,
+              "TM1-SessionContext": USER_AGENT,
+              "TM1-Session-Context": USER_AGENT,
+            },
+            signal,
+            dispatcher: getTm1Dispatcher(this.config),
+          } as RequestInit),
+      );
+    } catch (err) {
+      if (err instanceof TimeoutError) {
         this.logger.error("Keep-alive request timed out");
         return;
       }
-      throw error;
-    } finally {
-      clearTimeout(timeout);
+      throw err;
     }
+
+    // Always consume body to release connection
+    await response.text();
+
+    if (response.status === 401) {
+      this.logger.warn("Session expired during keep-alive, re-authenticating");
+      this.sessionCookie = null;
+      await this.authenticate();
+      return;
+    }
+
+    if (!response.ok) {
+      this.logger.error(
+        { endpoint: url, status: response.status },
+        "Keep-alive request failed"
+      );
+      throw new Error(
+        `Keep-alive failed with status ${response.status}: ${response.statusText}`
+      );
+    }
+
+    this.logger.debug("Keep-alive successful");
   }
 
   /**
