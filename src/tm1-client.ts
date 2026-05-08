@@ -5,6 +5,9 @@ import type { SessionManager } from "./session-manager.js";
 import type pino from "pino";
 import { TM1HttpClient } from "./tm1-client/http.js";
 import { CubeService } from "./tm1-client/services/cube-service.js";
+import { DimensionService } from "./tm1-client/services/dimension-service.js";
+import { HierarchyService } from "./tm1-client/services/hierarchy-service.js";
+import { ElementService } from "./tm1-client/services/element-service.js";
 
 /**
  * TM1 facade. Domain-specific OData calls live in service classes
@@ -17,10 +20,16 @@ export class TM1Client extends TM1HttpClient {
 
   // Domain services. Add new ones here as the god-class split progresses.
   readonly cubes: CubeService;
+  readonly dimensions: DimensionService;
+  readonly hierarchies: HierarchyService;
+  readonly elements: ElementService;
 
   constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
     super(config, sessionManager, logger);
     this.cubes = new CubeService(this);
+    this.dimensions = new DimensionService(this);
+    this.hierarchies = new HierarchyService(this);
+    this.elements = new ElementService(this);
   }
 
   /**
@@ -73,28 +82,9 @@ export class TM1Client extends TM1HttpClient {
    * Single round-trip — drop-in for audit workflows that previously
    * called getHierarchy() N times just to size dimensions.
    */
+  /** @deprecated Use `client.dimensions.list(opts)` instead. Removed in 2.0. */
   async getDimensions(opts?: { includeElementCount?: boolean }): Promise<Dimension[]> {
-    const expand = opts?.includeElementCount
-      ? "Hierarchies($select=Name;$expand=Elements($count=true;$top=0))"
-      : "Hierarchies($select=Name)";
-    const response = await this.request<{
-      value: Array<{
-        Name: string;
-        Hierarchies: Array<{ Name: string; "Elements@odata.count"?: number }>;
-      }>;
-    }>("GET", `/api/v1/Dimensions?$expand=${expand}`);
-    return response.value.map((d) => {
-      const dim: Dimension = {
-        name: d.Name,
-        hierarchies: d.Hierarchies.map((h) => h.Name),
-      };
-      if (opts?.includeElementCount) {
-        dim.elementCounts = Object.fromEntries(
-          d.Hierarchies.map((h) => [h.Name, h["Elements@odata.count"] ?? 0]),
-        );
-      }
-      return dim;
-    });
+    return this.dimensions.list(opts);
   }
 
   /**
@@ -105,6 +95,7 @@ export class TM1Client extends TM1HttpClient {
    * truncation. Filtered-out elements are removed from parents/children arrays of
    * remaining elements to avoid dangling references.
    */
+  /** @deprecated Use `client.hierarchies.get(dim, hier, opts)` instead. Removed in 2.0. */
   async getHierarchy(
     dimensionName: string,
     hierarchyName: string,
@@ -118,80 +109,7 @@ export class TM1Client extends TM1HttpClient {
       nameRegex?: string;
     },
   ): Promise<Hierarchy> {
-    // TM1 11.8 does not expose `Children` on Element — only `Parents`. Fetch Parents
-    // and derive children server-side. Weight defaults to 1 (actual weights live on
-    // /Edges; not fetched here to keep the query cheap).
-    const elementClauses: string[] = ["$select=Name,Type,Level", "$expand=Parents($select=Name)"];
-    const filters: string[] = [];
-    if (opts?.level !== undefined) filters.push(`Level eq ${opts.level}`);
-    if (opts?.levelMax !== undefined) filters.push(`Level le ${opts.levelMax}`);
-    const escapeOdata = (s: string) => s.replace(/'/g, "''");
-    if (opts?.nameContains) filters.push(`contains(Name, '${escapeOdata(opts.nameContains)}')`);
-    if (opts?.nameStartsWith) filters.push(`startswith(Name, '${escapeOdata(opts.nameStartsWith)}')`);
-    // elementType filter is applied client-side (TM1 OData rejects `Type eq 'Consolidated'`
-    // — the property is an enum, not a string. Type filter happens before topN/server-side
-    // filters because we cannot reliably express it in $filter without an enum-cast that
-    // varies between TM1 versions.) Same for nameRegex (regex unsupported in OData).
-    // When either is set, $top must also move client-side.
-    const filterByType = opts?.elementType && opts.elementType !== "All";
-    let regex: RegExp | undefined;
-    if (opts?.nameRegex !== undefined) {
-      try {
-        regex = new RegExp(opts.nameRegex);
-      } catch (e) {
-        throw new TM1Error({
-          code: TM1ErrorCode.VALIDATION_ERROR,
-          message: `Invalid nameRegex: ${(e as Error).message}`,
-        });
-      }
-    }
-    const needsClientPostFilter = filterByType || regex !== undefined;
-    if (filters.length > 0) elementClauses.push(`$filter=${filters.join(" and ")}`);
-    if (opts?.topN !== undefined && !needsClientPostFilter) elementClauses.push(`$top=${opts.topN}`);
-
-    const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')?$expand=Elements(${elementClauses.join(";")})`;
-    const rawResponse = await this.request<{
-      Name: string;
-      Elements: Array<{
-        Name: string;
-        Type: string;
-        Level: number;
-        Parents?: Array<{ Name: string }>;
-      }>;
-    }>("GET", path);
-
-    let filteredElements = rawResponse.Elements;
-    if (filterByType) filteredElements = filteredElements.filter((e) => e.Type === opts!.elementType);
-    if (regex !== undefined) filteredElements = filteredElements.filter((e) => regex!.test(e.Name));
-    if (needsClientPostFilter && opts?.topN !== undefined) {
-      filteredElements = filteredElements.slice(0, opts.topN);
-    }
-    const response = { Name: rawResponse.Name, Elements: filteredElements };
-
-    const keptNames = new Set(response.Elements.map((e) => e.Name));
-    const childrenByParent = new Map<string, Array<{ name: string; weight: number }>>();
-    for (const e of response.Elements) {
-      for (const p of e.Parents ?? []) {
-        if (!keptNames.has(p.Name)) continue;
-        const list = childrenByParent.get(p.Name) ?? [];
-        list.push({ name: e.Name, weight: 1 });
-        childrenByParent.set(p.Name, list);
-      }
-    }
-
-    const elements: HierarchyElement[] = response.Elements.map((e) => ({
-      name: e.Name,
-      type: e.Type as HierarchyElement["type"],
-      level: e.Level,
-      parents: (e.Parents ?? []).filter((p) => keptNames.has(p.Name)).map((p) => p.Name),
-      children: childrenByParent.get(e.Name) ?? [],
-    }));
-
-    return {
-      name: response.Name,
-      dimensionName,
-      elements,
-    };
+    return this.hierarchies.get(dimensionName, hierarchyName, opts);
   }
 
   /**
@@ -200,6 +118,7 @@ export class TM1Client extends TM1HttpClient {
    * Reuses getHierarchy() — REST traffic identical, but the LLM-facing payload
    * is a focused subtree, not the whole dimension.
    */
+  /** @deprecated Use `client.hierarchies.getDescendants(...)` instead. Removed in 2.0. */
   async getDescendants(
     dimensionName: string,
     hierarchyName: string,
@@ -209,37 +128,7 @@ export class TM1Client extends TM1HttpClient {
     element: string;
     descendants: Array<{ name: string; type: HierarchyElement["type"]; level: number; depth: number }>;
   }> {
-    const hierarchy = await this.getHierarchy(dimensionName, hierarchyName);
-    const byName = new Map<string, HierarchyElement>();
-    for (const e of hierarchy.elements) byName.set(e.name, e);
-    if (!byName.has(element)) {
-      throw new TM1Error({
-        code: TM1ErrorCode.NOT_FOUND,
-        message: `Element '${element}' not found in ${dimensionName}.${hierarchyName}`,
-      });
-    }
-    const out: Array<{ name: string; type: HierarchyElement["type"]; level: number; depth: number }> = [];
-    const seen = new Set<string>([element]);
-    const queue: Array<{ name: string; depth: number }> = [{ name: element, depth: 0 }];
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      const node = byName.get(cur.name);
-      if (!node) continue;
-      const nextDepth = cur.depth + 1;
-      if (opts?.depth !== undefined && nextDepth > opts.depth) continue;
-      for (const child of node.children) {
-        if (seen.has(child.name)) continue;
-        seen.add(child.name);
-        const childNode = byName.get(child.name);
-        if (!childNode) continue;
-        const isLeaf = childNode.children.length === 0;
-        if (!opts?.leavesOnly || isLeaf) {
-          out.push({ name: childNode.name, type: childNode.type, level: childNode.level, depth: nextDepth });
-        }
-        queue.push({ name: child.name, depth: nextDepth });
-      }
-    }
-    return { element, descendants: out };
+    return this.hierarchies.getDescendants(dimensionName, hierarchyName, element, opts);
   }
 
   /**
@@ -247,6 +136,7 @@ export class TM1Client extends TM1HttpClient {
    * hierarchies — returns the unique flat ancestor set AND every distinct
    * root-to-element path so consumers can see consolidation alternatives.
    */
+  /** @deprecated Use `client.hierarchies.getAncestors(...)` instead. Removed in 2.0. */
   async getAncestors(
     dimensionName: string,
     hierarchyName: string,
@@ -256,40 +146,7 @@ export class TM1Client extends TM1HttpClient {
     ancestors: Array<{ name: string; level: number }>;
     paths: string[][];
   }> {
-    const hierarchy = await this.getHierarchy(dimensionName, hierarchyName);
-    const byName = new Map<string, HierarchyElement>();
-    for (const e of hierarchy.elements) byName.set(e.name, e);
-    if (!byName.has(element)) {
-      throw new TM1Error({
-        code: TM1ErrorCode.NOT_FOUND,
-        message: `Element '${element}' not found in ${dimensionName}.${hierarchyName}`,
-      });
-    }
-    const ancestorMap = new Map<string, number>();
-    const paths: string[][] = [];
-    const walk = (name: string, currentPath: string[], visited: Set<string>) => {
-      const node = byName.get(name);
-      if (!node) return;
-      const parents = node.parents;
-      if (parents.length === 0) {
-        paths.push([...currentPath]);
-        return;
-      }
-      for (const parentName of parents) {
-        if (visited.has(parentName)) continue;
-        const parentNode = byName.get(parentName);
-        if (!parentNode) continue;
-        ancestorMap.set(parentName, parentNode.level);
-        const nextVisited = new Set(visited);
-        nextVisited.add(parentName);
-        walk(parentName, [...currentPath, parentName], nextVisited);
-      }
-    };
-    walk(element, [element], new Set([element]));
-    const ancestors = [...ancestorMap.entries()]
-      .map(([name, level]) => ({ name, level }))
-      .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
-    return { element, ancestors, paths };
+    return this.hierarchies.getAncestors(dimensionName, hierarchyName, element);
   }
 
   /**
@@ -1054,76 +911,35 @@ export class TM1Client extends TM1HttpClient {
    * Create a new element in a hierarchy.
    * POST /api/v1/Dimensions('{dim}')/Hierarchies('{hier}')/Elements
    */
+  /** @deprecated Use `client.elements.create(...)` instead. Removed in 2.0. */
   async createElement(
     dimensionName: string,
     hierarchyName: string,
     element: ElementCreate,
   ): Promise<void> {
-    const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')/Elements`;
-
-    const body: Record<string, unknown> = {
-      Name: element.name,
-      Type: element.type,
-    };
-
-    if (element.type === "Consolidated" && element.components && element.components.length > 0) {
-      body.Components = element.components.map((c) => ({
-        "@odata.id": `Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')/Elements('${encodeURIComponent(c.name)}')`,
-        Weight: c.weight,
-      }));
-    }
-
-    await this.request<void>("POST", path, body);
+    return this.elements.create(dimensionName, hierarchyName, element);
   }
 
-  /**
-   * Update an existing element in a hierarchy (name, type, or components).
-   * PATCH /api/v1/Dimensions('{dim}')/Hierarchies('{hier}')/Elements('{name}')
-   */
+  /** @deprecated Use `client.elements.update(...)` instead. Removed in 2.0. */
   async updateElement(
     dimensionName: string,
     hierarchyName: string,
     elementName: string,
     update: ElementUpdate,
   ): Promise<void> {
-    const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')/Elements('${encodeURIComponent(elementName)}')`;
-
-    const body: Record<string, unknown> = {};
-    if (update.newName !== undefined) {
-      body.Name = update.newName;
-    }
-    if (update.type !== undefined) {
-      body.Type = update.type;
-    }
-    if (update.components !== undefined) {
-      body.Components = update.components.map((c) => ({
-        "@odata.id": `Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')/Elements('${encodeURIComponent(c.name)}')`,
-        Weight: c.weight,
-      }));
-    }
-
-    await this.request<void>("PATCH", path, body);
+    return this.elements.update(dimensionName, hierarchyName, elementName, update);
   }
 
-  /**
-   * Delete an element from a hierarchy.
-   * DELETE /api/v1/Dimensions('{dim}')/Hierarchies('{hier}')/Elements('{name}')
-   * May throw an error if the element is referenced in rules.
-   */
+  /** @deprecated Use `client.elements.delete(...)` instead. Removed in 2.0. */
   async deleteElement(
     dimensionName: string,
     hierarchyName: string,
     elementName: string,
   ): Promise<void> {
-    const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')/Elements('${encodeURIComponent(elementName)}')`;
-    await this.request<void>("DELETE", path);
+    return this.elements.delete(dimensionName, hierarchyName, elementName);
   }
 
-  /**
-   * Move an element to a new parent within a hierarchy by adding it as a component
-   * of the new parent element.
-   * POST /api/v1/Dimensions('{dim}')/Hierarchies('{hier}')/Elements('{newParent}')/Components
-   */
+  /** @deprecated Use `client.elements.move(...)` instead. Removed in 2.0. */
   async moveElement(
     dimensionName: string,
     hierarchyName: string,
@@ -1131,57 +947,27 @@ export class TM1Client extends TM1HttpClient {
     newParent: string,
     weight?: number,
   ): Promise<void> {
-    const path = `/api/v1/Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')/Elements('${encodeURIComponent(newParent)}')/Components`;
-
-    const body = {
-      "@odata.id": `Dimensions('${encodeURIComponent(dimensionName)}')/Hierarchies('${encodeURIComponent(hierarchyName)}')/Elements('${encodeURIComponent(elementName)}')`,
-      Weight: weight ?? 1,
-    };
-
-    await this.request<void>("POST", path, body);
+    return this.elements.move(dimensionName, hierarchyName, elementName, newParent, weight);
   }
 
   // ── Element attribute methods ─────────────────────────────────────────────
 
-  /**
-   * List all element attribute definitions for a hierarchy.
-   * GET /api/v1/Dimensions('{dim}')/Hierarchies('{hier}')/ElementAttributes
-   */
+  /** @deprecated Use `client.elements.listAttributes(...)` instead. Removed in 2.0. */
   async listElementAttributes(
     dimensionName: string,
     hierarchyName: string,
   ): Promise<Array<{ name: string; type: "Numeric" | "String" | "Alias" }>> {
-    const enc = encodeURIComponent;
-    const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/ElementAttributes`;
-    const response = await this.request<{
-      value: Array<{ Name: string; Type: string }>;
-    }>("GET", path);
-    return response.value.map((a) => ({
-      name: a.Name,
-      type: a.Type as "Numeric" | "String" | "Alias",
-    }));
+    return this.elements.listAttributes(dimensionName, hierarchyName);
   }
 
-  /**
-   * Create an element attribute definition on a hierarchy.
-   * POST /api/v1/Dimensions('{dim}')/Hierarchies('{hier}')/ElementAttributes
-   *
-   * Prefer TI prolog (DimensionElementInsert on }ElementAttributes_{dim})
-   * for reproducible deployments. Use this REST-direct tool only for
-   * ad-hoc / debugging scenarios.
-   */
+  /** @deprecated Use `client.elements.createAttribute(...)` instead. Removed in 2.0. */
   async createElementAttribute(
     dimensionName: string,
     hierarchyName: string,
     attributeName: string,
     attributeType: "Numeric" | "String" | "Alias",
   ): Promise<void> {
-    const enc = encodeURIComponent;
-    const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/ElementAttributes`;
-    await this.request<void>("POST", path, {
-      Name: attributeName,
-      Type: attributeType,
-    });
+    return this.elements.createAttribute(dimensionName, hierarchyName, attributeName, attributeType);
   }
 
   // ── Cell write methods ────────────────────────────────────────────────────
@@ -1489,76 +1275,23 @@ export class TM1Client extends TM1HttpClient {
    * Create a new dimension (with a default hierarchy of the same name).
    * POST /api/v1/Dimensions
    */
+  /** @deprecated Use `client.dimensions.create(name)` instead. Removed in 2.0. */
   async createDimension(name: string): Promise<void> {
-    const enc = encodeURIComponent;
-    await this.request<void>("POST", "/api/v1/Dimensions", { Name: name });
-    // TM1 11.8 does not auto-create the default hierarchy from the POST body.
-    // Create it explicitly via a separate request.
-    try {
-      await this.request<void>(
-        "POST",
-        `/api/v1/Dimensions('${enc(name)}')/Hierarchies`,
-        { Name: name },
-      );
-    } catch (err) {
-      if (err instanceof TM1Error && err.httpStatus === 409) {
-        // Hierarchy already exists (some TM1 versions create it automatically)
-        return;
-      }
-      throw err;
-    }
+    return this.dimensions.create(name);
   }
 
-  /**
-   * Delete a dimension and all its hierarchies.
-   * DELETE /api/v1/Dimensions('{name}')
-   */
+  /** @deprecated Use `client.dimensions.delete(name)` instead. Removed in 2.0. */
   async deleteDimension(name: string): Promise<void> {
-    await this.request<void>("DELETE", `/api/v1/Dimensions('${encodeURIComponent(name)}')`);
+    return this.dimensions.delete(name);
   }
 
-  /**
-   * Bulk upsert elements into a hierarchy using the OData batch endpoint.
-   * Handles N, C, and S elements. Components for C-elements are set in a
-   * separate pass to ensure all leaf elements exist first.
-   *
-   * POST /api/v1/$batch
-   */
+  /** @deprecated Use `client.elements.bulkUpsert(...)` instead. Removed in 2.0. */
   async bulkUpsertElements(
     dimensionName: string,
     hierarchyName: string,
     elements: ElementCreate[],
   ): Promise<void> {
-    const enc = encodeURIComponent;
-    const baseUrl = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements`;
-
-    // Pass 1: Create/upsert all elements without components (C-elements without children first)
-    for (const el of elements) {
-      const body: Record<string, unknown> = { Name: el.name, Type: el.type };
-      try {
-        await this.request<void>("POST", baseUrl, body);
-      } catch (err) {
-        if (err instanceof TM1Error && err.httpStatus === 409) {
-          // Already exists – patch type if needed
-          await this.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
-        } else {
-          throw err;
-        }
-      }
-    }
-
-    // Pass 2: Set components for consolidated elements
-    const consolidated = elements.filter((el) => el.type === "Consolidated" && el.components && el.components.length > 0);
-    for (const el of consolidated) {
-      const path = `${baseUrl}('${enc(el.name)}')`;
-      const body = {
-        Components: el.components!.map((c) => ({
-          "@odata.id": `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(c.name)}')`,
-          Weight: c.weight,
-        })),
-      };
-      await this.request<void>("PATCH", path, body);
-    }
+    return this.elements.bulkUpsert(dimensionName, hierarchyName, elements);
   }
 
   // ── Model building methods ─────────────────────────────────────────────────
@@ -1791,25 +1524,14 @@ export class TM1Client extends TM1HttpClient {
    * Create a new hierarchy inside an existing dimension.
    * POST /api/v1/Dimensions('{d}')/Hierarchies
    */
+  /** @deprecated Use `client.hierarchies.create(...)` instead. Removed in 2.0. */
   async createHierarchy(dimensionName: string, hierarchyName: string): Promise<void> {
-    const enc = encodeURIComponent;
-    await this.request<void>(
-      "POST",
-      `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies`,
-      { Name: hierarchyName },
-    );
+    return this.hierarchies.create(dimensionName, hierarchyName);
   }
 
-  /**
-   * Delete a hierarchy from a dimension.
-   * DELETE /api/v1/Dimensions('{d}')/Hierarchies('{h}')
-   */
+  /** @deprecated Use `client.hierarchies.delete(...)` instead. Removed in 2.0. */
   async deleteHierarchy(dimensionName: string, hierarchyName: string): Promise<void> {
-    const enc = encodeURIComponent;
-    await this.request<void>(
-      "DELETE",
-      `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')`,
-    );
+    return this.hierarchies.delete(dimensionName, hierarchyName);
   }
 
   // ── View management ──────────────────────────────────────────────────────
