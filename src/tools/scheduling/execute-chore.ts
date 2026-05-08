@@ -8,9 +8,16 @@ export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): v
     "Execute a TM1 chore immediately, bypassing its schedule.",
     {
       name: z.string().describe("Chore name (case-sensitive)"),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(1000)
+        .max(3600000)
+        .optional()
+        .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for chores running long TI chains."),
     },
-    async ({ name }) => {
-      await tm1Client.executeChore(name);
+    async ({ name, timeoutMs }) => {
+      await tm1Client.executeChore(name, timeoutMs ? { timeoutMs } : undefined);
       return {
         content: [{
           type: "text" as const,

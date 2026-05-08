@@ -10,12 +10,19 @@ export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
     {
       mdx: z.string().describe("The MDX query string to execute"),
       ...PAGINATION_SCHEMA,
+      timeoutMs: z
+        .number()
+        .int()
+        .min(1000)
+        .max(3600000)
+        .optional()
+        .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for heavy MDX over wide views."),
     },
-    async ({ mdx, limit, offset, fetchAll }) => {
+    async ({ mdx, limit, offset, fetchAll, timeoutMs }) => {
       const all = fetchAll === true || limit === 0;
       const top = all ? undefined : limit;
       const skip = all ? undefined : offset;
-      const result = await tm1Client.executeMdx(mdx, top, skip);
+      const result = await tm1Client.executeMdx(mdx, top, skip, timeoutMs ? { timeoutMs } : undefined);
 
       const total = result.totalCellCount;
       const count = result.cells.length;
@@ -32,7 +39,7 @@ export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
       };
       return {
         content: [{ type: "text" as const, text: JSON.stringify(envelope, null, 2) }],
-      };
+      };
     },
   );
 }

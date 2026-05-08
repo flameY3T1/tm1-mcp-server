@@ -11,6 +11,14 @@ const MAX_NETWORK_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
 const USER_AGENT = `${NAME}/${VERSION}`;
 
+// Per-call overrides for the global config defaults. Currently only carries
+// timeoutMs (long-running execute_mdx/process/chore use this); kept as an
+// object so future per-call knobs (e.g. abort signal) can be added without
+// changing call signatures across the file.
+export interface RequestOptions {
+  timeoutMs?: number;
+}
+
 export class TM1HttpClient {
   protected readonly config: TM1Config;
   protected readonly sessionManager: SessionManager;
@@ -40,6 +48,7 @@ export class TM1HttpClient {
     method: string,
     path: string,
     body?: unknown,
+    opts?: RequestOptions,
   ): Promise<T> {
     const url = `${this.config.baseUrl}${path}`;
     const isSafeMethod = method === "GET" || method === "HEAD";
@@ -58,7 +67,7 @@ export class TM1HttpClient {
 
       try {
         const cookie = await this.sessionManager.ensureSession();
-        const response = await this.executeRequest(url, method, cookie, body);
+        const response = await this.executeRequest(url, method, cookie, body, opts?.timeoutMs);
 
         if (response.status === 401) {
           this.logger.warn({ endpoint: path }, "Received 401, re-authenticating");
@@ -68,6 +77,7 @@ export class TM1HttpClient {
             method,
             newCookie,
             body,
+            opts?.timeoutMs,
           );
 
           if (retryResponse.status === 401) {
@@ -119,13 +129,14 @@ export class TM1HttpClient {
    * Used for file content downloads where the response is CSV/TXT/etc.
    * Re-auths once on 401 like request().
    */
-  protected async requestRaw(method: string, path: string): Promise<string> {
+  protected async requestRaw(method: string, path: string, opts?: RequestOptions): Promise<string> {
     const url = `${this.config.baseUrl}${path}`;
     const cookie = await this.sessionManager.ensureSession();
+    const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
 
     const doFetch = async (c: string): Promise<Response> => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
+      const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
       try {
         return await fetch(url, {
           method,
@@ -162,11 +173,12 @@ export class TM1HttpClient {
     method: string,
     cookie: string,
     body?: unknown,
+    timeoutMs?: number,
   ): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      this.config.requestTimeoutMs,
+      timeoutMs ?? this.config.requestTimeoutMs,
     );
 
     const headers: Record<string, string> = {

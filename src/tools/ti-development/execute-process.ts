@@ -11,12 +11,19 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
         .record(z.string(), z.union([z.string(), z.number()]))
         .optional()
         .describe("Optional key-value map of process parameters"),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(1000)
+        .max(3600000)
+        .optional()
+        .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for long-running TI runs."),
     },
-    async ({ processName, parameters }) => {
-      const result = await tm1Client.executeProcess(processName, parameters);
+    async ({ processName, parameters, timeoutMs }) => {
+      const result = await tm1Client.executeProcess(processName, parameters, timeoutMs ? { timeoutMs } : undefined);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-      };
+      };
     },
   );
 }

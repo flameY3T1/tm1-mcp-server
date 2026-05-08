@@ -442,7 +442,12 @@ export class TM1Client extends TM1HttpClient {
    * Execute an MDX query and return structured results with cells and axes.
    * Supports pagination via optional top/skip parameters on the Cells expand.
    */
-  async executeMdx(mdx: string, top?: number, skip?: number): Promise<MdxResult> {
+  async executeMdx(
+    mdx: string,
+    top?: number,
+    skip?: number,
+    opts?: { timeoutMs?: number },
+  ): Promise<MdxResult> {
     // Build the $expand for Cells with optional pagination
     let cellsExpand = "Cells($select=Value,FormattedValue";
     if (top !== undefined) {
@@ -467,7 +472,7 @@ export class TM1Client extends TM1HttpClient {
           }>;
         }>;
       }>;
-    }>("POST", path, { MDX: mdx });
+    }>("POST", path, { MDX: mdx }, opts);
 
     return this.transformCellsetResponse(response);
   }
@@ -678,6 +683,7 @@ export class TM1Client extends TM1HttpClient {
   async executeProcess(
     processName: string,
     params?: Record<string, string | number>,
+    opts?: { timeoutMs?: number },
   ): Promise<ProcessResult> {
     const path = `/api/v1/Processes('${encodeURIComponent(processName)}')/tm1.Execute`;
 
@@ -690,7 +696,7 @@ export class TM1Client extends TM1HttpClient {
     }
 
     try {
-      await this.request<void>("POST", path, body);
+      await this.request<void>("POST", path, body, opts);
       return {
         success: true,
         processErrorStatus: "CompletedSuccessfully",
@@ -1418,9 +1424,9 @@ export class TM1Client extends TM1HttpClient {
    * Execute a chore immediately (bypass its schedule).
    * POST /api/v1/Chores('{name}')/tm1.Execute
    */
-  async executeChore(choreName: string): Promise<void> {
+  async executeChore(choreName: string, opts?: { timeoutMs?: number }): Promise<void> {
     const path = `/api/v1/Chores('${encodeURIComponent(choreName)}')/tm1.Execute`;
-    await this.request<void>("POST", path, {});
+    await this.request<void>("POST", path, {}, opts);
   }
 
   /**

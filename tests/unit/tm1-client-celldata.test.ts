@@ -299,6 +299,31 @@ describe("TM1Client – Cell Data Methods", () => {
       expect(result.totalCellCount).toBe(0);
     });
 
+    it("should use timeoutMs override when provided", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ID: "cellset-timeout", Cells: [], Axes: [] }),
+      );
+      const setTimeoutSpy = vi.spyOn(global, "setTimeout");
+
+      await client.executeMdx("SELECT {} FROM [Cube]", undefined, undefined, { timeoutMs: 120000 });
+
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 120000);
+      setTimeoutSpy.mockRestore();
+    });
+
+    it("should fall back to config requestTimeoutMs when no override", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ID: "cellset-default", Cells: [], Axes: [] }),
+      );
+      const setTimeoutSpy = vi.spyOn(global, "setTimeout");
+
+      await client.executeMdx("SELECT {} FROM [Cube]");
+
+      // makeConfig() sets requestTimeoutMs: 5000.
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
+      setTimeoutSpy.mockRestore();
+    });
+
     it("should compute totalCellCount from axes cardinality", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
