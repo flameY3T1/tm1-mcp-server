@@ -20,7 +20,8 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test",
+    "lint:no-flat-api": "node scripts/check-no-flat-tm1-methods.mjs",
+    "verify": "npm run typecheck && npm run lint:no-flat-api && npm test",
     "tools:list": "node scripts/gen-tool-list.mjs",
     "tools:update-readme": "node scripts/gen-tool-list.mjs --write-readme"
   },
