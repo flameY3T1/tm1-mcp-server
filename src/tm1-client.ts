@@ -11,6 +11,8 @@ import { ElementService } from "./tm1-client/services/element-service.js";
 import { CellService } from "./tm1-client/services/cell-service.js";
 import { ViewService } from "./tm1-client/services/view-service.js";
 import { SubsetService } from "./tm1-client/services/subset-service.js";
+import { ProcessService } from "./tm1-client/services/process-service.js";
+import { ChoreService } from "./tm1-client/services/chore-service.js";
 
 /**
  * TM1 facade. Domain-specific OData calls live in service classes
@@ -31,6 +33,8 @@ export class TM1Client extends TM1HttpClient {
   readonly views: ViewService;
   readonly subsets: SubsetService;
   readonly elements: ElementService;
+  readonly processes: ProcessService;
+  readonly chores: ChoreService;
 
   constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
     super(config, sessionManager, logger);
@@ -41,6 +45,8 @@ export class TM1Client extends TM1HttpClient {
     this.views = new ViewService(this);
     this.subsets = new SubsetService(this);
     this.elements = new ElementService(this, this.cells);
+    this.processes = new ProcessService(this);
+    this.chores = new ChoreService(this);
   }
 
   /**
@@ -164,79 +170,18 @@ export class TM1Client extends TM1HttpClient {
    * List all TI processes with their parameters.
    * GET /api/v1/Processes?$expand=Parameters
    */
+  /** @deprecated Use `client.processes.list()` instead. Removed in 2.0. */
   async getProcesses(): Promise<Process[]> {
-    // Parameters is a structural (complex) property, not a navigation property
-    // — TM1 v11 rejects $expand=Parameters with a syntax error. Use $select
-    // instead, which returns Parameters inline. Param.Type comes back as the
-    // already-decoded string "Numeric" / "String" (not the legacy int code).
-    try {
-      const response = await this.request<{
-        value: Array<{
-          Name: string;
-          Parameters?: Array<{
-            Name: string;
-            Type: string;
-            Value: string | number;
-            Prompt?: string;
-          }>;
-        }>;
-      }>("GET", "/api/v1/Processes?$select=Name,Parameters");
-
-      return response.value.map((p) => ({
-        name: p.Name,
-        parameters: (p.Parameters ?? []).map((param): ProcessParameter => ({
-          name: param.Name,
-          type: param.Type === "Numeric" ? "Numeric" : "String",
-          defaultValue: param.Value,
-          ...(param.Prompt ? { prompt: param.Prompt } : {}),
-        })),
-      }));
-    } catch {
-      const response = await this.request<{
-        value: Array<{ Name: string }>;
-      }>("GET", "/api/v1/Processes?$select=Name");
-
-      return response.value.map((p) => ({
-        name: p.Name,
-        parameters: [],
-      }));
-    }
+    return this.processes.list();
   }
 
   /**
    * List all chores with their tasks.
    * GET /api/v1/Chores?$expand=Tasks
    */
+  /** @deprecated Use `client.chores.list()` instead. Removed in 2.0. */
   async getChores(): Promise<Chore[]> {
-    // Expand Process inside Tasks — without it, Task.Process is omitted and the map
-    // below sees undefined for every task.
-    const response = await this.request<{
-      value: Array<{
-        Name: string;
-        Active: boolean;
-        StartTime: string;
-        DSTSensitive: boolean;
-        Frequency: string;
-        Tasks?: Array<{
-          Step: number;
-          Parameters?: Array<{ Name: string; Value: string | number }>;
-          Process?: { Name: string };
-        }>;
-      }>;
-    }>("GET", "/api/v1/Chores?$expand=Tasks($expand=Process($select=Name))");
-
-    return response.value.map((ch) => ({
-      name: ch.Name,
-      active: ch.Active,
-      startTime: ch.StartTime,
-      frequency: ch.Frequency,
-      processes: (ch.Tasks ?? []).map((t) => ({
-        name: t.Process?.Name ?? "<unknown>",
-        parameters: Object.fromEntries(
-          (t.Parameters ?? []).map((p) => [p.Name, p.Value]),
-        ),
-      })),
-    }));
+    return this.chores.list();
   }
 
   // ── Cell data methods ────────────────────────────────────────────────────
@@ -306,64 +251,22 @@ export class TM1Client extends TM1HttpClient {
    * Execute a TI process with optional parameters.
    * POST /api/v1/Processes('{processName}')/tm1.Execute
    */
+  /** @deprecated Use `client.processes.execute(name, params, opts)` instead. Removed in 2.0. */
   async executeProcess(
     processName: string,
     params?: Record<string, string | number>,
     opts?: { timeoutMs?: number },
   ): Promise<ProcessResult> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')/tm1.Execute`;
-
-    const body: { Parameters?: Array<{ Name: string; Value: string | number }> } = {};
-    if (params && Object.keys(params).length > 0) {
-      body.Parameters = Object.entries(params).map(([name, value]) => ({
-        Name: name,
-        Value: value,
-      }));
-    }
-
-    try {
-      await this.request<void>("POST", path, body, opts);
-      return {
-        success: true,
-        processErrorStatus: "CompletedSuccessfully",
-      };
-    } catch (error) {
-      if (error instanceof TM1Error) {
-        return {
-          success: false,
-          processErrorStatus: error.details ?? error.message,
-          errorLogFile: undefined,
-        };
-      }
-      throw error;
-    }
+    return this.processes.execute(processName, params, opts);
   }
 
   /**
    * Get the parameters of a TI process.
    * GET /api/v1/Processes('{processName}')/Parameters
    */
+  /** @deprecated Use `client.processes.getParameters(processName)` instead. Removed in 2.0. */
   async getProcessParameters(processName: string): Promise<ProcessParameter[]> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')/Parameters`;
-
-    // TM1 v11 returns Type as the decoded string "Numeric" / "String"
-    // (not the legacy int code 1 / 2). The old `=== 1` check silently
-    // classified every Numeric parameter as String.
-    const response = await this.request<{
-      value: Array<{
-        Name: string;
-        Type: string;
-        Value: string | number;
-        Prompt?: string;
-      }>;
-    }>("GET", path);
-
-    return response.value.map((param): ProcessParameter => ({
-      name: param.Name,
-      type: param.Type === "Numeric" ? "Numeric" : "String",
-      defaultValue: param.Value,
-      ...(param.Prompt ? { prompt: param.Prompt } : {}),
-    }));
+    return this.processes.getParameters(processName);
   }
 
   // ── TI development methods ──────────────────────────────────────────────
@@ -373,20 +276,14 @@ export class TM1Client extends TM1HttpClient {
    * POST /api/v1/Processes with body {"Name": "..."}
    * Throws CONFLICT (409) if a process with the same name already exists.
    */
+  /** @deprecated Use `client.processes.create(name)` instead. Removed in 2.0. */
   async createProcess(name: string): Promise<void> {
-    await this.request<void>("POST", "/api/v1/Processes", { Name: name });
+    return this.processes.create(name);
   }
 
+  /** @deprecated Use `client.processes.copy(source, target)` instead. Removed in 2.0. */
   async copyProcess(sourceName: string, targetName: string): Promise<void> {
-    const path = `/api/v1/Processes('${encodeURIComponent(sourceName)}')`;
-    const source = await this.request<Record<string, unknown>>("GET", path);
-    // Remove read-only / server-managed fields
-    delete source["@odata.context"];
-    delete source["@odata.etag"];
-    delete source["Attributes"];
-    delete source["LocalizedAttributes"];
-    source.Name = targetName;
-    await this.request<void>("POST", "/api/v1/Processes", source);
+    return this.processes.copy(sourceName, targetName);
   }
 
   /**
@@ -394,6 +291,7 @@ export class TM1Client extends TM1HttpClient {
    * indexing. Single round trip; falls back through 4 OData variants for
    * older/strict TM1 versions.
    */
+  /** @deprecated Use `client.processes.fetchForCallgraph(includeControl)` instead. Removed in 2.0. */
   async fetchProcessesForCallgraph(includeControl = false): Promise<Array<{
     name: string;
     prolog: string;
@@ -403,52 +301,7 @@ export class TM1Client extends TM1HttpClient {
     parameters: string[];
     parameterDefaults: Map<string, string>;
   }>> {
-    const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const urls = [
-      `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters${filter}`,
-      `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters&$expand=Parameters($select=Name,Value,Type)${filter}`,
-      `/api/v1/Processes?$expand=Parameters${filter}`,
-      `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure${filter}`,
-    ];
-    type Raw = {
-      Name?: string;
-      PrologProcedure?: string;
-      MetadataProcedure?: string;
-      DataProcedure?: string;
-      EpilogProcedure?: string;
-      Parameters?: Array<{ Name?: string; Value?: string | number; Type?: string | number }>;
-    };
-    let body: { value: Raw[] } | undefined;
-    let lastErr: unknown;
-    for (const u of urls) {
-      try {
-        body = await this.request<{ value: Raw[] }>("GET", u);
-        break;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    if (!body) throw lastErr ?? new Error("Processes fetch failed");
-    return (body.value ?? []).map((p) => {
-      const parameters = (p.Parameters ?? [])
-        .map((x) => String(x.Name ?? ""))
-        .filter((n) => n !== "");
-      const parameterDefaults = new Map<string, string>();
-      for (const x of p.Parameters ?? []) {
-        if (x.Name && x.Value !== undefined && x.Value !== null && x.Value !== "") {
-          parameterDefaults.set(String(x.Name), String(x.Value));
-        }
-      }
-      return {
-        name: String(p.Name ?? ""),
-        prolog: String(p.PrologProcedure ?? ""),
-        metadata: String(p.MetadataProcedure ?? ""),
-        data: String(p.DataProcedure ?? ""),
-        epilog: String(p.EpilogProcedure ?? ""),
-        parameters,
-        parameterDefaults,
-      };
-    }).filter((p) => p.name !== "");
+    return this.processes.fetchForCallgraph(includeControl);
   }
 
   /**
@@ -456,222 +309,57 @@ export class TM1Client extends TM1HttpClient {
    * GET /api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure
    * Control processes (Name starts with `}`) excluded unless includeControl=true.
    */
+  /** @deprecated Use `client.processes.getAllCode(includeControl)` instead. Removed in 2.0. */
   async getAllProcessesCode(includeControl = false): Promise<Array<ProcessCode & { name: string }>> {
-    const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const path = `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure${filter}`;
-    const response = await this.request<{
-      value: Array<{
-        Name: string;
-        PrologProcedure: string;
-        MetadataProcedure: string;
-        DataProcedure: string;
-        EpilogProcedure: string;
-      }>;
-    }>("GET", path);
-    return response.value.map((p) => ({
-      name: p.Name,
-      prolog: p.PrologProcedure ?? "",
-      metadata: p.MetadataProcedure ?? "",
-      data: p.DataProcedure ?? "",
-      epilog: p.EpilogProcedure ?? "",
-    }));
+    return this.processes.getAllCode(includeControl);
   }
 
-  /**
-   * Get the code of all four tabs of a TI process.
-   * GET /api/v1/Processes('{name}')
-   */
+  /** @deprecated Use `client.processes.getCode(processName)` instead. Removed in 2.0. */
   async getProcessCode(processName: string): Promise<ProcessCode> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')`;
-    const response = await this.request<{
-      PrologProcedure: string;
-      MetadataProcedure: string;
-      DataProcedure: string;
-      EpilogProcedure: string;
-    }>("GET", path);
-
-    return {
-      prolog: response.PrologProcedure,
-      metadata: response.MetadataProcedure,
-      data: response.DataProcedure,
-      epilog: response.EpilogProcedure,
-    };
+    return this.processes.getCode(processName);
   }
 
-  /**
-   * Update one or more code tabs of a TI process (partial update).
-   * PATCH /api/v1/Processes('{name}') with only the tabs to update.
-   */
+  /** @deprecated Use `client.processes.updateCode(processName, code)` instead. Removed in 2.0. */
   async updateProcessCode(processName: string, code: Partial<ProcessCode>): Promise<void> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')`;
-    const body: Record<string, string> = {};
-    if (code.prolog !== undefined) body.PrologProcedure = code.prolog;
-    if (code.metadata !== undefined) body.MetadataProcedure = code.metadata;
-    if (code.data !== undefined) body.DataProcedure = code.data;
-    if (code.epilog !== undefined) body.EpilogProcedure = code.epilog;
-
-    await this.request<void>("PATCH", path, body);
+    return this.processes.updateCode(processName, code);
   }
 
   /**
    * Get the data source configuration of a TI process.
    * GET /api/v1/Processes('{name}') and extract the DataSource field.
    */
+  /** @deprecated Use `client.processes.getDataSource(processName)` instead. Removed in 2.0. */
   async getProcessDataSource(processName: string): Promise<DataSource> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')`;
-    const response = await this.request<{
-      DataSource: {
-        Type: string;
-        dataSourceNameForServer?: string;
-        dataSourceNameForClient?: string;
-        asciiDelimiterType?: string;
-        asciiDelimiterChar?: string;
-        asciiQuoteCharacter?: string;
-        asciiHeaderRecords?: number;
-        asciiDecimalSeparator?: string;
-        asciiThousandSeparator?: string;
-        usesUnicode?: boolean;
-        userName?: string;
-        password?: string;
-        oDBCConnection?: string;
-        query?: string;
-        view?: string;
-        subset?: string;
-      };
-    }>("GET", path);
-
-    const ds = response.DataSource;
-    return {
-      type: ds.Type as DataSource["type"],
-      ...(ds.dataSourceNameForServer !== undefined ? { dataSourceNameForServer: ds.dataSourceNameForServer } : {}),
-      ...(ds.dataSourceNameForClient !== undefined ? { dataSourceNameForClient: ds.dataSourceNameForClient } : {}),
-      ...(ds.asciiDelimiterType !== undefined ? { asciiDelimiterType: ds.asciiDelimiterType } : {}),
-      ...(ds.asciiDelimiterChar !== undefined ? { asciiDelimiterChar: ds.asciiDelimiterChar } : {}),
-      ...(ds.asciiQuoteCharacter !== undefined ? { asciiQuoteCharacter: ds.asciiQuoteCharacter } : {}),
-      ...(ds.asciiHeaderRecords !== undefined ? { asciiHeaderRecords: ds.asciiHeaderRecords } : {}),
-      ...(ds.asciiDecimalSeparator !== undefined ? { asciiDecimalSeparator: ds.asciiDecimalSeparator } : {}),
-      ...(ds.asciiThousandSeparator !== undefined ? { asciiThousandSeparator: ds.asciiThousandSeparator } : {}),
-      ...(ds.usesUnicode !== undefined ? { usesUnicode: ds.usesUnicode } : {}),
-      ...(ds.userName !== undefined ? { userName: ds.userName } : {}),
-      ...(ds.password !== undefined ? { password: ds.password } : {}),
-      ...(ds.oDBCConnection !== undefined ? { oDBCConnection: ds.oDBCConnection } : {}),
-      ...(ds.query !== undefined ? { query: ds.query } : {}),
-      ...(ds.view !== undefined ? { view: ds.view } : {}),
-      ...(ds.subset !== undefined ? { subset: ds.subset } : {}),
-    };
+    return this.processes.getDataSource(processName);
   }
 
-  /**
-   * Update the data source configuration of a TI process.
-   * PATCH /api/v1/Processes('{name}') with DataSource object.
-   */
+  /** @deprecated Use `client.processes.updateDataSource(processName, ds)` instead. Removed in 2.0. */
   async updateProcessDataSource(processName: string, dataSource: DataSource): Promise<void> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')`;
-    const dsBody: Record<string, unknown> = { Type: dataSource.type };
-    if (dataSource.dataSourceNameForServer !== undefined) dsBody.dataSourceNameForServer = dataSource.dataSourceNameForServer;
-    if (dataSource.dataSourceNameForClient !== undefined) dsBody.dataSourceNameForClient = dataSource.dataSourceNameForClient;
-    if (dataSource.asciiDelimiterType !== undefined) dsBody.asciiDelimiterType = dataSource.asciiDelimiterType;
-    if (dataSource.asciiDelimiterChar !== undefined) dsBody.asciiDelimiterChar = dataSource.asciiDelimiterChar;
-    if (dataSource.asciiQuoteCharacter !== undefined) dsBody.asciiQuoteCharacter = dataSource.asciiQuoteCharacter;
-    if (dataSource.asciiHeaderRecords !== undefined) dsBody.asciiHeaderRecords = dataSource.asciiHeaderRecords;
-    if (dataSource.asciiDecimalSeparator !== undefined) dsBody.asciiDecimalSeparator = dataSource.asciiDecimalSeparator;
-    if (dataSource.asciiThousandSeparator !== undefined) dsBody.asciiThousandSeparator = dataSource.asciiThousandSeparator;
-    if (dataSource.usesUnicode !== undefined) {
-      if (this.config.tm1Version.startsWith("11")) {
-        this.logger.warn(
-          { processName, tm1Version: this.config.tm1Version },
-          "DataSource.usesUnicode is v12-only and is being dropped from the PATCH (TM1 11.x rejects it as 'unprocessed properties')",
-        );
-      } else {
-        dsBody.usesUnicode = dataSource.usesUnicode;
-      }
-    }
-    if (dataSource.userName !== undefined) dsBody.userName = dataSource.userName;
-    if (dataSource.password !== undefined) dsBody.password = dataSource.password;
-    if (dataSource.oDBCConnection !== undefined) dsBody.oDBCConnection = dataSource.oDBCConnection;
-    if (dataSource.query !== undefined) dsBody.query = dataSource.query;
-    if (dataSource.view !== undefined) dsBody.view = dataSource.view;
-    if (dataSource.subset !== undefined) dsBody.subset = dataSource.subset;
-
-    await this.request<void>("PATCH", path, { DataSource: dsBody });
+    return this.processes.updateDataSource(processName, dataSource);
   }
 
   /**
    * Get the variables (column-mapped names) of a TI process.
    * GET /api/v1/Processes('{name}')/Variables
    */
+  /** @deprecated Use `client.processes.getVariables(processName)` instead. Removed in 2.0. */
   async getProcessVariables(processName: string): Promise<ProcessVariable[]> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')/Variables`;
-    const response = await this.request<{
-      value: Array<{
-        Name: string;
-        Type: string;
-        Position: number;
-        StartByte?: number;
-        EndByte?: number;
-      }>;
-    }>("GET", path);
-
-    return response.value.map((v): ProcessVariable => ({
-      name: v.Name,
-      type: v.Type === "Numeric" ? "Numeric" : "String",
-      position: v.Position,
-      ...(v.StartByte !== undefined ? { startByte: v.StartByte } : {}),
-      ...(v.EndByte !== undefined ? { endByte: v.EndByte } : {}),
-    }));
+    return this.processes.getVariables(processName);
   }
 
-  /**
-   * Update the variables of a TI process (column-name mapping for ASCII/ODBC sources).
-   * PATCH /api/v1/Processes('{name}') with Variables array.
-   * Required after setting an ASCII DataSource because the MCP-side code
-   * cannot rely on TM1 auto-deriving column names without a UI save.
-   */
+  /** @deprecated Use `client.processes.updateVariables(processName, vars)` instead. Removed in 2.0. */
   async updateProcessVariables(processName: string, vars: ProcessVariable[]): Promise<void> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')`;
-    const body = {
-      Variables: vars.map((v) => ({
-        Name: v.name,
-        Type: v.type,
-        Position: v.position,
-        StartByte: v.startByte ?? 0,
-        EndByte: v.endByte ?? 0,
-      })),
-    };
-    await this.request<void>("PATCH", path, body);
+    return this.processes.updateVariables(processName, vars);
   }
 
-  /**
-   * Update the parameters of a TI process.
-   * PATCH /api/v1/Processes('{name}') with Parameters array.
-   */
+  /** @deprecated Use `client.processes.updateParameters(processName, params)` instead. Removed in 2.0. */
   async updateProcessParameters(processName: string, params: ProcessParameter[]): Promise<void> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')`;
-    // FIXME: write-direction Type encoding is INVERTED relative to OData metadata
-    // (tm1.ProcessVariableType maps String=1, Numeric=2 — opposite of below).
-    // TM1 v11 currently accepts both because of enum coercion leniency, but
-    // this could silently mis-classify params. Tracked for follow-up; needs
-    // a live PATCH+read roundtrip test before the safer string-name encoding
-    // can be shipped without behavior risk.
-    const body = {
-      Parameters: params.map((p) => ({
-        Name: p.name,
-        Type: p.type === "Numeric" ? 1 : 2,
-        Value: p.defaultValue,
-        ...(p.prompt ? { Prompt: p.prompt } : {}),
-      })),
-    };
-
-    await this.request<void>("PATCH", path, body);
+    return this.processes.updateParameters(processName, params);
   }
 
-  /**
-   * Delete a TI process.
-   * DELETE /api/v1/Processes('{name}')
-   */
+  /** @deprecated Use `client.processes.delete(processName)` instead. Removed in 2.0. */
   async deleteProcess(processName: string): Promise<void> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')`;
-    await this.request<void>("DELETE", path);
+    return this.processes.delete(processName);
   }
 
   // ── Dimension management methods ────────────────────────────────────────
@@ -928,72 +616,29 @@ export class TM1Client extends TM1HttpClient {
    * Activate or deactivate a chore.
    * PATCH /api/v1/Chores('{name}') with { Active: bool }
    */
+  /** @deprecated Use `client.chores.toggleActive(choreName, active)` instead. Removed in 2.0. */
   async toggleChoreActive(choreName: string, active: boolean): Promise<void> {
-    const path = `/api/v1/Chores('${encodeURIComponent(choreName)}')`;
-    await this.request<void>("PATCH", path, { Active: active });
+    return this.chores.toggleActive(choreName, active);
   }
 
-  /**
-   * Execute a chore immediately (bypass its schedule).
-   * POST /api/v1/Chores('{name}')/tm1.Execute
-   */
+  /** @deprecated Use `client.chores.execute(choreName, opts)` instead. Removed in 2.0. */
   async executeChore(choreName: string, opts?: { timeoutMs?: number }): Promise<void> {
-    const path = `/api/v1/Chores('${encodeURIComponent(choreName)}')/tm1.Execute`;
-    await this.request<void>("POST", path, {}, opts);
+    return this.chores.execute(choreName, opts);
   }
 
-  /**
-   * Create a new chore.
-   * POST /api/v1/Chores
-   */
+  /** @deprecated Use `client.chores.create(chore)` instead. Removed in 2.0. */
   async createChore(chore: ChoreCreate): Promise<void> {
-    const body = {
-      Name: chore.name,
-      StartTime: chore.startTime,
-      DSTSensitive: chore.dstSensitive,
-      Active: chore.active,
-      ExecutionMode: chore.executionMode,
-      Frequency: `P${chore.frequency.days}DT${String(chore.frequency.hours).padStart(2, "0")}H${String(chore.frequency.minutes).padStart(2, "0")}M${String(chore.frequency.seconds).padStart(2, "0")}S`,
-      Tasks: chore.steps.map((step, idx) => ({
-        Step: idx,
-        "Process@odata.bind": `Processes('${encodeURIComponent(step.process)}')`,
-        Parameters: step.parameters.map((p) => ({ Name: p.name, Value: p.value })),
-      })),
-    };
-    await this.request<void>("POST", "/api/v1/Chores", body);
+    return this.chores.create(chore);
   }
 
-  /**
-   * Update an existing chore (partial update).
-   * PATCH /api/v1/Chores('{name}')
-   */
+  /** @deprecated Use `client.chores.update(choreName, updates)` instead. Removed in 2.0. */
   async updateChore(choreName: string, updates: Partial<Pick<ChoreCreate, "startTime" | "active" | "dstSensitive" | "executionMode" | "frequency" | "steps">>): Promise<void> {
-    const path = `/api/v1/Chores('${encodeURIComponent(choreName)}')`;
-    const body: Record<string, unknown> = {};
-    if (updates.startTime !== undefined) body.StartTime = updates.startTime;
-    if (updates.active !== undefined) body.Active = updates.active;
-    if (updates.dstSensitive !== undefined) body.DSTSensitive = updates.dstSensitive;
-    if (updates.executionMode !== undefined) body.ExecutionMode = updates.executionMode;
-    if (updates.frequency !== undefined) {
-      const f = updates.frequency;
-      body.Frequency = `P${f.days}DT${String(f.hours).padStart(2, "0")}H${String(f.minutes).padStart(2, "0")}M${String(f.seconds).padStart(2, "0")}S`;
-    }
-    if (updates.steps !== undefined) {
-      body.Tasks = updates.steps.map((step, idx) => ({
-        Step: idx,
-        "Process@odata.bind": `Processes('${encodeURIComponent(step.process)}')`,
-        Parameters: step.parameters.map((p) => ({ Name: p.name, Value: p.value })),
-      }));
-    }
-    await this.request<void>("PATCH", path, body);
+    return this.chores.update(choreName, updates);
   }
 
-  /**
-   * Delete a chore.
-   * DELETE /api/v1/Chores('{name}')
-   */
+  /** @deprecated Use `client.chores.delete(choreName)` instead. Removed in 2.0. */
   async deleteChore(choreName: string): Promise<void> {
-    await this.request<void>("DELETE", `/api/v1/Chores('${encodeURIComponent(choreName)}')`);
+    return this.chores.delete(choreName);
   }
 
   // ── Dimension management (new) ─────────────────────────────────────────────
@@ -1139,27 +784,9 @@ export class TM1Client extends TM1HttpClient {
    * Compile a TI process to check its syntax without executing it.
    * POST /api/v1/Processes('{name}')/tm1.Compile
    */
+  /** @deprecated Use `client.processes.compile(processName)` instead. Removed in 2.0. */
   async compileProcess(processName: string): Promise<CompileResult> {
-    const path = `/api/v1/Processes('${encodeURIComponent(processName)}')/tm1.Compile`;
-    try {
-      const response = await this.request<{
-        value?: Array<{ LineNumber?: number; Procedure?: string; Message?: string }>;
-      }>("POST", path, {});
-      const errors = (response?.value ?? []).map((e) => ({
-        lineNumber: e.LineNumber,
-        procedure: e.Procedure,
-        message: e.Message ?? "",
-      }));
-      return { success: errors.length === 0, errors };
-    } catch (err) {
-      if (err instanceof TM1Error) {
-        return {
-          success: false,
-          errors: [{ message: err.details ?? err.message }],
-        };
-      }
-      throw err;
-    }
+    return this.processes.compile(processName);
   }
 
   /**
@@ -1168,81 +795,9 @@ export class TM1Client extends TM1HttpClient {
    * Mirrors tm1py's compile_process_with_body. Returns CompileResult identical
    * to compileProcess() for callers that already handle that shape.
    */
+  /** @deprecated Use `client.processes.check(input)` instead. Removed in 2.0. */
   async checkProcessCode(input: ProcessCheckInput): Promise<CompileResult> {
-    const path = "/api/v1/CompileProcess";
-
-    const processBody: Record<string, unknown> = {
-      Name: input.name ?? "_compile_check",
-      PrologProcedure: input.prolog ?? "",
-      MetadataProcedure: input.metadata ?? "",
-      DataProcedure: input.data ?? "",
-      EpilogProcedure: input.epilog ?? "",
-    };
-
-    if (input.parameters) {
-      processBody.Parameters = input.parameters.map((p) => ({
-        Name: p.name,
-        Type: p.type === "Numeric" ? 1 : 2,
-        Value: p.defaultValue,
-        ...(p.prompt ? { Prompt: p.prompt } : {}),
-      }));
-    }
-
-    if (input.variables) {
-      processBody.Variables = input.variables.map((v) => ({
-        Name: v.name,
-        Type: v.type,
-        Position: v.position,
-        StartByte: v.startByte ?? 0,
-        EndByte: v.endByte ?? 0,
-      }));
-    }
-
-    if (input.dataSource) {
-      const ds = input.dataSource;
-      const dsBody: Record<string, unknown> = { Type: ds.type };
-      if (ds.dataSourceNameForServer !== undefined) dsBody.dataSourceNameForServer = ds.dataSourceNameForServer;
-      if (ds.dataSourceNameForClient !== undefined) dsBody.dataSourceNameForClient = ds.dataSourceNameForClient;
-      if (ds.asciiDelimiterType !== undefined) dsBody.asciiDelimiterType = ds.asciiDelimiterType;
-      if (ds.asciiDelimiterChar !== undefined) dsBody.asciiDelimiterChar = ds.asciiDelimiterChar;
-      if (ds.asciiQuoteCharacter !== undefined) dsBody.asciiQuoteCharacter = ds.asciiQuoteCharacter;
-      if (ds.asciiHeaderRecords !== undefined) dsBody.asciiHeaderRecords = ds.asciiHeaderRecords;
-      if (ds.asciiDecimalSeparator !== undefined) dsBody.asciiDecimalSeparator = ds.asciiDecimalSeparator;
-      if (ds.asciiThousandSeparator !== undefined) dsBody.asciiThousandSeparator = ds.asciiThousandSeparator;
-      // usesUnicode: same v11 quirk as updateProcessDataSource — drop on TM1 11.x.
-      if (ds.usesUnicode !== undefined && !this.config.tm1Version.startsWith("11")) {
-        dsBody.usesUnicode = ds.usesUnicode;
-      }
-      if (ds.userName !== undefined) dsBody.userName = ds.userName;
-      if (ds.password !== undefined) dsBody.password = ds.password;
-      if (ds.oDBCConnection !== undefined) dsBody.oDBCConnection = ds.oDBCConnection;
-      if (ds.query !== undefined) dsBody.query = ds.query;
-      if (ds.view !== undefined) dsBody.view = ds.view;
-      if (ds.subset !== undefined) dsBody.subset = ds.subset;
-      processBody.DataSource = dsBody;
-    } else {
-      processBody.DataSource = { Type: "None" };
-    }
-
-    try {
-      const response = await this.request<{
-        value?: Array<{ LineNumber?: number; Procedure?: string; Message?: string }>;
-      }>("POST", path, { Process: processBody });
-      const errors = (response?.value ?? []).map((e) => ({
-        lineNumber: e.LineNumber,
-        procedure: e.Procedure,
-        message: e.Message ?? "",
-      }));
-      return { success: errors.length === 0, errors };
-    } catch (err) {
-      if (err instanceof TM1Error) {
-        return {
-          success: false,
-          errors: [{ message: err.details ?? err.message }],
-        };
-      }
-      throw err;
-    }
+    return this.processes.check(input);
   }
 
   // ── Hierarchy management ─────────────────────────────────────────────────
