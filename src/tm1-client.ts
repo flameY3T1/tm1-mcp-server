@@ -8,6 +8,9 @@ import { CubeService } from "./tm1-client/services/cube-service.js";
 import { DimensionService } from "./tm1-client/services/dimension-service.js";
 import { HierarchyService } from "./tm1-client/services/hierarchy-service.js";
 import { ElementService } from "./tm1-client/services/element-service.js";
+import { CellService } from "./tm1-client/services/cell-service.js";
+import { ViewService } from "./tm1-client/services/view-service.js";
+import { SubsetService } from "./tm1-client/services/subset-service.js";
 
 /**
  * TM1 facade. Domain-specific OData calls live in service classes
@@ -19,9 +22,14 @@ export class TM1Client extends TM1HttpClient {
   private connected = false;
 
   // Domain services. Add new ones here as the god-class split progresses.
+  // Init order matters when services depend on each other — `cells` is
+  // created before `elements` because the latter holds a CellService ref.
   readonly cubes: CubeService;
   readonly dimensions: DimensionService;
   readonly hierarchies: HierarchyService;
+  readonly cells: CellService;
+  readonly views: ViewService;
+  readonly subsets: SubsetService;
   readonly elements: ElementService;
 
   constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
@@ -29,7 +37,10 @@ export class TM1Client extends TM1HttpClient {
     this.cubes = new CubeService(this);
     this.dimensions = new DimensionService(this);
     this.hierarchies = new HierarchyService(this);
-    this.elements = new ElementService(this);
+    this.cells = new CellService(this);
+    this.views = new ViewService(this);
+    this.subsets = new SubsetService(this);
+    this.elements = new ElementService(this, this.cells);
   }
 
   /**
@@ -237,53 +248,9 @@ export class TM1Client extends TM1HttpClient {
    * empty axis collapses the cellset. Put the first element on COLUMNS and
    * the rest in WHERE to force a 1-cell cellset.
    */
+  /** @deprecated Use `client.cells.getValue(cubeName, elements)` instead. Removed in 2.0. */
   async getCellValue(cubeName: string, elements: string[]): Promise<CellValue> {
-    if (elements.length === 0) {
-      return null;
-    }
-
-    // Qualify each element with its dimension. Plain `[Element]` MDX is
-    // ambiguous when the same name exists in multiple dimensions (common in
-    // control cubes like `}ElementAttributes_*`, where attribute member
-    // `DisplayName` collides with the attribute dimension's element of the
-    // same name) and TM1 returns rte 77 "object not found".
-    const cubePath = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')?$expand=Dimensions($select=Name)`;
-    const cubeMeta = await this.request<{ Name: string; Dimensions: Array<{ Name: string }> }>(
-      "GET",
-      cubePath,
-    );
-    const dims = cubeMeta.Dimensions.map((d) => d.Name);
-    if (elements.length !== dims.length) {
-      throw new Error(
-        `Cube '${cubeName}' has ${dims.length} dimension(s) (${dims.join(", ")}) but ${elements.length} element(s) were given`,
-      );
-    }
-    const qualify = (dim: string, element: string): string => {
-      // Pre-qualified MDX member reference — pass through.
-      if (element.startsWith("[") && element.includes("].[")) return element;
-      // Single bracketed member like `[Foo]` — prepend dimension.
-      if (element.startsWith("[") && element.endsWith("]")) return `[${dim}].${element}`;
-      return `[${dim}].[${element}]`;
-    };
-    const qualified = dims.map((d, i) => qualify(d, elements[i]));
-
-    const colMember = qualified[0];
-    const whereParts = qualified.slice(1);
-    const mdx =
-      whereParts.length === 0
-        ? `SELECT {${colMember}} ON COLUMNS FROM [${cubeName}]`
-        : `SELECT {${colMember}} ON COLUMNS FROM [${cubeName}] WHERE (${whereParts.join(",")})`;
-
-    const cellsetResponse = await this.request<{
-      ID: string;
-      Cells?: Array<{ Value: CellValue; FormattedValue: string }>;
-    }>("POST", "/api/v1/ExecuteMDX?$expand=Cells($select=Value,FormattedValue)", { MDX: mdx });
-
-    if (cellsetResponse.Cells && cellsetResponse.Cells.length > 0) {
-      return cellsetResponse.Cells[0].Value;
-    }
-
-    return null;
+    return this.cells.getValue(cubeName, elements);
   }
 
   /**
@@ -299,70 +266,23 @@ export class TM1Client extends TM1HttpClient {
    * Execute an MDX query and return structured results with cells and axes.
    * Supports pagination via optional top/skip parameters on the Cells expand.
    */
+  /** @deprecated Use `client.cells.executeMdx(mdx, top, skip, opts)` instead. Removed in 2.0. */
   async executeMdx(
     mdx: string,
     top?: number,
     skip?: number,
     opts?: { timeoutMs?: number },
   ): Promise<MdxResult> {
-    // Build the $expand for Cells with optional pagination
-    let cellsExpand = "Cells($select=Value,FormattedValue";
-    if (top !== undefined) {
-      cellsExpand += `;$top=${top}`;
-    }
-    if (skip !== undefined) {
-      cellsExpand += `;$skip=${skip}`;
-    }
-    cellsExpand += ")";
-
-    const axesExpand = "Axes($expand=Tuples($expand=Members($select=Name;$expand=Hierarchy($select=Name))))";
-    const path = `/api/v1/ExecuteMDX?$expand=${cellsExpand},${axesExpand}`;
-
-    const response = await this.request<{
-      ID: string;
-      Cells: Array<{ Value: CellValue; FormattedValue: string }>;
-      Axes: Array<{
-        Tuples: Array<{
-          Members: Array<{
-            Name: string;
-            Hierarchy: { Name: string };
-          }>;
-        }>;
-      }>;
-    }>("POST", path, { MDX: mdx }, opts);
-
-    return this.transformCellsetResponse(response);
+    return this.cells.executeMdx(mdx, top, skip, opts);
   }
 
   /**
    * Execute a named view and return structured results.
    * POST /api/v1/Cubes('{cubeName}')/Views('{viewName}')/tm1.Execute
    */
+  /** @deprecated Use `client.views.getView(cubeName, viewName)` instead. Removed in 2.0. */
   async getView(cubeName: string, viewName: string): Promise<ViewResult> {
-    const axesExpand = "Axes($expand=Tuples($expand=Members($select=Name;$expand=Hierarchy($select=Name))))";
-    const path = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')/Views('${encodeURIComponent(viewName)}')/tm1.Execute?$expand=Cells($select=Value,FormattedValue),${axesExpand}`;
-
-    const response = await this.request<{
-      ID: string;
-      Cells: Array<{ Value: CellValue; FormattedValue: string }>;
-      Axes: Array<{
-        Tuples: Array<{
-          Members: Array<{
-            Name: string;
-            Hierarchy: { Name: string };
-          }>;
-        }>;
-      }>;
-    }>("POST", path);
-
-    const mdxResult = this.transformCellsetResponse(response);
-
-    return {
-      cubeName,
-      viewName,
-      cells: mdxResult.cells,
-      axes: mdxResult.axes,
-    };
+    return this.views.getView(cubeName, viewName);
   }
 
   /**
@@ -371,164 +291,13 @@ export class TM1Client extends TM1HttpClient {
    * is undefined.
    * GET /api/v1/Cubes('X')/Views('Y') with tm1.NativeView/* expands.
    */
+  /** @deprecated Use `client.views.getDefinition(cubeName, viewName, isPrivate)` instead. Removed in 2.0. */
   async getViewDefinition(
     cubeName: string,
     viewName: string,
     isPrivate?: boolean,
   ): Promise<ViewDefinition> {
-    const enc = encodeURIComponent;
-
-    type RawSubset = {
-      Name?: string;
-      Expression?: string;
-      Hierarchy?: { Name?: string; Dimension?: { Name?: string } };
-    };
-    type RawAxis = { Subset?: RawSubset };
-    type RawTitle = RawAxis & { Selected?: { Name?: string } };
-    type RawBase = { Name: string; MDX?: string | null };
-    type RawNative = {
-      Titles?: RawTitle[];
-      Columns?: RawAxis[];
-      Rows?: RawAxis[];
-    };
-
-    const fetchBase = async (
-      segment: "Views" | "PrivateViews",
-    ): Promise<RawBase> => {
-      const path = `/api/v1/Cubes('${enc(cubeName)}')/${segment}('${enc(viewName)}')?$select=Name,MDX`;
-      return this.request<RawBase>("GET", path);
-    };
-
-    const order: Array<{ seg: "Views" | "PrivateViews"; priv: boolean }> =
-      isPrivate === true
-        ? [{ seg: "PrivateViews", priv: true }]
-        : isPrivate === false
-          ? [{ seg: "Views", priv: false }]
-          : [
-              { seg: "Views", priv: false },
-              { seg: "PrivateViews", priv: true },
-            ];
-
-    let base: RawBase | null = null;
-    let resolvedSeg: "Views" | "PrivateViews" = "Views";
-    let resolvedPrivate = false;
-    let lastErr: unknown = null;
-    for (const { seg, priv } of order) {
-      try {
-        base = await fetchBase(seg);
-        resolvedSeg = seg;
-        resolvedPrivate = priv;
-        break;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    if (!base) {
-      if (lastErr instanceof TM1Error) throw lastErr;
-      throw new TM1Error({
-        code: TM1ErrorCode.NOT_FOUND,
-        message: `View not found: ${cubeName}/${viewName}`,
-        endpoint: `/api/v1/Cubes('${cubeName}')/Views('${viewName}')`,
-      });
-    }
-
-    const isMdx = typeof base.MDX === "string" && base.MDX.length > 0;
-    if (isMdx) {
-      return {
-        cubeName,
-        viewName,
-        private: resolvedPrivate,
-        type: "MDX",
-        mdx: base.MDX as string,
-      };
-    }
-
-    const subsetExpand =
-      "Subset($select=Name,Expression;$expand=Hierarchy($select=Name;$expand=Dimension($select=Name)))";
-    const nativeExpand =
-      `Titles($expand=${subsetExpand},Selected($select=Name)),` +
-      `Columns($expand=${subsetExpand}),` +
-      `Rows($expand=${subsetExpand})`;
-    const nativePath = `/api/v1/Cubes('${enc(cubeName)}')/${resolvedSeg}('${enc(viewName)}')/tm1.NativeView?$expand=${nativeExpand}`;
-
-    let native: RawNative;
-    try {
-      native = await this.request<RawNative>("GET", nativePath);
-    } catch (e) {
-      if (e instanceof TM1Error && e.httpStatus === 404) {
-        return {
-          cubeName,
-          viewName,
-          private: resolvedPrivate,
-          type: "Native",
-          native: { titles: [], columns: [], rows: [] },
-        };
-      }
-      throw e;
-    }
-
-    const mapAxis = (a: RawAxis) => {
-      const s = a.Subset ?? {};
-      return {
-        dimensionName: s.Hierarchy?.Dimension?.Name,
-        hierarchyName: s.Hierarchy?.Name,
-        subsetName: s.Name && s.Name.length > 0 ? s.Name : undefined,
-        expression: s.Expression && s.Expression.length > 0 ? s.Expression : undefined,
-      };
-    };
-    const mapTitle = (t: RawTitle) => ({
-      ...mapAxis(t),
-      selectedElement: t.Selected?.Name,
-    });
-
-    return {
-      cubeName,
-      viewName,
-      private: resolvedPrivate,
-      type: "Native",
-      native: {
-        titles: (native.Titles ?? []).map(mapTitle),
-        columns: (native.Columns ?? []).map(mapAxis),
-        rows: (native.Rows ?? []).map(mapAxis),
-      },
-    };
-  }
-
-  /**
-   * Transform a raw TM1 cellset API response into the structured MdxResult model.
-   */
-  private transformCellsetResponse(response: {
-    Cells: Array<{ Value: CellValue; FormattedValue: string }>;
-    Axes: Array<{
-      Tuples: Array<{
-        Members: Array<{
-          Name: string;
-          Hierarchy: { Name: string };
-        }>;
-      }>;
-    }>;
-  }): MdxResult {
-    const cells = (response.Cells ?? []).map((c) => ({
-      value: c.Value,
-      formattedValue: c.FormattedValue,
-    }));
-
-    const axes: MdxAxis[] = (response.Axes ?? []).map((axis) => ({
-      tuples: axis.Tuples.map((tuple) => ({
-        members: tuple.Members.map((m) => ({
-          name: m.Name,
-          hierarchyName: m.Hierarchy.Name,
-        })),
-      })),
-    }));
-
-    // totalCellCount: product of tuple counts across all axes, or cell count if no axes
-    const totalCellCount =
-      axes.length > 0
-        ? axes.reduce((acc, axis) => acc * axis.tuples.length, 1)
-        : cells.length;
-
-    return { cells, axes, totalCellCount };
+    return this.views.getDefinition(cubeName, viewName, isPrivate);
   }
 
   // ── Process execution methods ──────────────────────────────────────────────
@@ -989,55 +758,13 @@ export class TM1Client extends TM1HttpClient {
    * Prefer TI processes for reproducible data loads. Use this REST-direct
    * tool only for ad-hoc / debugging writes.
    */
+  /** @deprecated Use `client.cells.writeCells(cubeName, dimensions, cells)` instead. Removed in 2.0. */
   async writeCells(
     cubeName: string,
     dimensions: string[],
     cells: Array<{ elements: string[]; value: number | string }>,
   ): Promise<void> {
-    if (cells.length === 0) return;
-
-    for (const c of cells) {
-      if (c.elements.length !== dimensions.length) {
-        throw new TM1Error({
-          code: TM1ErrorCode.VALIDATION_ERROR,
-          message: `Cell tuple length (${c.elements.length}) does not match dimension count (${dimensions.length}) for cube '${cubeName}'.`,
-        });
-      }
-
-      const memberRefs = c.elements.map(
-        (e, idx) => `[${dimensions[idx]}].[${dimensions[idx]}].[${e}]`,
-      );
-      const colMember = memberRefs[0];
-      const rowTuple = memberRefs.slice(1).join(",");
-      const mdx =
-        memberRefs.length === 1
-          ? `SELECT {${colMember}} ON COLUMNS FROM [${cubeName}]`
-          : `SELECT {${colMember}} ON COLUMNS, {(${rowTuple})} ON ROWS FROM [${cubeName}]`;
-
-      const cellset = await this.request<{ ID: string }>(
-        "POST",
-        "/api/v1/ExecuteMDX",
-        { MDX: mdx },
-      );
-      const id = cellset.ID;
-
-      try {
-        await this.request<void>(
-          "PATCH",
-          `/api/v1/Cellsets('${encodeURIComponent(id)}')/Cells(0)`,
-          { Value: c.value },
-        );
-      } finally {
-        try {
-          await this.request<void>(
-            "DELETE",
-            `/api/v1/Cellsets('${encodeURIComponent(id)}')`,
-          );
-        } catch {
-          // cleanup best-effort
-        }
-      }
-    }
+    return this.cells.writeCells(cubeName, dimensions, cells);
   }
 
   // ── Operations methods ────────────────────────────────────────────────────
@@ -1540,57 +1267,19 @@ export class TM1Client extends TM1HttpClient {
    * List all views defined on a cube (public + private).
    * GET /api/v1/Cubes('{c}')/Views + /PrivateViews
    */
+  /** @deprecated Use `client.views.list(cubeName)` instead. Removed in 2.0. */
   async listViews(cubeName: string): Promise<CubeView[]> {
-    const enc = encodeURIComponent;
-    const result: CubeView[] = [];
-    try {
-      const pub = await this.request<{ value: Array<{ Name: string; MDX?: string }> }>(
-        "GET",
-        `/api/v1/Cubes('${enc(cubeName)}')/Views?$select=Name,MDX`,
-      );
-      result.push(...pub.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: false })));
-    } catch {
-      // no public views
-    }
-    try {
-      const priv = await this.request<{ value: Array<{ Name: string; MDX?: string }> }>(
-        "GET",
-        `/api/v1/Cubes('${enc(cubeName)}')/PrivateViews?$select=Name,MDX`,
-      );
-      result.push(...priv.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: true })));
-    } catch {
-      // no private views
-    }
-    return result;
+    return this.views.list(cubeName);
   }
 
-  /**
-   * Create a public MDX-based view on a cube.
-   * POST /api/v1/Cubes('{c}')/Views with @odata.type = #ibm.tm1.api.v1.MDXView
-   */
+  /** @deprecated Use `client.views.createMdx(cubeName, viewName, mdx)` instead. Removed in 2.0. */
   async createMdxView(cubeName: string, viewName: string, mdx: string): Promise<void> {
-    const enc = encodeURIComponent;
-    await this.request<void>(
-      "POST",
-      `/api/v1/Cubes('${enc(cubeName)}')/Views`,
-      {
-        "@odata.type": "#ibm.tm1.api.v1.MDXView",
-        Name: viewName,
-        MDX: mdx,
-      },
-    );
+    return this.views.createMdx(cubeName, viewName, mdx);
   }
 
-  /**
-   * Delete a public view from a cube.
-   * DELETE /api/v1/Cubes('{c}')/Views('{v}')
-   */
+  /** @deprecated Use `client.views.delete(cubeName, viewName)` instead. Removed in 2.0. */
   async deleteView(cubeName: string, viewName: string): Promise<void> {
-    const enc = encodeURIComponent;
-    await this.request<void>(
-      "DELETE",
-      `/api/v1/Cubes('${enc(cubeName)}')/Views('${enc(viewName)}')`,
-    );
+    return this.views.delete(cubeName, viewName);
   }
 
   // ── Subset management ────────────────────────────────────────────────────
@@ -1599,143 +1288,47 @@ export class TM1Client extends TM1HttpClient {
    * List public + private subsets of a hierarchy.
    * GET /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Subsets|PrivateSubsets
    */
+  /** @deprecated Use `client.subsets.list(dim, hier)` instead. Removed in 2.0. */
   async listSubsets(dimensionName: string, hierarchyName: string): Promise<Subset[]> {
-    const enc = encodeURIComponent;
-    const result: Subset[] = [];
-    const fetchScope = async (segment: "Subsets" | "PrivateSubsets", isPrivate: boolean) => {
-      try {
-        const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/${segment}?$select=Name,Expression,Alias`;
-        const response = await this.request<{
-          value: Array<{ Name: string; Expression?: string; Alias?: string }>;
-        }>("GET", path);
-        for (const s of response.value) {
-          result.push({
-            name: s.Name,
-            dimensionName,
-            hierarchyName,
-            private: isPrivate,
-            expression: s.Expression || undefined,
-            elements: [],
-            alias: s.Alias || undefined,
-          });
-        }
-      } catch {
-        // scope may not exist
-      }
-    };
-    await fetchScope("Subsets", false);
-    await fetchScope("PrivateSubsets", true);
-    return result;
+    return this.subsets.list(dimensionName, hierarchyName);
   }
 
-  /**
-   * Get a single subset incl. resolved Elements.
-   * GET /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Subsets('{s}')?$expand=Elements($select=Name)
-   */
+  /** @deprecated Use `client.subsets.get(dim, hier, name, isPrivate)` instead. Removed in 2.0. */
   async getSubset(
     dimensionName: string,
     hierarchyName: string,
     subsetName: string,
     isPrivate = false,
   ): Promise<Subset> {
-    const enc = encodeURIComponent;
-    const segment = isPrivate ? "PrivateSubsets" : "Subsets";
-    const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/${segment}('${enc(subsetName)}')?$expand=Elements($select=Name)&$select=Name,Expression,Alias`;
-    const response = await this.request<{
-      Name: string;
-      Expression?: string;
-      Alias?: string;
-      Elements?: Array<{ Name: string }>;
-    }>("GET", path);
-    return {
-      name: response.Name,
-      dimensionName,
-      hierarchyName,
-      private: isPrivate,
-      expression: response.Expression || undefined,
-      elements: (response.Elements ?? []).map((e) => e.Name),
-      alias: response.Alias || undefined,
-    };
+    return this.subsets.get(dimensionName, hierarchyName, subsetName, isPrivate);
   }
 
-  /**
-   * Create a public subset. Either MDX-based (expression) or static (elements).
-   * POST /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Subsets
-   */
+  /** @deprecated Use `client.subsets.create(dim, hier, subset)` instead. Removed in 2.0. */
   async createSubset(
     dimensionName: string,
     hierarchyName: string,
     subset: SubsetCreate,
   ): Promise<void> {
-    const enc = encodeURIComponent;
-    const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Subsets`;
-
-    if (subset.expression && subset.elements && subset.elements.length > 0) {
-      throw new TM1Error({
-        code: TM1ErrorCode.VALIDATION_ERROR,
-        message: "Subset must be either MDX-based (expression) OR static (elements), not both.",
-      });
-    }
-    if (!subset.expression && (!subset.elements || subset.elements.length === 0)) {
-      throw new TM1Error({
-        code: TM1ErrorCode.VALIDATION_ERROR,
-        message: "Subset requires either expression (MDX) or non-empty elements list.",
-      });
-    }
-
-    const body: Record<string, unknown> = { Name: subset.name };
-    if (subset.alias) body.Alias = subset.alias;
-    if (subset.expression) {
-      body.Expression = subset.expression;
-    } else {
-      body["Elements@odata.bind"] = subset.elements!.map(
-        (e) =>
-          `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(e)}')`,
-      );
-    }
-    await this.request<void>("POST", path, body);
+    return this.subsets.create(dimensionName, hierarchyName, subset);
   }
 
-  /**
-   * Update an existing public subset.
-   * PATCH /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Subsets('{s}')
-   */
+  /** @deprecated Use `client.subsets.update(dim, hier, name, update)` instead. Removed in 2.0. */
   async updateSubset(
     dimensionName: string,
     hierarchyName: string,
     subsetName: string,
     update: { expression?: string; elements?: string[]; alias?: string },
   ): Promise<void> {
-    const enc = encodeURIComponent;
-    const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Subsets('${enc(subsetName)}')`;
-    const body: Record<string, unknown> = {};
-    if (update.alias !== undefined) body.Alias = update.alias;
-    if (update.expression !== undefined) {
-      body.Expression = update.expression;
-    } else if (update.elements !== undefined) {
-      body.Expression = "";
-      body["Elements@odata.bind"] = update.elements.map(
-        (e) =>
-          `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(e)}')`,
-      );
-    }
-    await this.request<void>("PATCH", path, body);
+    return this.subsets.update(dimensionName, hierarchyName, subsetName, update);
   }
 
-  /**
-   * Delete a public subset.
-   * DELETE /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Subsets('{s}')
-   */
+  /** @deprecated Use `client.subsets.delete(dim, hier, name)` instead. Removed in 2.0. */
   async deleteSubset(
     dimensionName: string,
     hierarchyName: string,
     subsetName: string,
   ): Promise<void> {
-    const enc = encodeURIComponent;
-    await this.request<void>(
-      "DELETE",
-      `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Subsets('${enc(subsetName)}')`,
-    );
+    return this.subsets.delete(dimensionName, hierarchyName, subsetName);
   }
 
   // ── Element attribute values ─────────────────────────────────────────────
@@ -1743,49 +1336,22 @@ export class TM1Client extends TM1HttpClient {
   /**
    * Read all attribute values for one element via MDX on }ElementAttributes_{Dim}.
    */
+  /** @deprecated Use `client.elements.getAttributeValues(dim, name)` instead. Removed in 2.0. */
   async getElementAttributeValues(
     dimensionName: string,
     elementName: string,
   ): Promise<ElementAttributeValue[]> {
-    const ctrlCube = `}ElementAttributes_${dimensionName}`;
-    const mdx =
-      `SELECT {[}ElementAttributes_${dimensionName}].MEMBERS} ON COLUMNS ` +
-      `FROM [${ctrlCube}] ` +
-      `WHERE ([${dimensionName}].[${elementName}])`;
-    const result = await this.executeMdx(mdx);
-    const out: ElementAttributeValue[] = [];
-    const tuples = result.axes[0]?.tuples ?? [];
-    for (let i = 0; i < tuples.length; i++) {
-      const attrName = tuples[i].members[0]?.name ?? "";
-      const cell = result.cells[i];
-      out.push({
-        elementName,
-        attributeName: attrName,
-        value: cell?.value ?? null,
-      });
-    }
-    return out;
+    return this.elements.getAttributeValues(dimensionName, elementName);
   }
 
-  /**
-   * Set a single attribute value on an element by writing to the
-   * }ElementAttributes_{Dim} control cube.
-   *
-   * Prefer TI processes (CellPutS / AttrPutS) for reproducible deployments.
-   * Use this REST-direct tool only for ad-hoc / debugging scenarios.
-   */
+  /** @deprecated Use `client.elements.updateAttributeValue(dim, name, attr, value)` instead. Removed in 2.0. */
   async updateElementAttributeValue(
     dimensionName: string,
     elementName: string,
     attributeName: string,
     value: number | string,
   ): Promise<void> {
-    const ctrlCube = `}ElementAttributes_${dimensionName}`;
-    await this.writeCells(
-      ctrlCube,
-      [dimensionName, `}ElementAttributes_${dimensionName}`],
-      [{ elements: [elementName, attributeName], value }],
-    );
+    return this.elements.updateAttributeValue(dimensionName, elementName, attributeName, value);
   }
 
   // ── Cube clear ───────────────────────────────────────────────────────────

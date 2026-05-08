@@ -119,7 +119,7 @@ Tracked as backlog item #5 (see `docs/ROADMAP.md`).
 |-------|--------------------------------------------------------------------|-------------------|
 | 1     | Introduce `services/` directory + `CubeService` (exemplar pattern) | DONE 2026-05-08   |
 | 1.1   | `DimensionService`, `HierarchyService`, `ElementService`           | DONE 2026-05-08   |
-| 1.2   | `CellService`, `ViewService`, `SubsetService`                      | TODO              |
+| 1.2   | `CellService`, `ViewService`, `SubsetService`                      | DONE 2026-05-08   |
 | 1.3   | `ProcessService`, `ChoreService`                                   | TODO              |
 | 1.4   | `SecurityService`, `ServerService`, `MonitoringService`            | TODO              |
 | 1.5   | `FileService`, `CallgraphService`                                  | TODO              |

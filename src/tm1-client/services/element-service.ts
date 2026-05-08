@@ -1,22 +1,23 @@
 // Element domain service. Owns the OData calls under
 // /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Elements(...) — create, update,
-// delete, move, bulk upsert, plus ElementAttribute definition CRUD.
-//
-// Note: element ATTRIBUTE VALUE read/write (`getElementAttributeValues`,
-// `updateElementAttributeValue`) involve cell reads/writes on the
-// `}ElementAttributes_{Dim}` control cube and currently live on TM1Client.
-// They will move into this service once CellService exists (Phase 1.2) and we
-// can inject it.
+// delete, move, bulk upsert, ElementAttribute definition CRUD, plus the
+// element-attribute VALUE read/write that goes through the
+// `}ElementAttributes_{Dim}` control cube. Those last two methods route
+// through CellService for the underlying MDX read and cellset PATCH.
 //
 // See docs/ARCHITECTURE.md for the layering.
 import { TM1Error } from "../../types.js";
-import type { ElementCreate, ElementUpdate } from "../../types.js";
+import type { ElementAttributeValue, ElementCreate, ElementUpdate } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
+import type { CellService } from "./cell-service.js";
 
 const enc = encodeURIComponent;
 
 export class ElementService {
-  constructor(private readonly http: TM1HttpClient) {}
+  constructor(
+    private readonly http: TM1HttpClient,
+    private readonly cells: CellService,
+  ) {}
 
   /**
    * Create an element in a hierarchy. Consolidated elements may include
@@ -180,5 +181,55 @@ export class ElementService {
       Name: attributeName,
       Type: attributeType,
     });
+  }
+
+  /**
+   * Read all attribute values for one element via MDX on
+   * `}ElementAttributes_{Dim}`. Routes through CellService.executeMdx for the
+   * cellset round-trip.
+   */
+  async getAttributeValues(
+    dimensionName: string,
+    elementName: string,
+  ): Promise<ElementAttributeValue[]> {
+    const ctrlCube = `}ElementAttributes_${dimensionName}`;
+    const mdx =
+      `SELECT {[}ElementAttributes_${dimensionName}].MEMBERS} ON COLUMNS ` +
+      `FROM [${ctrlCube}] ` +
+      `WHERE ([${dimensionName}].[${elementName}])`;
+    const result = await this.cells.executeMdx(mdx);
+    const out: ElementAttributeValue[] = [];
+    const tuples = result.axes[0]?.tuples ?? [];
+    for (let i = 0; i < tuples.length; i++) {
+      const attrName = tuples[i].members[0]?.name ?? "";
+      const cell = result.cells[i];
+      out.push({
+        elementName,
+        attributeName: attrName,
+        value: cell?.value ?? null,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Set a single attribute value on an element by writing to the
+   * `}ElementAttributes_{Dim}` control cube via CellService.writeCells.
+   *
+   * Prefer TI processes (CellPutS / AttrPutS) for reproducible deployments;
+   * this REST-direct path is for ad-hoc / debugging use.
+   */
+  async updateAttributeValue(
+    dimensionName: string,
+    elementName: string,
+    attributeName: string,
+    value: number | string,
+  ): Promise<void> {
+    const ctrlCube = `}ElementAttributes_${dimensionName}`;
+    await this.cells.writeCells(
+      ctrlCube,
+      [dimensionName, `}ElementAttributes_${dimensionName}`],
+      [{ elements: [elementName, attributeName], value }],
+    );
   }
 }
