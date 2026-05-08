@@ -95,6 +95,9 @@ export interface Cube {
 export interface Dimension {
   name: string;
   hierarchies: string[];
+  // Populated only when getDimensions({includeElementCount: true}) is called.
+  // Map hierarchyName → element total. Cheap audit signal — avoids per-hierarchy round-trips.
+  elementCounts?: Record<string, number>;
 }
 
 export interface Hierarchy {

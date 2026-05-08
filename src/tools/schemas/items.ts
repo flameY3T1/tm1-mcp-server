@@ -24,6 +24,9 @@ export const CubeItemSchema = z.object({
 export const DimensionItemSchema = z.object({
   name: z.string(),
   hierarchies: z.array(z.string()),
+  // Present only when tm1_list_dimensions is called with includeElementCount=true.
+  // Map hierarchyName → element total.
+  elementCounts: z.record(z.string(), z.number().int()).optional(),
 });
 
 export const ProcessParameterSchema = z.object({

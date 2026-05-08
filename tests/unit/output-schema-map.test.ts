@@ -17,7 +17,11 @@ function asSchema(entry: ZodRawShape | ZodTypeAny): ZodTypeAny {
 // loud if a schema field changes underneath us.
 const SAMPLES: Record<string, unknown[]> = {
   tm1_list_cubes: [{ name: "Sales", dimensions: ["Region", "Period"] }],
-  tm1_list_dimensions: [{ name: "Region", hierarchies: ["Region"] }],
+  tm1_list_dimensions: [
+    { name: "Region", hierarchies: ["Region"] },
+    // Validates the optional `elementCounts` field surfaces under includeElementCount=true.
+    { name: "Period", hierarchies: ["Period"], elementCounts: { Period: 24 } },
+  ],
   tm1_list_processes: [
     {
       name: "p1",

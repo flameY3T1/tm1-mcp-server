@@ -62,16 +62,35 @@ export class TM1Client extends TM1HttpClient {
   /**
    * List all dimensions with their hierarchy names.
    * GET /api/v1/Dimensions?$expand=Hierarchies($select=Name)
+   *
+   * When opts.includeElementCount is true, the expand also requests
+   * `Elements($count=true;$top=0)` so each Hierarchy returns
+   * `Elements@odata.count` without paying for the full element list.
+   * Single round-trip — drop-in for audit workflows that previously
+   * called getHierarchy() N times just to size dimensions.
    */
-  async getDimensions(): Promise<Dimension[]> {
-    const response = await this.request<{ value: Array<{ Name: string; Hierarchies: Array<{ Name: string }> }> }>(
-      "GET",
-      "/api/v1/Dimensions?$expand=Hierarchies($select=Name)",
-    );
-    return response.value.map((d) => ({
-      name: d.Name,
-      hierarchies: d.Hierarchies.map((h) => h.Name),
-    }));
+  async getDimensions(opts?: { includeElementCount?: boolean }): Promise<Dimension[]> {
+    const expand = opts?.includeElementCount
+      ? "Hierarchies($select=Name;$expand=Elements($count=true;$top=0))"
+      : "Hierarchies($select=Name)";
+    const response = await this.request<{
+      value: Array<{
+        Name: string;
+        Hierarchies: Array<{ Name: string; "Elements@odata.count"?: number }>;
+      }>;
+    }>("GET", `/api/v1/Dimensions?$expand=${expand}`);
+    return response.value.map((d) => {
+      const dim: Dimension = {
+        name: d.Name,
+        hierarchies: d.Hierarchies.map((h) => h.Name),
+      };
+      if (opts?.includeElementCount) {
+        dim.elementCounts = Object.fromEntries(
+          d.Hierarchies.map((h) => [h.Name, h["Elements@odata.count"] ?? 0]),
+        );
+      }
+      return dim;
+    });
   }
 
   /**

@@ -128,6 +128,55 @@ describe("TM1Client – Metadata Methods", () => {
       const dims = await client.getDimensions();
       expect(dims).toEqual([]);
     });
+
+    it("should include elementCounts when includeElementCount=true", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          value: [
+            {
+              Name: "Region",
+              Hierarchies: [
+                { Name: "Region", "Elements@odata.count": 12 },
+                { Name: "Country", "Elements@odata.count": 195 },
+              ],
+            },
+            {
+              Name: "Time",
+              Hierarchies: [{ Name: "Time", "Elements@odata.count": 24 }],
+            },
+          ],
+        }),
+      );
+
+      const dims = await client.getDimensions({ includeElementCount: true });
+
+      expect(dims).toEqual([
+        {
+          name: "Region",
+          hierarchies: ["Region", "Country"],
+          elementCounts: { Region: 12, Country: 195 },
+        },
+        {
+          name: "Time",
+          hierarchies: ["Time"],
+          elementCounts: { Time: 24 },
+        },
+      ]);
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("$expand=Elements($count=true;$top=0)");
+    });
+
+    it("should default missing Elements@odata.count to 0", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          value: [{ Name: "Empty", Hierarchies: [{ Name: "Empty" }] }],
+        }),
+      );
+
+      const dims = await client.getDimensions({ includeElementCount: true });
+      expect(dims[0].elementCounts).toEqual({ Empty: 0 });
+    });
   });
 
   // ── getHierarchy() ─────────────────────────────────────────────────────────
