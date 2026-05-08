@@ -125,7 +125,7 @@ Tracked as backlog item #5 (see `docs/ROADMAP.md`).
 | 1.5   | `FileService` (callgraph stays as `processes.fetchForCallgraph`)   | DONE 2026-05-08   |
 | 2–8   | Migrate tool-files domain by domain to call services directly      | TODO (one PR each) |
 | 9     | Mark flat methods `@deprecated`, add `lint:no-flat-api` CI gate    | DONE 2026-05-08   |
-| 10    | Remove flat methods, release 2.0                                   | TODO              |
+| 10    | Remove flat methods, release 2.0                                   | DONE 2026-05-08   |
 
 Each Phase 1.x adds new service files; flat methods on `TM1Client` are
 added/converted to wrappers in the same PR. Tool files do not change
