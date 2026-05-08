@@ -29,7 +29,7 @@ export function registerUpdateProcessDatasource(server: McpServer, tm1Client: TM
       dataSource: dataSourceSchema.describe("New data source configuration"),
     },
     async ({ processName, dataSource }) => {
-      await tm1Client.updateProcessDataSource(processName, dataSource);
+      await tm1Client.processes.updateDataSource(processName, dataSource);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, processName }) }],
       };

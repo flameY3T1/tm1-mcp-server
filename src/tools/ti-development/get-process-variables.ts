@@ -9,7 +9,7 @@ export function registerGetProcessVariables(server: McpServer, tm1Client: TM1Cli
       processName: z.string().describe("Name of the TI process"),
     },
     async ({ processName }) => {
-      const variables = await tm1Client.getProcessVariables(processName);
+      const variables = await tm1Client.processes.getVariables(processName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ processName, variables }, null, 2) }],
       };

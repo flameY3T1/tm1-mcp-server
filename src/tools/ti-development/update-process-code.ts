@@ -58,7 +58,7 @@ export function registerUpdateProcessCode(server: McpServer, tm1Client: TM1Clien
       const code: Record<string, string> = {};
       for (const t of receivedTabs) code[t] = tabs[t]!;
 
-      await tm1Client.updateProcessCode(processName, code);
+      await tm1Client.processes.updateCode(processName, code);
       return {
         content: [
           {

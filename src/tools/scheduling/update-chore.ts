@@ -32,7 +32,7 @@ export function registerUpdateChore(server: McpServer, tm1Client: TM1Client): vo
         updates.startTime = `${updates.startTime}Z`;
         coerced = true;
       }
-      await tm1Client.updateChore(name, updates);
+      await tm1Client.chores.update(name, updates);
       const payload = {
         success: true,
         choreName: name,

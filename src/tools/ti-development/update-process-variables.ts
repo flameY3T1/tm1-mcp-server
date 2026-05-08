@@ -18,7 +18,7 @@ export function registerUpdateProcessVariables(server: McpServer, tm1Client: TM1
       variables: z.array(variableSchema).min(1).describe("Variables in source-column order"),
     },
     async ({ processName, variables }) => {
-      await tm1Client.updateProcessVariables(processName, variables);
+      await tm1Client.processes.updateVariables(processName, variables);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, processName, variableCount: variables.length }) }],
       };

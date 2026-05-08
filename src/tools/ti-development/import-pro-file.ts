@@ -62,7 +62,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       }
 
       if (preflight) {
-        const check = await tm1Client.checkProcessCode({
+        const check = await tm1Client.processes.check({
           name: processName,
           prolog: parsed.prolog,
           metadata: parsed.metadata,
@@ -80,7 +80,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         }
       }
 
-      const allProcs = await tm1Client.getProcesses();
+      const allProcs = await tm1Client.processes.list();
       const exists = allProcs.some((p: { name: string }) => p.name === processName);
 
       if (mode === "create" && exists) {
@@ -97,9 +97,9 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       }
 
       const action = exists ? "updated" : "created";
-      if (!exists) await tm1Client.createProcess(processName);
+      if (!exists) await tm1Client.processes.create(processName);
 
-      await tm1Client.updateProcessCode(processName, {
+      await tm1Client.processes.updateCode(processName, {
         prolog: parsed.prolog,
         metadata: parsed.metadata,
         data: parsed.data,
@@ -107,13 +107,13 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       });
 
       if (parsed.parameters.length > 0) {
-        await tm1Client.updateProcessParameters(processName, parsed.parameters);
+        await tm1Client.processes.updateParameters(processName, parsed.parameters);
       }
       if (parsed.variables.length > 0) {
-        await tm1Client.updateProcessVariables(processName, parsed.variables);
+        await tm1Client.processes.updateVariables(processName, parsed.variables);
       }
       if (parsed.dataSource.type !== "None") {
-        await tm1Client.updateProcessDataSource(processName, parsed.dataSource);
+        await tm1Client.processes.updateDataSource(processName, parsed.dataSource);
       }
 
       return {

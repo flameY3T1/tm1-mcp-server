@@ -9,7 +9,7 @@ export function registerCreateProcess(server: McpServer, tm1Client: TM1Client) {
       name: z.string().describe("Name for the new TI process"),
     },
     async ({ name }) => {
-      await tm1Client.createProcess(name);
+      await tm1Client.processes.create(name);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, processName: name }) }],
       };

@@ -10,7 +10,7 @@ export function registerDeleteChore(server: McpServer, tm1Client: TM1Client): vo
       name: z.string().describe("Chore name (case-sensitive)"),
     },
     async ({ name }) => {
-      await tm1Client.deleteChore(name);
+      await tm1Client.chores.delete(name);
       return {
         content: [{
           type: "text" as const,

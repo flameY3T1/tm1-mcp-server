@@ -60,7 +60,7 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, mode, autoCompile }) => {
       const trail: string[] = [];
-      const procs = await tm1Client.getProcesses();
+      const procs = await tm1Client.processes.list();
       const exists = procs.some((p: { name: string }) => p.name === name);
       if (mode === "create" && exists) {
         return {
@@ -76,12 +76,12 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
       }
 
       if (!exists) {
-        await tm1Client.createProcess(name);
+        await tm1Client.processes.create(name);
         trail.push("createProcess");
       }
 
       if (prolog !== undefined || metadata !== undefined || data !== undefined || epilog !== undefined) {
-        await tm1Client.updateProcessCode(name, {
+        await tm1Client.processes.updateCode(name, {
           ...(prolog !== undefined ? { prolog } : {}),
           ...(metadata !== undefined ? { metadata } : {}),
           ...(data !== undefined ? { data } : {}),
@@ -90,15 +90,15 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
         trail.push("updateProcessCode");
       }
       if (parameters !== undefined) {
-        await tm1Client.updateProcessParameters(name, parameters);
+        await tm1Client.processes.updateParameters(name, parameters);
         trail.push("updateProcessParameters");
       }
       if (variables !== undefined && variables.length > 0) {
-        await tm1Client.updateProcessVariables(name, variables);
+        await tm1Client.processes.updateVariables(name, variables);
         trail.push("updateProcessVariables");
       }
       if (dataSource !== undefined) {
-        await tm1Client.updateProcessDataSource(name, dataSource);
+        await tm1Client.processes.updateDataSource(name, dataSource);
         trail.push("updateProcessDataSource");
       }
 
@@ -108,7 +108,7 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
 
       let compile: { ok: boolean; errorCount: number; errors: unknown[] } | undefined;
       if (autoCompile) {
-        const result = await tm1Client.compileProcess(name);
+        const result = await tm1Client.processes.compile(name);
         compile = {
           ok: result.success,
           errorCount: result.errors.length,

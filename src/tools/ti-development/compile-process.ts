@@ -11,7 +11,7 @@ export function registerCompileProcess(server: McpServer, tm1Client: TM1Client):
     },
     async ({ name }) => {
       try {
-        const result = await tm1Client.compileProcess(name);
+        const result = await tm1Client.processes.compile(name);
         const payload = {
           ok: result.success,
           processName: name,

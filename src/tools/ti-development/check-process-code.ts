@@ -62,10 +62,10 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
         let resolvedParams = parameters as ProcessParameter[] | undefined;
         let resolvedVars = variables as ProcessVariable[] | undefined;
         if (baseProcess) {
-          if (!resolvedParams) resolvedParams = await tm1Client.getProcessParameters(baseProcess);
-          if (!resolvedVars) resolvedVars = await tm1Client.getProcessVariables(baseProcess);
+          if (!resolvedParams) resolvedParams = await tm1Client.processes.getParameters(baseProcess);
+          if (!resolvedVars) resolvedVars = await tm1Client.processes.getVariables(baseProcess);
         }
-        const result = await tm1Client.checkProcessCode({
+        const result = await tm1Client.processes.check({
           ...(name !== undefined ? { name } : {}),
           ...(prolog !== undefined ? { prolog } : {}),
           ...(metadata !== undefined ? { metadata } : {}),

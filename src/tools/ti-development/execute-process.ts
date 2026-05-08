@@ -20,7 +20,7 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
         .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for long-running TI runs."),
     },
     async ({ processName, parameters, timeoutMs }) => {
-      const result = await tm1Client.executeProcess(processName, parameters, timeoutMs ? { timeoutMs } : undefined);
+      const result = await tm1Client.processes.execute(processName, parameters, timeoutMs ? { timeoutMs } : undefined);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

@@ -26,7 +26,7 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
     },
     async ({ includeControl, prefixSegments, includeNames, minCount, excludePattern }) => {
       try {
-        let processes = await tm1Client.getProcesses();
+        let processes = await tm1Client.processes.list();
         if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
         if (excludePattern) {
           let re: RegExp;

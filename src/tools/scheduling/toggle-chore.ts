@@ -11,7 +11,7 @@ export function registerToggleChore(server: McpServer, tm1Client: TM1Client): vo
       active: z.boolean().describe("true to activate scheduling, false to deactivate"),
     },
     async ({ name, active }) => {
-      await tm1Client.toggleChoreActive(name, active);
+      await tm1Client.chores.toggleActive(name, active);
       return {
         content: [{
           type: "text" as const,

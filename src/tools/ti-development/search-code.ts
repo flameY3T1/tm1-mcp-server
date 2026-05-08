@@ -82,7 +82,7 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         }
 
         const searchTabs = tabs && tabs.length > 0 ? tabs : ALL_TABS;
-        const all = await tm1Client.getAllProcessesCode(includeControl);
+        const all = await tm1Client.processes.getAllCode(includeControl);
 
         const matches: Match[] = [];
         let truncated = false;

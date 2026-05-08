@@ -9,7 +9,7 @@ export function registerDeleteProcess(server: McpServer, tm1Client: TM1Client) {
       processName: z.string().describe("Name of the TI process to delete"),
     },
     async ({ processName }) => {
-      await tm1Client.deleteProcess(processName);
+      await tm1Client.processes.delete(processName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, processName }) }],
       };

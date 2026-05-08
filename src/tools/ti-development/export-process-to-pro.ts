@@ -23,10 +23,10 @@ export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Clie
     },
     async ({ processName, writeToFile }) => {
       const [code, parameters, variables, dataSource] = await Promise.all([
-        tm1Client.getProcessCode(processName),
-        tm1Client.getProcessParameters(processName),
-        tm1Client.getProcessVariables(processName),
-        tm1Client.getProcessDataSource(processName),
+        tm1Client.processes.getCode(processName),
+        tm1Client.processes.getParameters(processName),
+        tm1Client.processes.getVariables(processName),
+        tm1Client.processes.getDataSource(processName),
       ]);
 
       const proContent = serializeToPro({

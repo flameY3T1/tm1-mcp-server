@@ -66,7 +66,7 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
       let code: { prolog: string; metadata: string; data: string; epilog: string };
       let resolvedName = processName ?? "";
       if (processName) {
-        code = await tm1Client.getProcessCode(processName);
+        code = await tm1Client.processes.getCode(processName);
       } else {
         let body = content ?? "";
         if (!body && filePath) {

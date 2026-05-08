@@ -13,7 +13,7 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
         .describe("Include TM1 control processes whose names start with '}' (default: false)"),
     },
     async ({ includeControl }) => {
-      const all = await tm1Client.getAllProcessesCode(includeControl);
+      const all = await tm1Client.processes.getAllCode(includeControl);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ count: all.length, processes: all }, null, 2) }],
       };

@@ -126,10 +126,10 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
       }
 
       const [installedCode, installedParams, installedVars, installedDs] = await Promise.all([
-        tm1Client.getProcessCode(name),
-        tm1Client.getProcessParameters(name),
-        tm1Client.getProcessVariables(name),
-        tm1Client.getProcessDataSource(name),
+        tm1Client.processes.getCode(name),
+        tm1Client.processes.getParameters(name),
+        tm1Client.processes.getVariables(name),
+        tm1Client.processes.getDataSource(name),
       ]);
 
       const tabs = [

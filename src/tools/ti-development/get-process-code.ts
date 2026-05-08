@@ -9,10 +9,10 @@ export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) 
       processName: z.string().describe("Name of the TI process"),
     },
     async ({ processName }) => {
-      const code = await tm1Client.getProcessCode(processName);
+      const code = await tm1Client.processes.getCode(processName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(code, null, 2) }],
-      };
+      };
     },
   );
 }

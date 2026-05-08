@@ -32,7 +32,7 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ limit, offset, fetchAll, includeControl, nameContains, nameRegex, nameNotContains, excludePattern, fields }) => {
       try {
-        let processes: Process[] = await tm1Client.getProcesses();
+        let processes: Process[] = await tm1Client.processes.list();
 
         if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
 

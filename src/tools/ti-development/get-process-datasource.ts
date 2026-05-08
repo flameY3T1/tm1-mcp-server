@@ -9,7 +9,7 @@ export function registerGetProcessDatasource(server: McpServer, tm1Client: TM1Cl
       processName: z.string().describe("Name of the TI process"),
     },
     async ({ processName }) => {
-      const ds = await tm1Client.getProcessDataSource(processName);
+      const ds = await tm1Client.processes.getDataSource(processName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(ds, null, 2) }],
       };

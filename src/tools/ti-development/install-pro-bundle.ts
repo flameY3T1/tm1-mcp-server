@@ -70,7 +70,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
           };
         }
 
-        const installed = await tm1Client.getProcesses();
+        const installed = await tm1Client.processes.list();
         const installedNames = new Set(installed.map((p: { name: string }) => p.name));
 
         const results: FileResult[] = [];
@@ -92,7 +92,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
             }
 
             if (preflight) {
-              const check = await tm1Client.checkProcessCode({
+              const check = await tm1Client.processes.check({
                 name: processName,
                 prolog: parsed.prolog,
                 metadata: parsed.metadata,
@@ -126,21 +126,21 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
               continue;
             }
 
-            if (!exists) await tm1Client.createProcess(processName);
-            await tm1Client.updateProcessCode(processName, {
+            if (!exists) await tm1Client.processes.create(processName);
+            await tm1Client.processes.updateCode(processName, {
               prolog: parsed.prolog,
               metadata: parsed.metadata,
               data: parsed.data,
               epilog: parsed.epilog,
             });
             if (parsed.parameters.length > 0) {
-              await tm1Client.updateProcessParameters(processName, parsed.parameters);
+              await tm1Client.processes.updateParameters(processName, parsed.parameters);
             }
             if (parsed.variables.length > 0) {
-              await tm1Client.updateProcessVariables(processName, parsed.variables);
+              await tm1Client.processes.updateVariables(processName, parsed.variables);
             }
             if (parsed.dataSource.type !== "None") {
-              await tm1Client.updateProcessDataSource(processName, parsed.dataSource);
+              await tm1Client.processes.updateDataSource(processName, parsed.dataSource);
             }
             installedNames.add(processName);
             results.push({ file, processName, status: exists ? "updated" : "created" });

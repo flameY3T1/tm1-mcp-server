@@ -29,7 +29,7 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
         .describe("Replace processes[] with processCount (default: false)."),
     },
     async ({ limit, offset, fetchAll, compact }) => {
-      const chores = await tm1Client.getChores();
+      const chores = await tm1Client.chores.list();
       const projected: Array<Chore | ChoreCompact> = compact
         ? chores.map((c): ChoreCompact => ({
             name: c.name,

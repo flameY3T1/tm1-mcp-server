@@ -43,7 +43,7 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
     async ({ name, startTime, active, dstSensitive, executionMode, frequency, steps }) => {
       try {
         const { value: normalizedStartTime, coerced } = coerceUtc(startTime);
-        await tm1Client.createChore({ name, startTime: normalizedStartTime, active, dstSensitive, executionMode, frequency, steps });
+        await tm1Client.chores.create({ name, startTime: normalizedStartTime, active, dstSensitive, executionMode, frequency, steps });
         return {
           content: [{
             type: "text" as const,

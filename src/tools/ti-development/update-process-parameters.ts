@@ -17,7 +17,7 @@ export function registerUpdateProcessParameters(server: McpServer, tm1Client: TM
       parameters: z.array(parameterSchema).describe("Array of process parameters"),
     },
     async ({ processName, parameters }) => {
-      await tm1Client.updateProcessParameters(processName, parameters);
+      await tm1Client.processes.updateParameters(processName, parameters);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, processName, parameterCount: parameters.length }) }],
       };

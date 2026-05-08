@@ -9,7 +9,7 @@ export function registerGetProcessParameters(server: McpServer, tm1Client: TM1Cl
       processName: z.string().describe("Name of the TI process"),
     },
     async ({ processName }) => {
-      const params = await tm1Client.getProcessParameters(processName);
+      const params = await tm1Client.processes.getParameters(processName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ processName, parameters: params }, null, 2) }],
       };

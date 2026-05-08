@@ -10,7 +10,7 @@ export function registerCopyProcess(server: McpServer, tm1Client: TM1Client) {
       targetName: z.string().describe("Name for the new copy"),
     },
     async ({ sourceName, targetName }) => {
-      await tm1Client.copyProcess(sourceName, targetName);
+      await tm1Client.processes.copy(sourceName, targetName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, sourceName, targetName }) }],
       };
