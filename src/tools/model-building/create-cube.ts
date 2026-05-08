@@ -16,7 +16,7 @@ export function registerCreateCube(server: McpServer, tm1Client: TM1Client): voi
         .describe("Ordered list of dimension names. Order affects query performance."),
     },
     async ({ name, dimensions }) => {
-      await tm1Client.createCube(name, dimensions);
+      await tm1Client.cubes.create(name, dimensions);
       return {
         content: [{
           type: "text" as const,

@@ -72,7 +72,7 @@ export function registerGetAllCubeRules(server: McpServer, tm1Client: TM1Client)
         .describe("Drop rulesText, return aggregate metrics per cube instead (default: false)"),
     },
     async ({ includeControl, onlyWithRules, summary }) => {
-      let all = await tm1Client.getAllCubeRules(includeControl);
+      let all = await tm1Client.cubes.getAllRules(includeControl);
       if (onlyWithRules) all = all.filter((c) => c.rulesText.trim().length > 0);
       const cubes = summary
         ? all.map((c) => ({

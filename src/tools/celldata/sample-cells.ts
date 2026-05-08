@@ -40,7 +40,7 @@ export function registerSampleCells(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ cubeName, maxCells, filters, axisDimension, leavesOnly }) => {
       const startedAt = Date.now();
-      const dimensions = await tm1Client.getCubeDimensionNames(cubeName);
+      const dimensions = await tm1Client.cubes.getDimensionNames(cubeName);
 
       const built = buildSampleCellsMdx({
         cubeName,

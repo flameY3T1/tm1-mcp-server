@@ -104,7 +104,7 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         }
       }
 
-      const [cubes, dims] = await Promise.all([tm1Client.getCubes(), tm1Client.getDimensions()]);
+      const [cubes, dims] = await Promise.all([tm1Client.cubes.list(), tm1Client.dimensions.list()]);
       const cubeNames = new Set(
         cubes.filter((c) => includeControl || !c.name.startsWith("}")).map((c) => c.name.toLowerCase()),
       );

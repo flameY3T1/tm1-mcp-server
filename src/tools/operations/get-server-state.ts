@@ -29,12 +29,12 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
     async () => {
       try {
         const [infoRes, cubesRes, dimsRes, procsRes, choresRes, clientsRes] = await Promise.allSettled([
-          tm1Client.getServerInfo(),
-          tm1Client.getCubes(),
-          tm1Client.getDimensions(),
-          tm1Client.getProcesses(),
-          tm1Client.getChores(),
-          tm1Client.listClients(),
+          tm1Client.server.getInfo(),
+          tm1Client.cubes.list(),
+          tm1Client.dimensions.list(),
+          tm1Client.processes.list(),
+          tm1Client.chores.list(),
+          tm1Client.security.listClients(),
         ]);
 
         const info = infoRes.status === "fulfilled" ? infoRes.value : null;

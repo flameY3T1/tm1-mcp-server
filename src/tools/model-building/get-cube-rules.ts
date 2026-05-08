@@ -11,7 +11,7 @@ export function registerGetCubeRules(server: McpServer, tm1Client: TM1Client): v
     },
     async ({ cube }) => {
       try {
-        const rules = await tm1Client.getCubeRules(cube);
+        const rules = await tm1Client.cubes.getRules(cube);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(rules, null, 2) }],
         };

@@ -10,7 +10,7 @@ export function registerUnloadCube(server: McpServer, tm1Client: TM1Client): voi
       cubeName: z.string().describe("Name of the cube to unload"),
     },
     async ({ cubeName }) => {
-      await tm1Client.unloadCube(cubeName);
+      await tm1Client.cubes.unload(cubeName);
       return {
         content: [{
           type: "text" as const,

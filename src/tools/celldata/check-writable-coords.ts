@@ -25,7 +25,7 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
     },
     async ({ cube, coords }) => {
       try {
-        const cubes = await tm1Client.getCubes();
+        const cubes = await tm1Client.cubes.list();
         const cubeMeta = cubes.find((c) => c.name.toLowerCase() === cube.toLowerCase());
         if (!cubeMeta) {
           return {
@@ -90,7 +90,7 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
           note: "",
         };
         try {
-          const rules = await tm1Client.getCubeRules(cube);
+          const rules = await tm1Client.cubes.getRules(cube);
           const ruleText = (rules.rulesText ?? "").trim();
           if (ruleText) {
             ruleOverlapWarn = {

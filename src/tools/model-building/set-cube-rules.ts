@@ -18,7 +18,7 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
         .describe("Enable SKIPCHECK for performance (default: true, recommended)"),
     },
     async ({ cube, rules, skipCheck }) => {
-      await tm1Client.updateCubeRules(cube, rules, skipCheck);
+      await tm1Client.cubes.updateRules(cube, rules, skipCheck);
       const lineCount = rules.split("\n").length;
       // Rule changes shift call edges (DB(), feeders) — drop callgraph TTL early.
       const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();

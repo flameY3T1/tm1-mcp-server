@@ -66,7 +66,7 @@ export async function buildIndexFromTM1(tm1Client: TM1Client, opts: BuildIndexOp
 async function buildIndexInternal(tm1Client: TM1Client, includeControl: boolean): Promise<ReferenceIndex> {
 
   const fetchProcesses = async (): Promise<ProcessFetchResult[]> => {
-    const all = await tm1Client.fetchProcessesForCallgraph(includeControl);
+    const all = await tm1Client.processes.fetchForCallgraph(includeControl);
     return all.map((p) => ({
       name: p.name,
       prolog: p.prolog,
@@ -79,13 +79,13 @@ async function buildIndexInternal(tm1Client: TM1Client, includeControl: boolean)
   };
 
   const fetchCubesWithRules = async (): Promise<CubeRulesFetchResult[]> => {
-    const all = await tm1Client.getAllCubeRules(includeControl);
+    const all = await tm1Client.cubes.getAllRules(includeControl);
     return all.map((c) => ({ cubeName: c.cubeName, rulesText: c.rulesText }));
   };
 
   const fetchChores = async (): Promise<ChoreFetchResult[]> => {
     try {
-      const chs = await tm1Client.getChores();
+      const chs = await tm1Client.chores.list();
       return chs
         .filter((c) => includeControl || !c.name.startsWith("}"))
         .map((c) => {

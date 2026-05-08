@@ -59,7 +59,7 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
       nameRegex,
     }) => {
       try {
-        let cubes: Cube[] = await tm1Client.getCubes({ includeRules });
+        let cubes: Cube[] = await tm1Client.cubes.list({ includeRules });
 
         if (!includeControl) {
           cubes = cubes.filter((c) => !c.name.startsWith("}"));

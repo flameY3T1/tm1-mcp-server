@@ -16,7 +16,7 @@ export function registerCheckCubeRule(server: McpServer, tm1Client: TM1Client): 
     },
     async ({ cube, rules }) => {
       try {
-        const errors = await tm1Client.checkCubeRule(cube, rules);
+        const errors = await tm1Client.cubes.checkRule(cube, rules);
         const ok = errors.length === 0;
         const payload = {
           ok,
