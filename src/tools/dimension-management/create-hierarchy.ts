@@ -11,7 +11,7 @@ export function registerCreateHierarchy(server: McpServer, tm1Client: TM1Client)
       hierarchyName: z.string().describe("New hierarchy name (must differ from existing hierarchies)"),
     },
     async ({ dimensionName, hierarchyName }) => {
-      await tm1Client.createHierarchy(dimensionName, hierarchyName);
+      await tm1Client.hierarchies.create(dimensionName, hierarchyName);
       return {
         content: [{
           type: "text" as const,

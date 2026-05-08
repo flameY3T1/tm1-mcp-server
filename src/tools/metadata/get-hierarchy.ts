@@ -32,7 +32,7 @@ export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
         .describe("Drop parents[] and children[] arrays from each element. Use for hierarchy overviews."),
     },
     async ({ dimensionName, hierarchyName, level, levelMax, elementType, nameContains, nameStartsWith, nameRegex, topN, compact }) => {
-      const hierarchy = await tm1Client.getHierarchy(dimensionName, hierarchyName, {
+      const hierarchy = await tm1Client.hierarchies.get(dimensionName, hierarchyName, {
         ...(level !== undefined ? { level } : {}),
         ...(levelMax !== undefined ? { levelMax } : {}),
         ...(elementType !== undefined ? { elementType } : {}),

@@ -21,10 +21,10 @@ export function registerUpdateElement(server: McpServer, tm1Client: TM1Client) {
       update: updateSchema.describe("Fields to update on the element"),
     },
     async ({ dimensionName, hierarchyName, elementName, update }) => {
-      await tm1Client.updateElement(dimensionName, hierarchyName, elementName, update);
+      await tm1Client.elements.update(dimensionName, hierarchyName, elementName, update);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, elementName }) }],
-      };
+      };
     },
   );
 }

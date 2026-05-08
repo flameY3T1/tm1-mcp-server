@@ -13,10 +13,10 @@ export function registerMoveElement(server: McpServer, tm1Client: TM1Client) {
       weight: z.number().optional().describe("Weight for the parent-child relationship (default: 1)"),
     },
     async ({ dimensionName, hierarchyName, elementName, newParent, weight }) => {
-      await tm1Client.moveElement(dimensionName, hierarchyName, elementName, newParent, weight);
+      await tm1Client.elements.move(dimensionName, hierarchyName, elementName, newParent, weight);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, elementName, newParent }) }],
-      };
+      };
     },
   );
 }

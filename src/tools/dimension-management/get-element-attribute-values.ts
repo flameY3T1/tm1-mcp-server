@@ -10,7 +10,7 @@ export function registerGetElementAttributeValues(server: McpServer, tm1Client: 
       elementName: z.string().describe("Element whose attribute values should be read"),
     },
     async ({ dimensionName, elementName }) => {
-      const values = await tm1Client.getElementAttributeValues(dimensionName, elementName);
+      const values = await tm1Client.elements.getAttributeValues(dimensionName, elementName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ dimensionName, elementName, attributes: values }, null, 2) }],
       };

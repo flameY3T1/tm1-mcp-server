@@ -26,7 +26,7 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
         .describe("Attach `elementCounts: { hierarchyName: number }` per dimension via OData $count. Single extra server-side aggregation, no N+1. Default false."),
     },
     async ({ limit, offset, fetchAll, includeControl, includeElementCount }) => {
-      let dimensions = await tm1Client.getDimensions({ includeElementCount });
+      let dimensions = await tm1Client.dimensions.list({ includeElementCount });
       if (!includeControl) dimensions = dimensions.filter((d) => !d.name.startsWith("}"));
       return {
         content: [{ type: "text" as const, text: JSON.stringify(paginate(dimensions, limit, offset, fetchAll), null, 2) }],

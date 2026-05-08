@@ -52,7 +52,7 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
           dims.map(async (dim, idx) => {
             const element = coords[idx];
             try {
-              const hier = await tm1Client.getHierarchy(dim, dim);
+              const hier = await tm1Client.hierarchies.get(dim, dim);
               const el = hier.elements.find(
                 (e) => e.name.toLowerCase() === element.toLowerCase(),
               );

@@ -10,7 +10,7 @@ export function registerDeleteDimension(server: McpServer, tm1Client: TM1Client)
       name: z.string().describe("Dimension name (case-sensitive)"),
     },
     async ({ name }) => {
-      await tm1Client.deleteDimension(name);
+      await tm1Client.dimensions.delete(name);
       return {
         content: [{
           type: "text" as const,

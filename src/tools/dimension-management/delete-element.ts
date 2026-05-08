@@ -11,10 +11,10 @@ export function registerDeleteElement(server: McpServer, tm1Client: TM1Client) {
       elementName: z.string().describe("Name of the element to delete"),
     },
     async ({ dimensionName, hierarchyName, elementName }) => {
-      await tm1Client.deleteElement(dimensionName, hierarchyName, elementName);
+      await tm1Client.elements.delete(dimensionName, hierarchyName, elementName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, elementName }) }],
-      };
+      };
     },
   );
 }

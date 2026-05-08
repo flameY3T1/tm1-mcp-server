@@ -10,7 +10,7 @@ export function registerCreateDimension(server: McpServer, tm1Client: TM1Client)
       name: z.string().describe("Dimension name"),
     },
     async ({ name }) => {
-      await tm1Client.createDimension(name);
+      await tm1Client.dimensions.create(name);
       return {
         content: [{
           type: "text" as const,

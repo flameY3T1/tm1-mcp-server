@@ -11,7 +11,7 @@ export function registerDeleteHierarchy(server: McpServer, tm1Client: TM1Client)
       hierarchyName: z.string().describe("Hierarchy name to delete"),
     },
     async ({ dimensionName, hierarchyName }) => {
-      await tm1Client.deleteHierarchy(dimensionName, hierarchyName);
+      await tm1Client.hierarchies.delete(dimensionName, hierarchyName);
       return {
         content: [{
           type: "text" as const,

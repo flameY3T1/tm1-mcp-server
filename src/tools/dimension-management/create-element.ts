@@ -20,10 +20,10 @@ export function registerCreateElement(server: McpServer, tm1Client: TM1Client) {
       element: elementSchema.describe("Element definition with name, type and optional components"),
     },
     async ({ dimensionName, hierarchyName, element }) => {
-      await tm1Client.createElement(dimensionName, hierarchyName, element);
+      await tm1Client.elements.create(dimensionName, hierarchyName, element);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, elementName: element.name }) }],
-      };
+      };
     },
   );
 }

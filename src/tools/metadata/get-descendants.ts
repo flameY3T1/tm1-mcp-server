@@ -20,7 +20,7 @@ export function registerGetDescendants(server: McpServer, tm1Client: TM1Client) 
         .describe("Return only leaf elements (no consolidations)."),
     },
     async ({ dimensionName, hierarchyName, element, depth, leavesOnly }) => {
-      const result = await tm1Client.getDescendants(dimensionName, hierarchyName, element, {
+      const result = await tm1Client.hierarchies.getDescendants(dimensionName, hierarchyName, element, {
         ...(depth !== undefined ? { depth } : {}),
         ...(leavesOnly !== undefined ? { leavesOnly } : {}),
       });

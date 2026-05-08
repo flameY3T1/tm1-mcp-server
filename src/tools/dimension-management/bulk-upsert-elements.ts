@@ -26,7 +26,7 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
     },
     async ({ dimension, hierarchy, elements }) => {
       const hier = hierarchy ?? dimension;
-      await tm1Client.bulkUpsertElements(dimension, hier, elements);
+      await tm1Client.elements.bulkUpsert(dimension, hier, elements);
       const counts = {
         N: elements.filter((e) => e.type === "Numeric").length,
         C: elements.filter((e) => e.type === "Consolidated").length,

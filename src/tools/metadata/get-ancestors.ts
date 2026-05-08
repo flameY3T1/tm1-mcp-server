@@ -15,7 +15,7 @@ export function registerGetAncestors(server: McpServer, tm1Client: TM1Client) {
       element: z.string().describe("Element whose ancestors are requested. Root elements return empty ancestors and a single self-only path."),
     },
     async ({ dimensionName, hierarchyName, element }) => {
-      const result = await tm1Client.getAncestors(dimensionName, hierarchyName, element);
+      const result = await tm1Client.hierarchies.getAncestors(dimensionName, hierarchyName, element);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };

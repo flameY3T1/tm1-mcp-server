@@ -12,7 +12,7 @@ export function registerUpdateElementAttributeValue(server: McpServer, tm1Client
       value: z.union([z.string(), z.number()]).describe("New value (string for String/Alias attributes, number for Numeric attributes)"),
     },
     async ({ dimensionName, elementName, attributeName, value }) => {
-      await tm1Client.updateElementAttributeValue(dimensionName, elementName, attributeName, value);
+      await tm1Client.elements.updateAttributeValue(dimensionName, elementName, attributeName, value);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, dimensionName, elementName, attributeName, value }) }],
       };

@@ -12,7 +12,7 @@ export function registerCreateElementAttribute(server: McpServer, tm1Client: TM1
       attributeType: z.enum(["Numeric", "String", "Alias"]).describe("Attribute type: Numeric (ATTRN), String (ATTRS), or Alias"),
     },
     async ({ dimensionName, hierarchyName, attributeName, attributeType }) => {
-      await tm1Client.createElementAttribute(dimensionName, hierarchyName, attributeName, attributeType);
+      await tm1Client.elements.createAttribute(dimensionName, hierarchyName, attributeName, attributeType);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, attributeName, attributeType }) }],
       };
