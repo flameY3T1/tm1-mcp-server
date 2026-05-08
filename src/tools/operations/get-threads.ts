@@ -10,7 +10,7 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
     { ...PAGINATION_SCHEMA },
     async ({ limit, offset, fetchAll }) => {
       try {
-        const threads = await tm1Client.getThreads();
+        const threads = await tm1Client.monitoring.getThreads();
         return {
           content: [{
             type: "text",
@@ -31,7 +31,7 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
     },
     async ({ id }) => {
       try {
-        await tm1Client.cancelThread(id);
+        await tm1Client.monitoring.cancelThread(id);
         return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, threadId: id }, null, 2) }] };
       } catch (err) {
         return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };

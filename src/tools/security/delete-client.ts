@@ -9,7 +9,7 @@ export function registerDeleteClient(server: McpServer, tm1Client: TM1Client) {
       name: z.string().describe("Client (user) name"),
     },
     async ({ name }) => {
-      await tm1Client.deleteClient(name);
+      await tm1Client.security.deleteClient(name);
       return {
         content: [{
           type: "text" as const,

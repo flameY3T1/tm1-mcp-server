@@ -8,7 +8,7 @@ export function registerGetServerInfo(server: McpServer, tm1Client: TM1Client): 
     {},
     async () => {
       try {
-        const info = await tm1Client.getServerInfo();
+        const info = await tm1Client.server.getInfo();
         return {
           content: [{ type: "text" as const, text: JSON.stringify(info, null, 2) }],
         };

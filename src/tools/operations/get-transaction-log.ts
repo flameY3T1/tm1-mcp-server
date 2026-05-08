@@ -16,7 +16,7 @@ export function registerGetTransactionLog(server: McpServer, tm1Client: TM1Clien
     },
     async ({ top, cubeName, user, since }) => {
       try {
-        const entries = await tm1Client.getTransactionLog({ top, cubeName, user, since });
+        const entries = await tm1Client.server.getTransactionLog({ top, cubeName, user, since });
         return {
           content: [{
             type: "text" as const,

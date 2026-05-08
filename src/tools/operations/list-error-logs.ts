@@ -16,7 +16,7 @@ export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): 
     },
     async ({ processName, since, top }) => {
       try {
-        const files = await tm1Client.getErrorLogFiles({ processName, since, top });
+        const files = await tm1Client.server.listErrorLogFiles({ processName, since, top });
         return {
           content: [{
             type: "text" as const,

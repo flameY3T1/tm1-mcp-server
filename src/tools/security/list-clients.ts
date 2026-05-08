@@ -62,7 +62,7 @@ export function registerListClients(server: McpServer, tm1Client: TM1Client) {
         ),
     },
     async ({ limit, offset, fetchAll, fields, groupCount }) => {
-      const clients = await tm1Client.listClients();
+      const clients = await tm1Client.security.listClients();
       const page = paginate(clients, limit, offset, fetchAll);
       const projected = {
         ...page,

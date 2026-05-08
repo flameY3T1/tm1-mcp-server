@@ -45,7 +45,7 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
     },
     async ({ filename, tail, maxBytes, includeRelated, relatedWindowSec, relatedMaxFiles, relatedMaxBytes }) => {
       try {
-        const content = await tm1Client.getErrorLogContent(filename);
+        const content = await tm1Client.server.getErrorLogContent(filename);
         const totalBytes = Buffer.byteLength(content, "utf8");
 
         let body: string;
@@ -88,7 +88,7 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
               files: [],
             };
           } else {
-            const allFiles = await tm1Client.getErrorLogFiles({ top: 500 });
+            const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
             const windowMs = relatedWindowSec * 1000;
             const candidates = allFiles
               .filter((f) => f.filename !== filename)
@@ -101,7 +101,7 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
             const fetched = await Promise.all(
               candidates.map(async ({ filename: rf, ts }) => {
                 try {
-                  const raw = await tm1Client.getErrorLogContent(rf);
+                  const raw = await tm1Client.server.getErrorLogContent(rf);
                   const rawBytes = Buffer.byteLength(raw, "utf8");
                   const { body: rb, truncated: rt } = truncateTail(raw, relatedMaxBytes);
                   return {

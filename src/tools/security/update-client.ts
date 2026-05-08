@@ -12,7 +12,7 @@ export function registerUpdateClient(server: McpServer, tm1Client: TM1Client) {
       enabled: z.boolean().optional().describe("Enable/disable the client"),
     },
     async ({ name, ...payload }) => {
-      await tm1Client.updateClient(name, payload);
+      await tm1Client.security.updateClient(name, payload);
       return {
         content: [{
           type: "text" as const,

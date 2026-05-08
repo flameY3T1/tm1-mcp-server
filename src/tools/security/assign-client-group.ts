@@ -10,7 +10,7 @@ export function registerAssignClientGroup(server: McpServer, tm1Client: TM1Clien
       groupName: z.string().describe("Group name"),
     },
     async ({ clientName, groupName }) => {
-      await tm1Client.assignClientGroup(clientName, groupName);
+      await tm1Client.security.assignClientGroup(clientName, groupName);
       return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, clientName, groupName }, null, 2) }] };
     },
   );

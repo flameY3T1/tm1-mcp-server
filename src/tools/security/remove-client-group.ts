@@ -10,7 +10,7 @@ export function registerRemoveClientGroup(server: McpServer, tm1Client: TM1Clien
       groupName: z.string().describe("Group name"),
     },
     async ({ clientName, groupName }) => {
-      await tm1Client.removeClientGroup(clientName, groupName);
+      await tm1Client.security.removeClientGroup(clientName, groupName);
       return {
         content: [{
           type: "text" as const,

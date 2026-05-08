@@ -17,7 +17,7 @@ export function registerListGroups(server: McpServer, tm1Client: TM1Client) {
         ),
     },
     async ({ limit, offset, fetchAll, compact }) => {
-      const groups = await tm1Client.listGroups();
+      const groups = await tm1Client.security.listGroups();
       const page = paginate(groups, limit, offset, fetchAll);
       const items = compact
         ? page.items.map(({ Clients, ...rest }) => ({

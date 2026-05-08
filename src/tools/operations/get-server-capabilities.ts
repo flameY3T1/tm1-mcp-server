@@ -24,7 +24,7 @@ export function registerGetServerCapabilities(server: McpServer, tm1Client: TM1C
     {},
     async () => {
       try {
-        const info = await tm1Client.getServerInfo();
+        const info = await tm1Client.server.getInfo();
         const x = (info.extra ?? {}) as Record<string, unknown>;
 
         const capabilities = {

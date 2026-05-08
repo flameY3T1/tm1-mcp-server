@@ -14,7 +14,7 @@ export function registerGetMessageLog(server: McpServer, tm1Client: TM1Client): 
     },
     async ({ top, filter }) => {
       try {
-        const entries = await tm1Client.getMessageLog(top);
+        const entries = await tm1Client.server.getMessageLog(top);
         const filtered = filter
           ? entries.filter((e) => e.message.toLowerCase().includes(filter.toLowerCase()))
           : entries;

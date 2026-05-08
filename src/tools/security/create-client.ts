@@ -12,7 +12,7 @@ export function registerCreateClient(server: McpServer, tm1Client: TM1Client) {
       groups: z.array(z.string()).optional().describe("Group names to assign on creation"),
     },
     async (args) => {
-      await tm1Client.createClient(args);
+      await tm1Client.security.createClient(args);
       return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, name: args.name }, null, 2) }] };
     },
   );

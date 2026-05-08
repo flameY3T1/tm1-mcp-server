@@ -34,7 +34,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
     },
     async ({ processName, since, maxLogs, tail, includeRelated, relatedWindowSec, relatedMaxFiles }) => {
       try {
-        const allFiles = await tm1Client.getErrorLogFiles({ top: 500 });
+        const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
         const matching = allFiles
           .filter((f) => f.filename.toLowerCase().startsWith(processName.toLowerCase() + "_"))
           .filter((f) => {
@@ -61,7 +61,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
           let totalLines = 0;
 
           try {
-            const raw = await tm1Client.getErrorLogContent(f.filename);
+            const raw = await tm1Client.server.getErrorLogContent(f.filename);
             const result = tailLines(raw, tail);
             content = result.body;
             truncated = result.truncated;
@@ -93,7 +93,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
 
               const related = await Promise.all(candidates.map(async ({ filename: rf, ts }) => {
                 try {
-                  const raw = await tm1Client.getErrorLogContent(rf);
+                  const raw = await tm1Client.server.getErrorLogContent(rf);
                   const { body, truncated: rt } = truncateTail(raw, DEFAULT_RELATED_MAX_BYTES);
                   return { filename: rf, deltaSec: Math.round((ts - sourceTs) / 1000), truncated: rt, content: body };
                 } catch (e) {

@@ -9,7 +9,7 @@ export function registerGetClient(server: McpServer, tm1Client: TM1Client) {
       name: z.string().describe("Client (user) name"),
     },
     async ({ name }) => {
-      const client = await tm1Client.getClient(name);
+      const client = await tm1Client.security.getClient(name);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(client, null, 2) }],
       };

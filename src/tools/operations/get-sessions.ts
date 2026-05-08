@@ -22,7 +22,7 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
     },
     async ({ activeOnly, withThreads, compact, limit, offset, fetchAll }) => {
       try {
-        const sessions = await tm1Client.getSessions();
+        const sessions = await tm1Client.monitoring.getSessions();
         const filtered = activeOnly ? sessions.filter((s) => s.active !== false) : sessions;
         if (compact) {
           const namedUsers = filtered.filter((s) => s.user && s.user.trim() !== "").length;
