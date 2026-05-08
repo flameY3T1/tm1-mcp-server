@@ -32,7 +32,7 @@ export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
           });
         }
       }
-      await tm1Client.writeCells(cubeName, dimensions, cells);
+      await tm1Client.cells.writeCells(cubeName, dimensions, cells);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, cellsWritten: cells.length }) }],
       };

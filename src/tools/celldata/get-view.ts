@@ -10,10 +10,10 @@ export function registerGetView(server: McpServer, tm1Client: TM1Client) {
       viewName: z.string().describe("Name of the view to execute"),
     },
     async ({ cubeName, viewName }) => {
-      const result = await tm1Client.getView(cubeName, viewName);
+      const result = await tm1Client.views.getView(cubeName, viewName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-      };
+      };
     },
   );
 }

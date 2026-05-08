@@ -11,7 +11,7 @@ export function registerDeleteView(server: McpServer, tm1Client: TM1Client): voi
       viewName: z.string().describe("View name to delete"),
     },
     async ({ cubeName, viewName }) => {
-      await tm1Client.deleteView(cubeName, viewName);
+      await tm1Client.views.delete(cubeName, viewName);
       return {
         content: [{
           type: "text" as const,

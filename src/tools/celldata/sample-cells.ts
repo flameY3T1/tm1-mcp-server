@@ -51,7 +51,7 @@ export function registerSampleCells(server: McpServer, tm1Client: TM1Client) {
         leavesOnly: leavesOnly ?? true,
       });
 
-      const result = await tm1Client.executeMdx(built.mdx);
+      const result = await tm1Client.cells.executeMdx(built.mdx);
 
       const whereCoords: Record<string, string> = {};
       if (filters) {

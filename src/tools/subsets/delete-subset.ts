@@ -11,7 +11,7 @@ export function registerDeleteSubset(server: McpServer, tm1Client: TM1Client) {
       subsetName: z.string().describe("Subset to delete"),
     },
     async ({ dimensionName, hierarchyName, subsetName }) => {
-      await tm1Client.deleteSubset(dimensionName, hierarchyName, subsetName);
+      await tm1Client.subsets.delete(dimensionName, hierarchyName, subsetName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, subsetName }) }],
       };

@@ -12,7 +12,7 @@ export function registerCreateMdxView(server: McpServer, tm1Client: TM1Client): 
       mdx: z.string().describe("MDX SELECT query defining the view"),
     },
     async ({ cubeName, viewName, mdx }) => {
-      await tm1Client.createMdxView(cubeName, viewName, mdx);
+      await tm1Client.views.createMdx(cubeName, viewName, mdx);
       return {
         content: [{
           type: "text" as const,

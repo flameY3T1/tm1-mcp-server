@@ -13,7 +13,7 @@ export function registerListViews(server: McpServer, tm1Client: TM1Client): void
     },
     async ({ cubeName, limit, offset, fetchAll }) => {
       try {
-        const views = await tm1Client.listViews(cubeName);
+        const views = await tm1Client.views.list(cubeName);
         return {
           content: [{
             type: "text",

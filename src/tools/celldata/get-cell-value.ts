@@ -10,10 +10,10 @@ export function registerGetCellValue(server: McpServer, tm1Client: TM1Client) {
       elements: z.array(z.string()).describe("Element names for each dimension of the cube"),
     },
     async ({ cubeName, elements }) => {
-      const value = await tm1Client.getCellValue(cubeName, elements);
+      const value = await tm1Client.cells.getValue(cubeName, elements);
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ value }, null, 2) }],
-      };
+      };
     },
   );
 }

@@ -13,7 +13,7 @@ export function registerListSubsets(server: McpServer, tm1Client: TM1Client) {
       ...PAGINATION_SCHEMA,
     },
     async ({ dimensionName, hierarchyName, limit, offset, fetchAll }) => {
-      const subsets = await tm1Client.listSubsets(dimensionName, hierarchyName);
+      const subsets = await tm1Client.subsets.list(dimensionName, hierarchyName);
       return {
         content: [{
           type: "text" as const,

@@ -14,7 +14,7 @@ export function registerUpdateSubset(server: McpServer, tm1Client: TM1Client) {
       alias: z.string().optional().describe("New alias attribute"),
     },
     async ({ dimensionName, hierarchyName, subsetName, expression, elements, alias }) => {
-      await tm1Client.updateSubset(dimensionName, hierarchyName, subsetName, {
+      await tm1Client.subsets.update(dimensionName, hierarchyName, subsetName, {
         expression,
         elements,
         alias,

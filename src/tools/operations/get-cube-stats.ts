@@ -44,7 +44,7 @@ async function fetchOne(tm1Client: TM1Client, cubeName: string): Promise<CubeSta
     "WHERE ([}TimeIntervals].[LATEST])",
   ].join("\n");
 
-  const result = await tm1Client.executeMdx(mdx);
+  const result = await tm1Client.cells.executeMdx(mdx);
   const raw: Record<string, number | null> = {};
   const tuples = result.axes[1]?.tuples ?? [];
   for (let i = 0; i < tuples.length; i++) {

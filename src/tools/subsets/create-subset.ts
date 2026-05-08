@@ -14,7 +14,7 @@ export function registerCreateSubset(server: McpServer, tm1Client: TM1Client) {
       alias: z.string().optional().describe("Alias attribute used as display name in the subset"),
     },
     async ({ dimensionName, hierarchyName, subsetName, expression, elements, alias }) => {
-      await tm1Client.createSubset(dimensionName, hierarchyName, {
+      await tm1Client.subsets.create(dimensionName, hierarchyName, {
         name: subsetName,
         expression,
         elements,
