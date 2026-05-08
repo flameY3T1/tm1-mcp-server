@@ -1,9 +1,27 @@
 import { TM1Error, TM1ErrorCode } from "./types.js";
 import type { Cube, Dimension, Hierarchy, HierarchyElement, Process, ProcessParameter, ProcessVariable, ProcessResult, ProcessCode, DataSource, Chore, CellValue, MdxResult, MdxAxis, ViewResult, ViewDefinition, ElementCreate, ElementUpdate, Thread, MessageLogEntry, CubeRules, ChoreCreate, ServerInfo, CompileResult, ProcessCheckInput, CubeView, TransactionLogEntry, Subset, SubsetCreate, ElementAttributeValue, Client, ClientCreate, ClientUpdate, Group, Session, RuleSyntaxError, ErrorLogFile } from "./types.js";
+import type { TM1Config } from "./config.js";
+import type { SessionManager } from "./session-manager.js";
+import type pino from "pino";
 import { TM1HttpClient } from "./tm1-client/http.js";
+import { CubeService } from "./tm1-client/services/cube-service.js";
 
+/**
+ * TM1 facade. Domain-specific OData calls live in service classes
+ * (`this.cubes`, etc.) — see docs/ARCHITECTURE.md. Flat methods
+ * (`getCubes`, ...) remain as deprecated wrappers during the migration
+ * period and will be removed in 2.0.
+ */
 export class TM1Client extends TM1HttpClient {
   private connected = false;
+
+  // Domain services. Add new ones here as the god-class split progresses.
+  readonly cubes: CubeService;
+
+  constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
+    super(config, sessionManager, logger);
+    this.cubes = new CubeService(this);
+  }
 
   /**
    * Authenticate and start the keep-alive timer.
@@ -40,23 +58,9 @@ export class TM1Client extends TM1HttpClient {
    * opts.includeRules adds Rules text to the OData $select so we can
    * derive hasRules per cube in a single round-trip (no N+1).
    */
+  /** @deprecated Use `client.cubes.list(opts)` instead. Removed in 2.0. */
   async getCubes(opts: { includeRules?: boolean } = {}): Promise<Cube[]> {
-    const path = opts.includeRules
-      ? "/api/v1/Cubes?$select=Name,Rules&$expand=Dimensions($select=Name)"
-      : "/api/v1/Cubes?$expand=Dimensions($select=Name)";
-    const response = await this.request<{
-      value: Array<{ Name: string; Rules?: string; Dimensions: Array<{ Name: string }> }>;
-    }>("GET", path);
-    return response.value.map((c) => {
-      const cube: Cube = {
-        name: c.Name,
-        dimensions: c.Dimensions.map((d) => d.Name),
-      };
-      if (opts.includeRules) {
-        cube.hasRules = !!(c.Rules && c.Rules.trim().length > 0);
-      }
-      return cube;
-    });
+    return this.cubes.list(opts);
   }
 
   /**
@@ -429,13 +433,9 @@ export class TM1Client extends TM1HttpClient {
    * Return ordered dimension-name list of a cube.
    * GET /api/v1/Cubes('{name}')?$expand=Dimensions($select=Name)
    */
+  /** @deprecated Use `client.cubes.getDimensionNames(cubeName)` instead. Removed in 2.0. */
   async getCubeDimensionNames(cubeName: string): Promise<string[]> {
-    const path = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')?$expand=Dimensions($select=Name)`;
-    const response = await this.request<{ Name: string; Dimensions: Array<{ Name: string }> }>(
-      "GET",
-      path,
-    );
-    return response.Dimensions.map((d) => d.Name);
+    return this.cubes.getDimensionNames(cubeName);
   }
 
   /**
@@ -1567,97 +1567,34 @@ export class TM1Client extends TM1HttpClient {
    * Create a new cube with the given dimensions (in order).
    * POST /api/v1/Cubes
    */
+  /** @deprecated Use `client.cubes.create(name, dimensionNames)` instead. Removed in 2.0. */
   async createCube(name: string, dimensionNames: string[]): Promise<void> {
-    await this.request<void>("POST", "/api/v1/Cubes", {
-      Name: name,
-      Dimensions: dimensionNames.map((d) => ({
-        "@odata.id": `Dimensions('${encodeURIComponent(d)}')`,
-      })),
-    });
+    return this.cubes.create(name, dimensionNames);
   }
 
-  /**
-   * Delete a cube.
-   * DELETE /api/v1/Cubes('{name}')
-   */
+  /** @deprecated Use `client.cubes.delete(name)` instead. Removed in 2.0. */
   async deleteCube(name: string): Promise<void> {
-    await this.request<void>("DELETE", `/api/v1/Cubes('${encodeURIComponent(name)}')`);
+    return this.cubes.delete(name);
   }
 
-  /**
-   * Get the rules text for a cube.
-   * GET /api/v1/Cubes('{name}')/Rules
-   */
+  /** @deprecated Use `client.cubes.getRules(cubeName)` instead. Removed in 2.0. */
   async getCubeRules(cubeName: string): Promise<CubeRules> {
-    const path = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')/Rules`;
-    try {
-      // TM1 11.8 returns rules text in the "value" field (not "Text")
-      const response = await this.request<{
-        value?: string;
-        Text?: string;
-      }>("GET", path);
-      const rulesText = response.value ?? response.Text ?? "";
-      return {
-        cubeName,
-        rulesText,
-        skipCheck: rulesText.toUpperCase().includes("SKIPCHECK"),
-      };
-    } catch (err) {
-      if (err instanceof TM1Error && (err.httpStatus === 404 || err.httpStatus === 204)) {
-        // No rules exist yet
-        return { cubeName, rulesText: "", skipCheck: false };
-      }
-      throw err;
-    }
+    return this.cubes.getRules(cubeName);
   }
 
-  /**
-   * Bulk-fetch rules for every cube in a single round trip.
-   * GET /api/v1/Cubes?$select=Name,Rules
-   * Control cubes (Name starts with `}`) excluded unless includeControl=true.
-   */
+  /** @deprecated Use `client.cubes.getAllRules(includeControl)` instead. Removed in 2.0. */
   async getAllCubeRules(includeControl = false): Promise<CubeRules[]> {
-    const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const path = `/api/v1/Cubes?$select=Name,Rules${filter}`;
-    const response = await this.request<{
-      value: Array<{ Name: string; Rules?: string | null }>;
-    }>("GET", path);
-    return response.value.map((c) => {
-      const rulesText = c.Rules ?? "";
-      return {
-        cubeName: c.Name,
-        rulesText,
-        skipCheck: rulesText.toUpperCase().includes("SKIPCHECK"),
-      };
-    });
+    return this.cubes.getAllRules(includeControl);
   }
 
-  /**
-   * Create or replace the rules for a cube.
-   * If rules exist: PATCH; if not: POST.
-   * GET /api/v1/Cubes('{name}')/Rules
-   */
+  /** @deprecated Use `client.cubes.updateRules(cubeName, rulesText)` instead. Removed in 2.0. */
   async updateCubeRules(cubeName: string, rulesText: string, _skipCheck = true): Promise<void> {
-    // TM1 11.8: rules are set by PATCHing the Cube entity with {"Rules": "...text..."}
-    // PATCH/POST on /Cubes('{name}')/Rules returns 400 "not supported"
-    const cubePath = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')`;
-    await this.request<void>("PATCH", cubePath, { Rules: rulesText });
+    return this.cubes.updateRules(cubeName, rulesText, _skipCheck);
   }
 
-  /**
-   * Validate cube rule syntax without applying. Returns empty array if valid,
-   * otherwise array of {message, lineNumber?} errors.
-   * POST /api/v1/Cubes('{name}')/tm1.CheckRules with { Rules: "..." }
-   */
+  /** @deprecated Use `client.cubes.checkRule(cubeName, ruleText)` instead. Removed in 2.0. */
   async checkCubeRule(cubeName: string, ruleText: string): Promise<RuleSyntaxError[]> {
-    const path = `/api/v1/Cubes('${encodeURIComponent(cubeName)}')/tm1.CheckRules`;
-    const response = await this.request<{
-      value?: Array<{ Message: string; LineNumber?: number }>;
-    }>("POST", path, { Rules: ruleText });
-    return (response.value ?? []).map((e) => ({
-      message: e.Message,
-      ...(e.LineNumber !== undefined ? { lineNumber: e.LineNumber } : {}),
-    }));
+    return this.cubes.checkRule(cubeName, ruleText);
   }
 
   // ── File operations ──────────────────────────────────────────────────────
@@ -2140,76 +2077,13 @@ export class TM1Client extends TM1HttpClient {
    *     - Full-cube clear (all dimensions wildcarded): ephemeral TI with CubeClearData()
    *     - Partial clear: throws TM1Error with guidance to use a TI process
    */
+  /** @deprecated Use `client.cubes.clear(cubeName, dimensions, tuples)` instead. Removed in 2.0. */
   async clearCube(
     cubeName: string,
     dimensions: string[],
     tuples: string[][],
   ): Promise<void> {
-    if (this.config.tm1Version.startsWith("11")) {
-      const isFullClear = dimensions.every((_, i) => (tuples[i] ?? []).length === 0);
-      if (!isFullClear) {
-        throw new TM1Error({
-          code: TM1ErrorCode.UNSUPPORTED_OPERATION,
-          message: `Partial clearCube is not supported on TM1 ${this.config.tm1Version} (tm1.Clear endpoint unavailable). Implement a TI process with bedrock '}bedrock.cube.data.clear' or custom CellPutN loop and call via tm1_execute_process.`,
-          endpoint: `/api/v1/Cubes('${cubeName}')/tm1.Clear`,
-        });
-      }
-      await this.clearCubeViaTI(cubeName);
-      return;
-    }
-
-    const enc = encodeURIComponent;
-    const body = {
-      Tuples: dimensions.map((dim, idx) => ({
-        "Hierarchy@odata.bind": `Dimensions('${enc(dim)}')/Hierarchies('${enc(dim)}')`,
-        "Members@odata.bind": (tuples[idx] ?? []).map(
-          (el) =>
-            `Dimensions('${enc(dim)}')/Hierarchies('${enc(dim)}')/Members('${enc(el)}')`,
-        ),
-      })),
-    };
-    await this.request<void>(
-      "POST",
-      `/api/v1/Cubes('${enc(cubeName)}')/tm1.Clear`,
-      body,
-    );
-  }
-
-  /**
-   * 11.x fallback: deploy ephemeral TI with CubeClearData(), execute, delete.
-   */
-  private async clearCubeViaTI(cubeName: string): Promise<void> {
-    const enc = encodeURIComponent;
-    const procName = `}TempClear_${cubeName.replace(/[^A-Za-z0-9_]/g, "_")}_${Date.now()}`;
-    const safeCube = cubeName.replace(/'/g, "''");
-    const prologCode = `CubeClearData('${safeCube}');`;
-
-    await this.request<void>("POST", "/api/v1/Processes", {
-      Name: procName,
-      HasSecurityAccess: false,
-      PrologProcedure: prologCode,
-      MetadataProcedure: "",
-      DataProcedure: "",
-      EpilogProcedure: "",
-      DataSource: { Type: "None" },
-    });
-
-    try {
-      await this.request<void>(
-        "POST",
-        `/api/v1/Processes('${enc(procName)}')/tm1.ExecuteWithReturn`,
-        {},
-      );
-    } finally {
-      try {
-        await this.request<void>("DELETE", `/api/v1/Processes('${enc(procName)}')`);
-      } catch (cleanupErr) {
-        this.logger.warn(
-          { proc: procName, err: String(cleanupErr) },
-          "Failed to delete ephemeral clearCube TI process — manual cleanup needed",
-        );
-      }
-    }
+    return this.cubes.clear(cubeName, dimensions, tuples);
   }
 
   // ── Cube unload ──────────────────────────────────────────────────────────
@@ -2222,11 +2096,9 @@ export class TM1Client extends TM1HttpClient {
    *
    * POST /api/v1/Cubes('{cube}')/tm1.Unload
    */
+  /** @deprecated Use `client.cubes.unload(cubeName)` instead. Removed in 2.0. */
   async unloadCube(cubeName: string): Promise<void> {
-    await this.request<void>(
-      "POST",
-      `/api/v1/Cubes('${encodeURIComponent(cubeName)}')/tm1.Unload`,
-    );
+    return this.cubes.unload(cubeName);
   }
 
   // ── Transaction log ──────────────────────────────────────────────────────

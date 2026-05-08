@@ -20,9 +20,12 @@ export interface RequestOptions {
 }
 
 export class TM1HttpClient {
-  protected readonly config: TM1Config;
+  // Public so domain Service classes (CubeService, ProcessService, ...) can
+  // read tm1Version for version-conditional code paths and emit structured
+  // logs without holding their own logger refs.
+  public readonly config: TM1Config;
+  public readonly logger: pino.Logger;
   protected readonly sessionManager: SessionManager;
-  protected readonly logger: pino.Logger;
 
   constructor(
     config: TM1Config,
@@ -44,7 +47,8 @@ export class TM1HttpClient {
    *   and a retry could spawn duplicate side-effects (e.g. parallel TI runs on tm1.Execute)
    * - On other HTTP errors: classifies and throws TM1Error
    */
-  protected async request<T = unknown>(
+  /** @internal — for Service-layer use; not part of the public consumer API. */
+  public async request<T = unknown>(
     method: string,
     path: string,
     body?: unknown,
@@ -129,7 +133,8 @@ export class TM1HttpClient {
    * Used for file content downloads where the response is CSV/TXT/etc.
    * Re-auths once on 401 like request().
    */
-  protected async requestRaw(method: string, path: string, opts?: RequestOptions): Promise<string> {
+  /** @internal — for Service-layer use; not part of the public consumer API. */
+  public async requestRaw(method: string, path: string, opts?: RequestOptions): Promise<string> {
     const url = `${this.config.baseUrl}${path}`;
     const cookie = await this.sessionManager.ensureSession();
     const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
