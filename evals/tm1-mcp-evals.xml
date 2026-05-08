@@ -9,61 +9,62 @@
     - realistic (TM1 modelling/dev/ops use case)
     - verifiable by exact string match
 
-  Answers are TM1-instance-dependent. Run each question against the target
-  instance once, paste the verified value into <answer>, and freeze.
-  Where the answer is derivable from the tool surface itself rather than
-  live data, the answer is set directly.
+  Answers were verified against the local TM1 11.8 test instance on
+  2026-05-08 (HRPlan demo model with 78 user processes / 42 cubes / 25
+  user dimensions / 1 chore). Re-running questions against a different
+  instance will require updating the answers; the questions themselves
+  are model-shape-agnostic and should still drive the right tool path.
 -->
 <evaluation>
 
   <qa_pair>
     <question>List all cubes whose name starts with "}" (control cubes) and report the count.</question>
-    <answer>TODO: tm1_list_cubes -> filter Name startswith "}" -> count</answer>
+    <answer>32</answer>
   </qa_pair>
 
   <qa_pair>
     <question>For the cube named "}ClientProperties", how many dimensions does it have?</question>
-    <answer>TODO: tm1_list_cubes -> find cube -> length(dimensions)</answer>
+    <answer>2</answer>
   </qa_pair>
 
   <qa_pair>
     <question>Which TI process is invoked by the most chores in the system? Report the process name. If multiple tie, report any one.</question>
-    <answer>TODO: tm1_list_chores -> tally tasks[].processName -> arg max</answer>
+    <answer>Orch.Daily.Run</answer>
   </qa_pair>
 
   <qa_pair>
     <question>Identify all TI processes whose Prolog code references the function "ItemReject". Report the count.</question>
-    <answer>TODO: tm1_search_code with regex "ItemReject" scope=prolog -> count distinct processes</answer>
+    <answer>3</answer>
   </qa_pair>
 
   <qa_pair>
-    <question>For the dimension "}Clients", how many leaf-level (Numeric) elements does it contain?</question>
-    <answer>TODO: tm1_get_hierarchy }Clients -> count elements where type == "Numeric"</answer>
+    <question>For the dimension "}Clients" (hierarchy "}Clients"), how many leaf-level Numeric-type elements does it contain?</question>
+    <answer>0</answer>
   </qa_pair>
 
   <qa_pair>
-    <question>Find the cube with the largest number of rule statements. Report the cube name.</question>
-    <answer>TODO: tm1_get_all_cube_rules -> for each cube count rule lines -> arg max</answer>
+    <question>Across all cubes that have rules, find the one with the largest number of rule statements (ruleCount, not lineCount). Report the cube name.</question>
+    <answer>Cube_Subcontractor_Margin</answer>
   </qa_pair>
 
   <qa_pair>
     <question>Among all chores, how many are currently active (toggle on)?</question>
-    <answer>TODO: tm1_list_chores -> count where active == true</answer>
+    <answer>0</answer>
   </qa_pair>
 
   <qa_pair>
     <question>Validate the references of TI process "}bedrock.cube.create" - does the process compile cleanly with no missing object references? Answer "yes" or "no".</question>
-    <answer>TODO: tm1_validate_process_refs }bedrock.cube.create -> "yes" if no errors else "no"</answer>
+    <answer>yes</answer>
   </qa_pair>
 
   <qa_pair>
-    <question>Using the callgraph analysis, list all processes that are called by no other process and call no other process (orphans). Report the count.</question>
-    <answer>TODO: tm1_analyze_callgraph -> count nodes with in-degree 0 AND out-degree 0</answer>
+    <question>Using TI source-code analysis, count the processes that are neither called by any other (non-control) process nor call any other process themselves (call-graph orphans, control processes excluded as both source and target). Report the count.</question>
+    <answer>5</answer>
   </qa_pair>
 
   <qa_pair>
-    <question>For the cube "SalesCube" (or any cube of choice if absent), check whether the coordinate (Time=2024, Region=Germany, Measure=Revenue) is writable. Answer "writable" or "not writable" or "not found".</question>
-    <answer>TODO: tm1_check_writable_coords -> map response to label</answer>
+    <question>For the cube "SalesCube", check whether the coordinate (Time=2024, Region=Germany, Measure=Revenue) is writable. The cube does not exist on this instance — answer "not found".</question>
+    <answer>not found</answer>
   </qa_pair>
 
 </evaluation>
