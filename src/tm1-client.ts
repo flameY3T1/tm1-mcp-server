@@ -13,6 +13,9 @@ import { ViewService } from "./tm1-client/services/view-service.js";
 import { SubsetService } from "./tm1-client/services/subset-service.js";
 import { ProcessService } from "./tm1-client/services/process-service.js";
 import { ChoreService } from "./tm1-client/services/chore-service.js";
+import { SecurityService } from "./tm1-client/services/security-service.js";
+import { ServerService } from "./tm1-client/services/server-service.js";
+import { MonitoringService } from "./tm1-client/services/monitoring-service.js";
 
 /**
  * TM1 facade. Domain-specific OData calls live in service classes
@@ -35,6 +38,9 @@ export class TM1Client extends TM1HttpClient {
   readonly elements: ElementService;
   readonly processes: ProcessService;
   readonly chores: ChoreService;
+  readonly security: SecurityService;
+  readonly server: ServerService;
+  readonly monitoring: MonitoringService;
 
   constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
     super(config, sessionManager, logger);
@@ -47,6 +53,9 @@ export class TM1Client extends TM1HttpClient {
     this.elements = new ElementService(this, this.cells);
     this.processes = new ProcessService(this);
     this.chores = new ChoreService(this);
+    this.security = new SecurityService(this);
+    this.server = new ServerService(this);
+    this.monitoring = new MonitoringService(this);
   }
 
   /**
@@ -461,16 +470,9 @@ export class TM1Client extends TM1HttpClient {
    * Get recent TM1 server message log entries.
    * GET /api/v1/MessageLogEntries?$orderby=TimeStamp desc&$top={top}
    */
+  /** @deprecated Use `client.server.getMessageLog(top)` instead. Removed in 2.0. */
   async getMessageLog(top = 100): Promise<MessageLogEntry[]> {
-    const path = `/api/v1/MessageLogEntries?$orderby=TimeStamp desc&$top=${top}`;
-    const response = await this.request<{
-      value: Array<{ TimeStamp?: string; Timestamp?: string; Level?: string; Message?: string; Text?: string }>;
-    }>("GET", path);
-    return response.value.map((e) => ({
-      timestamp: e.TimeStamp ?? e.Timestamp ?? "",
-      level: (e.Level ?? "").toUpperCase(),
-      message: e.Message ?? e.Text ?? "",
-    }));
+    return this.server.getMessageLog(top);
   }
 
   /**
@@ -480,134 +482,33 @@ export class TM1Client extends TM1HttpClient {
    * support). Sorting is filename-descending — filenames embed a yyyymmddhhmmss timestamp,
    * so lexical desc sort matches chronological newest-first.
    */
+  /** @deprecated Use `client.server.listErrorLogFiles(opts)` instead. Removed in 2.0. */
   async getErrorLogFiles(opts: { processName?: string; since?: string; top?: number } = {}): Promise<ErrorLogFile[]> {
-    const top = opts.top ?? 50;
-    const response = await this.request<{ value: Array<{ Filename?: string }> }>(
-      "GET",
-      "/api/v1/ErrorLogFiles",
-    );
-    let entries = response.value
-      .map((e): ErrorLogFile => ({ filename: e.Filename ?? "" }))
-      .filter((e) => e.filename);
-
-    if (opts.processName) {
-      const proc = opts.processName;
-      // TM1 pattern: TM1ProcessError_<ts>_<id>_<proc>.log (proc at end before .log)
-      // Legacy/manual pattern: <proc>_<ts>.log (proc at start)
-      const suffix = `_${proc}.log`;
-      const prefix = `${proc}_`;
-      entries = entries.filter(
-        (e) => e.filename.endsWith(suffix) || e.filename.startsWith(prefix) || e.filename === proc,
-      );
-    }
-    if (opts.since) {
-      const sinceCompact = opts.since.replace(/[^0-9]/g, "").slice(0, 14);
-      if (sinceCompact.length >= 8) {
-        entries = entries.filter((e) => {
-          // TM1 pattern: TM1ProcessError_YYYYMMDDHHMMSS_... — timestamp after first underscore.
-          // Fallback: any embedded YYYYMMDDHHMMSS-style group.
-          const m = e.filename.match(/(?:TM1ProcessError_|_)(\d{14})/) ?? e.filename.match(/_(\d{8,14})\.log$/i);
-          return m ? m[1] >= sinceCompact.slice(0, m[1].length) : true;
-        });
-      }
-    }
-    // Filename embeds yyyymmddhhmmss → lexical desc ≈ chronological newest-first.
-    entries.sort((a, b) => (a.filename < b.filename ? 1 : a.filename > b.filename ? -1 : 0));
-    return entries.slice(0, top);
+    return this.server.listErrorLogFiles(opts);
   }
 
-  /**
-   * Fetch the raw text content of a single TI error log file.
-   * GET /api/v1/ErrorLogFiles('<filename>')/Content
-   */
+  /** @deprecated Use `client.server.getErrorLogContent(filename)` instead. Removed in 2.0. */
   async getErrorLogContent(filename: string): Promise<string> {
-    const path = `/api/v1/ErrorLogFiles('${encodeURIComponent(filename)}')/Content`;
-    return await this.requestRaw("GET", path);
+    return this.server.getErrorLogContent(filename);
   }
 
   /**
    * List all active threads on the TM1 server.
    * GET /api/v1/Threads
    */
+  /** @deprecated Use `client.monitoring.getThreads()` instead. Removed in 2.0. */
   async getThreads(): Promise<Thread[]> {
-    const response = await this.request<{
-      value: Array<{
-        ID: number;
-        Type: number;
-        Name: string;
-        Context?: string;
-        State: string;
-        Function: string;
-        ObjectName: string;
-        ElapsedTime?: string;
-      }>;
-    }>("GET", "/api/v1/Threads?$select=ID,Type,Name,Context,State,Function,ObjectName,ElapsedTime");
-    const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
-    return response.value.map((t) => ({
-      id: t.ID,
-      type: typeNames[t.Type] ?? `Type${t.Type}`,
-      name: t.Name,
-      state: t.State,
-      function: t.Function,
-      objectName: t.ObjectName,
-      elapsedTime: t.ElapsedTime,
-      context: t.Context,
-    }));
+    return this.monitoring.getThreads();
   }
 
-  /**
-   * Cancel a running TM1 server thread.
-   * POST /api/v1/Threads({id})/tm1.CancelOperation
-   */
+  /** @deprecated Use `client.monitoring.cancelThread(threadId)` instead. Removed in 2.0. */
   async cancelThread(threadId: number): Promise<void> {
-    await this.request<void>("POST", `/api/v1/Threads(${threadId})/tm1.CancelOperation`, {});
+    return this.monitoring.cancelThread(threadId);
   }
 
-  /**
-   * List all active sessions on the TM1 server with associated user and threads.
-   * GET /api/v1/Sessions?$expand=Threads,User($select=Name)
-   */
+  /** @deprecated Use `client.monitoring.getSessions()` instead. Removed in 2.0. */
   async getSessions(): Promise<Session[]> {
-    const response = await this.request<{
-      value: Array<{
-        // TM1 v11.8 returns ID as number; v12 as string. Coerce below.
-        ID: string | number;
-        Active?: boolean;
-        User?: { Name: string };
-        Threads?: Array<{
-          ID: number;
-          Type: number | string;
-          Name: string;
-          State: string;
-          Function: string;
-          ObjectName: string;
-          ObjectType?: string;
-          LockType?: string;
-          ElapsedTime?: string;
-          WaitTime?: string;
-          Info?: string;
-        }>;
-      }>;
-    }>("GET", "/api/v1/Sessions?$expand=Threads,User($select=Name)");
-    const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
-    return response.value.map((s) => ({
-      id: String(s.ID),
-      user: s.User?.Name ?? "",
-      ...(s.Active !== undefined ? { active: s.Active } : {}),
-      threads: (s.Threads ?? []).map((t) => ({
-        id: t.ID,
-        type: typeof t.Type === "number" ? (typeNames[t.Type] ?? `Type${t.Type}`) : (t.Type ?? ""),
-        name: t.Name ?? "",
-        state: t.State ?? "",
-        function: t.Function ?? "",
-        objectName: t.ObjectName ?? "",
-        ...(t.ObjectType !== undefined ? { objectType: t.ObjectType } : {}),
-        ...(t.LockType !== undefined ? { lockType: t.LockType } : {}),
-        ...(t.ElapsedTime !== undefined ? { elapsedTime: t.ElapsedTime } : {}),
-        ...(t.WaitTime !== undefined ? { waitTime: t.WaitTime } : {}),
-        ...(t.Info !== undefined ? { info: t.Info } : {}),
-      })),
-    }));
+    return this.monitoring.getSessions();
   }
 
   // ── Scheduling methods ────────────────────────────────────────────────────
@@ -756,26 +657,9 @@ export class TM1Client extends TM1HttpClient {
   /**
    * Fetch TM1 server configuration. Merges /Configuration and /ActiveConfiguration.
    */
+  /** @deprecated Use `client.server.getInfo()` instead. Removed in 2.0. */
   async getServerInfo(): Promise<ServerInfo> {
-    const cfg = await this.request<Record<string, unknown>>("GET", "/api/v1/Configuration");
-    let active: Record<string, unknown> = {};
-    try {
-      active = await this.request<Record<string, unknown>>("GET", "/api/v1/ActiveConfiguration");
-    } catch {
-      // Some TM1 versions don't expose ActiveConfiguration — ignore.
-    }
-    const merged: Record<string, unknown> = { ...cfg, ...active };
-    delete merged["@odata.context"];
-    return {
-      serverName: String(merged.ServerName ?? ""),
-      productVersion: String(merged.ProductVersion ?? ""),
-      productEdition: merged.ProductEdition !== undefined ? String(merged.ProductEdition) : undefined,
-      adminHost: merged.AdminHost !== undefined ? String(merged.AdminHost) : undefined,
-      dataDirectory: merged.DataBaseDirectory !== undefined ? String(merged.DataBaseDirectory) : undefined,
-      timeZoneId: merged.TimeZoneID !== undefined ? String(merged.TimeZoneID) : undefined,
-      integratedSecurityMode: merged.IntegratedSecurityMode !== undefined ? String(merged.IntegratedSecurityMode) : undefined,
-      extra: merged,
-    };
+    return this.server.getInfo();
   }
 
   // ── TI development (compile) ─────────────────────────────────────────────
@@ -950,125 +834,57 @@ export class TM1Client extends TM1HttpClient {
    * Fetch recent TM1 transaction log entries (cell writes).
    * GET /api/v1/TransactionLogEntries
    */
+  /** @deprecated Use `client.server.getTransactionLog(opts)` instead. Removed in 2.0. */
   async getTransactionLog(opts: {
     top?: number;
     cubeName?: string;
     user?: string;
-    since?: string; // ISO timestamp
+    since?: string;
   }): Promise<TransactionLogEntry[]> {
-    const filters: string[] = [];
-    if (opts.cubeName) filters.push(`Cube eq '${opts.cubeName.replace(/'/g, "''")}'`);
-    if (opts.user) filters.push(`User eq '${opts.user.replace(/'/g, "''")}'`);
-    if (opts.since) filters.push(`TimeStamp ge ${opts.since}`);
-    const top = opts.top ?? 100;
-    const qs: string[] = [`$top=${top}`, `$orderby=TimeStamp desc`];
-    if (filters.length > 0) qs.push(`$filter=${encodeURIComponent(filters.join(" and "))}`);
-    const path = `/api/v1/TransactionLogEntries?${qs.join("&")}`;
-    const response = await this.request<{
-      value: Array<{
-        TimeStamp?: string;
-        User?: string;
-        Cube?: string;
-        Tuple?: string[];
-        OldValue?: CellValue;
-        NewValue?: CellValue;
-      }>;
-    }>("GET", path);
-    return response.value.map((e) => ({
-      timestamp: e.TimeStamp ?? "",
-      user: e.User ?? "",
-      cubeName: e.Cube ?? "",
-      elements: e.Tuple ?? [],
-      oldValue: e.OldValue ?? null,
-      newValue: e.NewValue ?? null,
-    }));
+    return this.server.getTransactionLog(opts);
   }
 
   // --- Security: Users (Clients) ---
   // TM1 11.8 uses /api/v1/Users (not /Clients). Tool names retain "client"
   // for backward-compatibility with the MCP surface.
 
+  /** @deprecated Use `client.security.listClients()` instead. Removed in 2.0. */
   async listClients(): Promise<Client[]> {
-    const res = await this.request<{ value: Client[] }>(
-      "GET",
-      "/api/v1/Users?$select=Name,FriendlyName,Type,Enabled&$expand=Groups",
-    );
-    return res.value;
+    return this.security.listClients();
   }
 
+  /** @deprecated Use `client.security.getClient(name)` instead. Removed in 2.0. */
   async getClient(name: string): Promise<Client> {
-    return this.request<Client>(
-      "GET",
-      `/api/v1/Users('${encodeURIComponent(name)}')?$select=Name,FriendlyName,Type,Enabled&$expand=Groups`,
-    );
+    return this.security.getClient(name);
   }
 
+  /** @deprecated Use `client.security.createClient(payload)` instead. Removed in 2.0. */
   async createClient(payload: ClientCreate): Promise<void> {
-    const body: Record<string, unknown> = {
-      Name: payload.name,
-    };
-    if (payload.password !== undefined) body.Password = payload.password;
-    if (payload.friendlyName !== undefined) body.FriendlyName = payload.friendlyName;
-    if (payload.groups !== undefined) {
-      body["Groups@odata.bind"] = payload.groups.map(
-        (g) => `Groups('${encodeURIComponent(g)}')`,
-      );
-    }
-    await this.request<void>("POST", "/api/v1/Users", body);
+    return this.security.createClient(payload);
   }
 
+  /** @deprecated Use `client.security.updateClient(name, payload)` instead. Removed in 2.0. */
   async updateClient(name: string, payload: ClientUpdate): Promise<void> {
-    const body: Record<string, unknown> = {};
-    if (payload.password !== undefined) body.Password = payload.password;
-    if (payload.friendlyName !== undefined) body.FriendlyName = payload.friendlyName;
-    if (payload.enabled !== undefined) body.Enabled = payload.enabled;
-    await this.request<void>(
-      "PATCH",
-      `/api/v1/Users('${encodeURIComponent(name)}')`,
-      body,
-    );
+    return this.security.updateClient(name, payload);
   }
 
+  /** @deprecated Use `client.security.deleteClient(name)` instead. Removed in 2.0. */
   async deleteClient(name: string): Promise<void> {
-    await this.request<void>(
-      "DELETE",
-      `/api/v1/Users('${encodeURIComponent(name)}')`,
-    );
+    return this.security.deleteClient(name);
   }
 
-  // --- Security: Groups ---
-
+  /** @deprecated Use `client.security.listGroups()` instead. Removed in 2.0. */
   async listGroups(): Promise<Group[]> {
-    // TM1 REST: Groups expose their members under the `Users` navigation
-    // property (not `Clients`, despite TM1's user-facing "Client" terminology).
-    // Verified on TM1 v11.8 — using `$expand=Clients` returns HTTP 400.
-    const res = await this.request<{ value: Array<{ Name: string; Users?: Array<{ Name: string }> }> }>(
-      "GET",
-      "/api/v1/Groups?$expand=Users($select=Name)",
-    );
-    return res.value.map((g) => ({
-      Name: g.Name,
-      Clients: g.Users ?? [],
-    }));
+    return this.security.listGroups();
   }
 
+  /** @deprecated Use `client.security.assignClientGroup(client, group)` instead. Removed in 2.0. */
   async assignClientGroup(clientName: string, groupName: string): Promise<void> {
-    // tm1py pattern: PATCH /Users('x') with Name + Groups@odata.bind
-    await this.request<void>(
-      "PATCH",
-      `/api/v1/Users('${encodeURIComponent(clientName)}')`,
-      {
-        Name: clientName,
-        "Groups@odata.bind": [`Groups('${encodeURIComponent(groupName)}')`],
-      },
-    );
+    return this.security.assignClientGroup(clientName, groupName);
   }
 
+  /** @deprecated Use `client.security.removeClientGroup(client, group)` instead. Removed in 2.0. */
   async removeClientGroup(clientName: string, groupName: string): Promise<void> {
-    // tm1py pattern: DELETE /Users('x')/Groups?$id=Groups('y')
-    await this.request<void>(
-      "DELETE",
-      `/api/v1/Users('${encodeURIComponent(clientName)}')/Groups?$id=Groups('${encodeURIComponent(groupName)}')`,
-    );
+    return this.security.removeClientGroup(clientName, groupName);
   }
 }
