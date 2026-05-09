@@ -104,4 +104,29 @@ export function normalizeErrorResult(result: McpToolResult): McpToolResult {
   };
 }
 
+// Attach a tool-context hint to any thrown error and rethrow.
+// Use to wrap an awaited TM1 call so failures carry a tool-specific
+// follow-up suggestion instead of just the generic code-derived hint.
+//
+// Example:
+//   await withToolHint(
+//     tm1Client.cubes.setRules(cube, rules),
+//     "Validate first with tm1_check_cube_rule before tm1_set_cube_rules.",
+//   );
+export async function withToolHint<T>(p: Promise<T>, hint: string): Promise<T> {
+  try {
+    return await p;
+  } catch (err) {
+    if (err instanceof TM1Error) {
+      err.hintOverride = hint;
+      throw err;
+    }
+    throw new TM1Error({
+      code: DEFAULT_CODE,
+      message: err instanceof Error ? err.message : String(err),
+      hint,
+    });
+  }
+}
+
 export type { UniformErrorPayload, McpToolResult };

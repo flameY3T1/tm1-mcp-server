@@ -20,6 +20,10 @@ export class TM1Error extends Error {
   readonly httpStatus?: number;
   readonly endpoint?: string;
   readonly details?: string;
+  // Optional tool-context override. When set, takes precedence over
+  // hintForCode(). Tools attach this via attachHint() to provide
+  // operation-specific next steps (G4 from MCP best-practices review).
+  hintOverride?: string;
 
   constructor(opts: {
     code: TM1ErrorCode;
@@ -27,6 +31,7 @@ export class TM1Error extends Error {
     httpStatus?: number;
     endpoint?: string;
     details?: string;
+    hint?: string;
   }) {
     super(opts.message);
     this.name = "TM1Error";
@@ -34,12 +39,13 @@ export class TM1Error extends Error {
     this.httpStatus = opts.httpStatus;
     this.endpoint = opts.endpoint;
     this.details = opts.details;
+    this.hintOverride = opts.hint;
   }
 
-  // Actionable next-step suggestion for an LLM agent. Maps the code to a
-  // concrete follow-up tool call rather than a vague "check your input".
+  // Actionable next-step suggestion for an LLM agent. Tool-context override
+  // wins over the generic code-derived hint.
   get hint(): string {
-    return hintForCode(this.code);
+    return this.hintOverride ?? hintForCode(this.code);
   }
 
   toErrorPayload(): {

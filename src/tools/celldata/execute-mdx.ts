@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA } from "../pagination.js";
+import { withToolHint } from "../error-format.js";
 
 export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -22,7 +23,10 @@ export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
       const all = fetchAll === true || limit === 0;
       const top = all ? undefined : limit;
       const skip = all ? undefined : offset;
-      const result = await tm1Client.cells.executeMdx(mdx, top, skip, timeoutMs ? { timeoutMs } : undefined);
+      const result = await withToolHint(
+        tm1Client.cells.executeMdx(mdx, top, skip, timeoutMs ? { timeoutMs } : undefined),
+        "MDX execution failed. Common causes: missing brackets around member names ([Dim].[Hier].[Member]), unbalanced FROM/SELECT, unknown cube. Inspect details; cross-check member names with tm1_get_hierarchy or tm1_list_cubes.",
+      );
 
       const total = result.totalCellCount;
       const count = result.cells.length;

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
+import { withToolHint } from "../error-format.js";
 
 export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -32,7 +33,10 @@ export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
           });
         }
       }
-      await tm1Client.cells.writeCells(cubeName, dimensions, cells);
+      await withToolHint(
+        tm1Client.cells.writeCells(cubeName, dimensions, cells),
+        `Cell write rejected. Common causes: writing to a consolidated cell (only N-level allowed), or rule-derived cell (read-only). Run tm1_check_writable_coords(cubeName='${cubeName}', dimensions=..., cells=...) first to filter writable coords and detect rule-overlap warnings.`,
+      );
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ success: true, cellsWritten: cells.length }) }],
       };

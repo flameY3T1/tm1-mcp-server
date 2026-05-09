@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
+import { withToolHint } from "../error-format.js";
 
 export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -18,7 +19,10 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
         .describe("Enable SKIPCHECK for performance (default: true, recommended)"),
     },
     async ({ cube, rules, skipCheck }) => {
-      await tm1Client.cubes.updateRules(cube, rules, skipCheck);
+      await withToolHint(
+        tm1Client.cubes.updateRules(cube, rules, skipCheck),
+        `Pre-flight syntax with tm1_check_cube_rule(cube='${cube}', rules=...) before set_cube_rules. Inspect details for the offending line.`,
+      );
       const lineCount = rules.split("\n").length;
       // Rule changes shift call edges (DB(), feeders) — drop callgraph TTL early.
       const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();

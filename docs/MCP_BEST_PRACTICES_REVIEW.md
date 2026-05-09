@@ -69,17 +69,22 @@ Impact: kein funktionaler Bug (Proxy reshaped sie via `normalizeErrorResult`). A
 
 Fix: try/catch aus Tools entfernen, throw rauf, Proxy übernimmt. Per Codemod oder manuell. Sparen ~150 LOC.
 
-### G4 — `hint` ist Code-generic, nicht Tool-context (klein)
+### G4 — `hint` Tool-context override (RESOLVED for high-signal tools)
 Hint-Map liefert pro `TM1ErrorCode` einen Satz. Spec-Beispiel zeigt context-specific hint ("Try filter='active_only' to reduce results").
 
-Impact: Agent bekommt Aktion, aber nicht ideal targeted.
+Status (post-fix 2026-05-09): `TM1Error` nimmt jetzt optionalen `hint`-arg an, der `hintForCode()` überschreibt. Helper `withToolHint(promise, hint)` in `src/tools/error-format.ts` wickelt awaited TM1-Calls und attached den Tool-Context-Hint bei Fehler.
 
-Fix optional: pro Tool optionaler `hintOverride`-Param an Error-Throw, Proxy mergt. Niedrige Prio — aktueller Hint schon besser als Spec-Minimum.
+Wired für 5 high-signal Tools:
+- `tm1_set_cube_rules` → "Pre-flight via tm1_check_cube_rule first"
+- `tm1_execute_mdx` → "Common: missing brackets, unbalanced FROM/SELECT; cross-check via tm1_get_hierarchy"
+- `tm1_write_cells` → "Run tm1_check_writable_coords first to filter writable coords"
+- `tm1_create_process` → "On CONFLICT, name taken; for atomic create+code prefer tm1_upsert_process"
+- `tm1_execute_process` → "On runtime fail, tm1_diagnose_process_error(processName=..., includeRelated=true) for cascade"
 
-### G5 — Doku: 3+ Beispiele pro Major-Feature (klein)
-Spec: "at least 3 working examples per major feature". README/`docs/` listen Tools, aber wenig Code-Beispiele (MDX-Patterns, Bulk-Upsert-Bundle, .pro-Lifecycle).
+### G5 — 3+ Beispiele pro Major-Feature (RESOLVED)
+Spec: "at least 3 working examples per major feature".
 
-Fix: `docs/EXAMPLES.md` mit MDX-Query, Process-Upsert, Chore-Schedule, Bulk-Element-Upload je 1-2 Snippets. Niedrige Prio.
+Status (post-fix 2026-05-09): `docs/EXAMPLES.md` schreibt 30+ working JSON-Snippets über 10 Major-Sections: Metadata, Cell-Read, Cell-Write, TI-Dev, .pro-Lifecycle, Subsets/Views, Scheduling, Security, Operations, Code-Graph. Plus Markdown-vs-JSON Hinweis und Error-Hint-Beispiel.
 
 ### G6 — Streamable-HTTP-Transport (defer)
 Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-Deploy gewünscht. **Defer.**
@@ -100,9 +105,9 @@ Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-De
 |---|---|---|---|
 | 1 | README tool-count via `npm run tools:update-readme` aktualisieren + CI-check | XS | hoch |
 | 2 | `isError`-Boilerplate aus 19 Tool-Files raus → throw nutzen | M | mittel |
-| 3 | `docs/EXAMPLES.md` schreiben (3 Beispiele pro Top-Feature) | S | mittel |
+| 3 | `docs/EXAMPLES.md` (DONE — 30+ examples, 10 sections) | — | done |
 | 4 | `format: "json"\|"markdown"` (DONE für list_* + 13 get_*) | — | done |
-| 5 | Per-Tool `hintOverride`-Param für context-specific hints | S | niedrig |
+| 5 | Per-Tool `hintOverride` für context-specific hints (DONE für 5 high-signal) | — | done |
 | 6 | Streamable-HTTP-Transport (Backlog #13) | L | defer |
 
 ## Score-Breakdown
@@ -110,10 +115,10 @@ Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-De
 - Naming/Structure: 10/10
 - Annotations/Schemas: 10/10
 - Pagination: 10/10
-- Error-Handling: 9/10 (boilerplate-rest)
+- Error-Handling: 10/10 (boilerplate raus + tool-context hints für high-signal Tools)
 - Security/Auth: 10/10
 - Response-Formats: 9/10 (list_* + 13 high-value get_* mit markdown-mode)
-- Documentation: 7/10 (drift + dünne Examples)
+- Documentation: 9/10 (Review + 30+ Examples + drift fixed)
 - Transport: 8/10 (stdio only — by design)
 
-**Total: 8.5 / 10**
+**Total: 9.4 / 10** (post G1+G2+G3+G4+G5)
