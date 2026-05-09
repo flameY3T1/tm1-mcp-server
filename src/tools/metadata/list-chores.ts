@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import type { Chore } from "../../types.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
 type ChoreCompact = {
   name: string;
@@ -22,13 +23,14 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,
+      ...FORMAT_SCHEMA,
       compact: z
         .boolean()
         .optional()
         .default(false)
         .describe("Replace processes[] with processCount (default: false)."),
     },
-    async ({ limit, offset, fetchAll, compact }) => {
+    async ({ limit, offset, fetchAll, format, compact }) => {
       const chores = await tm1Client.chores.list();
       const projected: Array<Chore | ChoreCompact> = compact
         ? chores.map((c): ChoreCompact => ({
@@ -39,9 +41,16 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
             processCount: c.processes.length,
           }))
         : chores;
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2) }],
-      };
+      const page = paginate(projected, limit, offset, fetchAll);
+      type Row = (typeof projected)[number];
+      const columns: Column<Row>[] = [
+        { header: "name", get: (c) => c.name },
+        { header: "active", get: (c) => c.active },
+        { header: "startTime", get: (c) => c.startTime },
+        { header: "frequency", get: (c) => c.frequency },
+        { header: "processes", get: (c) => ("processes" in c ? c.processes.map((p) => p.name).join(", ") : `${c.processCount} (compact)`) },
+      ];
+      return pageResponse(page, format, { title: "Chores", columns });
     },
   );
 }

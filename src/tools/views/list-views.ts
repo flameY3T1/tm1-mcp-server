@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
 export function registerListViews(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -10,15 +11,18 @@ export function registerListViews(server: McpServer, tm1Client: TM1Client): void
     {
       cubeName: z.string().describe("Cube name"),
       ...PAGINATION_SCHEMA,
+      ...FORMAT_SCHEMA,
     },
-    async ({ cubeName, limit, offset, fetchAll }) => {
+    async ({ cubeName, limit, offset, fetchAll, format }) => {
       const views = await tm1Client.views.list(cubeName);
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify(paginate(views, limit, offset, fetchAll), null, 2),
-        }],
-      };
+      const page = paginate(views, limit, offset, fetchAll);
+      type Row = (typeof views)[number];
+      const columns: Column<Row>[] = [
+        { header: "name", get: (v) => v.name },
+        { header: "scope", get: (v) => (v.private ? "private" : "public") },
+        { header: "mdx", get: (v) => v.mdx ?? "" },
+      ];
+      return pageResponse(page, format, { title: `Views of ${cubeName}`, columns });
     },
   );
 }

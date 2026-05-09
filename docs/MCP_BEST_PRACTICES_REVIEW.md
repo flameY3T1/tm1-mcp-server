@@ -33,14 +33,12 @@ Repo-Stand: commit `bdd5303` (main), 107 Tool-Files, MCP SDK 1.29.0.
 
 ## Gaps (Lücken zur Spec)
 
-### G1 — Response-Format-Duo fehlt (mittel)
+### G1 — Response-Format-Duo (RESOLVED for list_*)
 Spec: "Support both JSON and Markdown formats. JSON for programmatic, Markdown for human readability."
 
-Status: alle Tools liefern `JSON.stringify(...)` als text-content. Kein `response_format: "json"|"markdown"` Param.
+Status (post-fix 2026-05-09): alle 14 `tm1_list_*` Tools haben optionalen `format: "json"|"markdown"` Param. Default `json` = unverändertes Vor-Verhalten + Proxy `structuredContent`. `markdown` rendert eine Tabelle mit Page-Metadaten. Helper: `src/tools/format.ts` (FORMAT_SCHEMA, pageResponse, wrappedPageResponse, payloadResponse).
 
-Impact: Agent-Konsum OK (Proxy attached `structuredContent`), Mensch-Lesbarkeit von Text-Output schlecht (Roh-JSON in Chat).
-
-Fix: für list/get-Tools optionalen `format: z.enum(["json","markdown"]).default("json")` Param. Markdown-Renderer pro Domain (cubes-table, dim-tree). Niedrige Prio bis User es vermisst.
+Offen: `get_*`-Tools (z.B. `tm1_get_hierarchy`, `tm1_get_server_info`, `tm1_get_cube_rules`) haben noch keinen Markdown-Mode. Bei Bedarf via `payloadResponse` nachziehen.
 
 ### G2 — README Tool-Count-Drift (klein, schnell)
 README claimed `98 tools`. Aktuell:
@@ -93,7 +91,7 @@ Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-De
 | 1 | README tool-count via `npm run tools:update-readme` aktualisieren + CI-check | XS | hoch |
 | 2 | `isError`-Boilerplate aus 19 Tool-Files raus → throw nutzen | M | mittel |
 | 3 | `docs/EXAMPLES.md` schreiben (3 Beispiele pro Top-Feature) | S | mittel |
-| 4 | `format: "json"\|"markdown"` für list/get-Tools | L | niedrig |
+| 4 | `format: "json"\|"markdown"` für get-Tools (list_* erledigt) | M | niedrig |
 | 5 | Per-Tool `hintOverride`-Param für context-specific hints | S | niedrig |
 | 6 | Streamable-HTTP-Transport (Backlog #13) | L | defer |
 
@@ -104,7 +102,7 @@ Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-De
 - Pagination: 10/10
 - Error-Handling: 9/10 (boilerplate-rest)
 - Security/Auth: 10/10
-- Response-Formats: 6/10 (kein markdown-mode)
+- Response-Formats: 8/10 (list_* haben markdown-mode, get_* offen)
 - Documentation: 7/10 (drift + dünne Examples)
 - Transport: 8/10 (stdio only — by design)
 

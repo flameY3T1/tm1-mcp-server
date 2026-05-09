@@ -4,6 +4,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import type { Process } from "../../types.js";
 import { TM1Error } from "../../types.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
 export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -17,6 +18,7 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,
+      ...FORMAT_SCHEMA,
       includeControl: z.boolean().optional().default(false)
         .describe("Include TM1 control processes whose names start with '}' (default: false)"),
       nameContains: z.string().optional()
@@ -30,7 +32,7 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
       fields: z.array(z.enum(["name", "parameters"])).optional()
         .describe("Projection. Default: all fields. Use ['name'] to skip parameters[] and shrink payload ~10x."),
     },
-    async ({ limit, offset, fetchAll, includeControl, nameContains, nameRegex, nameNotContains, excludePattern, fields }) => {
+    async ({ limit, offset, fetchAll, format, includeControl, nameContains, nameRegex, nameNotContains, excludePattern, fields }) => {
       try {
         let processes: Process[] = await tm1Client.processes.list();
 
@@ -74,9 +76,13 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
             ? processes.map((p) => ({ name: p.name }))
             : processes;
 
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2) }],
-        };
+        const page = paginate(projected, limit, offset, fetchAll);
+        type Row = (typeof projected)[number];
+        const columns: Column<Row>[] = [
+          { header: "name", get: (p) => p.name },
+          { header: "parameters", get: (p) => ("parameters" in p ? (p.parameters?.map((x) => x.name).join(", ") ?? "") : "—") },
+        ];
+        return pageResponse(page, format, { title: "Processes", columns });
       } catch (error) {
         const msg =
           error instanceof TM1Error

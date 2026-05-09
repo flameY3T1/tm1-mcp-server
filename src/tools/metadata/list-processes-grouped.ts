@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
+import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
 
 export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -13,6 +14,7 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
       "Set includeNames=true to get the full process list per group for targeted follow-up.",
     ].join(" "),
     {
+      ...FORMAT_SCHEMA,
       includeControl: z.boolean().optional().default(false)
         .describe("Include control processes ('}'-prefixed). Default: false."),
       prefixSegments: z.number().int().min(1).max(5).optional().default(1)
@@ -24,7 +26,7 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
       excludePattern: z.string().optional()
         .describe("JS-compatible regex (case-insensitive) — drop processes whose name matches before grouping. E.g. '^Bedrock\\.' to hide Bedrock utility processes."),
     },
-    async ({ includeControl, prefixSegments, includeNames, minCount, excludePattern }) => {
+    async ({ format, includeControl, prefixSegments, includeNames, minCount, excludePattern }) => {
       try {
         let processes = await tm1Client.processes.list();
         if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
@@ -60,17 +62,21 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
 
         if (minCount !== undefined) groups = groups.filter((g) => g.count >= minCount);
 
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({
-              totalProcesses: processes.length,
-              groupCount: groups.length,
-              prefixSegments,
-              groups,
-            }, null, 2),
-          }],
+        const payload = {
+          totalProcesses: processes.length,
+          groupCount: groups.length,
+          prefixSegments,
+          groups,
         };
+        type GroupRow = (typeof groups)[number];
+        const columns: Column<GroupRow>[] = [
+          { header: "prefix", get: (g) => g.prefix },
+          { header: "count", get: (g) => g.count },
+          ...(includeNames ? [{ header: "processes", get: (g: GroupRow) => ("processes" in g ? g.processes : []) } as Column<GroupRow>] : []),
+        ];
+        return payloadResponse(payload, format, (p) =>
+          `## Processes grouped by prefix\n\n${p.totalProcesses} processes · ${p.groupCount} groups · prefixSegments=${p.prefixSegments}\n\n${renderTable(p.groups, columns)}`,
+        );
       } catch (error) {
         const msg =
           error instanceof TM1Error

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
 
 export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -13,15 +14,19 @@ export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): 
         .describe("Only logs with LastUpdated >= this ISO timestamp, e.g. '2026-05-01T00:00:00'"),
       top: z.number().int().min(1).max(500).optional().default(50)
         .describe("Max entries to return (default: 50, max: 500)"),
+      ...FORMAT_SCHEMA,
     },
-    async ({ processName, since, top }) => {
+    async ({ processName, since, top, format }) => {
       const files = await tm1Client.server.listErrorLogFiles({ processName, since, top });
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({ count: files.length, files }, null, 2),
-        }],
-      };
+      const payload = { count: files.length, files };
+      type Row = (typeof files)[number];
+      const columns: Column<Row>[] = [
+        { header: "filename", get: (f) => f.filename },
+        { header: "lastUpdated", get: (f) => f.lastUpdated ?? "" },
+      ];
+      return payloadResponse(payload, format, (p) =>
+        `## Error logs\n\n${p.count} files\n\n${renderTable(p.files, columns)}`,
+      );
     },
   );
 }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
 export function registerListDimensions(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -14,6 +15,7 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,
+      ...FORMAT_SCHEMA,
       includeControl: z
         .boolean()
         .optional()
@@ -25,12 +27,19 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
         .default(false)
         .describe("Attach `elementCounts: { hierarchyName: number }` per dimension via OData $count. Single extra server-side aggregation, no N+1. Default false."),
     },
-    async ({ limit, offset, fetchAll, includeControl, includeElementCount }) => {
+    async ({ limit, offset, fetchAll, format, includeControl, includeElementCount }) => {
       let dimensions = await tm1Client.dimensions.list({ includeElementCount });
       if (!includeControl) dimensions = dimensions.filter((d) => !d.name.startsWith("}"));
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(paginate(dimensions, limit, offset, fetchAll), null, 2) }],
-      };
+      const page = paginate(dimensions, limit, offset, fetchAll);
+      type Row = (typeof dimensions)[number];
+      const columns: Column<Row>[] = [
+        { header: "name", get: (d) => d.name },
+        { header: "hierarchies", get: (d) => d.hierarchies },
+        ...(includeElementCount
+          ? [{ header: "elementCounts", get: (d: Row) => d.elementCounts ?? {} } as Column<Row>]
+          : []),
+      ];
+      return pageResponse(page, format, { title: "Dimensions", columns });
     },
   );
 }

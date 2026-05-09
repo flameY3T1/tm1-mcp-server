@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+import { FORMAT_SCHEMA, wrappedPageResponse, type Column } from "../format.js";
 
 export function registerListFiles(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -18,15 +19,15 @@ export function registerListFiles(server: McpServer, tm1Client: TM1Client): void
         "Subfolder path (e.g. 'imports' or 'imports/2024'). Empty = root.",
       ),
       ...PAGINATION_SCHEMA,
+      ...FORMAT_SCHEMA,
     },
-    async ({ path, limit, offset, fetchAll }) => {
+    async ({ path, limit, offset, fetchAll, format }) => {
       const files = await tm1Client.files.list(path);
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({ path: path ?? "", ...paginate(files, limit, offset, fetchAll) }, null, 2),
-        }],
-      };
+      const page = paginate(files, limit, offset, fetchAll);
+      const wrapper = { path: path ?? "", ...page };
+      type Row = (typeof files)[number];
+      const columns: Column<Row>[] = [{ header: "filename", get: (f) => f }];
+      return wrappedPageResponse(wrapper, page, format, { title: `Files in /${path ?? ""}`, columns });
     },
   );
 }

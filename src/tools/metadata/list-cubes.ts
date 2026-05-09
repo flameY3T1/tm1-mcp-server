@@ -4,6 +4,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import type { Cube } from "../../types.js";
 import { TM1Error } from "../../types.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
 type CubeOut = Pick<Cube, "name"> & Partial<Pick<Cube, "dimensions" | "hasRules">>;
 
@@ -19,6 +20,7 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,
+      ...FORMAT_SCHEMA,
       includeControl: z
         .boolean()
         .optional()
@@ -51,6 +53,7 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
       limit,
       offset,
       fetchAll,
+      format,
       includeControl,
       includeDimensions,
       includeRules,
@@ -98,14 +101,13 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
           return out;
         });
 
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2),
-            },
-          ],
-        };
+        const page = paginate(projected, limit, offset, fetchAll);
+        const columns: Column<CubeOut>[] = [
+          { header: "name", get: (c) => c.name },
+          ...(includeDimensions ? [{ header: "dimensions", get: (c: CubeOut) => c.dimensions ?? [] } as Column<CubeOut>] : []),
+          ...(includeRules ? [{ header: "hasRules", get: (c: CubeOut) => c.hasRules ?? false } as Column<CubeOut>] : []),
+        ];
+        return pageResponse(page, format, { title: "Cubes", columns });
       } catch (error) {
         const msg =
           error instanceof TM1Error
