@@ -443,6 +443,35 @@ Returns 2 static + N process-code templates (one per non-control TI) + M cube-ru
 
 URLs use URI-encoding for special characters (`/`, spaces, etc.).
 
+## MCP Prompts
+
+Slash-command workflow templates surfaced by IDE clients. Each prompt briefs the LLM with a concrete tool sequence.
+
+### List
+
+```jsonrpc
+{ "jsonrpc": "2.0", "id": 1, "method": "prompts/list" }
+```
+
+### Available prompts
+
+| Name | Args | Use case |
+|---|---|---|
+| `tm1_diagnose_process` | `processName` | Root-cause failed TI: error logs → cascade → params → code → refs → callgraph |
+| `tm1_audit_cube` | `cubeName` | Read-only health audit: shape → rules → stats → object-usage → tx log |
+| `tm1_health_check` | — | Server snapshot: state, sessions, threads, error logs, message log |
+| `tm1_rules_review` | `cubeName` | Code-review rules: SKIPCHECK, FEEDERS, N/C splits, syntax check, deps |
+
+### Get a prompt
+
+```jsonrpc
+{ "jsonrpc": "2.0", "id": 2, "method": "prompts/get",
+  "params": { "name": "tm1_diagnose_process",
+              "arguments": { "processName": "Load_Sales" } } }
+```
+
+Returns one user message with the workflow text. The LLM follows it autonomously.
+
 ## Error hints
 
 Failures return uniform JSON:

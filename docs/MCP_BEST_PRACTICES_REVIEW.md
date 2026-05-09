@@ -6,9 +6,9 @@ Repo-Stand: commit `bdd5303` (main), 107 Tool-Files, MCP SDK 1.29.0.
 
 ## Verdict
 
-**9.8 / 10** (post G1–G6 + Resources). Spec-konform: stdio + Streamable-HTTP, json/markdown response-formats, tool-context hints, 30+ docs examples, isError-Boilerplate raus, Proxy-zentralisiertes Annotation/outputSchema-Routing, **MCP Resources** (URI-addressable read-only views). Restpunkt: Response-Formats sind in `list_*` + 13 high-value `get_*` wired (rest absichtlich übersprungen).
+**9.9 / 10** (post G1–G6 + Resources + Prompts). Alle 3 MCP-Primitiven implementiert. Spec-konform: stdio + Streamable-HTTP, json/markdown response-formats, tool-context hints, 30+ docs examples, isError-Boilerplate raus, Proxy-zentralisiertes Annotation/outputSchema-Routing, **MCP Resources** (URI-addressable read-only views), **MCP Prompts** (workflow-templates als Slash-Commands).
 
-Initial 2026-05-09 Verdict war 8.5 — nach Behebung G1-G6 + Resources-Layer jetzt 9.8.
+Initial 2026-05-09 Verdict war 8.5 — nach G1-G6 + Resources + Prompts jetzt 9.9.
 
 ### Resources (added post-G6)
 2 static + 2 templates über `src/resources/index.ts`:
@@ -18,6 +18,15 @@ Initial 2026-05-09 Verdict war 8.5 — nach Behebung G1-G6 + Resources-Layer jet
 - `tm1://cube/{name}/rules` (template) — rules text per cube (filtert auf `hasRules=true`)
 
 `list` callbacks enumerieren live aus TM1. URLs URI-encoded für Namen mit Sonderzeichen. Service-Layer wird wiederverwendet (kein Code-Duplikat zur Tool-Schicht — beide rufen `tm1Client.processes/cubes/server`-Methoden).
+
+### Prompts (added post-Resources)
+4 Workflow-Templates über `src/prompts/index.ts`:
+- `tm1_diagnose_process(processName)` — failed-TI walkthrough: error-logs+cascade → params → code → refs → callgraph → message-log
+- `tm1_audit_cube(cubeName)` — read-only audit: shape → rules → stats → object-usage → transaction-log
+- `tm1_health_check` (no args) — server snapshot: state → sessions → threads → error-logs → message-log
+- `tm1_rules_review(cubeName)` — code-review style: rules → syntax-check → stats → object-usage; output als unified-diff
+
+Pro Prompt: 1 user-message mit konkreter Tool-Sequenz, damit LLM Workflow nicht selbst rederivieren muss. IDE-Clients zeigen sie als Slash-Commands.
 
 ---
 

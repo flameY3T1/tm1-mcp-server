@@ -14,6 +14,7 @@ import {
   normalizeErrorResult,
   type McpToolResult,
 } from "./tools/error-format.js";
+import { registerAllPrompts } from "./prompts/index.js";
 import { registerAllResources } from "./resources/index.js";
 import { registerAllTools } from "./tools/index.js";
 import { OUTPUT_SCHEMA_MAP } from "./tools/output-schema-map.js";
@@ -247,6 +248,12 @@ async function main(): Promise<void> {
   // can `#`-reference TM1 objects in chat or browse a sidebar tree.
   registerAllResources(server, tm1Client);
   logger.info("All MCP resources registered");
+
+  // Register MCP Prompts (parameterised templates surfaced as slash-
+  // commands in IDE clients). Each prompt briefs the LLM with a concrete
+  // tool sequence for a common TM1 workflow.
+  registerAllPrompts(server);
+  logger.info("All MCP prompts registered");
 
   // Branch on transport. stdio is the default for local MCP-client setups
   // (Claude Code, Claude Desktop). http (Streamable HTTP, stateless) is for
