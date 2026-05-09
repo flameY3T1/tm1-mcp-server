@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
+import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
 
 // Maps server-side `}StatsByCube` measure-element labels (verified live on
 // TM1 v11.8) to a stable typed field name on the response. Anything not
@@ -85,8 +86,9 @@ export function registerGetCubeStats(server: McpServer, tm1Client: TM1Client) {
         .describe("Single cube name. Mutually exclusive with cubeNames."),
       cubeNames: z.array(z.string()).min(1).optional()
         .describe("Batch mode — list of cube names. Mutually exclusive with cubeName."),
+      ...FORMAT_SCHEMA,
     },
-    async ({ cubeName, cubeNames }) => {
+    async ({ cubeName, cubeNames, format }) => {
       if (cubeName !== undefined && cubeNames !== undefined) {
         return {
           content: [{
@@ -121,12 +123,18 @@ export function registerGetCubeStats(server: McpServer, tm1Client: TM1Client) {
         return { cubeName: targets[i], raw: {}, error: msg };
       });
 
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({ count: items.length, items }, null, 2),
-        }],
-      };
+      const payload = { count: items.length, items };
+      const columns: Column<CubeStatsItem>[] = [
+        { header: "cube", get: (i) => i.cubeName },
+        { header: "memoryTotal", get: (i) => i.memoryTotal ?? "" },
+        { header: "populatedNumeric", get: (i) => i.populatedNumeric ?? "" },
+        { header: "fedCells", get: (i) => i.fedCells ?? "" },
+        { header: "feederEfficiency", get: (i) => i.feederEfficiency ?? "" },
+        { header: "error", get: (i) => i.error ?? "" },
+      ];
+      return payloadResponse(payload, format, (p) =>
+        `## Cube stats\n\n${p.count} cubes\n\n${renderTable(p.items, columns)}`,
+      );
     },
   );
 }

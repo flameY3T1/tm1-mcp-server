@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
+
 export function registerGetDescendants(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_get_descendants",
@@ -18,15 +20,23 @@ export function registerGetDescendants(server: McpServer, tm1Client: TM1Client) 
         .describe("Max depth below the start element. Omit for unlimited."),
       leavesOnly: z.boolean().optional().default(false)
         .describe("Return only leaf elements (no consolidations)."),
+      ...FORMAT_SCHEMA,
     },
-    async ({ dimensionName, hierarchyName, element, depth, leavesOnly }) => {
+    async ({ dimensionName, hierarchyName, element, depth, leavesOnly, format }) => {
       const result = await tm1Client.hierarchies.getDescendants(dimensionName, hierarchyName, element, {
         ...(depth !== undefined ? { depth } : {}),
         ...(leavesOnly !== undefined ? { leavesOnly } : {}),
       });
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-      };
+      type Row = (typeof result.descendants)[number];
+      const columns: Column<Row>[] = [
+        { header: "name", get: (d) => d.name },
+        { header: "type", get: (d) => d.type },
+        { header: "level", get: (d) => d.level },
+        { header: "depth", get: (d) => d.depth },
+      ];
+      return payloadResponse(result, format, (r) =>
+        `## Descendants of ${r.element}\n\n${r.descendants.length} elements\n\n${renderTable(r.descendants, columns)}`,
+      );
     },
   );
 }

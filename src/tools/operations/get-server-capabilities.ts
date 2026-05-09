@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { FORMAT_SCHEMA, payloadResponse, renderKV } from "../format.js";
 
 // Pull a nested key path from the raw merged configuration. Returns undefined if any
 // segment is missing — TM1 versions vary in which sections they expose.
@@ -21,8 +22,8 @@ export function registerGetServerCapabilities(server: McpServer, tm1Client: TM1C
       "that drive TI behavior, MDX, rules, MTQ parallelism, job queuing, security, logging, and HTTP.",
       "Use this instead of probing TI hacks (e.g. HierarchyCreate/Destroy) to detect feature support.",
     ].join(" "),
-    {},
-    async () => {
+    { ...FORMAT_SCHEMA },
+    async ({ format }) => {
       const info = await tm1Client.server.getInfo();
       const x = (info.extra ?? {}) as Record<string, unknown>;
 
@@ -88,9 +89,9 @@ export function registerGetServerCapabilities(server: McpServer, tm1Client: TM1C
         },
       };
 
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(capabilities, null, 2) }],
-      };
+      return payloadResponse(capabilities, format, (c) =>
+        renderKV(c as unknown as Record<string, unknown>, "Server capabilities"),
+      );
     },
   );
 }

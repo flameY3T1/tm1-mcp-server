@@ -33,12 +33,22 @@ Repo-Stand: commit `bdd5303` (main), 107 Tool-Files, MCP SDK 1.29.0.
 
 ## Gaps (Lücken zur Spec)
 
-### G1 — Response-Format-Duo (RESOLVED for list_*)
+### G1 — Response-Format-Duo (RESOLVED for list_* + key get_*)
 Spec: "Support both JSON and Markdown formats. JSON for programmatic, Markdown for human readability."
 
-Status (post-fix 2026-05-09): alle 14 `tm1_list_*` Tools haben optionalen `format: "json"|"markdown"` Param. Default `json` = unverändertes Vor-Verhalten + Proxy `structuredContent`. `markdown` rendert eine Tabelle mit Page-Metadaten. Helper: `src/tools/format.ts` (FORMAT_SCHEMA, pageResponse, wrappedPageResponse, payloadResponse).
+Status (post-fix 2026-05-09):
+- alle 14 `tm1_list_*` Tools haben `format: "json"|"markdown"` Param.
+- 13 hochwertige `tm1_get_*` Tools wired: `get_server_info`, `get_server_state`, `get_server_capabilities`, `get_cube_stats`, `get_message_log`, `get_transaction_log`, `get_process_parameters`, `get_process_variables`, `get_process_datasource`, `get_ancestors`, `get_descendants`, `get_element_attribute_values`, `get_client`.
 
-Offen: `get_*`-Tools (z.B. `tm1_get_hierarchy`, `tm1_get_server_info`, `tm1_get_cube_rules`) haben noch keinen Markdown-Mode. Bei Bedarf via `payloadResponse` nachziehen.
+Helper: `src/tools/format.ts` (FORMAT_SCHEMA, pageResponse, wrappedPageResponse, payloadResponse, renderTable, renderKV).
+
+Default `json` = unverändert + Proxy `structuredContent`. `markdown` rendert Table/KV mit Titel + Metadaten.
+
+Bewusst übersprungen (Markdown-Mode bringt wenig):
+- Skalar/Single-Value: `get_cell_value`
+- Komplex/Hierarchisch: `get_hierarchy`, `get_view`, `get_view_definition`, `get_subset`
+- Bereits-Text: `get_process_code`, `get_cube_rules`, `get_file_content`, `get_error_log_content`, `get_knowledge`
+- Bulk-Aggregate: `get_all_cube_rules`, `get_all_processes_code`
 
 ### G2 — README Tool-Count-Drift (klein, schnell)
 README claimed `98 tools`. Aktuell:
@@ -91,7 +101,7 @@ Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-De
 | 1 | README tool-count via `npm run tools:update-readme` aktualisieren + CI-check | XS | hoch |
 | 2 | `isError`-Boilerplate aus 19 Tool-Files raus → throw nutzen | M | mittel |
 | 3 | `docs/EXAMPLES.md` schreiben (3 Beispiele pro Top-Feature) | S | mittel |
-| 4 | `format: "json"\|"markdown"` für get-Tools (list_* erledigt) | M | niedrig |
+| 4 | `format: "json"\|"markdown"` (DONE für list_* + 13 get_*) | — | done |
 | 5 | Per-Tool `hintOverride`-Param für context-specific hints | S | niedrig |
 | 6 | Streamable-HTTP-Transport (Backlog #13) | L | defer |
 
@@ -102,7 +112,7 @@ Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-De
 - Pagination: 10/10
 - Error-Handling: 9/10 (boilerplate-rest)
 - Security/Auth: 10/10
-- Response-Formats: 8/10 (list_* haben markdown-mode, get_* offen)
+- Response-Formats: 9/10 (list_* + 13 high-value get_* mit markdown-mode)
 - Documentation: 7/10 (drift + dünne Examples)
 - Transport: 8/10 (stdio only — by design)
 

@@ -38,6 +38,35 @@ function mdEscape(v: unknown): string {
   return s.replace(/\|/g, "\\|").replace(/\n/g, " ").replace(/\r/g, "");
 }
 
+// Render an object as a 2-column key/value Markdown table.
+// Nested objects become indented sub-tables; scalars stringify directly.
+export function renderKV(obj: Record<string, unknown>, title?: string): string {
+  const lines: string[] = [];
+  if (title) lines.push(`## ${title}`, "");
+  lines.push("| key | value |", "| --- | --- |");
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) {
+      lines.push(`| ${k} | _(none)_ |`);
+    } else if (Array.isArray(v)) {
+      lines.push(`| ${k} | ${mdEscape(v)} |`);
+    } else if (typeof v === "object") {
+      lines.push(`| **${k}** | _(see below)_ |`);
+    } else {
+      lines.push(`| ${k} | ${mdEscape(v)} |`);
+    }
+  }
+  for (const [k, v] of Object.entries(obj)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      lines.push("", `### ${k}`, "");
+      lines.push("| key | value |", "| --- | --- |");
+      for (const [k2, v2] of Object.entries(v as Record<string, unknown>)) {
+        lines.push(`| ${k2} | ${mdEscape(v2)} |`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
 export function renderTable<T>(rows: readonly T[], columns: Column<T>[]): string {
   if (rows.length === 0) return "_(no rows)_";
   const headers = columns.map((c) => c.header);

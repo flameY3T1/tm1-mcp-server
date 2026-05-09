@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { FORMAT_SCHEMA, payloadResponse, renderKV } from "../format.js";
 
 // Pull a nested key path from the raw merged configuration.
 function pick(extra: Record<string, unknown>, path: string[]): unknown {
@@ -25,8 +26,8 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
       "and object counts for cubes, dimensions, processes, chores, and clients.",
       "All fetches run in parallel; per-bucket failures are reported as count: null with an error message instead of failing the whole call.",
     ].join(" "),
-    {},
-    async () => {
+    { ...FORMAT_SCHEMA },
+    async ({ format }) => {
       const [infoRes, cubesRes, dimsRes, procsRes, choresRes, clientsRes] = await Promise.allSettled([
         tm1Client.server.getInfo(),
         tm1Client.cubes.list(),
@@ -70,9 +71,9 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
         },
       };
 
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(state, null, 2) }],
-      };
+      return payloadResponse(state, format, (s) =>
+        renderKV(s as unknown as Record<string, unknown>, "Server state"),
+      );
     },
   );
 }
