@@ -70,6 +70,33 @@ Copy `mcp.json.example` to `.mcp.json` (project-local) or merge into
 
 Restart Claude Code → server name `tm1` available.
 
+## HTTP transport (Streamable, stateless)
+
+Default transport is **stdio** (best for local Claude Code / Claude Desktop).
+For multi-client / remote setups, switch to MCP **Streamable HTTP**:
+
+```env
+TM1_MCP_TRANSPORT=http
+TM1_MCP_HTTP_HOST=127.0.0.1   # default — bind loopback only
+TM1_MCP_HTTP_PORT=3000        # default
+```
+
+Then `npm start` exposes a single `POST /mcp` endpoint speaking JSON-RPC
+(stateless mode, no session IDs). DNS-rebinding protection is on by default
+and `Host`/`Origin` are validated against `allowedHosts: [host:port,
+127.0.0.1, localhost]`.
+
+```bash
+curl -X POST http://127.0.0.1:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
+```
+
+> Setting `TM1_MCP_HTTP_HOST=0.0.0.0` exposes the server (and your TM1
+> credentials) to the LAN — only do this behind a reverse proxy with
+> additional auth.
+
 ### Security
 
 - Keep `TM1_PASSWORD` and any other secret only in `.env` (gitignored).

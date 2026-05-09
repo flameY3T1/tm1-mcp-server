@@ -1,8 +1,10 @@
 import "dotenv/config";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type pino from "pino";
-import { loadConfig } from "./config.js";
+import { loadConfig, type TM1Config } from "./config.js";
 import { createLogger } from "./logger.js";
 import { SessionManager } from "./session-manager.js";
 import { TM1Client } from "./tm1-client.js";
@@ -121,6 +123,90 @@ function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
   }) as McpServer;
 }
 
+// stdio transport: existing Claude-Code/Desktop entry path.
+async function startStdioTransport(
+  server: McpServer,
+  logger: pino.Logger,
+): Promise<() => Promise<void>> {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  logger.info("MCP server listening on stdio");
+  return async () => {
+    await transport.close();
+  };
+}
+
+// Streamable HTTP transport (stateless JSON, single /mcp endpoint). Per MCP
+// best practices: bind 127.0.0.1 by default and enable DNS rebinding
+// protection. allowedHosts/Origins narrow what the underlying transport will
+// accept on incoming requests.
+async function startHttpTransport(
+  server: McpServer,
+  config: TM1Config,
+  logger: pino.Logger,
+): Promise<() => Promise<void>> {
+  const allowedHost = `${config.httpHost}:${config.httpPort}`;
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless mode
+    enableDnsRebindingProtection: true,
+    allowedHosts: [allowedHost, "127.0.0.1", "localhost"],
+  });
+  await server.connect(transport);
+
+  const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    if (!req.url || !req.url.startsWith("/mcp")) {
+      res.statusCode = 404;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ error: "Not found. Use POST /mcp." }));
+      return;
+    }
+    let body: unknown;
+    if (req.method === "POST") {
+      try {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : (chunk as Buffer));
+        }
+        const raw = Buffer.concat(chunks).toString("utf8");
+        body = raw ? JSON.parse(raw) : undefined;
+      } catch (err) {
+        logger.warn({ err }, "Bad JSON in /mcp body");
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ error: "Invalid JSON" }));
+        return;
+      }
+    }
+    try {
+      await transport.handleRequest(req, res, body);
+    } catch (err) {
+      logger.error({ err }, "Transport handleRequest threw");
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ error: "Internal transport error" }));
+      }
+    }
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once("error", reject);
+    httpServer.listen(config.httpPort, config.httpHost, () => {
+      httpServer.off("error", reject);
+      resolve();
+    });
+  });
+  logger.info(
+    { host: config.httpHost, port: config.httpPort, endpoint: "/mcp" },
+    "MCP server listening on HTTP (Streamable, stateless)",
+  );
+
+  return async () => {
+    await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    await transport.close();
+  };
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
@@ -155,10 +241,13 @@ async function main(): Promise<void> {
   registerAllTools(withAnnotations(server, logger), tm1Client);
   logger.info("All MCP tools registered");
 
-  // Start stdio transport
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  logger.info("MCP server listening on stdio");
+  // Branch on transport. stdio is the default for local MCP-client setups
+  // (Claude Code, Claude Desktop). http (Streamable HTTP, stateless) is for
+  // remote/multi-client deploys; binds to 127.0.0.1 by default with DNS-
+  // rebinding protection per MCP spec recommendation.
+  const httpCloser = config.transport === "http"
+    ? await startHttpTransport(server, config, logger)
+    : await startStdioTransport(server, logger);
 
   // Graceful shutdown — ensure TM1 session is always cleaned up.
   let shuttingDown = false;
@@ -166,6 +255,11 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info({ signal }, "Shutting down TM1 MCP Server");
+    try {
+      await httpCloser?.();
+    } catch (err) {
+      logger.error({ err }, "Error closing transport");
+    }
     try {
       await tm1Client.disconnect();
     } catch (err) {
@@ -178,15 +272,19 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGHUP", () => shutdown("SIGHUP"));
 
-  // Parent process death — common for MCP stdio servers.
-  process.stdin.on("end", () => {
-    logger.info("stdin ended (parent process gone), shutting down");
-    void shutdown("stdin-end");
-  });
-  process.stdin.on("close", () => {
-    logger.info("stdin closed, shutting down");
-    void shutdown("stdin-close");
-  });
+  // Parent process death — only meaningful on stdio (Claude spawns us as a
+  // child). For http we ignore stdin events since the process lifecycle is
+  // independent.
+  if (config.transport === "stdio") {
+    process.stdin.on("end", () => {
+      logger.info("stdin ended (parent process gone), shutting down");
+      void shutdown("stdin-end");
+    });
+    process.stdin.on("close", () => {
+      logger.info("stdin closed, shutting down");
+      void shutdown("stdin-close");
+    });
+  }
 
   // Last resort — try to clean up the TM1 session on uncaught errors.
   process.on("uncaughtException", (err) => {

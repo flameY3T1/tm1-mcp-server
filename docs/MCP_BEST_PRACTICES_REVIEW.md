@@ -6,7 +6,9 @@ Repo-Stand: commit `bdd5303` (main), 107 Tool-Files, MCP SDK 1.29.0.
 
 ## Verdict
 
-**8.5 / 10.** Solide Basis, post-2.0.0 Service-Split sauber, Cross-Cutting via Proxy zentralisiert. Hauptlücken: Response-Format-Duo (json/markdown), README-Drift, restliches `isError`-Boilerplate.
+**9.7 / 10** (post G1–G6). Spec-konform: stdio + Streamable-HTTP, json/markdown response-formats, tool-context hints, 30+ docs examples, isError-Boilerplate raus, Proxy-zentralisiertes Annotation/outputSchema-Routing. Restpunkt: Response-Formats sind in `list_*` + 13 high-value `get_*` wired (rest absichtlich übersprungen — Markdown würde nichts bringen).
+
+Initial 2026-05-09 Verdict war 8.5 — nach Behebung G1-G6 jetzt 9.7.
 
 ---
 
@@ -86,8 +88,12 @@ Spec: "at least 3 working examples per major feature".
 
 Status (post-fix 2026-05-09): `docs/EXAMPLES.md` schreibt 30+ working JSON-Snippets über 10 Major-Sections: Metadata, Cell-Read, Cell-Write, TI-Dev, .pro-Lifecycle, Subsets/Views, Scheduling, Security, Operations, Code-Graph. Plus Markdown-vs-JSON Hinweis und Error-Hint-Beispiel.
 
-### G6 — Streamable-HTTP-Transport (defer)
-Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-Deploy gewünscht. **Defer.**
+### G6 — Streamable-HTTP-Transport (RESOLVED)
+Status (post-fix 2026-05-09): zweite Transport-Option implementiert. `TM1_MCP_TRANSPORT=http` aktiviert `StreamableHTTPServerTransport` in stateless-JSON-Mode mit DNS-Rebinding-Protection (allowedHosts: `host:port`, `127.0.0.1`, `localhost`). Bind-Default `127.0.0.1`. Endpoint `POST /mcp`.
+
+Konfig-vars: `TM1_MCP_TRANSPORT` (`stdio`|`http`, default `stdio`), `TM1_MCP_HTTP_HOST` (default `127.0.0.1`), `TM1_MCP_HTTP_PORT` (default 3000). README + EXAMPLES.md dokumentieren mit curl-Probe.
+
+Stdio bleibt Default für Claude Code / Desktop. HTTP für Multi-Client / Cloud-Deploy.
 
 ---
 
@@ -108,7 +114,7 @@ Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-De
 | 3 | `docs/EXAMPLES.md` (DONE — 30+ examples, 10 sections) | — | done |
 | 4 | `format: "json"\|"markdown"` (DONE für list_* + 13 get_*) | — | done |
 | 5 | Per-Tool `hintOverride` für context-specific hints (DONE für 5 high-signal) | — | done |
-| 6 | Streamable-HTTP-Transport (Backlog #13) | L | defer |
+| 6 | Streamable-HTTP-Transport (DONE — stateless JSON, DNS-rebinding protect) | — | done |
 
 ## Score-Breakdown
 
@@ -119,6 +125,6 @@ Backlog #13. stdio reicht für 1-User-Setup. HTTP nur wenn Multi-Client/Cloud-De
 - Security/Auth: 10/10
 - Response-Formats: 9/10 (list_* + 13 high-value get_* mit markdown-mode)
 - Documentation: 9/10 (Review + 30+ Examples + drift fixed)
-- Transport: 8/10 (stdio only — by design)
+- Transport: 10/10 (stdio + Streamable-HTTP stateless mit DNS-rebinding protect)
 
-**Total: 9.4 / 10** (post G1+G2+G3+G4+G5)
+**Total: 9.7 / 10** (post G1+G2+G3+G4+G5+G6)

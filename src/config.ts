@@ -10,9 +10,13 @@ export interface TM1Config {
   logLevel: "debug" | "info" | "warn" | "error";
   logFile?: string;
   tm1Version: string;
+  transport: "stdio" | "http";
+  httpHost: string;
+  httpPort: number;
 }
 
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+const VALID_TRANSPORTS = ["stdio", "http"] as const;
 
 export function loadConfig(): TM1Config {
   const baseUrl = process.env.TM1_BASE_URL;
@@ -60,6 +64,17 @@ export function loadConfig(): TM1Config {
 
   const tm1Version = process.env.TM1_VERSION || "11.8";
 
+  const transportRaw = process.env.TM1_MCP_TRANSPORT ?? "stdio";
+  const transport = VALID_TRANSPORTS.includes(transportRaw as typeof VALID_TRANSPORTS[number])
+    ? (transportRaw as TM1Config["transport"])
+    : "stdio";
+
+  // Default to loopback. Binding to 0.0.0.0 must be opt-in to avoid exposing
+  // a TM1-credentialed MCP server to the LAN by accident.
+  const httpHost = process.env.TM1_MCP_HTTP_HOST || "127.0.0.1";
+  const httpPortRaw = process.env.TM1_MCP_HTTP_PORT;
+  const httpPort = httpPortRaw ? parseInt(httpPortRaw, 10) : 3000;
+
   return {
     baseUrl: baseUrl!,
     user: user!,
@@ -70,5 +85,8 @@ export function loadConfig(): TM1Config {
     logLevel,
     logFile,
     tm1Version,
+    transport,
+    httpHost,
+    httpPort,
   };
 }
