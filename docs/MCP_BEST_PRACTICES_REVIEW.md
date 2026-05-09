@@ -6,9 +6,18 @@ Repo-Stand: commit `bdd5303` (main), 107 Tool-Files, MCP SDK 1.29.0.
 
 ## Verdict
 
-**9.7 / 10** (post G1–G6). Spec-konform: stdio + Streamable-HTTP, json/markdown response-formats, tool-context hints, 30+ docs examples, isError-Boilerplate raus, Proxy-zentralisiertes Annotation/outputSchema-Routing. Restpunkt: Response-Formats sind in `list_*` + 13 high-value `get_*` wired (rest absichtlich übersprungen — Markdown würde nichts bringen).
+**9.8 / 10** (post G1–G6 + Resources). Spec-konform: stdio + Streamable-HTTP, json/markdown response-formats, tool-context hints, 30+ docs examples, isError-Boilerplate raus, Proxy-zentralisiertes Annotation/outputSchema-Routing, **MCP Resources** (URI-addressable read-only views). Restpunkt: Response-Formats sind in `list_*` + 13 high-value `get_*` wired (rest absichtlich übersprungen).
 
-Initial 2026-05-09 Verdict war 8.5 — nach Behebung G1-G6 jetzt 9.7.
+Initial 2026-05-09 Verdict war 8.5 — nach Behebung G1-G6 + Resources-Layer jetzt 9.8.
+
+### Resources (added post-G6)
+2 static + 2 templates über `src/resources/index.ts`:
+- `tm1://server/info` (static) — config snapshot
+- `tm1://server/state` (static) — health + counts
+- `tm1://process/{name}/code` (template) — TI source per process
+- `tm1://cube/{name}/rules` (template) — rules text per cube (filtert auf `hasRules=true`)
+
+`list` callbacks enumerieren live aus TM1. URLs URI-encoded für Namen mit Sonderzeichen. Service-Layer wird wiederverwendet (kein Code-Duplikat zur Tool-Schicht — beide rufen `tm1Client.processes/cubes/server`-Methoden).
 
 ---
 

@@ -14,6 +14,7 @@ import {
   normalizeErrorResult,
   type McpToolResult,
 } from "./tools/error-format.js";
+import { registerAllResources } from "./resources/index.js";
 import { registerAllTools } from "./tools/index.js";
 import { OUTPUT_SCHEMA_MAP } from "./tools/output-schema-map.js";
 import { NAME, VERSION } from "./version.js";
@@ -240,6 +241,12 @@ async function main(): Promise<void> {
   // annotation hint from ANNOTATION_MAP without editing call sites.
   registerAllTools(withAnnotations(server, logger), tm1Client);
   logger.info("All MCP tools registered");
+
+  // Register MCP Resources (URI-addressable read-only views over TM1
+  // objects). Mirrors a subset of the get_* tool surface so IDE clients
+  // can `#`-reference TM1 objects in chat or browse a sidebar tree.
+  registerAllResources(server, tm1Client);
+  logger.info("All MCP resources registered");
 
   // Branch on transport. stdio is the default for local MCP-client setups
   // (Claude Code, Claude Desktop). http (Streamable HTTP, stateless) is for

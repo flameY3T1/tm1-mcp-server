@@ -408,6 +408,41 @@ Add `format: "markdown"` to any list_* tool or to these get_* tools for human-re
 
 Default `json` is preferred for agent consumption — the Proxy parses it into `structuredContent` so typed clients can consume the payload directly.
 
+## MCP Resources
+
+Beyond tools, the server exposes URI-addressable read-only resources. IDE clients (Kiro, VSCode Copilot Chat) can `#`-reference them in chat or browse a sidebar tree.
+
+### List all resources
+
+```jsonrpc
+{ "jsonrpc": "2.0", "id": 1, "method": "resources/list" }
+```
+
+Returns 2 static + N process-code templates (one per non-control TI) + M cube-rules templates (one per cube with rules).
+
+### Static resources
+
+| URI | Mime | Content |
+|---|---|---|
+| `tm1://server/info` | application/json | full TM1 server config (matches `tm1_get_server_info`) |
+| `tm1://server/state` | application/json | health snapshot: connected, version, object counts |
+
+### Resource templates (dynamic)
+
+| Template | Mime | Content |
+|---|---|---|
+| `tm1://process/{name}/code` | application/json | Prolog/Metadata/Data/Epilog of TI process |
+| `tm1://cube/{name}/rules` | text/plain | rules text (SKIPCHECK + FEEDERS) |
+
+### Read example
+
+```jsonrpc
+{ "jsonrpc": "2.0", "id": 2, "method": "resources/read",
+  "params": { "uri": "tm1://process/Load_Sales/code" } }
+```
+
+URLs use URI-encoding for special characters (`/`, spaces, etc.).
+
 ## Error hints
 
 Failures return uniform JSON:
