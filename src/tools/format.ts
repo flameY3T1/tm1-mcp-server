@@ -96,10 +96,16 @@ export function renderPage<T>(page: Page<T>, opts: PageRenderOpts<T>): string {
 interface TextResult {
   [x: string]: unknown;
   content: Array<{ type: "text"; text: string }>;
+  structuredContent?: { [k: string]: unknown };
 }
 
 // Page payload as either JSON (default, Proxy → structuredContent) or
 // Markdown table (for human display).
+//
+// In markdown mode we also attach `structuredContent` directly so tools that
+// declare `outputSchema` still satisfy the SDK's "outputSchema requires
+// structuredContent" validation — agents get typed data and the markdown
+// renders for humans.
 export function pageResponse<T>(
   page: Page<T>,
   format: ResponseFormat,
@@ -108,6 +114,7 @@ export function pageResponse<T>(
   if (format === "markdown") {
     return {
       content: [{ type: "text" as const, text: renderPage(page, opts) }],
+      structuredContent: page as unknown as { [k: string]: unknown },
     };
   }
   return {
@@ -128,6 +135,7 @@ export function wrappedPageResponse<T>(
   if (format === "markdown") {
     return {
       content: [{ type: "text" as const, text: renderPage(page, opts) }],
+      structuredContent: wrapper as { [k: string]: unknown },
     };
   }
   return {
@@ -143,7 +151,10 @@ export function payloadResponse<T>(
   renderMarkdown: (p: T) => string,
 ): TextResult {
   if (format === "markdown") {
-    return { content: [{ type: "text" as const, text: renderMarkdown(payload) }] };
+    return {
+      content: [{ type: "text" as const, text: renderMarkdown(payload) }],
+      structuredContent: payload as unknown as { [k: string]: unknown },
+    };
   }
   return {
     content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
