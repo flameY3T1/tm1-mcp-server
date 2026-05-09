@@ -14,24 +14,20 @@ export function registerClearCube(server: McpServer, tm1Client: TM1Client): void
       ),
     },
     async ({ cubeName, dimensions, tuples }) => {
-      try {
-        if (dimensions.length !== tuples.length) {
-          return {
-            isError: true,
-            content: [{
-              type: "text",
-              text: `dimensions (${dimensions.length}) and tuples (${tuples.length}) must have the same length.`,
-            }],
-          };
-        }
-        await tm1Client.cubes.clear(cubeName, dimensions, tuples);
-        const summary = dimensions
-          .map((d, i) => `${d}=${tuples[i].length === 0 ? "*" : tuples[i].join("|")}`)
-          .join(", ");
-        return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, cubeName, summary }, null, 2) }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
+      if (dimensions.length !== tuples.length) {
+        return {
+          isError: true,
+          content: [{
+            type: "text",
+            text: `dimensions (${dimensions.length}) and tuples (${tuples.length}) must have the same length.`,
+          }],
+        };
       }
+      await tm1Client.cubes.clear(cubeName, dimensions, tuples);
+      const summary = dimensions
+        .map((d, i) => `${d}=${tuples[i].length === 0 ? "*" : tuples[i].join("|")}`)
+        .join(", ");
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, cubeName, summary }, null, 2) }] };
     },
   );
 }

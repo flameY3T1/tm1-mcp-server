@@ -9,17 +9,13 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
     "List active threads on the TM1 server (running processes, chores, MDX queries, etc.). Paginated (default 50/page).",
     { ...PAGINATION_SCHEMA },
     async ({ limit, offset, fetchAll }) => {
-      try {
-        const threads = await tm1Client.monitoring.getThreads();
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify(paginate(threads, limit, offset, fetchAll), null, 2),
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const threads = await tm1Client.monitoring.getThreads();
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(paginate(threads, limit, offset, fetchAll), null, 2),
+        }],
+      };
     },
   );
 
@@ -30,12 +26,8 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
       id: z.number().int().describe("Thread ID to cancel"),
     },
     async ({ id }) => {
-      try {
-        await tm1Client.monitoring.cancelThread(id);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, threadId: id }, null, 2) }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      await tm1Client.monitoring.cancelThread(id);
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, threadId: id }, null, 2) }] };
     },
   );
 }

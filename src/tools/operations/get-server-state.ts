@@ -27,56 +27,52 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
     ].join(" "),
     {},
     async () => {
-      try {
-        const [infoRes, cubesRes, dimsRes, procsRes, choresRes, clientsRes] = await Promise.allSettled([
-          tm1Client.server.getInfo(),
-          tm1Client.cubes.list(),
-          tm1Client.dimensions.list(),
-          tm1Client.processes.list(),
-          tm1Client.chores.list(),
-          tm1Client.security.listClients(),
-        ]);
+      const [infoRes, cubesRes, dimsRes, procsRes, choresRes, clientsRes] = await Promise.allSettled([
+        tm1Client.server.getInfo(),
+        tm1Client.cubes.list(),
+        tm1Client.dimensions.list(),
+        tm1Client.processes.list(),
+        tm1Client.chores.list(),
+        tm1Client.security.listClients(),
+      ]);
 
-        const info = infoRes.status === "fulfilled" ? infoRes.value : null;
-        const x = (info?.extra ?? {}) as Record<string, unknown>;
+      const info = infoRes.status === "fulfilled" ? infoRes.value : null;
+      const x = (info?.extra ?? {}) as Record<string, unknown>;
 
-        const state = {
-          connected: tm1Client.isConnected(),
-          server: info
-            ? {
-                name: info.serverName,
-                productVersion: info.productVersion,
-                dataDirectory: info.dataDirectory,
-                timeZoneId: info.timeZoneId,
-              }
-            : { error: (infoRes as PromiseRejectedResult).reason?.message ?? String((infoRes as PromiseRejectedResult).reason) },
-          capabilities: info
-            ? {
-                enableNewHierarchyCreation: pick(x, ["Modelling", "EnableNewHierarchyCreation"]),
-                allowSeparateNandCRules: pick(x, ["Modelling", "Rules", "AllowSeparateNandCRules"]),
-                mtqUseAllThreads: pick(x, ["Performance", "MTQ", "UseAllThreads"]),
-                mtqNumberOfThreads: pick(x, ["Performance", "MTQ", "NumberOfThreadsToUse"]),
-                jobQueuingEnabled: pick(x, ["Performance", "JobQueuing", "Enable"]),
-                jobQueuingThreadPoolSize: pick(x, ["Performance", "JobQueuing", "ThreadPoolSize"]),
-                disableSandboxing: pick(x, ["Administration", "DisableSandboxing"]) ?? pick(x, ["DisableSandboxing"]),
-                loggingDirectory: pick(x, ["Administration", "DebugLog", "LoggingDirectory"]),
-              }
-            : null,
-          counts: {
-            cubes: settleCount(cubesRes),
-            dimensions: settleCount(dimsRes),
-            processes: settleCount(procsRes),
-            chores: settleCount(choresRes),
-            clients: settleCount(clientsRes),
-          },
-        };
+      const state = {
+        connected: tm1Client.isConnected(),
+        server: info
+          ? {
+              name: info.serverName,
+              productVersion: info.productVersion,
+              dataDirectory: info.dataDirectory,
+              timeZoneId: info.timeZoneId,
+            }
+          : { error: (infoRes as PromiseRejectedResult).reason?.message ?? String((infoRes as PromiseRejectedResult).reason) },
+        capabilities: info
+          ? {
+              enableNewHierarchyCreation: pick(x, ["Modelling", "EnableNewHierarchyCreation"]),
+              allowSeparateNandCRules: pick(x, ["Modelling", "Rules", "AllowSeparateNandCRules"]),
+              mtqUseAllThreads: pick(x, ["Performance", "MTQ", "UseAllThreads"]),
+              mtqNumberOfThreads: pick(x, ["Performance", "MTQ", "NumberOfThreadsToUse"]),
+              jobQueuingEnabled: pick(x, ["Performance", "JobQueuing", "Enable"]),
+              jobQueuingThreadPoolSize: pick(x, ["Performance", "JobQueuing", "ThreadPoolSize"]),
+              disableSandboxing: pick(x, ["Administration", "DisableSandboxing"]) ?? pick(x, ["DisableSandboxing"]),
+              loggingDirectory: pick(x, ["Administration", "DebugLog", "LoggingDirectory"]),
+            }
+          : null,
+        counts: {
+          cubes: settleCount(cubesRes),
+          dimensions: settleCount(dimsRes),
+          processes: settleCount(procsRes),
+          chores: settleCount(choresRes),
+          clients: settleCount(clientsRes),
+        },
+      };
 
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(state, null, 2) }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(state, null, 2) }],
+      };
     },
   );
 }

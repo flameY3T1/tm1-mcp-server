@@ -15,26 +15,22 @@ export function registerCheckCubeRule(server: McpServer, tm1Client: TM1Client): 
       rules: z.string().describe("Full rules text to validate (must include SKIPCHECK; / FEEDERS; structure if used)"),
     },
     async ({ cube, rules }) => {
-      try {
-        const errors = await tm1Client.cubes.checkRule(cube, rules);
-        const ok = errors.length === 0;
-        const payload = {
-          ok,
-          cube,
-          lineCount: rules.split("\n").length,
-          errorCount: errors.length,
-          errors: errors.map((e) => ({
-            lineNumber: e.lineNumber,
-            message: e.message,
-          })),
-        };
-        return {
-          isError: !ok || undefined,
-          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const errors = await tm1Client.cubes.checkRule(cube, rules);
+      const ok = errors.length === 0;
+      const payload = {
+        ok,
+        cube,
+        lineCount: rules.split("\n").length,
+        errorCount: errors.length,
+        errors: errors.map((e) => ({
+          lineNumber: e.lineNumber,
+          message: e.message,
+        })),
+      };
+      return {
+        isError: !ok || undefined,
+        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+      };
     },
   );
 }

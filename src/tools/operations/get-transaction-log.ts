@@ -15,17 +15,13 @@ export function registerGetTransactionLog(server: McpServer, tm1Client: TM1Clien
         .describe("Only entries on or after this ISO timestamp, e.g. '2026-04-17T00:00:00'"),
     },
     async ({ top, cubeName, user, since }) => {
-      try {
-        const entries = await tm1Client.server.getTransactionLog({ top, cubeName, user, since });
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({ count: entries.length, entries }, null, 2),
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const entries = await tm1Client.server.getTransactionLog({ top, cubeName, user, since });
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ count: entries.length, entries }, null, 2),
+        }],
+      };
     },
   );
 }

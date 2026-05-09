@@ -10,21 +10,17 @@ export function registerCompileProcess(server: McpServer, tm1Client: TM1Client):
       name: z.string().describe("TI process name to compile"),
     },
     async ({ name }) => {
-      try {
-        const result = await tm1Client.processes.compile(name);
-        const payload = {
-          ok: result.success,
-          processName: name,
-          errorCount: result.errors.length,
-          errors: result.errors,
-        };
-        return {
-          isError: !result.success || undefined,
-          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const result = await tm1Client.processes.compile(name);
+      const payload = {
+        ok: result.success,
+        processName: name,
+        errorCount: result.errors.length,
+        errors: result.errors,
+      };
+      return {
+        isError: !result.success || undefined,
+        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+      };
     },
   );
 }

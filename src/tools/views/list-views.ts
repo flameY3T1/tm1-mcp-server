@@ -12,17 +12,13 @@ export function registerListViews(server: McpServer, tm1Client: TM1Client): void
       ...PAGINATION_SCHEMA,
     },
     async ({ cubeName, limit, offset, fetchAll }) => {
-      try {
-        const views = await tm1Client.views.list(cubeName);
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify(paginate(views, limit, offset, fetchAll), null, 2),
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const views = await tm1Client.views.list(cubeName);
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(paginate(views, limit, offset, fetchAll), null, 2),
+        }],
+      };
     },
   );
 }

@@ -58,36 +58,32 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
       baseProcess: z.string().optional().describe("Existing process name to inherit parameters and variables from. Prevents 'undefined parameter' compile errors when validating code that references params defined on the saved process. Explicit parameters/variables override the inherited values."),
     },
     async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, baseProcess }) => {
-      try {
-        let resolvedParams = parameters as ProcessParameter[] | undefined;
-        let resolvedVars = variables as ProcessVariable[] | undefined;
-        if (baseProcess) {
-          if (!resolvedParams) resolvedParams = await tm1Client.processes.getParameters(baseProcess);
-          if (!resolvedVars) resolvedVars = await tm1Client.processes.getVariables(baseProcess);
-        }
-        const result = await tm1Client.processes.check({
-          ...(name !== undefined ? { name } : {}),
-          ...(prolog !== undefined ? { prolog } : {}),
-          ...(metadata !== undefined ? { metadata } : {}),
-          ...(data !== undefined ? { data } : {}),
-          ...(epilog !== undefined ? { epilog } : {}),
-          ...(resolvedParams !== undefined ? { parameters: resolvedParams } : {}),
-          ...(resolvedVars !== undefined ? { variables: resolvedVars } : {}),
-          ...(dataSource !== undefined ? { dataSource: dataSource as DataSource } : {}),
-        });
-        const payload = {
-          ok: result.success,
-          processName: name ?? "_compile_check",
-          errorCount: result.errors.length,
-          errors: result.errors,
-        };
-        return {
-          isError: !result.success || undefined,
-          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
+      let resolvedParams = parameters as ProcessParameter[] | undefined;
+      let resolvedVars = variables as ProcessVariable[] | undefined;
+      if (baseProcess) {
+        if (!resolvedParams) resolvedParams = await tm1Client.processes.getParameters(baseProcess);
+        if (!resolvedVars) resolvedVars = await tm1Client.processes.getVariables(baseProcess);
       }
+      const result = await tm1Client.processes.check({
+        ...(name !== undefined ? { name } : {}),
+        ...(prolog !== undefined ? { prolog } : {}),
+        ...(metadata !== undefined ? { metadata } : {}),
+        ...(data !== undefined ? { data } : {}),
+        ...(epilog !== undefined ? { epilog } : {}),
+        ...(resolvedParams !== undefined ? { parameters: resolvedParams } : {}),
+        ...(resolvedVars !== undefined ? { variables: resolvedVars } : {}),
+        ...(dataSource !== undefined ? { dataSource: dataSource as DataSource } : {}),
+      });
+      const payload = {
+        ok: result.success,
+        processName: name ?? "_compile_check",
+        errorCount: result.errors.length,
+        errors: result.errors,
+      };
+      return {
+        isError: !result.success || undefined,
+        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+      };
     },
   );
 }

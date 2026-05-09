@@ -13,20 +13,16 @@ export function registerGetMessageLog(server: McpServer, tm1Client: TM1Client): 
         .describe("Optional text filter — only entries containing this string are returned (case-insensitive)"),
     },
     async ({ top, filter }) => {
-      try {
-        const entries = await tm1Client.server.getMessageLog(top);
-        const filtered = filter
-          ? entries.filter((e) => e.message.toLowerCase().includes(filter.toLowerCase()))
-          : entries;
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({ count: filtered.length, entries: filtered }, null, 2),
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const entries = await tm1Client.server.getMessageLog(top);
+      const filtered = filter
+        ? entries.filter((e) => e.message.toLowerCase().includes(filter.toLowerCase()))
+        : entries;
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ count: filtered.length, entries: filtered }, null, 2),
+        }],
+      };
     },
   );
 }

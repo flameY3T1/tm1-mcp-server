@@ -10,14 +10,10 @@ export function registerGetCubeRules(server: McpServer, tm1Client: TM1Client): v
       cube: z.string().describe("Cube name (case-sensitive)"),
     },
     async ({ cube }) => {
-      try {
-        const rules = await tm1Client.cubes.getRules(cube);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(rules, null, 2) }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const rules = await tm1Client.cubes.getRules(cube);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(rules, null, 2) }],
+      };
     },
   );
 }

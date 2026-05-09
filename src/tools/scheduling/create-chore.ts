@@ -41,27 +41,23 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
       steps: z.array(ChoreStepSchema).min(1).describe("Ordered list of TI processes to execute"),
     },
     async ({ name, startTime, active, dstSensitive, executionMode, frequency, steps }) => {
-      try {
-        const { value: normalizedStartTime, coerced } = coerceUtc(startTime);
-        await tm1Client.chores.create({ name, startTime: normalizedStartTime, active, dstSensitive, executionMode, frequency, steps });
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({
-              success: true,
-              name,
-              stepCount: steps.length,
-              active,
-              startTime: normalizedStartTime,
-              ...(coerced ? {
-                warning: `startTime had no timezone offset; auto-appended 'Z' → '${normalizedStartTime}'. Pass an explicit offset to silence this.`,
-              } : {}),
-            }, null, 2),
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const { value: normalizedStartTime, coerced } = coerceUtc(startTime);
+      await tm1Client.chores.create({ name, startTime: normalizedStartTime, active, dstSensitive, executionMode, frequency, steps });
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            success: true,
+            name,
+            stepCount: steps.length,
+            active,
+            startTime: normalizedStartTime,
+            ...(coerced ? {
+              warning: `startTime had no timezone offset; auto-appended 'Z' → '${normalizedStartTime}'. Pass an explicit offset to silence this.`,
+            } : {}),
+          }, null, 2),
+        }],
+      };
     },
   );
 }

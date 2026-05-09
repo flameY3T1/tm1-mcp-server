@@ -15,17 +15,13 @@ export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): 
         .describe("Max entries to return (default: 50, max: 500)"),
     },
     async ({ processName, since, top }) => {
-      try {
-        const files = await tm1Client.server.listErrorLogFiles({ processName, since, top });
-        return {
-          content: [{
-            type: "text" as const,
-            text: JSON.stringify({ count: files.length, files }, null, 2),
-          }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
-      }
+      const files = await tm1Client.server.listErrorLogFiles({ processName, since, top });
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ count: files.length, files }, null, 2),
+        }],
+      };
     },
   );
 }

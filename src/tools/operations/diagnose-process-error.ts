@@ -33,96 +33,92 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
         .describe(`Max related logs per primary log (default ${DEFAULT_RELATED_MAX_FILES}).`),
     },
     async ({ processName, since, maxLogs, tail, includeRelated, relatedWindowSec, relatedMaxFiles }) => {
-      try {
-        const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
-        const matching = allFiles
-          .filter((f) => f.filename.toLowerCase().startsWith(processName.toLowerCase() + "_"))
-          .filter((f) => {
-            if (!since) return true;
-            return !f.lastUpdated || f.lastUpdated >= since;
-          })
-          .slice(0, maxLogs);
+      const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
+      const matching = allFiles
+        .filter((f) => f.filename.toLowerCase().startsWith(processName.toLowerCase() + "_"))
+        .filter((f) => {
+          if (!since) return true;
+          return !f.lastUpdated || f.lastUpdated >= since;
+        })
+        .slice(0, maxLogs);
 
-        if (matching.length === 0) {
-          return {
-            content: [{
-              type: "text" as const,
-              text: JSON.stringify({ processName, since, logsFound: 0, logsReturned: 0, logs: [] }, null, 2),
-            }],
-          };
-        }
-
-        const windowMs = relatedWindowSec * 1000;
-
-        const logs = await Promise.all(matching.map(async (f) => {
-          let content = "";
-          let fetchError: string | undefined;
-          let truncated = false;
-          let totalLines = 0;
-
-          try {
-            const raw = await tm1Client.server.getErrorLogContent(f.filename);
-            const result = tailLines(raw, tail);
-            content = result.body;
-            truncated = result.truncated;
-            totalLines = result.totalLines;
-          } catch (e) {
-            fetchError = (e as Error).message;
-          }
-
-          const entry: Record<string, unknown> = {
-            filename: f.filename,
-            lastUpdated: f.lastUpdated,
-            totalLines,
-            truncated,
-            ...(fetchError ? { fetchError } : { content }),
-          };
-
-          if (includeRelated) {
-            const sourceTs = tsFromFilename(f.filename);
-            if (sourceTs === null) {
-              entry.related = { note: "No embedded timestamp — cascade lookup skipped.", files: [] };
-            } else {
-              const candidates = allFiles
-                .filter((r) => r.filename !== f.filename)
-                .map((r) => ({ filename: r.filename, ts: tsFromFilename(r.filename) }))
-                .filter((r): r is { filename: string; ts: number } => r.ts !== null)
-                .filter((r) => Math.abs(r.ts - sourceTs) <= windowMs)
-                .sort((a, b) => Math.abs(a.ts - sourceTs) - Math.abs(b.ts - sourceTs))
-                .slice(0, relatedMaxFiles);
-
-              const related = await Promise.all(candidates.map(async ({ filename: rf, ts }) => {
-                try {
-                  const raw = await tm1Client.server.getErrorLogContent(rf);
-                  const { body, truncated: rt } = truncateTail(raw, DEFAULT_RELATED_MAX_BYTES);
-                  return { filename: rf, deltaSec: Math.round((ts - sourceTs) / 1000), truncated: rt, content: body };
-                } catch (e) {
-                  return { filename: rf, deltaSec: Math.round((ts - sourceTs) / 1000), fetchError: (e as Error).message };
-                }
-              }));
-
-              entry.related = { windowSec: relatedWindowSec, found: candidates.length, files: related };
-            }
-          }
-
-          return entry;
-        }));
-
+      if (matching.length === 0) {
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({
-              processName,
-              since,
-              logsFound: matching.length,
-              logsReturned: logs.length,
-              logs,
-            }, null, 2),
+            text: JSON.stringify({ processName, since, logsFound: 0, logsReturned: 0, logs: [] }, null, 2),
           }],
         };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
       }
+
+      const windowMs = relatedWindowSec * 1000;
+
+      const logs = await Promise.all(matching.map(async (f) => {
+        let content = "";
+        let fetchError: string | undefined;
+        let truncated = false;
+        let totalLines = 0;
+
+        try {
+          const raw = await tm1Client.server.getErrorLogContent(f.filename);
+          const result = tailLines(raw, tail);
+          content = result.body;
+          truncated = result.truncated;
+          totalLines = result.totalLines;
+        } catch (e) {
+          fetchError = (e as Error).message;
+        }
+
+        const entry: Record<string, unknown> = {
+          filename: f.filename,
+          lastUpdated: f.lastUpdated,
+          totalLines,
+          truncated,
+          ...(fetchError ? { fetchError } : { content }),
+        };
+
+        if (includeRelated) {
+          const sourceTs = tsFromFilename(f.filename);
+          if (sourceTs === null) {
+            entry.related = { note: "No embedded timestamp — cascade lookup skipped.", files: [] };
+          } else {
+            const candidates = allFiles
+              .filter((r) => r.filename !== f.filename)
+              .map((r) => ({ filename: r.filename, ts: tsFromFilename(r.filename) }))
+              .filter((r): r is { filename: string; ts: number } => r.ts !== null)
+              .filter((r) => Math.abs(r.ts - sourceTs) <= windowMs)
+              .sort((a, b) => Math.abs(a.ts - sourceTs) - Math.abs(b.ts - sourceTs))
+              .slice(0, relatedMaxFiles);
+
+            const related = await Promise.all(candidates.map(async ({ filename: rf, ts }) => {
+              try {
+                const raw = await tm1Client.server.getErrorLogContent(rf);
+                const { body, truncated: rt } = truncateTail(raw, DEFAULT_RELATED_MAX_BYTES);
+                return { filename: rf, deltaSec: Math.round((ts - sourceTs) / 1000), truncated: rt, content: body };
+              } catch (e) {
+                return { filename: rf, deltaSec: Math.round((ts - sourceTs) / 1000), fetchError: (e as Error).message };
+              }
+            }));
+
+            entry.related = { windowSec: relatedWindowSec, found: candidates.length, files: related };
+          }
+        }
+
+        return entry;
+      }));
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            processName,
+            since,
+            logsFound: matching.length,
+            logsReturned: logs.length,
+            logs,
+          }, null, 2),
+        }],
+      };
     },
   );
 }

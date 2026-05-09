@@ -21,38 +21,34 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
       ...PAGINATION_SCHEMA,
     },
     async ({ activeOnly, withThreads, compact, limit, offset, fetchAll }) => {
-      try {
-        const sessions = await tm1Client.monitoring.getSessions();
-        const filtered = activeOnly ? sessions.filter((s) => s.active !== false) : sessions;
-        if (compact) {
-          const namedUsers = filtered.filter((s) => s.user && s.user.trim() !== "").length;
-          return {
-            content: [{
-              type: "text",
-              text: JSON.stringify({
-                total: filtered.length,
-                count: 0,
-                offset: 0,
-                has_more: false,
-                next_offset: null,
-                items: [],
-                summary: { namedUsers, anonymousCount: filtered.length - namedUsers },
-              }, null, 2),
-            }],
-          };
-        }
-        const projected = withThreads
-          ? filtered
-          : filtered.map((s) => ({ ...s, threads: [] }));
+      const sessions = await tm1Client.monitoring.getSessions();
+      const filtered = activeOnly ? sessions.filter((s) => s.active !== false) : sessions;
+      if (compact) {
+        const namedUsers = filtered.filter((s) => s.user && s.user.trim() !== "").length;
         return {
           content: [{
             type: "text",
-            text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2),
+            text: JSON.stringify({
+              total: filtered.length,
+              count: 0,
+              offset: 0,
+              has_more: false,
+              next_offset: null,
+              items: [],
+              summary: { namedUsers, anonymousCount: filtered.length - namedUsers },
+            }, null, 2),
           }],
         };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
       }
+      const projected = withThreads
+        ? filtered
+        : filtered.map((s) => ({ ...s, threads: [] }));
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(paginate(projected, limit, offset, fetchAll), null, 2),
+        }],
+      };
     },
   );
 }

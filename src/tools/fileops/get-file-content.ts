@@ -25,43 +25,39 @@ export function registerGetFileContent(server: McpServer, tm1Client: TM1Client):
         .describe("If set, only return the first N lines (overrides byte truncation)."),
     },
     async ({ fileName, maxBytes, headLines }) => {
-      try {
-        const content = await tm1Client.files.getContent(fileName);
-        const totalBytes = Buffer.byteLength(content, "utf8");
+      const content = await tm1Client.files.getContent(fileName);
+      const totalBytes = Buffer.byteLength(content, "utf8");
 
-        let body: string;
-        let truncated = false;
-        let truncationReason: string | undefined;
+      let body: string;
+      let truncated = false;
+      let truncationReason: string | undefined;
 
-        if (headLines !== undefined) {
-          const allLines = content.split("\n");
-          body = allLines.slice(0, headLines).join("\n");
-          if (allLines.length > headLines) {
-            truncated = true;
-            truncationReason = `headLines=${headLines} (of ${allLines.length})`;
-          }
-        } else if (totalBytes > maxBytes) {
-          body = Buffer.from(content, "utf8").subarray(0, maxBytes).toString("utf8");
+      if (headLines !== undefined) {
+        const allLines = content.split("\n");
+        body = allLines.slice(0, headLines).join("\n");
+        if (allLines.length > headLines) {
           truncated = true;
-          truncationReason = `maxBytes=${maxBytes}`;
-        } else {
-          body = content;
+          truncationReason = `headLines=${headLines} (of ${allLines.length})`;
         }
-
-        const payload = {
-          fileName,
-          totalBytes,
-          returnedBytes: Buffer.byteLength(body, "utf8"),
-          truncated,
-          ...(truncationReason ? { truncationReason } : {}),
-          content: body,
-        };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
+      } else if (totalBytes > maxBytes) {
+        body = Buffer.from(content, "utf8").subarray(0, maxBytes).toString("utf8");
+        truncated = true;
+        truncationReason = `maxBytes=${maxBytes}`;
+      } else {
+        body = content;
       }
+
+      const payload = {
+        fileName,
+        totalBytes,
+        returnedBytes: Buffer.byteLength(body, "utf8"),
+        truncated,
+        ...(truncationReason ? { truncationReason } : {}),
+        content: body,
+      };
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+      };
     },
   );
 }

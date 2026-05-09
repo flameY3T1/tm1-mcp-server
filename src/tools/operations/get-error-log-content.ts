@@ -44,99 +44,95 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
         .describe(`Per-related-log byte cap (tail-truncated, default ${DEFAULT_RELATED_MAX_BYTES}).`),
     },
     async ({ filename, tail, maxBytes, includeRelated, relatedWindowSec, relatedMaxFiles, relatedMaxBytes }) => {
-      try {
-        const content = await tm1Client.server.getErrorLogContent(filename);
-        const totalBytes = Buffer.byteLength(content, "utf8");
+      const content = await tm1Client.server.getErrorLogContent(filename);
+      const totalBytes = Buffer.byteLength(content, "utf8");
 
-        let body: string;
-        let truncated = false;
-        let truncationReason: string | undefined;
+      let body: string;
+      let truncated = false;
+      let truncationReason: string | undefined;
 
-        if (tail !== undefined) {
-          // Strip trailing CR/LF so a file ending in '\n' doesn't yield a phantom empty last line.
-          const trimmed = content.replace(/[\r\n]+$/, "");
-          const allLines = trimmed.split(/\r?\n/);
-          if (allLines.length > tail) {
-            body = allLines.slice(-tail).join("\n");
-            truncated = true;
-            truncationReason = `tail=${tail} (of ${allLines.length} lines)`;
-          } else {
-            body = trimmed;
-          }
-        } else if (totalBytes > maxBytes) {
-          body = Buffer.from(content, "utf8").subarray(-maxBytes).toString("utf8");
+      if (tail !== undefined) {
+        // Strip trailing CR/LF so a file ending in '\n' doesn't yield a phantom empty last line.
+        const trimmed = content.replace(/[\r\n]+$/, "");
+        const allLines = trimmed.split(/\r?\n/);
+        if (allLines.length > tail) {
+          body = allLines.slice(-tail).join("\n");
           truncated = true;
-          truncationReason = `maxBytes=${maxBytes} (tail-truncated)`;
+          truncationReason = `tail=${tail} (of ${allLines.length} lines)`;
         } else {
-          body = content;
+          body = trimmed;
         }
-
-        const payload: Record<string, unknown> = {
-          filename,
-          totalBytes,
-          returnedBytes: Buffer.byteLength(body, "utf8"),
-          truncated,
-          ...(truncationReason ? { truncationReason } : {}),
-          content: body,
-        };
-
-        if (includeRelated) {
-          const sourceTs = tsFromFilename(filename);
-          if (sourceTs === null) {
-            payload.related = {
-              note: "Source filename has no embedded YYYYMMDDHHMMSS timestamp — relation lookup skipped.",
-              files: [],
-            };
-          } else {
-            const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
-            const windowMs = relatedWindowSec * 1000;
-            const candidates = allFiles
-              .filter((f) => f.filename !== filename)
-              .map((f) => ({ filename: f.filename, ts: tsFromFilename(f.filename) }))
-              .filter((f): f is { filename: string; ts: number } => f.ts !== null)
-              .filter((f) => Math.abs(f.ts - sourceTs) <= windowMs)
-              .sort((a, b) => Math.abs(a.ts - sourceTs) - Math.abs(b.ts - sourceTs))
-              .slice(0, relatedMaxFiles);
-
-            const fetched = await Promise.all(
-              candidates.map(async ({ filename: rf, ts }) => {
-                try {
-                  const raw = await tm1Client.server.getErrorLogContent(rf);
-                  const rawBytes = Buffer.byteLength(raw, "utf8");
-                  const { body: rb, truncated: rt } = truncateTail(raw, relatedMaxBytes);
-                  return {
-                    filename: rf,
-                    deltaSec: Math.round((ts - sourceTs) / 1000),
-                    totalBytes: rawBytes,
-                    returnedBytes: Buffer.byteLength(rb, "utf8"),
-                    truncated: rt,
-                    content: rb,
-                  };
-                } catch (e) {
-                  return {
-                    filename: rf,
-                    deltaSec: Math.round((ts - sourceTs) / 1000),
-                    error: (e as Error).message,
-                  };
-                }
-              }),
-            );
-
-            payload.related = {
-              windowSec: relatedWindowSec,
-              found: candidates.length,
-              maxFiles: relatedMaxFiles,
-              files: fetched,
-            };
-          }
-        }
-
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
-        };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: `TM1 error: ${(err as Error).message}` }] };
+      } else if (totalBytes > maxBytes) {
+        body = Buffer.from(content, "utf8").subarray(-maxBytes).toString("utf8");
+        truncated = true;
+        truncationReason = `maxBytes=${maxBytes} (tail-truncated)`;
+      } else {
+        body = content;
       }
+
+      const payload: Record<string, unknown> = {
+        filename,
+        totalBytes,
+        returnedBytes: Buffer.byteLength(body, "utf8"),
+        truncated,
+        ...(truncationReason ? { truncationReason } : {}),
+        content: body,
+      };
+
+      if (includeRelated) {
+        const sourceTs = tsFromFilename(filename);
+        if (sourceTs === null) {
+          payload.related = {
+            note: "Source filename has no embedded YYYYMMDDHHMMSS timestamp — relation lookup skipped.",
+            files: [],
+          };
+        } else {
+          const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
+          const windowMs = relatedWindowSec * 1000;
+          const candidates = allFiles
+            .filter((f) => f.filename !== filename)
+            .map((f) => ({ filename: f.filename, ts: tsFromFilename(f.filename) }))
+            .filter((f): f is { filename: string; ts: number } => f.ts !== null)
+            .filter((f) => Math.abs(f.ts - sourceTs) <= windowMs)
+            .sort((a, b) => Math.abs(a.ts - sourceTs) - Math.abs(b.ts - sourceTs))
+            .slice(0, relatedMaxFiles);
+
+          const fetched = await Promise.all(
+            candidates.map(async ({ filename: rf, ts }) => {
+              try {
+                const raw = await tm1Client.server.getErrorLogContent(rf);
+                const rawBytes = Buffer.byteLength(raw, "utf8");
+                const { body: rb, truncated: rt } = truncateTail(raw, relatedMaxBytes);
+                return {
+                  filename: rf,
+                  deltaSec: Math.round((ts - sourceTs) / 1000),
+                  totalBytes: rawBytes,
+                  returnedBytes: Buffer.byteLength(rb, "utf8"),
+                  truncated: rt,
+                  content: rb,
+                };
+              } catch (e) {
+                return {
+                  filename: rf,
+                  deltaSec: Math.round((ts - sourceTs) / 1000),
+                  error: (e as Error).message,
+                };
+              }
+            }),
+          );
+
+          payload.related = {
+            windowSec: relatedWindowSec,
+            found: candidates.length,
+            maxFiles: relatedMaxFiles,
+            files: fetched,
+          };
+        }
+      }
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+      };
     },
   );
 }
