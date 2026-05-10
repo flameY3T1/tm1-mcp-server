@@ -173,6 +173,59 @@ export class TM1HttpClient {
     return response.text();
   }
 
+  /**
+   * Make an authenticated HTTP request with a binary body (Buffer/Uint8Array).
+   * Used for blob/file uploads where the body is raw bytes (not JSON).
+   * Sends Content-Type: application/octet-stream by default.
+   * Re-auths once on 401 like request(). No network-error retries (non-safe methods).
+   */
+  /** @internal — for Service-layer use; not part of the public consumer API. */
+  public async requestBinary(
+    method: string,
+    path: string,
+    body: Uint8Array,
+    contentType: string = "application/octet-stream",
+    opts?: RequestOptions,
+  ): Promise<void> {
+    const url = `${this.config.baseUrl}${path}`;
+    const cookie = await this.sessionManager.ensureSession();
+    const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
+
+    const doFetch = async (c: string): Promise<Response> => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
+      try {
+        return await fetch(url, {
+          method,
+          headers: {
+            Cookie: `TM1SessionId=${c}`,
+            Accept: "application/json,*/*",
+            "Content-Type": contentType,
+            "User-Agent": USER_AGENT,
+            "TM1-SessionContext": USER_AGENT,
+            "TM1-Session-Context": USER_AGENT,
+          },
+          body,
+          signal: controller.signal,
+          dispatcher: getTm1Dispatcher(this.config),
+        } as RequestInit);
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
+    let response = await doFetch(cookie);
+    if (response.status === 401) {
+      const newCookie = await this.sessionManager.authenticate();
+      response = await doFetch(newCookie);
+    }
+    if (!response.ok) {
+      let errBody = "";
+      try { errBody = await response.text(); } catch { /* ignore */ }
+      throw this.classifyHttpError(response.status, path, errBody || undefined);
+    }
+  }
+
   private async executeRequest(
     url: string,
     method: string,

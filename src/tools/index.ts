@@ -107,6 +107,9 @@ import { registerGetCubeStats } from "./operations/get-cube-stats.js";
 // File operations tools
 import { registerListFiles } from "./fileops/list-files.js";
 import { registerGetFileContent } from "./fileops/get-file-content.js";
+import { registerUploadFile } from "./fileops/upload-file.js";
+import { registerDeleteFile } from "./fileops/delete-file.js";
+import { registerSearchFiles } from "./fileops/search-files.js";
 
 // Analysis tools
 import { registerAnalyzeCallgraph } from "./analysis/analyze-callgraph.js";
@@ -230,6 +233,9 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   // File operations
   registerListFiles(server, tm1Client);
   registerGetFileContent(server, tm1Client);
+  registerUploadFile(server, tm1Client);
+  registerDeleteFile(server, tm1Client);
+  registerSearchFiles(server, tm1Client);
 
   // Analysis
   registerAnalyzeCallgraph(server, tm1Client);

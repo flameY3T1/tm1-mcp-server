@@ -46,6 +46,9 @@ export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
   // fileops
   tm1_get_file_content: READ_ONLY,
   tm1_list_files: READ_ONLY,
+  tm1_search_files: READ_ONLY,
+  tm1_upload_file: IDEMPOTENT_WRITE,
+  tm1_delete_file: DESTRUCTIVE,
 
   // metadata
   tm1_get_ancestors: READ_ONLY,
