@@ -22,7 +22,7 @@ export function registerDeleteFile(server: McpServer, tm1Client: TM1Client): voi
         tm1Client.files.delete(fileName),
         "Verify exact name with tm1_list_files or tm1_search_files. Names are case-sensitive.",
       );
-      const payload = { fileName, deleted: true };
+      const payload = { success: true, fileName, deleted: true };
       return {
         content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
         structuredContent: payload,

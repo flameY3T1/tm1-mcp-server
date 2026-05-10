@@ -58,6 +58,7 @@ export function registerUploadFile(server: McpServer, tm1Client: TM1Client): voi
       );
 
       const payload = {
+        success: true,
         fileName,
         bytesUploaded: bytes.byteLength,
         created: result.created,

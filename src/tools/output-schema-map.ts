@@ -74,6 +74,16 @@ const filePageShape = {
   ...pageShapeFor(FilenameItemSchema),
 };
 
+// tm1_search_files echoes the search filters alongside the page envelope so
+// callers can correlate matches with the request that produced them.
+const searchFilePageShape = {
+  path: z.string().describe("Folder that was searched (echoes the input)"),
+  startswith: z.string().nullable().describe("Prefix filter applied, or null"),
+  contains: z.array(z.string()).nullable().describe("Substring filters applied, or null"),
+  operator: z.enum(["and", "or"]).describe("How `contains` substrings were joined"),
+  ...pageShapeFor(FilenameItemSchema),
+};
+
 export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_list_cubes: pageShapeFor(CubeItemSchema),
   tm1_list_dimensions: pageShapeFor(DimensionItemSchema),
@@ -84,6 +94,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_list_views: pageShapeFor(ViewItemSchema),
   tm1_list_subsets: pageShapeFor(SubsetItemSchema),
   tm1_list_files: filePageShape,
+  tm1_search_files: searchFilePageShape,
   tm1_list_threads: pageShapeFor(ThreadItemSchema),
   tm1_list_sessions: {
     ...pageShapeFor(SessionItemSchema),
@@ -220,6 +231,8 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_update_process_variables: asOutputSchema(MutationResultSchema),
   tm1_update_subset: asOutputSchema(MutationResultSchema),
   tm1_write_cells: asOutputSchema(MutationResultSchema),
+  tm1_upload_file: asOutputSchema(MutationResultSchema),
+  tm1_delete_file: asOutputSchema(MutationResultSchema),
 
   // Bespoke shape: cleared/entriesBefore counters, no `success` field.
   tm1_invalidate_callgraph_cache: asOutputSchema(InvalidateCallgraphCacheResultSchema),
@@ -252,4 +265,8 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_unload_cube: asOutputSchema(MutationResultSchema),
   tm1_update_chore: asOutputSchema(MutationResultSchema),
   tm1_update_client: asOutputSchema(MutationResultSchema),
+
+  // ── Intentionally NOT mapped ──────────────────────────────────────────────
+  // tm1_get_knowledge returns raw markdown article text, not structured JSON.
+  // No outputSchema applies; the Proxy passes through `content[0].text` as-is.
 };
