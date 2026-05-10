@@ -30,11 +30,12 @@ import { NAME, VERSION } from "./version.js";
 //      registration through `server.registerTool` so the SDK can publish
 //      `outputSchema` to clients, and parses the JSON text body back into
 //      `structuredContent` for typed consumption (audit gap 2)
-// Centralized so we don't touch 84 register* call sites.
+// Centralized so we don't touch ~100 register* call sites. Every legacy
+// `server.tool(name, desc, schema, cb)` call-site is rerouted through the
+// SDK's modern `registerTool({ description, inputSchema, outputSchema?,
+// annotations })` API; outputSchema is attached only when present in
+// OUTPUT_SCHEMA_MAP.
 function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
-  const originalTool = server.tool.bind(server) as (
-    ...args: unknown[]
-  ) => unknown;
   const originalRegisterTool = server.registerTool.bind(server) as (
     ...args: unknown[]
   ) => unknown;
@@ -87,39 +88,34 @@ function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
           typeof args[0] === "string" &&
           typeof args[1] === "string" &&
           typeof args[3] === "function";
-        if (isFourArg) {
-          const name = args[0] as string;
-          const description = args[1] as string;
-          const inputSchema = args[2];
-          const annot = ANNOTATION_MAP[name];
-          const outputSchema = OUTPUT_SCHEMA_MAP[name];
-          const wrappedCb = wrapCb(
-            name,
-            args[3] as ToolCallback,
-            Boolean(outputSchema),
+        if (!isFourArg) {
+          throw new Error(
+            "withAnnotations Proxy expects server.tool(name, description, inputSchema, cb). " +
+              "Other tool() overloads are deprecated and not supported here.",
           );
-
-          if (outputSchema) {
-            // registerTool publishes outputSchema to clients; the wrapped
-            // callback parses the existing text body into structuredContent
-            // so call sites stay unchanged.
-            const config: Record<string, unknown> = {
-              description,
-              inputSchema,
-              outputSchema,
-            };
-            if (annot) config.annotations = annot;
-            return originalRegisterTool(name, config, wrappedCb);
-          }
-
-          if (annot) {
-            return originalTool(name, description, inputSchema, annot, wrappedCb);
-          }
+        }
+        const name = args[0] as string;
+        const description = args[1] as string;
+        const inputSchema = args[2];
+        const annot = ANNOTATION_MAP[name];
+        if (!annot) {
           throw new Error(
             `Tool "${name}" registered without annotation — add it to ANNOTATION_MAP in src/tools/annotation-map.ts`,
           );
         }
-        return originalTool(...args);
+        const outputSchema = OUTPUT_SCHEMA_MAP[name];
+        const wrappedCb = wrapCb(
+          name,
+          args[3] as ToolCallback,
+          Boolean(outputSchema),
+        );
+        const config: Record<string, unknown> = {
+          description,
+          inputSchema,
+          annotations: annot,
+        };
+        if (outputSchema) config.outputSchema = outputSchema;
+        return originalRegisterTool(name, config, wrappedCb);
       };
     },
   }) as McpServer;
