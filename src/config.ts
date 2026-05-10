@@ -13,6 +13,10 @@ export interface TM1Config {
   transport: "stdio" | "http";
   httpHost: string;
   httpPort: number;
+  // Origin headers accepted by the Streamable HTTP transport when DNS-rebinding
+  // protection is enabled. Defaults to loopback origins; extend via env when
+  // serving from an explicit hostname.
+  httpAllowedOrigins: string[];
 }
 
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
@@ -75,6 +79,24 @@ export function loadConfig(): TM1Config {
   const httpPortRaw = process.env.TM1_MCP_HTTP_PORT;
   const httpPort = httpPortRaw ? parseInt(httpPortRaw, 10) : 3000;
 
+  // Origin allow-list for DNS-rebinding protection. Loopback origins are
+  // always included so localhost dev clients work out of the box; if the
+  // server binds to a non-loopback host we add http://<host>:<port> too.
+  // TM1_MCP_HTTP_ALLOWED_ORIGINS (comma-separated) appends extras and is the
+  // hook for HTTPS reverse-proxies / browser clients on a different origin.
+  const defaultOrigins = [
+    `http://127.0.0.1:${httpPort}`,
+    `http://localhost:${httpPort}`,
+  ];
+  if (httpHost !== "127.0.0.1" && httpHost !== "localhost" && httpHost !== "0.0.0.0") {
+    defaultOrigins.push(`http://${httpHost}:${httpPort}`);
+  }
+  const extraOriginsRaw = process.env.TM1_MCP_HTTP_ALLOWED_ORIGINS;
+  const extraOrigins = extraOriginsRaw
+    ? extraOriginsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+  const httpAllowedOrigins = Array.from(new Set([...defaultOrigins, ...extraOrigins]));
+
   return {
     baseUrl: baseUrl!,
     user: user!,
@@ -88,5 +110,6 @@ export function loadConfig(): TM1Config {
     transport,
     httpHost,
     httpPort,
+    httpAllowedOrigins,
   };
 }

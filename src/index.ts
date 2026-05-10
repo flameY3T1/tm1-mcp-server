@@ -152,6 +152,7 @@ async function startHttpTransport(
     sessionIdGenerator: undefined, // stateless mode
     enableDnsRebindingProtection: true,
     allowedHosts: [allowedHost, "127.0.0.1", "localhost"],
+    allowedOrigins: config.httpAllowedOrigins,
   });
   await server.connect(transport);
 
@@ -199,7 +200,13 @@ async function startHttpTransport(
     });
   });
   logger.info(
-    { host: config.httpHost, port: config.httpPort, endpoint: "/mcp" },
+    {
+      host: config.httpHost,
+      port: config.httpPort,
+      endpoint: "/mcp",
+      allowedOrigins: config.httpAllowedOrigins,
+      dnsRebindingProtection: true,
+    },
     "MCP server listening on HTTP (Streamable, stateless)",
   );
 
