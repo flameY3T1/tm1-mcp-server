@@ -243,6 +243,13 @@ export const ElementAttributeValueSchema = z.object({
   value: z.union([z.string(), z.number(), z.null()]),
 });
 
+// Attribute *definition* (as returned by listAttributes) — distinct from a
+// per-element attribute *value* above. Used by tm1_list_element_attributes.
+export const ElementAttributeDefinitionSchema = z.object({
+  name: z.string().describe("Attribute name"),
+  type: z.enum(["Numeric", "String", "Alias"]).describe("Attribute storage type"),
+});
+
 // listFiles returns bare strings (file/folder names).
 export const FilenameItemSchema = z.string();
 

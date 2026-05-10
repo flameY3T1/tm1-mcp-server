@@ -63,7 +63,7 @@ const SAMPLES: Record<string, unknown[]> = {
     { id: "1", user: "admin", threads: [] },
   ],
   tm1_list_element_attributes: [
-    { elementName: "EU", attributeName: "Currency", value: "EUR" },
+    { name: "Currency", type: "String" },
   ],
 };
 

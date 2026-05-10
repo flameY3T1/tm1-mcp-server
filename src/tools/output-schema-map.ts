@@ -29,6 +29,7 @@ import {
   DiagnoseProcessErrorResultSchema,
   DiffProcessResultSchema,
   DimensionItemSchema,
+  ElementAttributeDefinitionSchema,
   ElementAttributeValueSchema,
   ErrorLogContentResultSchema,
   ErrorLogFileSchema,
@@ -106,7 +107,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
       .optional()
       .describe("Present only when compact=true: aggregate headcount, items[] is empty in that mode"),
   },
-  tm1_list_element_attributes: pageShapeFor(ElementAttributeValueSchema),
+  tm1_list_element_attributes: pageShapeFor(ElementAttributeDefinitionSchema),
 
   // ── Phase 2a: validation/check tools ──────────────────────────────────────
   tm1_check_writable_coords: asOutputSchema(WritableCoordsResultSchema),
