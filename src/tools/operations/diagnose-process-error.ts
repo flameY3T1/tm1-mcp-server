@@ -46,7 +46,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ processName, since, logsFound: 0, logsReturned: 0, logs: [] }, null, 2),
+            text: JSON.stringify({ processName, since: since ?? null, logsFound: 0, logsReturned: 0, logs: [] }, null, 2),
           }],
         };
       }
@@ -112,7 +112,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
           type: "text" as const,
           text: JSON.stringify({
             processName,
-            since,
+            since: since ?? null,
             logsFound: matching.length,
             logsReturned: logs.length,
             logs,
