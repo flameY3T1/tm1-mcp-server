@@ -79,6 +79,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_cancel_thread",
         "tm1_check_cube_rule",
         "tm1_check_process_code",
+        "tm1_check_v12_readiness",
         "tm1_check_writable_coords",
         "tm1_clear_cube",
         "tm1_compile_process",

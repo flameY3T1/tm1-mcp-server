@@ -29,6 +29,7 @@ import {
   DiagnoseProcessErrorResultSchema,
   DiffProcessResultSchema,
   FindOrphanDimensionsResultSchema,
+  V12ReadinessResultSchema,
   DimensionItemSchema,
   ElementAttributeDefinitionSchema,
   ElementAttributeValueSchema,
@@ -248,6 +249,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_diagnose_process_error: asOutputSchema(DiagnoseProcessErrorResultSchema),
   tm1_export_process_to_pro: asOutputSchema(ExportProcessToProResultSchema),
   tm1_find_orphan_dimensions: asOutputSchema(FindOrphanDimensionsResultSchema),
+  tm1_check_v12_readiness: asOutputSchema(V12ReadinessResultSchema),
 
   // ── Phase 2j: text→JSON-converted mutations ──────────────────────────────
   tm1_bulk_upsert_elements: asOutputSchema(MutationResultSchema),

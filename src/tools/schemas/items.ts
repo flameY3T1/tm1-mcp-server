@@ -673,6 +673,35 @@ export const FindOrphanDimensionsResultSchema = z.object({
   ),
 });
 
+export const V12FindingSchema = z.object({
+  severity: z.enum(["error", "warning"]),
+  category: z.enum(["deprecated_ti_function"]),
+  objectKind: z.enum(["process", "cube"]),
+  objectName: z.string(),
+  section: z.enum(["prolog", "metadata", "data", "epilog", "rules"]),
+  line: z.number().int(),
+  function: z.string(),
+  snippet: z.string(),
+  issue: z.string(),
+  suggestion: z.string(),
+});
+
+export const V12ReadinessResultSchema = z.object({
+  scope: z.enum(["processes", "rules", "all"]),
+  includeControl: z.boolean(),
+  scannedProcesses: z.number().int(),
+  scannedCubes: z.number().int(),
+  findingsCount: z.number().int(),
+  readinessScore: z.enum(["ready", "needs-work", "blocked"]),
+  summary: z.object({
+    byCategory: z.record(z.string(), z.number().int()),
+    bySeverity: z.record(z.string(), z.number().int()),
+    topFunctions: z.array(z.object({ function: z.string(), count: z.number().int() })),
+  }),
+  findings: z.array(V12FindingSchema),
+  rulesetSource: z.string(),
+});
+
 export const ExportProcessToProResultSchema = z.object({
   processName: z.string(),
   byteLength: z.number().int(),
