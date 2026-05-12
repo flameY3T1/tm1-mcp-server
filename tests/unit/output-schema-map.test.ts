@@ -109,6 +109,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_execute_mdx",
         "tm1_execute_process",
         "tm1_export_process_to_pro",
+        "tm1_find_orphan_dimensions",
         "tm1_get_all_cube_rules",
         "tm1_get_all_processes_code",
         "tm1_get_ancestors",

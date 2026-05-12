@@ -660,6 +660,19 @@ export const DiagnoseProcessErrorResultSchema = z.object({
   logs: z.array(z.unknown()),
 });
 
+export const FindOrphanDimensionsResultSchema = z.object({
+  totalDimensions: z.number().int(),
+  totalCubes: z.number().int(),
+  orphanCount: z.number().int(),
+  includeControl: z.boolean(),
+  orphans: z.array(
+    z.object({
+      name: z.string(),
+      hierarchies: z.array(z.string()),
+    }),
+  ),
+});
+
 export const ExportProcessToProResultSchema = z.object({
   processName: z.string(),
   byteLength: z.number().int(),

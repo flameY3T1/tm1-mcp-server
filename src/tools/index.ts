@@ -116,6 +116,7 @@ import { registerAnalyzeCallgraph } from "./analysis/analyze-callgraph.js";
 import { registerAnalyzeObjectUsage } from "./analysis/analyze-object-usage.js";
 import { registerAnalyzeChoreGraph } from "./analysis/analyze-chore-graph.js";
 import { registerInvalidateCallgraphCache } from "./analysis/invalidate-callgraph-cache.js";
+import { registerFindOrphanDimensions } from "./analysis/find-orphan-dimensions.js";
 
 // Security tools
 import { registerListClients } from "./security/list-clients.js";
@@ -242,6 +243,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerAnalyzeObjectUsage(server, tm1Client);
   registerAnalyzeChoreGraph(server, tm1Client);
   registerInvalidateCallgraphCache(server, tm1Client);
+  registerFindOrphanDimensions(server, tm1Client);
 
   // Security
   registerListClients(server, tm1Client);
