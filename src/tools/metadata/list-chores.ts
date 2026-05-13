@@ -19,6 +19,7 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
     [
       "List chores in the TM1 server with schedule and assigned processes.",
       "Use compact=true to replace the full processes[] array with processCount (~5–10x payload shrink for chores with many steps).",
+      "Filter: processNameContains restricts results to chores whose steps reference a process matching the substring (case-insensitive).",
       "Paginated (default 50/page). Returns {total, count, offset, has_more, next_offset, items}.",
     ].join(" "),
     {
@@ -29,18 +30,27 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(false)
         .describe("Replace processes[] with processCount (default: false)."),
+      processNameContains: z
+        .string()
+        .optional()
+        .describe("Return only chores whose steps reference a process name containing this substring (case-insensitive)."),
     },
-    async ({ limit, offset, fetchAll, format, compact }) => {
+    async ({ limit, offset, fetchAll, format, compact, processNameContains }) => {
       const chores = await tm1Client.chores.list();
+      const filtered = (() => {
+        if (processNameContains === undefined || processNameContains.length === 0) return chores;
+        const needle = processNameContains.toLowerCase();
+        return chores.filter((c) => c.processes.some((p) => p.name.toLowerCase().includes(needle)));
+      })();
       const projected: Array<Chore | ChoreCompact> = compact
-        ? chores.map((c): ChoreCompact => ({
+        ? filtered.map((c): ChoreCompact => ({
             name: c.name,
             active: c.active,
             startTime: c.startTime,
             frequency: c.frequency,
             processCount: c.processes.length,
           }))
-        : chores;
+        : filtered;
       const page = paginate(projected, limit, offset, fetchAll);
       type Row = (typeof projected)[number];
       const columns: Column<Row>[] = [
