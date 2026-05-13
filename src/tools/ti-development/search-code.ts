@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { maskCodeLine } from "../../lib/mask-secrets.js";
 
 type Tab = "prolog" | "metadata" | "data" | "epilog";
@@ -69,71 +69,62 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
       maskSecrets,
       excludeCommented,
     }) => {
+      const flags = caseSensitive ? "g" : "gi";
+      let regex: RegExp;
       try {
-        const flags = caseSensitive ? "g" : "gi";
-        let regex: RegExp;
-        try {
-          regex = new RegExp(pattern, flags);
-        } catch (e) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: `Invalid regex: ${(e as Error).message}` }) }],
-            isError: true,
-          };
-        }
-
-        const searchTabs = tabs && tabs.length > 0 ? tabs : ALL_TABS;
-        const all = await tm1Client.processes.getAllCode(includeControl);
-
-        const matches: Match[] = [];
-        let truncated = false;
-
-        outer: for (const proc of all) {
-          let perProcess = 0;
-          for (const tab of searchTabs) {
-            const code = (proc as Record<Tab, string>)[tab] ?? "";
-            if (!code) continue;
-            const lines = code.split(/\r?\n/);
-            for (let i = 0; i < lines.length; i++) {
-              regex.lastIndex = 0;
-              const raw = lines[i];
-              if (excludeCommented && COMMENT_RE.test(raw)) continue;
-              if (regex.test(raw)) {
-                const text = (maskSecrets ? maskCodeLine(raw) : raw).trim().slice(0, 240);
-                matches.push({ process: proc.name, tab, line: i + 1, text });
-                perProcess++;
-                if (matches.length >= maxTotalMatches) {
-                  truncated = true;
-                  break outer;
-                }
-                if (perProcess >= maxMatchesPerProcess) break;
-              }
-            }
-            if (perProcess >= maxMatchesPerProcess) break;
-          }
-        }
-
-        const summary = {
-          pattern,
-          caseSensitive,
-          tabsSearched: searchTabs,
-          processesScanned: all.length,
-          matchCount: matches.length,
-          truncated,
-          maskSecrets,
-          excludeCommented,
-          matches,
-        };
-        return { content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }] };
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
+        regex = new RegExp(pattern, flags);
+      } catch (e) {
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message: `Invalid regex: ${(e as Error).message}`,
+          details: pattern,
+          hint: "Pattern must be a valid JavaScript regex. Escape backslashes (e.g. 'c:\\\\\\\\' for 'c:\\\\') and balance brackets/parens.",
+        });
       }
+
+      const searchTabs = tabs && tabs.length > 0 ? tabs : ALL_TABS;
+      const all = await tm1Client.processes.getAllCode(includeControl);
+
+      const matches: Match[] = [];
+      let truncated = false;
+
+      outer: for (const proc of all) {
+        let perProcess = 0;
+        for (const tab of searchTabs) {
+          const code = (proc as Record<Tab, string>)[tab] ?? "";
+          if (!code) continue;
+          const lines = code.split(/\r?\n/);
+          for (let i = 0; i < lines.length; i++) {
+            regex.lastIndex = 0;
+            const raw = lines[i];
+            if (excludeCommented && COMMENT_RE.test(raw)) continue;
+            if (regex.test(raw)) {
+              const text = (maskSecrets ? maskCodeLine(raw) : raw).trim().slice(0, 240);
+              matches.push({ process: proc.name, tab, line: i + 1, text });
+              perProcess++;
+              if (matches.length >= maxTotalMatches) {
+                truncated = true;
+                break outer;
+              }
+              if (perProcess >= maxMatchesPerProcess) break;
+            }
+          }
+          if (perProcess >= maxMatchesPerProcess) break;
+        }
+      }
+
+      const summary = {
+        pattern,
+        caseSensitive,
+        tabsSearched: searchTabs,
+        processesScanned: all.length,
+        matchCount: matches.length,
+        truncated,
+        maskSecrets,
+        excludeCommented,
+        matches,
+      };
+      return { content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }] };
     },
   );
 }
