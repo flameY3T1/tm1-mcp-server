@@ -581,6 +581,8 @@ export const SearchCodeResultSchema = z.object({
   processesScanned: z.number().int(),
   matchCount: z.number().int(),
   truncated: z.boolean(),
+  maskSecrets: z.boolean(),
+  excludeCommented: z.boolean(),
   matches: z.array(
     z.object({
       process: z.string(),

@@ -382,6 +382,8 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       processesScanned: 50,
       matchCount: 2,
       truncated: false,
+      maskSecrets: true,
+      excludeCommented: false,
       matches: [
         { process: "Load.Sales", tab: "data", line: 12, text: "CellPutN(...)" },
         { process: "Load.Costs", tab: "data", line: 8, text: "CellPutN(...)" },
