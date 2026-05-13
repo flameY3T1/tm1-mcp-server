@@ -79,13 +79,38 @@ export class CubeService {
    */
   async getRules(cubeName: string): Promise<CubeRules> {
     const path = `/api/v1/Cubes('${enc(cubeName)}')/Rules`;
+    // TM1 returns 404/204 both for "cube missing" and "cube has no rules";
+    // an empty 200 body (response undefined) also means "no rules". For any
+    // of those, probe `/Cubes('X')?$select=Name` to disambiguate so callers
+    // get a clear NOT_FOUND for typos instead of a silently-empty rulesText.
+    const empty = async (): Promise<CubeRules> => {
+      try {
+        await this.http.request<{ Name: string }>(
+          "GET",
+          `/api/v1/Cubes('${enc(cubeName)}')?$select=Name`,
+        );
+      } catch (probeErr) {
+        if (probeErr instanceof TM1Error && probeErr.httpStatus === 404) {
+          throw new TM1Error({
+            code: TM1ErrorCode.NOT_FOUND,
+            message: `Cube '${cubeName}' does not exist.`,
+            httpStatus: 404,
+            endpoint: `/api/v1/Cubes('${cubeName}')`,
+          });
+        }
+        throw probeErr;
+      }
+      return { cubeName, rulesText: "", skipCheck: false };
+    };
+
     try {
       // TM1 11.8 returns rules text in the "value" field (not "Text")
       const response = await this.http.request<{
         value?: string;
         Text?: string;
-      }>("GET", path);
-      const rulesText = response.value ?? response.Text ?? "";
+      } | undefined | null>("GET", path);
+      const rulesText = response?.value ?? response?.Text ?? "";
+      if (rulesText === "") return empty();
       return {
         cubeName,
         rulesText,
@@ -93,8 +118,7 @@ export class CubeService {
       };
     } catch (err) {
       if (err instanceof TM1Error && (err.httpStatus === 404 || err.httpStatus === 204)) {
-        // No rules exist yet
-        return { cubeName, rulesText: "", skipCheck: false };
+        return empty();
       }
       throw err;
     }
