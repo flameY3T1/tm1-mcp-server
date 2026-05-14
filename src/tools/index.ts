@@ -10,6 +10,8 @@ import { registerListDimensions } from "./metadata/list-dimensions.js";
 import { registerGetHierarchy } from "./metadata/get-hierarchy.js";
 import { registerGetDescendants } from "./metadata/get-descendants.js";
 import { registerGetAncestors } from "./metadata/get-ancestors.js";
+import { registerResolveDefaultMember } from "./metadata/resolve-default-member.js";
+import { registerResolveDefaultMembers } from "./metadata/resolve-default-members.js";
 import { registerListProcesses } from "./metadata/list-processes.js";
 import { registerListProcessesGrouped } from "./metadata/list-processes-grouped.js";
 import { registerListChores } from "./metadata/list-chores.js";
@@ -136,6 +138,8 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerGetHierarchy(server, tm1Client);
   registerGetDescendants(server, tm1Client);
   registerGetAncestors(server, tm1Client);
+  registerResolveDefaultMember(server, tm1Client);
+  registerResolveDefaultMembers(server, tm1Client);
   registerListProcesses(server, tm1Client);
   registerListProcessesGrouped(server, tm1Client);
   registerListChores(server, tm1Client);

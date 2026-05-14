@@ -615,6 +615,33 @@ export const DescendantsResultSchema = z.object({
   ),
 });
 
+export const DefaultMemberResolutionSchema = z.object({
+  dimension: z.string(),
+  hierarchy: z.string(),
+  resolved: z.object({ name: z.string(), level: z.number().int() }),
+  source: z.enum(["defined", "single_root", "first_root", "index_1"]),
+  confidence: z.enum(["high", "medium", "low"]),
+  alternatives: z
+    .object({
+      roots: z.array(z.object({ name: z.string(), level: z.number().int() })),
+      indexOne: z.string().optional(),
+    })
+    .optional(),
+  warning: z.string().optional(),
+});
+
+export const DefaultMemberErrorSchema = z.object({
+  dimension: z.string(),
+  hierarchy: z.string(),
+  error: z.object({ code: z.string(), message: z.string() }),
+});
+
+export const DefaultMembersBulkResultSchema = z.object({
+  results: z.array(
+    z.union([DefaultMemberResolutionSchema, DefaultMemberErrorSchema]),
+  ),
+});
+
 // Server capabilities/state snapshots curate config flags whose surface differs
 // per TM1 build — every section is permissive (.passthrough()).
 export const ServerCapabilitiesResultSchema = z

@@ -154,6 +154,8 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_list_views",
         "tm1_move_element",
         "tm1_remove_client_group",
+        "tm1_resolve_default_member",
+        "tm1_resolve_default_members",
         "tm1_sample_cells",
         "tm1_search_code",
         "tm1_search_files",
