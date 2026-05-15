@@ -3,6 +3,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { maskCodeLine } from "../../lib/mask-secrets.js";
+import { FORMAT_SCHEMA, wrappedPageResponse, type Column } from "../format.js";
+import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 
 type Tab = "prolog" | "metadata" | "data" | "epilog";
 const ALL_TABS: Tab[] = ["prolog", "metadata", "data", "epilog"];
@@ -19,7 +21,12 @@ interface Match {
 export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_search_code",
-    "Regex search across all TI process code (Prolog/Metadata/Data/Epilog). Returns matches with process name, tab, line number, and trimmed line text. Wrapper over tm1_get_all_processes_code that avoids dumping ~MB of code through the channel.",
+    [
+      "Regex search across all TI process code (Prolog/Metadata/Data/Epilog).",
+      "Returns matches paginated (default 50/page) with process name, tab, line number, and trimmed line text.",
+      "Wrapper over tm1_get_all_processes_code that avoids dumping ~MB of code through the channel.",
+      "Use tm1_get_process_code on a hit to inspect the surrounding context.",
+    ].join(" "),
     {
       pattern: z.string().describe("Regex pattern (JavaScript flavor). Anchors and groups supported."),
       tabs: z
@@ -58,6 +65,8 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(false)
         .describe("Skip lines beginning with '#' or '//' (TI comment markers). Default: false."),
+      ...PAGINATION_SCHEMA,
+      ...FORMAT_SCHEMA,
     },
     async ({
       pattern,
@@ -68,6 +77,10 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
       maxTotalMatches,
       maskSecrets,
       excludeCommented,
+      limit,
+      offset,
+      fetchAll,
+      format,
     }) => {
       const flags = caseSensitive ? "g" : "gi";
       let regex: RegExp;
@@ -113,7 +126,8 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         }
       }
 
-      const summary = {
+      const page = paginate(matches, limit, offset, fetchAll);
+      const wrapper = {
         pattern,
         caseSensitive,
         tabsSearched: searchTabs,
@@ -122,9 +136,15 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         truncated,
         maskSecrets,
         excludeCommented,
-        matches,
+        ...page,
       };
-      return { content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }] };
+      const columns: Column<Match>[] = [
+        { header: "process", get: (m) => m.process },
+        { header: "tab", get: (m) => m.tab },
+        { header: "line", get: (m) => m.line },
+        { header: "text", get: (m) => m.text },
+      ];
+      return wrappedPageResponse(wrapper, page, format, { title: `Search: ${pattern}`, columns });
     },
   );
 }

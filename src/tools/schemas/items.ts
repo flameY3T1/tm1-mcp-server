@@ -585,6 +585,15 @@ export const CubeStatsResultSchema = z
   })
   .passthrough();
 
+export const SearchCodeMatchSchema = z.object({
+  process: z.string(),
+  tab: z.string(),
+  line: z.number().int(),
+  text: z.string(),
+});
+
+// Wrapper around the paginated `items` array — keeps summary fields the agent
+// uses to interpret the search (pattern echo, totals, truncation flag).
 export const SearchCodeResultSchema = z.object({
   pattern: z.string(),
   caseSensitive: z.boolean(),
@@ -594,14 +603,12 @@ export const SearchCodeResultSchema = z.object({
   truncated: z.boolean(),
   maskSecrets: z.boolean(),
   excludeCommented: z.boolean(),
-  matches: z.array(
-    z.object({
-      process: z.string(),
-      tab: z.string(),
-      line: z.number().int(),
-      text: z.string(),
-    }),
-  ),
+  total: z.number().int(),
+  count: z.number().int(),
+  offset: z.number().int(),
+  has_more: z.boolean(),
+  next_offset: z.number().int().nullable(),
+  items: z.array(SearchCodeMatchSchema),
 });
 
 // ── Phase 2i: hierarchy navigation, server snapshots, diagnostics ────────────
@@ -700,17 +707,22 @@ export const DiagnoseProcessErrorResultSchema = z.object({
   logs: z.array(z.unknown()),
 });
 
+export const OrphanDimensionSchema = z.object({
+  name: z.string(),
+  hierarchies: z.array(z.string()),
+});
+
 export const FindOrphanDimensionsResultSchema = z.object({
   totalDimensions: z.number().int(),
   totalCubes: z.number().int(),
   orphanCount: z.number().int(),
   includeControl: z.boolean(),
-  orphans: z.array(
-    z.object({
-      name: z.string(),
-      hierarchies: z.array(z.string()),
-    }),
-  ),
+  total: z.number().int(),
+  count: z.number().int(),
+  offset: z.number().int(),
+  has_more: z.boolean(),
+  next_offset: z.number().int().nullable(),
+  items: z.array(OrphanDimensionSchema),
 });
 
 export const V12FindingSchema = z.object({

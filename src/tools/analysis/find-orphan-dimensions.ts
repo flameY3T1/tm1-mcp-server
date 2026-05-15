@@ -1,6 +1,13 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { FORMAT_SCHEMA, wrappedPageResponse, type Column } from "../format.js";
+import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+
+interface Orphan {
+  name: string;
+  hierarchies: string[];
+}
 
 export function registerFindOrphanDimensions(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -11,6 +18,7 @@ export function registerFindOrphanDimensions(server: McpServer, tm1Client: TM1Cl
       "diffs against the full dimension list. Replaces the agent-side join over",
       "tm1_list_cubes × tm1_list_dimensions which is token-heavy on large models.",
       "Control dimensions ('}'-prefix) are excluded by default — set includeControl=true to include them.",
+      "Paginated (default 50/page). Inspect a hit with tm1_get_hierarchy or remove via tm1_delete_dimension.",
     ].join(" "),
     {
       includeControl: z
@@ -18,8 +26,10 @@ export function registerFindOrphanDimensions(server: McpServer, tm1Client: TM1Cl
         .optional()
         .default(false)
         .describe("Include control dimensions whose names start with '}' (default: false)."),
+      ...PAGINATION_SCHEMA,
+      ...FORMAT_SCHEMA,
     },
-    async ({ includeControl }) => {
+    async ({ includeControl, limit, offset, fetchAll, format }) => {
       const [cubes, dimensions] = await Promise.all([
         tm1Client.cubes.list(),
         tm1Client.dimensions.list(),
@@ -34,28 +44,23 @@ export function registerFindOrphanDimensions(server: McpServer, tm1Client: TM1Cl
         ? dimensions
         : dimensions.filter((d) => !d.name.startsWith("}"));
 
-      const orphans = candidates
+      const orphans: Orphan[] = candidates
         .filter((d) => !usedDims.has(d.name))
         .map((d) => ({ name: d.name, hierarchies: d.hierarchies }));
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify(
-              {
-                totalDimensions: candidates.length,
-                totalCubes: cubes.length,
-                orphanCount: orphans.length,
-                includeControl,
-                orphans,
-              },
-              null,
-              2,
-            ),
-          },
-        ],
+      const page = paginate(orphans, limit, offset, fetchAll);
+      const wrapper = {
+        totalDimensions: candidates.length,
+        totalCubes: cubes.length,
+        orphanCount: orphans.length,
+        includeControl,
+        ...page,
       };
+      const columns: Column<Orphan>[] = [
+        { header: "name", get: (o) => o.name },
+        { header: "hierarchies", get: (o) => o.hierarchies },
+      ];
+      return wrappedPageResponse(wrapper, page, format, { title: "Orphan dimensions", columns });
     },
   );
 }

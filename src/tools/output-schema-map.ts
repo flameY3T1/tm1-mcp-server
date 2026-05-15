@@ -204,10 +204,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
     count: z.number().int(),
     entries: z.array(TransactionLogEntrySchema),
   },
-  tm1_list_error_logs: {
-    count: z.number().int(),
-    files: z.array(ErrorLogFileSchema),
-  },
+  tm1_list_error_logs: pageShapeFor(ErrorLogFileSchema),
   tm1_get_error_log_content: asOutputSchema(ErrorLogContentResultSchema),
   tm1_get_file_content: asOutputSchema(FileContentResultSchema),
 
