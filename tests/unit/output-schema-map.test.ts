@@ -386,7 +386,12 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       truncated: false,
       maskSecrets: true,
       excludeCommented: false,
-      matches: [
+      total: 2,
+      count: 2,
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [
         { process: "Load.Sales", tab: "data", line: 12, text: "CellPutN(...)" },
         { process: "Load.Costs", tab: "data", line: 8, text: "CellPutN(...)" },
       ],
@@ -480,8 +485,12 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       content: "a,b,c\n1,2,3",
     },
     tm1_list_error_logs: {
+      total: 1,
       count: 1,
-      files: [
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [
         { filename: "Load.Sales_20260504_123045.log", lastUpdated: "2026-05-04T12:30:45Z" },
       ],
     },

@@ -6,10 +6,21 @@ import type { SessionManager } from "../session-manager.js";
 import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
 import { getTm1Dispatcher } from "./dispatcher.js";
+import { invalidateCallgraphCache } from "../lib/callgraph/tm1-adapter.js";
 
 const MAX_NETWORK_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
 const USER_AGENT = `${NAME}/${VERSION}`;
+
+// R2-22: any successful mutating HTTP call invalidates the callgraph
+// reference-index cache. Cheap (Map.clear()) and rebuild is lazy on next
+// read — over-invalidation on non-graph-affecting calls (write_cells,
+// upload_file, CheckRules) costs at most one rebuild. The alternative —
+// per-service hooks across 17 mutation methods — risks drift as new
+// mutating methods are added.
+function isSafeHttpMethod(method: string): boolean {
+  return method === "GET" || method === "HEAD";
+}
 
 // Per-call overrides for the global config defaults. Currently only carries
 // timeoutMs (long-running execute_mdx/process/chore use this); kept as an
@@ -55,7 +66,7 @@ export class TM1HttpClient {
     opts?: RequestOptions,
   ): Promise<T> {
     const url = `${this.config.baseUrl}${path}`;
-    const isSafeMethod = method === "GET" || method === "HEAD";
+    const isSafeMethod = isSafeHttpMethod(method);
     const maxAttempts = isSafeMethod ? MAX_NETWORK_RETRIES : 0;
     let lastError: unknown;
 
@@ -93,10 +104,14 @@ export class TM1HttpClient {
             });
           }
 
-          return this.handleResponse<T>(retryResponse, path);
+          const retryResult = await this.handleResponse<T>(retryResponse, path);
+          if (!isSafeMethod) invalidateCallgraphCache();
+          return retryResult;
         }
 
-        return this.handleResponse<T>(response, path);
+        const result = await this.handleResponse<T>(response, path);
+        if (!isSafeMethod) invalidateCallgraphCache();
+        return result;
       } catch (error) {
         if (error instanceof TM1Error) {
           throw error;
@@ -170,7 +185,9 @@ export class TM1HttpClient {
       try { body = await response.text(); } catch { /* ignore */ }
       throw this.classifyHttpError(response.status, path, body || undefined);
     }
-    return response.text();
+    const text = await response.text();
+    if (!isSafeHttpMethod(method)) invalidateCallgraphCache();
+    return text;
   }
 
   /**
@@ -224,6 +241,7 @@ export class TM1HttpClient {
       try { errBody = await response.text(); } catch { /* ignore */ }
       throw this.classifyHttpError(response.status, path, errBody || undefined);
     }
+    if (!isSafeHttpMethod(method)) invalidateCallgraphCache();
   }
 
   private async executeRequest(

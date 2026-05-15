@@ -22,6 +22,72 @@ function userMessage(text: string): GetPromptResult {
 }
 
 export function registerAllPrompts(server: McpServer): void {
+  // ── tm1_orientation ─────────────────────────────────────────────────
+  // R2-19: LLM onboarding. Surfaces server topology, naming conventions,
+  // pagination/envelope shape, and a workflow→tool map so the agent
+  // doesn't have to re-derive these from individual tool descriptions.
+  server.registerPrompt(
+    "tm1_orientation",
+    {
+      title: "TM1 MCP server orientation",
+      description:
+        "Use at the start of a TM1 session to brief yourself on server topology, naming conventions ('}'-prefix control objects), pagination envelope shape, and the recommended tool sequence per workflow (audit, build, debug, deploy). Read before making tool calls in an unfamiliar TM1 environment.",
+    },
+    async () =>
+      userMessage(
+        [
+          "# TM1 MCP Server Orientation",
+          "",
+          "## Server topology",
+          "TM1 = OLAP database with these primary object types:",
+          "- **Cubes** — multidimensional fact tables. Each dimension is an ordered axis.",
+          "- **Dimensions** — categorical axes with one or more **Hierarchies** (parent/child trees of **Elements**). Element types: N (numeric leaf), C (consolidation/sum), S (string).",
+          "- **Subsets** — named element selections inside a hierarchy. Used as view slicers.",
+          "- **Views** — saved MDX query (rows × columns × titles) over a cube.",
+          "- **Processes (TI)** — TurboIntegrator scripts. 4 tabs: Prolog → Metadata → Data → Epilog.",
+          "- **Chores** — scheduled TI sequences with parameters.",
+          "- **Cube Rules** — calculated cell formulas with SKIPCHECK + FEEDERS.",
+          "- **Clients / Groups** — security principals.",
+          "",
+          "## Naming conventions",
+          "- Object names starting with `}` are **control objects** (system-internal: }ClientProperties, }StatsByCube, …). All `list_*` tools exclude them by default; set `includeControl=true` to inspect.",
+          "- Names are case-sensitive. Use exact match from `list_*` output; never guess casing.",
+          "- TI process names allow dots, slashes, spaces — URI-encoded on the wire.",
+          "",
+          "## Response envelope",
+          "List/search tools return:",
+          "```json",
+          '{ "total": N, "count": K, "offset": O, "has_more": bool, "next_offset": O+K|null, "items": [...] }',
+          "```",
+          "Override with `fetchAll=true` (entire dataset, beware on large dims) or `format=\"markdown\"` (human-readable table, structuredContent still attached).",
+          "",
+          "## Workflow → tool map",
+          "| Goal | Sequence |",
+          "|---|---|",
+          "| Inspect a cube | `tm1_list_cubes(nameExact=X)` → `tm1_get_cube_rules` → `tm1_get_cube_stats` |",
+          "| Debug failed TI | use the `tm1_diagnose_process` prompt |",
+          "| Build new model | `tm1_create_dimension` → `tm1_create_element` (bulk: `tm1_bulk_upsert_elements`) → `tm1_create_cube` |",
+          "| Audit cube | use the `tm1_audit_cube` prompt |",
+          "| Health check | use the `tm1_health_check` prompt |",
+          "| Review rules | use the `tm1_rules_review` prompt |",
+          "| Deploy TI bundle | `tm1_diff_process_with_file` (preview) → `tm1_install_pro_bundle` |",
+          "| Find dead code | `tm1_find_orphan_dimensions`, `tm1_analyze_object_usage` |",
+          "| Pre-write check | `tm1_check_writable_coords` (N-Level + rule-overlap warn) |",
+          "",
+          "## Safety rules",
+          "- Destructive tools (`tm1_delete_cube`, `tm1_delete_dimension`, `tm1_delete_process`, `tm1_clear_cube`) require a `confirm=<name verbatim>` arg as a safety net.",
+          "- `tm1_execute_process` and `tm1_execute_chore` are destructive in effect (irreversible cell mutation) even though they are not `delete_*`.",
+          "- Cube rules edits: validate first with `tm1_check_cube_rule` before `tm1_set_cube_rules`.",
+          "",
+          "## Knowledge base",
+          "Optional articles via `tm1_get_knowledge(topic='index')` if `TM1_KNOWLEDGE_DIR` is configured. Topics typically include `ti-syntax`, `mdx-patterns`, `tm1-rules`.",
+          "",
+          "## When in doubt",
+          "Call `tm1_get_server_info` and `tm1_get_server_capabilities` first to check version (v11/v12) and feature flags (MTQ, JobQueuing, AllowSeparateNandCRules).",
+        ].join("\n"),
+      ),
+  );
+
   // ── tm1_diagnose_process ────────────────────────────────────────────
   server.registerPrompt(
     "tm1_diagnose_process",
