@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { parseProFile } from "../../lib/pro-parser.js";
+import { withToolHint } from "../error-format.js";
 
 export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -97,23 +98,40 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       }
 
       const action = exists ? "updated" : "created";
-      if (!exists) await tm1Client.processes.create(processName);
+      if (!exists) {
+        await withToolHint(
+          tm1Client.processes.create(processName),
+          `Process create failed mid-import. Name '${processName}' may already exist (mode=create would have caught — likely race) or contain invalid characters. tm1_list_processes to verify state before retry.`,
+        );
+      }
 
-      await tm1Client.processes.updateCode(processName, {
-        prolog: parsed.prolog,
-        metadata: parsed.metadata,
-        data: parsed.data,
-        epilog: parsed.epilog,
-      });
+      await withToolHint(
+        tm1Client.processes.updateCode(processName, {
+          prolog: parsed.prolog,
+          metadata: parsed.metadata,
+          data: parsed.data,
+          epilog: parsed.epilog,
+        }),
+        `Code update failed after process '${processName}' was ${exists ? "located" : "created"}. PARTIAL APPLY: the process shell exists but tabs are stale/empty. Re-run tm1_import_pro_file with mode=update once root cause fixed, or tm1_delete_process to roll back.`,
+      );
 
       if (parsed.parameters.length > 0) {
-        await tm1Client.processes.updateParameters(processName, parsed.parameters);
+        await withToolHint(
+          tm1Client.processes.updateParameters(processName, parsed.parameters),
+          `Parameter update failed for '${processName}'. Code applied but parameters missing. Inspect parsed parameters and call tm1_update_process_parameters directly to recover.`,
+        );
       }
       if (parsed.variables.length > 0) {
-        await tm1Client.processes.updateVariables(processName, parsed.variables);
+        await withToolHint(
+          tm1Client.processes.updateVariables(processName, parsed.variables),
+          `Variable update failed for '${processName}'. Code+parameters applied but variables missing. tm1_update_process_variables to recover.`,
+        );
       }
       if (parsed.dataSource.type !== "None") {
-        await tm1Client.processes.updateDataSource(processName, parsed.dataSource);
+        await withToolHint(
+          tm1Client.processes.updateDataSource(processName, parsed.dataSource),
+          `Datasource update failed for '${processName}' (type=${parsed.dataSource.type}). Code+params+vars applied. Verify datasource credentials/path (ASCII file existence, ODBC DSN, view name) and call tm1_update_process_datasource directly.`,
+        );
       }
 
       return {

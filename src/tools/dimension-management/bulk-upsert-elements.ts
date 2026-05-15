@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { withToolHint } from "../error-format.js";
 
 const ElementSchema = z.object({
   name: z.string().describe("Element name"),
@@ -26,7 +27,10 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
     },
     async ({ dimension, hierarchy, elements }) => {
       const hier = hierarchy ?? dimension;
-      await tm1Client.elements.bulkUpsert(dimension, hier, elements);
+      await withToolHint(
+        tm1Client.elements.bulkUpsert(dimension, hier, elements),
+        "Bulk upsert failed. Common causes: Consolidated element references a child that is not in this batch and does not exist yet (list leafs first), dimension/hierarchy name mismatch (tm1_list_dimensions to verify), or attempt to change an element's type (delete + recreate instead).",
+      );
       const counts = {
         N: elements.filter((e) => e.type === "Numeric").length,
         C: elements.filter((e) => e.type === "Consolidated").length,

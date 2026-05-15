@@ -39,7 +39,22 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
         .default(false)
         .describe("Parse + preflight only — no create/update calls. Default false."),
     },
-    async ({ directory, recursive, pattern, mode, preflight, continueOnError, dryRun }) => {
+    async ({ directory, recursive, pattern, mode, preflight, continueOnError, dryRun }, extra) => {
+      // R2-02: emit MCP progress notifications per-file so clients can show
+      // a moving progress bar during multi-file deploys. Only fires when the
+      // client opted in by passing _meta.progressToken in the tool call;
+      // sendNotification is fire-and-forget so a non-progress-aware client
+      // can't break the install loop.
+      const progressToken = extra?._meta?.progressToken;
+      const sendProgress = (progress: number, total: number, message: string): void => {
+        if (progressToken === undefined) return;
+        void extra
+          .sendNotification({
+            method: "notifications/progress",
+            params: { progressToken, progress, total, message },
+          })
+          .catch(() => undefined);
+      };
       try {
         if (!path.isAbsolute(directory)) {
           return {
@@ -75,8 +90,11 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
 
         const results: FileResult[] = [];
         let stopped = false;
+        sendProgress(0, files.length, `starting install of ${files.length} files`);
 
-        for (const file of files) {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          sendProgress(i, files.length, `processing ${path.basename(file)}`);
           if (stopped) {
             results.push({ file, processName: null, status: "skipped", error: "stopped after earlier failure" });
             continue;
@@ -152,6 +170,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
           }
         }
 
+        sendProgress(files.length, files.length, "install complete");
         const summary = {
           directory,
           filesFound: files.length,

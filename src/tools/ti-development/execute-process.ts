@@ -26,14 +26,42 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
         .optional()
         .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for long-running TI runs."),
     },
-    async ({ processName, parameters, timeoutMs }) => {
-      const result = await withToolHint(
-        tm1Client.processes.execute(processName, parameters, timeoutMs ? { timeoutMs } : undefined),
-        `Process '${processName}' failed at runtime. Inspect cascade with tm1_diagnose_process_error(processName='${processName}', includeRelated=true). Verify parameter shape via tm1_get_process_parameters; check syntax with tm1_compile_process before re-running.`,
-      );
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-      };
+    async ({ processName, parameters, timeoutMs }, extra) => {
+      // R2-02: TM1 REST exposes no mid-run progress for tm1.Execute, so we
+      // emit periodic heartbeat notifications (every 5s) instead. Keeps
+      // client UI alive during long TI runs and lets users distinguish
+      // "still working" from "hung". Heartbeat-only; total stays undefined
+      // since TI duration is unknown ahead of time.
+      const progressToken = extra?._meta?.progressToken;
+      const start = Date.now();
+      let heartbeatTimer: NodeJS.Timeout | undefined;
+      if (progressToken !== undefined) {
+        const tick = (): void => {
+          const elapsedSec = Math.round((Date.now() - start) / 1000);
+          void extra
+            .sendNotification({
+              method: "notifications/progress",
+              params: {
+                progressToken,
+                progress: elapsedSec,
+                message: `${processName} still running (${elapsedSec}s elapsed)`,
+              },
+            })
+            .catch(() => undefined);
+        };
+        heartbeatTimer = setInterval(tick, 5000);
+      }
+      try {
+        const result = await withToolHint(
+          tm1Client.processes.execute(processName, parameters, timeoutMs ? { timeoutMs } : undefined),
+          `Process '${processName}' failed at runtime. Inspect cascade with tm1_diagnose_process_error(processName='${processName}', includeRelated=true). Verify parameter shape via tm1_get_process_parameters; check syntax with tm1_compile_process before re-running.`,
+        );
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } finally {
+        if (heartbeatTimer !== undefined) clearInterval(heartbeatTimer);
+      }
     },
   );
 }

@@ -57,14 +57,38 @@ function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
     }
   };
 
+  // R2-04: surface tool executions slower than this threshold as MCP
+  // logging notifications so clients (Claude Desktop log panel, VS Code
+  // MCP output) can show users what's taking time. Stays below the
+  // 30s default HTTP timeout so a single slow MDX still emits a log
+  // before the request resolves.
+  const SLOW_TOOL_MS = 5000;
+
   const wrapCb = (
     toolName: string,
     cb: ToolCallback,
     hasOutputSchema: boolean,
   ): ToolCallback => {
     return async (...cbArgs: unknown[]) => {
+      const start = Date.now();
       try {
         const result = (await cb(...cbArgs)) as McpToolResult | undefined;
+        const durationMs = Date.now() - start;
+        if (durationMs >= SLOW_TOOL_MS) {
+          // sendLoggingMessage rejects silently if the connected client did
+          // not declare the logging capability — fire-and-forget is fine.
+          void server.server
+            .sendLoggingMessage({
+              level: "warning",
+              logger: "tm1-mcp",
+              data: {
+                tool: toolName,
+                durationMs,
+                message: `slow tool call: ${toolName} took ${durationMs}ms`,
+              },
+            })
+            .catch(() => undefined);
+        }
         if (result && result.isError) {
           return normalizeErrorResult(result);
         }
