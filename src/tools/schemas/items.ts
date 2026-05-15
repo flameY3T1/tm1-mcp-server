@@ -21,12 +21,23 @@ export const CubeItemSchema = z.object({
   hasRules: z.boolean().optional(),
 });
 
+export const ElementStatsSchema = z.object({
+  total: z.number().int(),
+  numeric: z.number().int(),
+  consolidated: z.number().int(),
+  string: z.number().int(),
+  maxLevel: z.number().int(),
+});
+
 export const DimensionItemSchema = z.object({
   name: z.string(),
   hierarchies: z.array(z.string()),
   // Present only when tm1_list_dimensions is called with includeElementCount=true.
   // Map hierarchyName → element total.
   elementCounts: z.record(z.string(), z.number().int()).optional(),
+  // Present only when tm1_list_dimensions is called with includeElementStats=true.
+  // Map hierarchyName → {total, numeric, consolidated, string, maxLevel}.
+  elementStats: z.record(z.string(), ElementStatsSchema).optional(),
 });
 
 export const ProcessParameterSchema = z.object({

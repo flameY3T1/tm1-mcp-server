@@ -98,12 +98,24 @@ export interface Cube {
   hasRules?: boolean;
 }
 
+export interface ElementStats {
+  total: number;
+  numeric: number;
+  consolidated: number;
+  string: number;
+  maxLevel: number;
+}
+
 export interface Dimension {
   name: string;
   hierarchies: string[];
   // Populated only when getDimensions({includeElementCount: true}) is called.
   // Map hierarchyName → element total. Cheap audit signal — avoids per-hierarchy round-trips.
   elementCounts?: Record<string, number>;
+  // Populated only when getDimensions({includeElementStats: true}) is called.
+  // Per-hierarchy Type breakdown (N/C/S) + maxLevel. Drives orphan & double-hierarchy detection
+  // without cube/MDX dependency.
+  elementStats?: Record<string, ElementStats>;
 }
 
 export interface Hierarchy {

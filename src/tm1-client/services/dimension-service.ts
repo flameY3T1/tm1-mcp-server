@@ -38,15 +38,32 @@ export class DimensionService {
    * `Elements@odata.count` without paying for the full element list.
    * Single round-trip — drop-in for audit workflows that previously
    * called getHierarchy() N times just to size dimensions.
+   *
+   * When opts.includeElementStats is true, the expand fetches every
+   * Element's Type+Level so we can aggregate per-Type counts and maxLevel
+   * client-side. TM1 OData rejects `Type eq 'Numeric'` ($filter on enum
+   * properties) and exposes no nested `$apply=groupby`, so a single
+   * full-element scan is the cheapest path — still one round-trip, payload
+   * scales with total element count across all dimensions.
+   * Takes precedence over includeElementCount when both are set.
    */
-  async list(opts?: { includeElementCount?: boolean }): Promise<Dimension[]> {
-    const expand = opts?.includeElementCount
-      ? "Hierarchies($select=Name;$expand=Elements($count=true;$top=0))"
-      : "Hierarchies($select=Name)";
+  async list(opts?: { includeElementCount?: boolean; includeElementStats?: boolean }): Promise<Dimension[]> {
+    let expand: string;
+    if (opts?.includeElementStats) {
+      expand = "Hierarchies($select=Name;$expand=Elements($select=Type,Level))";
+    } else if (opts?.includeElementCount) {
+      expand = "Hierarchies($select=Name;$expand=Elements($count=true;$top=0))";
+    } else {
+      expand = "Hierarchies($select=Name)";
+    }
     const response = await this.http.request<{
       value: Array<{
         Name: string;
-        Hierarchies: Array<{ Name: string; "Elements@odata.count"?: number }>;
+        Hierarchies: Array<{
+          Name: string;
+          "Elements@odata.count"?: number;
+          Elements?: Array<{ Type: string; Level: number }>;
+        }>;
       }>;
     }>("GET", `/api/v1/Dimensions?$expand=${expand}`);
     return response.value.map((d) => {
@@ -54,7 +71,27 @@ export class DimensionService {
         name: d.Name,
         hierarchies: d.Hierarchies.map((h) => h.Name),
       };
-      if (opts?.includeElementCount) {
+      if (opts?.includeElementStats) {
+        dim.elementStats = Object.fromEntries(
+          d.Hierarchies.map((h) => {
+            const elements = h.Elements ?? [];
+            let numeric = 0;
+            let consolidated = 0;
+            let stringCount = 0;
+            let maxLevel = 0;
+            for (const e of elements) {
+              if (e.Type === "Numeric") numeric++;
+              else if (e.Type === "Consolidated") consolidated++;
+              else if (e.Type === "String") stringCount++;
+              if (e.Level > maxLevel) maxLevel = e.Level;
+            }
+            return [
+              h.Name,
+              { total: elements.length, numeric, consolidated, string: stringCount, maxLevel },
+            ];
+          }),
+        );
+      } else if (opts?.includeElementCount) {
         dim.elementCounts = Object.fromEntries(
           d.Hierarchies.map((h) => [h.Name, h["Elements@odata.count"] ?? 0]),
         );
