@@ -26,7 +26,17 @@ export const WRITE: ToolAnnotations = {
   openWorldHint: true,
 };
 
-// delete_*, clear_*, unload_*, cancel_*, remove_*, invalidate_*, execute_* (TI side effects).
+// delete_*, clear_*, unload_*, cancel_*, remove_*, execute_* (TI side effects).
+// Note: "destructive" per MCP spec = "may perform destructive updates to its
+// environment". This covers two distinct shapes in TM1:
+//   1. Irreversible object/data removal (delete_*, clear_*) — true destructive
+//   2. Irreversible data mutation via side-effects (execute_process,
+//      execute_chore) — process runs and writes through to cubes; output is
+//      not recoverable by undoing the tool call.
+// Both surface to the client as a single destructiveHint=true so prompts
+// before invocation warn either way. tm1_invalidate_callgraph_cache was
+// previously here but is in fact recoverable (cache rebuilds on next read)
+// and is now classified IDEMPOTENT_WRITE.
 export const DESTRUCTIVE: ToolAnnotations = {
   readOnlyHint: false,
   destructiveHint: true,

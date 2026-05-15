@@ -160,3 +160,15 @@ export function payloadResponse<T>(
     content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
   };
 }
+
+// Action-result helper for non-paginated mutation tools (delete/clear/
+// toggle/etc.) that return a flat {success, ...meta} payload. JSON-only;
+// no markdown variant since one-liner action results don't benefit from a
+// table view. structuredContent is attached so output-schema-map roundtrip
+// is satisfied without the Proxy re-parsing the JSON body.
+export function actionResponse<T extends object>(payload: T): TextResult {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+    structuredContent: payload as unknown as { [k: string]: unknown },
+  };
+}

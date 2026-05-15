@@ -1,6 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
+import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 
 export function registerClearCube(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -8,7 +10,8 @@ export function registerClearCube(server: McpServer, tm1Client: TM1Client): void
     [
       "Clear a subset of cells from a cube. For each dimension, pass either specific element names or an empty array to select all elements (wildcard).",
       "The dimensions array must match the cube's dimension order. Consolidated elements expand to their leaves. Prefer TI for reproducible loads — this is for ad-hoc resets.",
-      "Irreversible: cleared cells return zero/empty on next read. Before: tm1_sample_cells to confirm the slice you intend to wipe.",
+      "Irreversible: cleared cells return zero/empty on next read. Safety: pass confirm=<cube name verbatim>. Mismatched confirm rejects the call.",
+      "Before: tm1_sample_cells to confirm the slice you intend to wipe.",
     ].join(" "),
     {
       cubeName: z.string().describe("Cube to clear"),
@@ -16,8 +19,10 @@ export function registerClearCube(server: McpServer, tm1Client: TM1Client): void
       tuples: z.array(z.array(z.string())).describe(
         "Per-dimension element lists (same length as dimensions). Empty array = all elements on that dimension.",
       ),
+      ...CONFIRM_SCHEMA,
     },
-    async ({ cubeName, dimensions, tuples }) => {
+    async ({ cubeName, dimensions, tuples, confirm }) => {
+      requireConfirm(confirm, cubeName, "cube");
       if (dimensions.length !== tuples.length) {
         return {
           isError: true,
@@ -31,7 +36,7 @@ export function registerClearCube(server: McpServer, tm1Client: TM1Client): void
       const summary = dimensions
         .map((d, i) => `${d}=${tuples[i].length === 0 ? "*" : tuples[i].join("|")}`)
         .join(", ");
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, cubeName, summary }, null, 2) }] };
+      return actionResponse({ success: true, cubeName, summary });
     },
   );
 }

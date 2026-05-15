@@ -19,7 +19,7 @@ export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
   tm1_analyze_object_usage: READ_ONLY,
   tm1_check_v12_readiness: READ_ONLY,
   tm1_find_orphan_dimensions: READ_ONLY,
-  tm1_invalidate_callgraph_cache: DESTRUCTIVE,
+  tm1_invalidate_callgraph_cache: IDEMPOTENT_WRITE,
 
   // celldata
   tm1_check_writable_coords: READ_ONLY,

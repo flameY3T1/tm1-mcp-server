@@ -146,3 +146,141 @@ Stdio bleibt Default für Claude Code / Desktop. HTTP für Multi-Client / Cloud-
 - Transport: 10/10 (stdio + Streamable-HTTP stateless mit DNS-rebinding protect)
 
 **Total: 9.7 / 10** (post G1+G2+G3+G4+G5+G6)
+
+---
+
+# Round 2 — Protocol-Features & Polish (2026-05-15)
+
+Zweite Iteration: tieferer Blick auf MCP-Protokoll-Features die in Round 1 nicht betrachtet wurden (progress, cancellation, logging, subscriptions, capability-declaration), plus Annotation-Korrekturen und Tool-Body-Inkonsistenzen.
+
+## Protokoll-Features ungenutzt
+
+### R2-01 — Capabilities nicht deklariert
+`new McpServer({ name, version })` in `src/index.ts:239` ohne `capabilities`-Objekt. SDK setzt Defaults, aber explizite Declaration ist Spec-empfohlen für `logging`, `prompts`, `resources`, `tools.listChanged`. Clients können sonst Features missinterpretieren.
+
+### R2-02 — Keine progress notifications
+Long-running Tools blockieren stumm bis Fertigstellung:
+- `tm1_execute_process` (TI-Run, mehrere Minuten möglich)
+- `tm1_install_pro_bundle` (Verzeichnis voller `.pro` deployen)
+- `tm1_bulk_upsert_elements` (große Dim-Refreshes)
+- `tm1_get_all_processes_code` (N+1 process-fetches)
+- `tm1_check_v12_readiness` (vollständiger TI/Rules-Scan)
+
+MCP `notifications/progress` mit `progressToken` ungenutzt. User sieht keinen Fortschritt, kann nicht abschätzen ob hängt oder läuft.
+
+### R2-03 — Keine cancellation
+Kein `AbortSignal` von MCP-Request bis undici durchgeschleift. User kann blockierenden Tool-Call nicht abbrechen (MCP `notifications/cancelled` ignoriert). Bei TI-Execution besonders schmerzhaft — Process läuft TM1-seitig weiter.
+
+### R2-04 — MCP logging notifications ungenutzt
+pino loggt lokal nach stderr (korrekt für stdio), aber `server.sendLoggingMessage()` nie aufgerufen. Client-Side log-panel (Claude Desktop log viewer, VS Code MCP output) sieht keine Tool-Events. Kandidaten: slow MDX (`durationMs > 5000`), deprecation warnings, retry-on-reconnect.
+
+### R2-05 — Keine resource subscriptions
+Kommentar `src/resources/index.ts:5` deutet auf "subscribe to updates without polling" — nicht implementiert. Gute Kandidaten:
+- `tm1://server/state` (state-changes pushen)
+- `tm1://server/sessions` (login/logout events)
+- `tm1://server/threads` (long-running-thread alerts)
+
+Spec: `resources/subscribe` + `notifications/resources/updated`.
+
+### R2-06 — Keine tool-list-changed notifications
+Tools sind static nach `registerAllTools()`. Falls künftig version-abhängig (v11 vs v12 expose unterschiedliche Tools) fehlt `notifications/tools/list_changed`.
+
+### R2-07 — Cursor-basierte MCP-pagination ungenutzt
+Eigene `{limit, offset, fetchAll}` Envelope statt protokoll-natives `cursor`-Feld (z.B. bei `resources/list` mit vielen Cubes). Tool-interne Pagination OK lassen, aber `resources/list` callbacks könnten MCP-Cursor zurückgeben für lange Listen (>1000 Cubes/Processes).
+
+## Auth / Security
+
+### R2-08 — HTTP transport ohne Auth-Layer
+Loopback-bind (127.0.0.1) + DNS-rebind-guard schützen Single-User-Setup. Falls jemand `TM1_MCP_HTTP_HOST=0.0.0.0` setzt = LAN-exponiert ohne Auth. Spec empfiehlt OAuth 2.1 für remote-Transport. Optionen:
+- Bearer-Token-Check (env `TM1_MCP_HTTP_TOKEN`)
+- OAuth 2.1 mit DCR
+- mTLS hinter Reverse-Proxy (außerhalb scope)
+
+### R2-09 — Kein audience-binding / token-binding
+Wenn HTTP exponiert wird (R2-08), fehlt token-binding gegen replay über mehrere Server-Instanzen.
+
+## Tool-Design
+
+### R2-10 — `delete-cube` ohne `confirm`-Parameter
+Annotation = DESTRUCTIVE ✓, Description warnt ✓. Aber kein in-tool double-check (`confirm: z.literal(cubeName)`). Verlässt sich auf Client-UI-Prompt + autoApprove-Allowlist. Gleicher Mangel bei `tm1_delete_dimension`, `tm1_delete_process`, `tm1_clear_cube`, `tm1_unload_cube`.
+
+Pattern: zweites Parameter `confirm: z.string()` mit Validierung gegen `name` macht versehentlichen LLM-Call schwerer.
+
+### R2-11 — `tm1_invalidate_callgraph_cache` als DESTRUCTIVE falsch klassifiziert
+Cache-Invalidation ist idempotent + recoverable (re-build beim nächsten Read). DESTRUCTIVE löst unnötige Client-Prompts aus. → IDEMPOTENT_WRITE.
+
+### R2-12 — `openWorldHint` fehlt in allen annotations
+`READ_ONLY/IDEMPOTENT_WRITE/WRITE/DESTRUCTIVE` annotations in `src/tools/annotations.ts` setzen `openWorldHint` nicht. TM1 ist external system → Spec sagt `openWorldHint: true` für alle TM1-tools.
+
+### R2-13 — `tm1_execute_chore` / `tm1_execute_process` als DESTRUCTIVE — semantisch ok aber overloaded
+DESTRUCTIVE laut Spec = "may perform destructive updates to its environment". Execute fällt rein (Side-effects auf Cubes), aber annotation map vermischt "delete" mit "execute". Beibehalten OK, aber Doku-Hinweis: TI-Execute = irreversible Daten-Mutation.
+
+### R2-14 — `delete-cube` Tool-Body inkonsistent
+`src/tools/model-building/delete-cube.ts` schreibt `content`-Envelope manuell (Z. 17-22), während andere Tools `pageResponse`/`payloadResponse` helper nutzen. Konsistenz: Helper `simpleResponse({ success: true, ...meta })`.
+
+## SDK / Versioning
+
+### R2-15 — SDK pinned `@modelcontextprotocol/sdk 1.29.0`
+Stand prüfen ggü. latest. Update könnte bringen:
+- elicitation (mid-call user-input request)
+- sampling (LLM-completion request vom Server)
+- bessere progress/cancellation-APIs
+- structured-content-roundtrip Fixes
+
+### R2-16 — Node engines `>=18` OK
+Kein Handlungsbedarf — fetch ist seit 18 stable.
+
+## Output / Errors
+
+### R2-17 — `structuredContent` nur wenn outputSchema existiert
+Proxy in `src/index.ts` routet auf `registerTool` mit `outputSchema` nur wenn in `OUTPUT_SCHEMA_MAP`. Tools ohne Schema-Eintrag (z.B. `tm1_delete_cube`, `tm1_execute_mdx` evtl.) returnen Text-JSON ohne `structuredContent` → typed-Clients verlieren Typing. Coverage prüfen: `OUTPUT_SCHEMA_MAP` Einträge vs `ANNOTATION_MAP` Einträge.
+
+### R2-18 — Error-Hint statisch pro Code
+`hintForCode` mapping in `src/types.ts` gut. Aber kein situational hint (TM1-Version, capability flag, current Tool-Context). `withToolHint` löst das pro-call → in `delete-cube`, `bulk-upsert`, `import-pro-file` nicht genutzt.
+
+## Inhaltliche Lücken
+
+### R2-19 — Kein `tm1_orientation` / `tm1_help` prompt
+LLM-Onboarding-Prompt fehlt: Server-Topology, Naming-Conventions, `}`-Prefix für Control-Objekte, Pagination-Envelope-Shape, Welche Tools für welchen Workflow. Pendant zu agentskills.io "When to use" / SKILL.md.
+
+### R2-20 — Knowledge-Tool optional, kein Default-Bundle
+`tm1_get_knowledge` liest aus `TM1_KNOWLEDGE_DIR`. Wenn unkonfiguriert = stille Degradation (kein Article, kein Hint). Sollte gebündelte Default-Artikel ausliefern (ti-syntax, mdx-patterns, tm1-rules) als NPM-Package-Assets.
+
+### R2-21 — Keine v11-vs-v12 capability annotation per Tool
+`tm1_check_v12_readiness` global ✓, aber einzelne Tools (`tm1_install_pro_bundle`, `tm1_import_pro_file`) ohne Metadata wer sie verträgt. Tool-Description erwähnt es z.T., aber keine machine-readable Annotation. Vorschlag: `requiresVersion: "v12"` in `ToolAnnotations` extension.
+
+### R2-22 — Callgraph-Cache wird nicht auto-invalidiert
+Schema-Mutationen (`create_dimension`, `create_cube`, `update_process_code`, `set_cube_rules`) sollten Callgraph-Cache automatisch invalidieren. Aktuell muss User `tm1_invalidate_callgraph_cache` manuell aufrufen → stale graph silently möglich.
+
+---
+
+## Action-Items Round 2 (priorisiert)
+
+| # | Punkt | Impact | Aufwand | Prio |
+|---|---|---|---|---|
+| R2-12 | `openWorldHint:true` für alle annotations | korrekte Client-Warnings | XS | hoch |
+| R2-11 | `tm1_invalidate_callgraph_cache` → IDEMPOTENT_WRITE | weniger false-positive Prompts | XS | hoch |
+| R2-01 | Capabilities explizit deklarieren in `new McpServer` | Spec-Compliance | XS | hoch |
+| R2-10 | `confirm`-Param auf delete-cube/-dimension/-process, clear-cube | Safety-Net | S | hoch |
+| R2-14 | `delete-cube` Body auf Helper umstellen | Konsistenz | XS | mittel |
+| R2-22 | Auto-invalidate Callgraph nach Schema-Mutationen | Korrektheit | S | mittel |
+| R2-17 | OUTPUT_SCHEMA_MAP Coverage prüfen + auf 100% | Typed Output | M | mittel |
+| R2-19 | `tm1_orientation` Prompt | LLM-Onboarding | S | mittel |
+| R2-02 | Progress Notifications für 5 Long-Running Tools | UX bei Long-Ops | M | mittel |
+| R2-04 | `sendLoggingMessage` für slow query / deprecation | Client-Visibility | M | mittel |
+| R2-15 | SDK-Update prüfen + Migration | Future-Proof | M | mittel |
+| R2-03 | AbortSignal MCP→undici durchschleifen | Cancel-Support | M | niedrig |
+| R2-05 | Resource Subscriptions für server-state/threads/sessions | Polling vermeiden | L | niedrig |
+| R2-20 | Knowledge-Default-Bundle als NPM-Asset | Out-of-Box-Wert | M | niedrig |
+| R2-21 | `requiresVersion` Annotation extension | Machine-Readable Compat | M | niedrig |
+| R2-18 | `withToolHint` Coverage auf High-Signal Mutations | bessere Hints | S | niedrig |
+| R2-08 | HTTP Bearer-Token oder OAuth 2.1 | Remote-Auth | L | niedrig (nur wenn HTTP exposed) |
+| R2-09 | Audience/Token-Binding | Replay-Schutz | M | niedrig |
+| R2-06 | Tools-List-Changed Notifications | dynamic Tools | S | niedrig (nicht benötigt aktuell) |
+| R2-07 | Cursor-Pagination für resources/list | nur bei >1000 Objekten | M | niedrig |
+| R2-13 | Doku-Hinweis Execute vs DESTRUCTIVE | Klärung | XS | niedrig |
+| R2-16 | Node-Engines — kein Handlungsbedarf | — | — | done |
+
+## Score-Update (post Round-2-Analyse)
+
+Round-2 senkt aktuellen Score nicht — alle Punkte sind Polish + Protokoll-Feature-Erweiterungen, kein Spec-Bruch. Total bleibt **9.7 / 10**. Bei Umsetzung R2-01/02/03/04/05/12 → **10/10** (volle Protokoll-Feature-Nutzung).

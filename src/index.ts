@@ -235,11 +235,28 @@ async function main(): Promise<void> {
     );
   }
 
-  // Create MCP server
-  const server = new McpServer({
-    name: NAME,
-    version: VERSION,
-  });
+  // Create MCP server.
+  // Capabilities explicitly declared per MCP spec recommendation:
+  //   tools / resources / prompts — auto-registered by the SDK when the
+  //     respective register* helper is first called, declared here for
+  //     self-documentation and to allow listChanged toggling later.
+  //   logging — NOT auto-registered by the SDK; declaring it unlocks
+  //     server.sendLoggingMessage() so we can surface slow-query and
+  //     deprecation events in the client-side log panel.
+  const server = new McpServer(
+    {
+      name: NAME,
+      version: VERSION,
+    },
+    {
+      capabilities: {
+        tools: {},
+        resources: { listChanged: false, subscribe: false },
+        prompts: { listChanged: false },
+        logging: {},
+      },
+    },
+  );
 
   // Register all tools — wrap server so each registration receives the
   // annotation hint from ANNOTATION_MAP without editing call sites.
