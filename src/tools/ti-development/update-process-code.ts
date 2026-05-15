@@ -15,6 +15,7 @@ export function registerUpdateProcessCode(server: McpServer, tm1Client: TM1Clien
       "Update one or more code tabs of a TI process (partial update supported).",
       "Returns receivedTabs[] + per-tab byte sizes so you can detect silent payload truncation by the MCP transport.",
       "Payload note: MCP stdio JSON-RPC frames are uncapped at protocol level, but very large tabs (>~1 MB) may trip client/server buffer limits — chunked uploads aren't yet supported by this tool. If a tab arrives empty after parse, the server reports the receivedTabs list so the caller can compare against what was sent.",
+      "Before: tm1_check_process_code on the new code (syntax) or tm1_get_process_code to read the current state. After: tm1_execute_process to test, tm1_validate_process_refs to verify cross-references.",
     ].join(" "),
     {
       processName: z.string().describe("Name of the TI process to update"),
@@ -71,7 +72,7 @@ export function registerUpdateProcessCode(server: McpServer, tm1Client: TM1Clien
             }),
           },
         ],
-      };
+      };
     },
   );
 }

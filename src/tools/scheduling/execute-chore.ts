@@ -5,7 +5,11 @@ import type { TM1Client } from "../../tm1-client.js";
 export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
     "tm1_execute_chore",
-    "Execute a TM1 chore immediately, bypassing its schedule.",
+    [
+      "Execute a TM1 chore immediately, bypassing its schedule.",
+      "Non-idempotent: runs every chained process. Before: tm1_analyze_chore_graph to preview the call chain.",
+      "On failure: tm1_diagnose_process_error for the failing step (chores fail-fast on first error).",
+    ].join(" "),
     {
       name: z.string().describe("Chore name (case-sensitive)"),
       timeoutMs: z

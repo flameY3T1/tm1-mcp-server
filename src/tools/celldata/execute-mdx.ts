@@ -7,7 +7,10 @@ import { withToolHint } from "../error-format.js";
 export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_execute_mdx",
-    "Execute an MDX query against the TM1 server and return structured cell data with axes (page-envelope shape consistent with list_*).",
+    [
+      "Execute an MDX query against the TM1 server and return structured cell data with axes (page-envelope shape consistent with list_*).",
+      "Related: tm1_create_mdx_view to persist a query as a public view, tm1_sample_cells for cheap sparsity probe, tm1_get_cell_value for a single coordinate.",
+    ].join(" "),
     {
       mdx: z.string().describe("The MDX query string to execute"),
       ...PAGINATION_SCHEMA,

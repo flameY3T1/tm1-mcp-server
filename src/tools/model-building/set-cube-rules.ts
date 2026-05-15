@@ -11,6 +11,7 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
       "Create or replace the rules for a TM1 cube.",
       "The rules text must include SKIPCHECK; at the top and FEEDERS; before all feeder definitions.",
       "Replaces existing rules completely — always provide the full rules text.",
+      "Before: tm1_check_cube_rule to validate syntax. After: tm1_get_cube_rules to read back, tm1_invalidate_callgraph_cache is called automatically (rule changes shift DB() / feeder edges).",
     ].join(" "),
     {
       cube: z.string().describe("Cube name (case-sensitive)"),

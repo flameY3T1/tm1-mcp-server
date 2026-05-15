@@ -6,7 +6,12 @@ import { withToolHint } from "../error-format.js";
 export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_execute_process",
-    "Execute a TurboIntegrator process on the TM1 server with optional parameters",
+    [
+      "Execute a TurboIntegrator process on the TM1 server with optional parameters.",
+      "Non-idempotent: each call re-runs the process — do not retry blindly on transport errors without checking server state.",
+      "Before: tm1_check_process_code (syntax) and/or tm1_compile_process (full compile). Discover required params with tm1_get_process_parameters.",
+      "On failure: use tm1_diagnose_process_error for combined log + cascade fetch.",
+    ].join(" "),
     {
       processName: z.string().describe("Name of the TI process to execute"),
       parameters: z
