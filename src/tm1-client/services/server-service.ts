@@ -118,14 +118,19 @@ export class ServerService {
       .filter((e) => e.filename);
 
     if (opts.processName) {
-      const proc = opts.processName;
-      // TM1 pattern: TM1ProcessError_<ts>_<id>_<proc>.log (proc at end before .log)
-      // Legacy/manual pattern: <proc>_<ts>.log (proc at start)
-      const suffix = `_${proc}.log`;
-      const prefix = `${proc}_`;
-      entries = entries.filter(
-        (e) => e.filename.endsWith(suffix) || e.filename.startsWith(prefix) || e.filename === proc,
-      );
+      const proc = opts.processName.toLowerCase();
+      // TM1 v11+ pattern with session hash: TM1ProcessError_<ts>_<id>_<proc>_<hash>.log
+      // TM1 pattern without hash:           TM1ProcessError_<ts>_<id>_<proc>.log
+      // Legacy/manual pattern:              <proc>_<ts>.log
+      entries = entries.filter((e) => {
+        const f = e.filename.toLowerCase();
+        return (
+          f === proc ||
+          f.startsWith(`${proc}_`) ||
+          f.endsWith(`_${proc}.log`) ||
+          f.includes(`_${proc}_`)
+        );
+      });
     }
     if (opts.since) {
       const sinceCompact = opts.since.replace(/[^0-9]/g, "").slice(0, 14);

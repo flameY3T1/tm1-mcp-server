@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
-import { tsFromFilename, truncateTail, tailLines } from "./error-log-helpers.js";
+import { matchesProcessName, tsFromFilename, truncateTail, tailLines } from "./error-log-helpers.js";
 
 const DEFAULT_TAIL_LINES = 60;
 const DEFAULT_MAX_LOGS = 3;
@@ -19,7 +19,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
       "Returns logs newest-first. Use since to narrow to a specific time window.",
     ].join(" "),
     {
-      processName: z.string().describe("Process name to diagnose. Matches log files whose filename starts with '<processName>_'."),
+      processName: z.string().describe("Process name to diagnose. Matches both TM1 filename conventions: modern 'TM1ProcessError_<ts>_<id>_<processName>.log' and legacy '<processName>_<ts>.log'."),
       since: z.string().optional().describe("Only consider logs with LastUpdated >= this ISO timestamp, e.g. '2026-05-04T00:00:00'."),
       maxLogs: z.number().int().min(1).max(20).optional().default(DEFAULT_MAX_LOGS)
         .describe(`Max number of log files to fetch (newest first, default ${DEFAULT_MAX_LOGS}).`),
@@ -35,7 +35,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
     async ({ processName, since, maxLogs, tail, includeRelated, relatedWindowSec, relatedMaxFiles }) => {
       const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
       const matching = allFiles
-        .filter((f) => f.filename.toLowerCase().startsWith(processName.toLowerCase() + "_"))
+        .filter((f) => matchesProcessName(f.filename, processName))
         .filter((f) => {
           if (!since) return true;
           return !f.lastUpdated || f.lastUpdated >= since;
