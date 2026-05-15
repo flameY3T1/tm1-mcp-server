@@ -9,6 +9,8 @@ export function registerCreateCube(server: McpServer, tm1Client: TM1Client): voi
       "Create a new TM1 cube with the specified dimensions.",
       "The dimension order matters for performance: put dimensions used most often in WHERE clauses first.",
       "All referenced dimensions must exist before calling this tool.",
+      "Fails if a cube with the same name already exists — no idempotent variant; delete first with tm1_delete_cube if you intend to replace.",
+      "After: tm1_set_cube_rules for calculations, tm1_create_mdx_view for default slices.",
     ].join(" "),
     {
       name: z.string().describe("Cube name"),

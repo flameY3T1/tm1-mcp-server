@@ -26,7 +26,10 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
 
   server.tool(
     "tm1_cancel_thread",
-    "Cancel a running TM1 server thread by its ID. Use tm1_list_threads to find the ID.",
+    [
+      "Cancel a running TM1 server thread by its ID. Use tm1_list_threads to find the ID.",
+      "Non-idempotent: cancelling a finished thread errors. Before: tm1_list_threads to confirm the thread is still running.",
+    ].join(" "),
     {
       id: z.number().int().describe("Thread ID to cancel"),
     },

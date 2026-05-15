@@ -20,7 +20,11 @@ const ChoreStepSchema = z.object({
 export function registerCreateChore(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
     "tm1_create_chore",
-    "Create a new TM1 chore with a schedule and list of TI processes to run.",
+    [
+      "Create a new TM1 chore with a schedule and list of TI processes to run.",
+      "Fails if a chore with the same name already exists; use tm1_update_chore for idempotent edits.",
+      "After: tm1_toggle_chore to activate scheduling, tm1_execute_chore to run immediately.",
+    ].join(" "),
     {
       name: z.string().describe("Chore name"),
       startTime: z.string().describe(

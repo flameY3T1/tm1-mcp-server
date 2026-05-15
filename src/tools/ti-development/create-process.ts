@@ -6,7 +6,11 @@ import { withToolHint } from "../error-format.js";
 export function registerCreateProcess(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_create_process",
-    "Create a new empty TurboIntegrator process on the TM1 server",
+    [
+      "Create a new empty TurboIntegrator process on the TM1 server.",
+      "Fails if a process with the same name already exists — for idempotent create-or-replace use tm1_upsert_process instead.",
+      "After: tm1_update_process_code to add code, tm1_update_process_parameters for params, tm1_update_process_datasource for ODBC/file sources.",
+    ].join(" "),
     {
       name: z.string().describe("Name for the new TI process"),
     },
