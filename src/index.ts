@@ -16,6 +16,7 @@ import {
 } from "./tools/error-format.js";
 import { registerAllPrompts } from "./prompts/index.js";
 import { registerAllResources } from "./resources/index.js";
+import { SubscriptionRegistry } from "./resources/subscriptions.js";
 import { registerAllTools } from "./tools/index.js";
 import { OUTPUT_SCHEMA_MAP } from "./tools/output-schema-map.js";
 import { NAME, VERSION } from "./version.js";
@@ -275,7 +276,7 @@ async function main(): Promise<void> {
     {
       capabilities: {
         tools: {},
-        resources: { listChanged: false, subscribe: false },
+        resources: { listChanged: false, subscribe: true },
         prompts: { listChanged: false },
         logging: {},
       },
@@ -292,6 +293,14 @@ async function main(): Promise<void> {
   // can `#`-reference TM1 objects in chat or browse a sidebar tree.
   registerAllResources(server, tm1Client);
   logger.info("All MCP resources registered");
+
+  // R2-05: install subscribe/unsubscribe handlers and bridge HTTP-layer
+  // mutation events to notifications/resources/updated for any client that
+  // subscribed to tm1://server/state. Decoupled from the HTTP layer via
+  // the tm1Events bus so transport-side concerns don't reach into MCP.
+  const subscriptions = new SubscriptionRegistry(server, logger);
+  subscriptions.install();
+  logger.info("Resource subscription registry installed");
 
   // Register MCP Prompts (parameterised templates surfaced as slash-
   // commands in IDE clients). Each prompt briefs the LLM with a concrete

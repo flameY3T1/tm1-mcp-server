@@ -7,6 +7,7 @@ import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
 import { getTm1Dispatcher } from "./dispatcher.js";
 import { invalidateCallgraphCache } from "../lib/callgraph/tm1-adapter.js";
+import { tm1Events } from "../lib/tm1-events.js";
 
 const MAX_NETWORK_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
@@ -122,12 +123,18 @@ export class TM1HttpClient {
           }
 
           const retryResult = await this.handleResponse<T>(retryResponse, path);
-          if (!isSafeMethod) invalidateCallgraphCache();
+          if (!isSafeMethod) {
+            invalidateCallgraphCache();
+            tm1Events.emit("mutation", { method, path });
+          }
           return retryResult;
         }
 
         const result = await this.handleResponse<T>(response, path);
-        if (!isSafeMethod) invalidateCallgraphCache();
+        if (!isSafeMethod) {
+          invalidateCallgraphCache();
+          tm1Events.emit("mutation", { method, path });
+        }
         return result;
       } catch (error) {
         if (error instanceof TM1Error) {
@@ -205,7 +212,10 @@ export class TM1HttpClient {
       throw this.classifyHttpError(response.status, path, body || undefined);
     }
     const text = await response.text();
-    if (!isSafeHttpMethod(method)) invalidateCallgraphCache();
+    if (!isSafeHttpMethod(method)) {
+      invalidateCallgraphCache();
+      tm1Events.emit("mutation", { method, path });
+    }
     return text;
   }
 
@@ -262,7 +272,10 @@ export class TM1HttpClient {
       try { errBody = await response.text(); } catch { /* ignore */ }
       throw this.classifyHttpError(response.status, path, errBody || undefined);
     }
-    if (!isSafeHttpMethod(method)) invalidateCallgraphCache();
+    if (!isSafeHttpMethod(method)) {
+      invalidateCallgraphCache();
+      tm1Events.emit("mutation", { method, path });
+    }
   }
 
   private async executeRequest(

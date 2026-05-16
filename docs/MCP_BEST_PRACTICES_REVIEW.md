@@ -177,12 +177,16 @@ MCP `notifications/progress` mit `progressToken` ungenutzt. User sieht keinen Fo
 pino loggt lokal nach stderr (korrekt für stdio), aber `server.sendLoggingMessage()` nie aufgerufen. Client-Side log-panel (Claude Desktop log viewer, VS Code MCP output) sieht keine Tool-Events. Kandidaten: slow MDX (`durationMs > 5000`), deprecation warnings, retry-on-reconnect.
 
 ### R2-05 — Keine resource subscriptions
-Kommentar `src/resources/index.ts:5` deutet auf "subscribe to updates without polling" — nicht implementiert. Gute Kandidaten:
+~~Kommentar `src/resources/index.ts:5` deutet auf "subscribe to updates without polling" — nicht implementiert. Gute Kandidaten:
 - `tm1://server/state` (state-changes pushen)
 - `tm1://server/sessions` (login/logout events)
 - `tm1://server/threads` (long-running-thread alerts)
 
-Spec: `resources/subscribe` + `notifications/resources/updated`.
+Spec: `resources/subscribe` + `notifications/resources/updated`.~~
+
+**Done 2026-05-16 (MVP).** Capabilities `resources.subscribe: true`. `SubscriptionRegistry` installs `resources/subscribe` and `resources/unsubscribe` handlers via `server.server.setRequestHandler`. HTTP layer emits typed `tm1Events.mutation` after every successful non-safe response (POST/PUT/PATCH/DELETE). Registry listens, matches against `STATE_SENSITIVE_URIS` (currently `tm1://server/state`), and fires `sendResourceUpdated({ uri })` per subscribed match. Decoupled via in-process EventEmitter so HTTP layer holds no MCP-server reference. Send errors logged, never thrown.
+
+Sessions/threads subscriptions deferred — TM1 doesn't push session events, so they'd require a polling loop. Add later if a client surfaces real demand. Tests: `tests/unit/resource-subscriptions.test.ts` (8 scenarios) + `tests/unit/http-mutation-events.test.ts` (4 scenarios).
 
 ### R2-06 — Keine tool-list-changed notifications
 Tools sind static nach `registerAllTools()`. Falls künftig version-abhängig (v11 vs v12 expose unterschiedliche Tools) fehlt `notifications/tools/list_changed`.
