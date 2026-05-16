@@ -22,12 +22,28 @@ function isSafeHttpMethod(method: string): boolean {
   return method === "GET" || method === "HEAD";
 }
 
-// Per-call overrides for the global config defaults. Currently only carries
-// timeoutMs (long-running execute_mdx/process/chore use this); kept as an
-// object so future per-call knobs (e.g. abort signal) can be added without
-// changing call signatures across the file.
+// Per-call overrides for the global config defaults. timeoutMs caps long-running
+// execute_mdx/process/chore; signal forwards an MCP-side AbortSignal (R2-03) so
+// `notifications/cancelled` from a client terminates the in-flight fetch.
 export interface RequestOptions {
   timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+// Link an external AbortSignal (e.g. from RequestHandlerExtra.signal) to a
+// locally-owned timeout AbortController. Returns an unsubscribe function the
+// caller must invoke in `finally` to avoid leaking the listener after the
+// request resolves. If the external signal is already aborted, propagates the
+// reason immediately.
+function linkAbortSignals(local: AbortController, external?: AbortSignal): () => void {
+  if (!external) return () => undefined;
+  if (external.aborted) {
+    local.abort(external.reason);
+    return () => undefined;
+  }
+  const onAbort = (): void => local.abort(external.reason);
+  external.addEventListener("abort", onAbort, { once: true });
+  return () => external.removeEventListener("abort", onAbort);
 }
 
 export class TM1HttpClient {
@@ -82,7 +98,7 @@ export class TM1HttpClient {
 
       try {
         const cookie = await this.sessionManager.ensureSession();
-        const response = await this.executeRequest(url, method, cookie, body, opts?.timeoutMs);
+        const response = await this.executeRequest(url, method, cookie, body, opts?.timeoutMs, opts?.signal);
 
         if (response.status === 401) {
           this.logger.warn({ endpoint: path }, "Received 401, re-authenticating");
@@ -93,6 +109,7 @@ export class TM1HttpClient {
             newCookie,
             body,
             opts?.timeoutMs,
+            opts?.signal,
           );
 
           if (retryResponse.status === 401) {
@@ -157,6 +174,7 @@ export class TM1HttpClient {
     const doFetch = async (c: string): Promise<Response> => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
+      const unlink = linkAbortSignals(controller, opts?.signal);
       try {
         return await fetch(url, {
           method,
@@ -172,6 +190,7 @@ export class TM1HttpClient {
         } as RequestInit);
       } finally {
         clearTimeout(timeout);
+        unlink();
       }
     };
 
@@ -211,6 +230,7 @@ export class TM1HttpClient {
     const doFetch = async (c: string): Promise<Response> => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
+      const unlink = linkAbortSignals(controller, opts?.signal);
       try {
         return await fetch(url, {
           method,
@@ -228,6 +248,7 @@ export class TM1HttpClient {
         } as RequestInit);
       } finally {
         clearTimeout(timeout);
+        unlink();
       }
     };
 
@@ -250,12 +271,14 @@ export class TM1HttpClient {
     cookie: string,
     body?: unknown,
     timeoutMs?: number,
+    externalSignal?: AbortSignal,
   ): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
       timeoutMs ?? this.config.requestTimeoutMs,
     );
+    const unlink = linkAbortSignals(controller, externalSignal);
 
     const headers: Record<string, string> = {
       Cookie: `TM1SessionId=${cookie}`,
@@ -280,6 +303,7 @@ export class TM1HttpClient {
       } as RequestInit);
     } finally {
       clearTimeout(timeout);
+      unlink();
     }
   }
 

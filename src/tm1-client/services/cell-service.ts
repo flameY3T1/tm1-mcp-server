@@ -6,7 +6,7 @@
 // See docs/ARCHITECTURE.md for the layering.
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import type { CellValue, MdxResult } from "../../types.js";
-import type { TM1HttpClient } from "../http.js";
+import type { RequestOptions, TM1HttpClient } from "../http.js";
 import { transformCellsetResponse } from "./cellset-transform.js";
 
 const enc = encodeURIComponent;
@@ -76,7 +76,7 @@ export class CellService {
     mdx: string,
     top?: number,
     skip?: number,
-    opts?: { timeoutMs?: number },
+    opts?: RequestOptions,
   ): Promise<MdxResult> {
     let cellsExpand = "Cells($select=Value,FormattedValue";
     if (top !== undefined) {

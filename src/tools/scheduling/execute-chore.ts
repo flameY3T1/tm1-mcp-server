@@ -20,8 +20,8 @@ export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): v
         .optional()
         .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for chores running long TI chains."),
     },
-    async ({ name, timeoutMs }) => {
-      await tm1Client.chores.execute(name, timeoutMs ? { timeoutMs } : undefined);
+    async ({ name, timeoutMs }, extra) => {
+      await tm1Client.chores.execute(name, { signal: extra?.signal, ...(timeoutMs ? { timeoutMs } : {}) });
       return {
         content: [{
           type: "text" as const,

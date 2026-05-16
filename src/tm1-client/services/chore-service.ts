@@ -3,7 +3,7 @@
 //
 // See docs/ARCHITECTURE.md for the layering.
 import type { Chore, ChoreCreate } from "../../types.js";
-import type { TM1HttpClient } from "../http.js";
+import type { RequestOptions, TM1HttpClient } from "../http.js";
 
 const enc = encodeURIComponent;
 
@@ -64,7 +64,7 @@ export class ChoreService {
    * overrides the 30s default for chores that run long TI chains.
    * POST /api/v1/Chores('{name}')/tm1.Execute
    */
-  async execute(choreName: string, opts?: { timeoutMs?: number }): Promise<void> {
+  async execute(choreName: string, opts?: RequestOptions): Promise<void> {
     const path = `/api/v1/Chores('${enc(choreName)}')/tm1.Execute`;
     await this.http.request<void>("POST", path, {}, opts);
   }

@@ -14,7 +14,7 @@ import type {
   ProcessResult,
   ProcessVariable,
 } from "../../types.js";
-import type { TM1HttpClient } from "../http.js";
+import type { RequestOptions, TM1HttpClient } from "../http.js";
 
 const enc = encodeURIComponent;
 
@@ -73,7 +73,7 @@ export class ProcessService {
   async execute(
     processName: string,
     params?: Record<string, string | number>,
-    opts?: { timeoutMs?: number },
+    opts?: RequestOptions,
   ): Promise<ProcessResult> {
     const path = `/api/v1/Processes('${enc(processName)}')/tm1.Execute`;
     const body: { Parameters?: Array<{ Name: string; Value: string | number }> } = {};

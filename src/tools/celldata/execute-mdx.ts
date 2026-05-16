@@ -22,12 +22,12 @@ export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for heavy MDX over wide views."),
     },
-    async ({ mdx, limit, offset, fetchAll, timeoutMs }) => {
+    async ({ mdx, limit, offset, fetchAll, timeoutMs }, extra) => {
       const all = fetchAll === true || limit === 0;
       const top = all ? undefined : limit;
       const skip = all ? undefined : offset;
       const result = await withToolHint(
-        tm1Client.cells.executeMdx(mdx, top, skip, timeoutMs ? { timeoutMs } : undefined),
+        tm1Client.cells.executeMdx(mdx, top, skip, { signal: extra?.signal, ...(timeoutMs ? { timeoutMs } : {}) }),
         "MDX execution failed. Common causes: missing brackets around member names ([Dim].[Hier].[Member]), unbalanced FROM/SELECT, unknown cube. Inspect details; cross-check member names with tm1_get_hierarchy or tm1_list_cubes.",
       );
 

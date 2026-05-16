@@ -169,7 +169,9 @@ Long-running Tools blockieren stumm bis Fertigstellung:
 MCP `notifications/progress` mit `progressToken` ungenutzt. User sieht keinen Fortschritt, kann nicht abschätzen ob hängt oder läuft.
 
 ### R2-03 — Keine cancellation
-Kein `AbortSignal` von MCP-Request bis undici durchgeschleift. User kann blockierenden Tool-Call nicht abbrechen (MCP `notifications/cancelled` ignoriert). Bei TI-Execution besonders schmerzhaft — Process läuft TM1-seitig weiter.
+~~Kein `AbortSignal` von MCP-Request bis undici durchgeschleift. User kann blockierenden Tool-Call nicht abbrechen (MCP `notifications/cancelled` ignoriert). Bei TI-Execution besonders schmerzhaft — Process läuft TM1-seitig weiter.~~
+
+**Done 2026-05-16.** `RequestOptions.signal` plumbed through `request`/`requestRaw`/`requestBinary`. `linkAbortSignals` couples external MCP `RequestHandlerExtra.signal` to local timeout `AbortController` (no `AbortSignal.any()` — Node 18 baseline). Wired into `tm1_execute_process`, `tm1_execute_chore`, `tm1_execute_mdx`. Cancellation aborts in-flight undici fetch; TM1-side process continues but client unblocks. Unit tests `tests/unit/http-abort-signal.test.ts` cover pre/mid-flight abort + no-signal control.
 
 ### R2-04 — MCP logging notifications ungenutzt
 pino loggt lokal nach stderr (korrekt für stdio), aber `server.sendLoggingMessage()` nie aufgerufen. Client-Side log-panel (Claude Desktop log viewer, VS Code MCP output) sieht keine Tool-Events. Kandidaten: slow MDX (`durationMs > 5000`), deprecation warnings, retry-on-reconnect.
