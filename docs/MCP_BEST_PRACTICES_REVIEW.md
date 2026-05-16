@@ -201,13 +201,14 @@ Sessions/threads subscriptions deferred — TM1 doesn't push session events, so 
 ## Auth / Security
 
 ### R2-08 — HTTP transport ohne Auth-Layer
-Loopback-bind (127.0.0.1) + DNS-rebind-guard schützen Single-User-Setup. Falls jemand `TM1_MCP_HTTP_HOST=0.0.0.0` setzt = LAN-exponiert ohne Auth. Spec empfiehlt OAuth 2.1 für remote-Transport. Optionen:
-- Bearer-Token-Check (env `TM1_MCP_HTTP_TOKEN`)
-- OAuth 2.1 mit DCR
-- mTLS hinter Reverse-Proxy (außerhalb scope)
+~~Loopback-bind (127.0.0.1) + DNS-rebind-guard schützen Single-User-Setup. Falls jemand `TM1_MCP_HTTP_HOST=0.0.0.0` setzt = LAN-exponiert ohne Auth.~~
+
+**Closed 2026-05-16 (won't-fix).** Default deployment is stdio-only; HTTP transport opt-in via `TM1_MCP_HTTP_HOST`. Mitigations in place: 127.0.0.1 default bind, `enableDnsRebindingProtection: true`, `allowedHosts` + `allowedOrigins` allowlists. Bearer/OAuth defer until a real remote-exposure use-case appears — adding auth without a deployment target is speculative work.
 
 ### R2-09 — Kein audience-binding / token-binding
-Wenn HTTP exponiert wird (R2-08), fehlt token-binding gegen replay über mehrere Server-Instanzen.
+~~Wenn HTTP exponiert wird (R2-08), fehlt token-binding gegen replay über mehrere Server-Instanzen.~~
+
+**Closed 2026-05-16 (won't-fix).** Depends on R2-08 — see that entry. No auth → no token → no binding required.
 
 ## Tool-Design
 
@@ -231,14 +232,12 @@ DESTRUCTIVE laut Spec = "may perform destructive updates to its environment". Ex
 ## SDK / Versioning
 
 ### R2-15 — SDK pinned `@modelcontextprotocol/sdk 1.29.0`
-Stand prüfen ggü. latest. Update könnte bringen:
-- elicitation (mid-call user-input request)
-- sampling (LLM-completion request vom Server)
-- bessere progress/cancellation-APIs
-- structured-content-roundtrip Fixes
+~~Stand prüfen ggü. latest.~~
+
+**Closed 2026-05-16.** `npm view @modelcontextprotocol/sdk version` → 1.29.0 is latest. Pin is current. Re-evaluate on next SDK minor.
 
 ### R2-16 — Node engines `>=18` OK
-Kein Handlungsbedarf — fetch ist seit 18 stable.
+**No action needed.** fetch stable since 18, no upgrade necessary.
 
 ## Output / Errors
 
