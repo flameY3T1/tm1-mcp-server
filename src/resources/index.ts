@@ -11,6 +11,7 @@ import {
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../tm1-client.js";
+import type { CatalogEntry, ResourceCatalog } from "./list-handler.js";
 
 interface ReadResult {
   [x: string]: unknown;
@@ -32,7 +33,13 @@ function asJsonContent(uri: URL, payload: unknown): ReadResult {
 export function registerAllResources(
   server: McpServer,
   tm1: TM1Client,
-): void {
+): ResourceCatalog {
+  // Build a parallel catalog as we go so installPaginatedListHandler can
+  // override SDK's default ListResourcesRequestSchema with cursor support.
+  // registerResource still wires the read callbacks; we just keep our own
+  // listing source of truth.
+  const entries: CatalogEntry[] = [];
+
   // ── Static endpoints ────────────────────────────────────────────────
   server.registerResource(
     "server-info",
@@ -45,6 +52,17 @@ export function registerAllResources(
     },
     async (uri) => asJsonContent(uri, await tm1.server.getInfo()),
   );
+  entries.push({
+    kind: "static",
+    resource: {
+      uri: "tm1://server/info",
+      name: "server-info",
+      title: "TM1 Server Info",
+      description:
+        "TM1 server configuration snapshot: name, version, data directory, timezone, integrated security mode.",
+      mimeType: "application/json",
+    },
+  });
 
   server.registerResource(
     "server-state",
@@ -82,6 +100,17 @@ export function registerAllResources(
       });
     },
   );
+  entries.push({
+    kind: "static",
+    resource: {
+      uri: "tm1://server/state",
+      name: "server-state",
+      title: "TM1 Server State",
+      description:
+        "Health-check snapshot: connection state, version, capability flags, object counts (cubes/dimensions/processes/chores/clients).",
+      mimeType: "application/json",
+    },
+  });
 
   // ── Resource templates ──────────────────────────────────────────────
   // Process source code — `tm1://process/{name}/code`
@@ -116,6 +145,29 @@ export function registerAllResources(
       return asJsonContent(uri, code);
     },
   );
+  entries.push({
+    kind: "template",
+    templateMetadata: {
+      title: "TI Process Source Code",
+      description:
+        "Source code of any TurboIntegrator process by name. URI: tm1://process/{name}/code.",
+      mimeType: "application/json",
+    },
+    list: async () => {
+      const procs = await tm1.processes.list();
+      return {
+        resources: procs
+          .filter((p) => !p.name.startsWith("}"))
+          .map((p) => ({
+            name: `process-code-${p.name}`,
+            uri: `tm1://process/${encodeURIComponent(p.name)}/code`,
+            title: `TI: ${p.name}`,
+            description: `Source code (Prolog/Metadata/Data/Epilog) of TI process '${p.name}'.`,
+            mimeType: "application/json",
+          })),
+      };
+    },
+  });
 
   // Cube rules — `tm1://cube/{name}/rules`
   server.registerResource(
@@ -159,4 +211,29 @@ export function registerAllResources(
       };
     },
   );
+  entries.push({
+    kind: "template",
+    templateMetadata: {
+      title: "Cube Rules Text",
+      description:
+        "Rules text of any TM1 cube by name. URI: tm1://cube/{name}/rules. Returns plain text.",
+      mimeType: "text/plain",
+    },
+    list: async () => {
+      const cubes = await tm1.cubes.list({ includeRules: true });
+      return {
+        resources: cubes
+          .filter((c) => !c.name.startsWith("}") && c.hasRules)
+          .map((c) => ({
+            name: `cube-rules-${c.name}`,
+            uri: `tm1://cube/${encodeURIComponent(c.name)}/rules`,
+            title: `Rules: ${c.name}`,
+            description: `Rules text of cube '${c.name}' (SKIPCHECK + FEEDERS sections).`,
+            mimeType: "text/plain",
+          })),
+      };
+    },
+  });
+
+  return { entries };
 }

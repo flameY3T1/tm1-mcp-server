@@ -17,6 +17,7 @@ import {
 import { registerAllPrompts } from "./prompts/index.js";
 import { registerAllResources } from "./resources/index.js";
 import { SubscriptionRegistry } from "./resources/subscriptions.js";
+import { installPaginatedListHandler } from "./resources/list-handler.js";
 import { registerAllTools } from "./tools/index.js";
 import { OUTPUT_SCHEMA_MAP } from "./tools/output-schema-map.js";
 import { NAME, VERSION } from "./version.js";
@@ -275,9 +276,13 @@ async function main(): Promise<void> {
     },
     {
       capabilities: {
-        tools: {},
-        resources: { listChanged: false, subscribe: true },
-        prompts: { listChanged: false },
+        // R2-06: declare listChanged so clients listen for
+        // notifications/tools/list_changed. SDK fires automatically when
+        // McpServer.tool() is called post-connect (currently never; lays
+        // groundwork for future version-conditional tool gating).
+        tools: { listChanged: true },
+        resources: { listChanged: true, subscribe: true },
+        prompts: { listChanged: true },
         logging: {},
       },
     },
@@ -291,8 +296,15 @@ async function main(): Promise<void> {
   // Register MCP Resources (URI-addressable read-only views over TM1
   // objects). Mirrors a subset of the get_* tool surface so IDE clients
   // can `#`-reference TM1 objects in chat or browse a sidebar tree.
-  registerAllResources(server, tm1Client);
+  const resourceCatalog = registerAllResources(server, tm1Client);
   logger.info("All MCP resources registered");
+
+  // R2-07: replace SDK's default ListResourcesRequestSchema handler with a
+  // cursor-aware override that paginates the combined static + template
+  // resource list. SDK 1.29.0 does not forward params.cursor or honor
+  // nextCursor on its high-level handler; this override is the only way to
+  // serve TM1 sites with thousands of processes/cubes spec-compliantly.
+  installPaginatedListHandler(server, resourceCatalog, logger);
 
   // R2-05: install subscribe/unsubscribe handlers and bridge HTTP-layer
   // mutation events to notifications/resources/updated for any client that

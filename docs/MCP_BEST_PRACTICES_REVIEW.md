@@ -189,10 +189,14 @@ Spec: `resources/subscribe` + `notifications/resources/updated`.~~
 Sessions/threads subscriptions deferred — TM1 doesn't push session events, so they'd require a polling loop. Add later if a client surfaces real demand. Tests: `tests/unit/resource-subscriptions.test.ts` (8 scenarios) + `tests/unit/http-mutation-events.test.ts` (4 scenarios).
 
 ### R2-06 — Keine tool-list-changed notifications
-Tools sind static nach `registerAllTools()`. Falls künftig version-abhängig (v11 vs v12 expose unterschiedliche Tools) fehlt `notifications/tools/list_changed`.
+~~Tools sind static nach `registerAllTools()`. Falls künftig version-abhängig (v11 vs v12 expose unterschiedliche Tools) fehlt `notifications/tools/list_changed`.~~
+
+**Done 2026-05-16.** Capabilities `tools.listChanged: true`, `resources.listChanged: true`, `prompts.listChanged: true`. SDK auto-fires `notifications/tools/list_changed` when `server.tool()` is called post-connect (currently never, but groundwork laid for future version-conditional tool gating).
 
 ### R2-07 — Cursor-basierte MCP-pagination ungenutzt
-Eigene `{limit, offset, fetchAll}` Envelope statt protokoll-natives `cursor`-Feld (z.B. bei `resources/list` mit vielen Cubes). Tool-interne Pagination OK lassen, aber `resources/list` callbacks könnten MCP-Cursor zurückgeben für lange Listen (>1000 Cubes/Processes).
+~~Eigene `{limit, offset, fetchAll}` Envelope statt protokoll-natives `cursor`-Feld (z.B. bei `resources/list` mit vielen Cubes). Tool-interne Pagination OK lassen, aber `resources/list` callbacks könnten MCP-Cursor zurückgeben für lange Listen (>1000 Cubes/Processes).~~
+
+**Done 2026-05-16.** SDK 1.29.0's high-level `ListResourcesRequestSchema` handler does NOT forward `params.cursor` to template list callbacks and strips `nextCursor` from results, so we override it. New `src/resources/list-handler.ts` builds a typed catalog from `registerAllResources` and installs a low-level handler via `server.server.setRequestHandler` that paginates the combined static+template resource list. Cursor is opaque base64url-encoded JSON `{ o: offset }`; malformed cursors degrade to a fresh listing. Page size default 200 (configurable). Sorting is by URI for stable paging. Tool-internal pagination envelopes (`limit/offset/fetchAll`) remain unchanged — that's tool-level data slicing, distinct from resource-listing protocol pagination. Tests: `tests/unit/resource-list-cursor.test.ts` (11 scenarios incl. multi-page round-trip).
 
 ## Auth / Security
 
