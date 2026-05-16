@@ -246,7 +246,9 @@ Proxy in `src/index.ts` routet auf `registerTool` mit `outputSchema` nur wenn in
 LLM-Onboarding-Prompt fehlt: Server-Topology, Naming-Conventions, `}`-Prefix für Control-Objekte, Pagination-Envelope-Shape, Welche Tools für welchen Workflow. Pendant zu agentskills.io "When to use" / SKILL.md.
 
 ### R2-20 — Knowledge-Tool optional, kein Default-Bundle
-`tm1_get_knowledge` liest aus `TM1_KNOWLEDGE_DIR`. Wenn unkonfiguriert = stille Degradation (kein Article, kein Hint). Sollte gebündelte Default-Artikel ausliefern (ti-syntax, mdx-patterns, tm1-rules) als NPM-Package-Assets.
+~~`tm1_get_knowledge` liest aus `TM1_KNOWLEDGE_DIR`. Wenn unkonfiguriert = stille Degradation (kein Article, kein Hint). Sollte gebündelte Default-Artikel ausliefern (ti-syntax, mdx-patterns, tm1-rules) als NPM-Package-Assets.~~
+
+**Done 2026-05-16.** Shipped `knowledge/` directory at package root with `INDEX.md`, `ti-syntax.md`, `mdx-patterns.md`, `tm1-rules.md`. `get-knowledge.ts` resolves bundled dir via `import.meta.url` three-up traversal (works in both `src/` and `dist/` layouts and via `node_modules/`). `TM1_KNOWLEDGE_DIR` still overrides if set. `package.json` `files: ["dist", "knowledge"]` ensures the bundle ships in the NPM tarball. Orientation prompt updated. Tests `tests/unit/knowledge-bundle.test.ts` verify bundle integrity and INDEX coverage.
 
 ### R2-21 — Keine v11-vs-v12 capability annotation per Tool
 ~~`tm1_check_v12_readiness` global ✓, aber einzelne Tools (`tm1_install_pro_bundle`, `tm1_import_pro_file`) ohne Metadata wer sie verträgt. Tool-Description erwähnt es z.T., aber keine machine-readable Annotation. Vorschlag: `requiresVersion: "v12"` in `ToolAnnotations` extension.~~

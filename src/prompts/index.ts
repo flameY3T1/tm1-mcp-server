@@ -80,7 +80,7 @@ export function registerAllPrompts(server: McpServer): void {
           "- Cube rules edits: validate first with `tm1_check_cube_rule` before `tm1_set_cube_rules`.",
           "",
           "## Knowledge base",
-          "Optional articles via `tm1_get_knowledge(topic='index')` if `TM1_KNOWLEDGE_DIR` is configured. Topics typically include `ti-syntax`, `mdx-patterns`, `tm1-rules`.",
+          "Default articles shipped with the server (ti-syntax, mdx-patterns, tm1-rules, index). Fetch via `tm1_get_knowledge(topic='index')` or `tm1_get_knowledge(topic='list')`. Override the bundle by setting `TM1_KNOWLEDGE_DIR` to a custom directory of `*.md` files.",
           "",
           "## When in doubt",
           "Call `tm1_get_server_info` and `tm1_get_server_capabilities` first to check version (v11/v12) and feature flags (MTQ, JobQueuing, AllowSeparateNandCRules).",

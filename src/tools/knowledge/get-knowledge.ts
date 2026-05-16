@@ -1,7 +1,20 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readFileSync, readdirSync, existsSync } from "fs";
-import { join, basename } from "path";
+import { fileURLToPath } from "url";
+import { join, basename, dirname } from "path";
+
+// R2-20: default knowledge bundle shipped with the package. When
+// TM1_KNOWLEDGE_DIR is unset, fall back to the in-package directory rather
+// than degrading silently. Resolved relative to this module:
+//   src/tools/knowledge/get-knowledge.ts → ../../../knowledge/
+//   dist/tools/knowledge/get-knowledge.js → ../../../knowledge/
+// Both source and built layouts (and node_modules-installed layouts) share
+// the same three-up traversal because tsconfig keeps src↔dist symmetric.
+function getBundledKnowledgeDir(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return join(here, "..", "..", "..", "knowledge");
+}
 
 export function registerGetKnowledge(server: McpServer): void {
   server.tool(
@@ -22,17 +35,21 @@ export function registerGetKnowledge(server: McpServer): void {
       ),
     },
     async ({ topic, search }) => {
-      const knowledgeDir = process.env.TM1_KNOWLEDGE_DIR;
-      if (!knowledgeDir) {
-        return {
-          isError: true,
-          content: [{ type: "text", text: "TM1_KNOWLEDGE_DIR env var not set. Set it to your knowledge directory path (e.g. /home/user/tm1-ai-dev/knowledge)." }],
-        };
-      }
+      // Override > bundled fallback. Bundled bundle ships under <pkg>/knowledge/
+      // with ti-syntax, mdx-patterns, tm1-rules, INDEX. Point TM1_KNOWLEDGE_DIR
+      // at a custom path to replace it project-wide.
+      const envDir = process.env.TM1_KNOWLEDGE_DIR;
+      const knowledgeDir = envDir ?? getBundledKnowledgeDir();
+      const usingBundle = !envDir;
       if (!existsSync(knowledgeDir)) {
         return {
           isError: true,
-          content: [{ type: "text", text: `Knowledge directory not found: ${knowledgeDir}` }],
+          content: [{
+            type: "text",
+            text: usingBundle
+              ? `Bundled knowledge directory missing (expected at ${knowledgeDir}). Reinstall the package or set TM1_KNOWLEDGE_DIR to a valid directory.`
+              : `Knowledge directory not found: ${knowledgeDir}`,
+          }],
         };
       }
 

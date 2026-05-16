@@ -9,6 +9,10 @@
   "author": "flameY3T1",
   "type": "module",
   "main": "dist/index.js",
+  "files": [
+    "dist",
+    "knowledge"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
