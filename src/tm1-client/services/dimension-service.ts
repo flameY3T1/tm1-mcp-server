@@ -190,13 +190,14 @@ export class DimensionService {
     }
 
     const roots = elements.filter((e) => !e.Parents || e.Parents.length === 0);
-    const indexOne = elements[0].Name;
+    // elements.length > 0 is guarded above
+    const indexOne = elements[0]!.Name;
 
     if (roots.length === 1) {
       return {
         dimension: dimensionName,
         hierarchy: hier,
-        resolved: { name: roots[0].Name, level: roots[0].Level },
+        resolved: { name: roots[0]!.Name, level: roots[0]!.Level },
         source: "single_root",
         confidence: "high",
         warning:
@@ -212,7 +213,7 @@ export class DimensionService {
       return {
         dimension: dimensionName,
         hierarchy: hier,
-        resolved: { name: sorted[0].Name, level: sorted[0].Level },
+        resolved: { name: sorted[0]!.Name, level: sorted[0]!.Level },
         source: "first_root",
         confidence: "medium",
         alternatives: {
@@ -227,7 +228,7 @@ export class DimensionService {
     return {
       dimension: dimensionName,
       hierarchy: hier,
-      resolved: { name: indexOne, level: elements[0].Level ?? 0 },
+      resolved: { name: indexOne, level: elements[0]!.Level ?? 0 },
       source: "index_1",
       confidence: "low",
       alternatives: { roots: [], indexOne },

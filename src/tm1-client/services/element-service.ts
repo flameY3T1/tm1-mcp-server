@@ -201,7 +201,7 @@ export class ElementService {
     const out: ElementAttributeValue[] = [];
     const tuples = result.axes[0]?.tuples ?? [];
     for (let i = 0; i < tuples.length; i++) {
-      const attrName = tuples[i].members[0]?.name ?? "";
+      const attrName = tuples[i]!.members[0]?.name ?? "";
       const cell = result.cells[i];
       out.push({
         elementName,

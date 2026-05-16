@@ -20,14 +20,14 @@ export function scanForDeprecatedTi(text: string): ScanHit[] {
   const hits: ScanHit[] = [];
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i];
+    const raw = lines[i]!;
     const trimmed = raw.trimStart();
     if (trimmed.startsWith("#")) continue;
     const seenOnThisLine = new Set<string>();
     V12_DEPRECATED_TI_REGEX.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = V12_DEPRECATED_TI_REGEX.exec(raw)) !== null) {
-      const key = m[1].toLowerCase();
+      const key = m[1]!.toLowerCase();
       if (seenOnThisLine.has(key)) continue;
       seenOnThisLine.add(key);
       const entry = V12_DEPRECATED_TI.get(key);

@@ -191,11 +191,11 @@ export function parseBracketDimRefs(content: string): BracketDimRef[] {
   const dimSpecRe = /'([^']+)'\s*:\s*(?:'([^']+)'|\{([^}]+)\})/g;
   let m: RegExpExecArray | null;
   while ((m = dimSpecRe.exec(content)) !== null) {
-    const dim = m[1];
+    const dim = m[1]!;
     if (m[2] !== undefined) {
       result.push({ dim, elems: [m[2]] });
     } else if (m[3] !== undefined) {
-      const elems = [...m[3].matchAll(/'([^']+)'/g)].map(r => r[1]);
+      const elems = [...m[3].matchAll(/'([^']+)'/g)].map(r => r[1]!);
       result.push({ dim, elems });
     }
   }
@@ -640,12 +640,12 @@ export async function lintRulesServer(
       const dims = cubeDimDetails.get(call.cubeName.toLowerCase());
       if (!Array.isArray(dims) || call.args.length !== dims.length + 1) { continue; }
       for (let i = 1; i < call.args.length; i++) {
-        const arg = call.args[i].trim();
+        const arg = call.args[i]!.trim();
         if (!arg.startsWith("'") || !arg.endsWith("'") || arg.length < 3) { continue; }
         if (arg.slice(1, -1).includes("'")) { continue; } // concatenation — skip
         const dimIdx = i - 1;
         if (dimIdx < dims.length) {
-          const dim = dims[dimIdx];
+          const dim = dims[dimIdx]!;
           const lc = dim.toLowerCase();
           if (!dimOriginal.has(lc)) { dimOriginal.set(lc, dim); }
         }
@@ -702,12 +702,12 @@ export async function lintRulesServer(
         } else {
           // Element existence check for string-literal dimension args
           for (let i = 1; i < call.args.length; i++) {
-            const arg = call.args[i].trim();
+            const arg = call.args[i]!.trim();
             if (!arg.startsWith("'") || !arg.endsWith("'") || arg.length < 3) { continue; }
             const inner = arg.slice(1, -1);
             if (inner.includes("'")) { continue; } // concatenation — skip
             const dimIdx = i - 1;
-            const dim = dims[dimIdx];
+            const dim = dims[dimIdx]!;
             const elemSet = dimElements.get(dim.toLowerCase());
             if (elemSet instanceof Set && !elemSet.has(inner.toLowerCase())) {
               diags.push({

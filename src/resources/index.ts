@@ -140,7 +140,7 @@ export function registerAllResources(
     },
     async (uri, vars) => {
       const raw = vars.name;
-      const name = decodeURIComponent(Array.isArray(raw) ? raw[0] : raw);
+      const name = decodeURIComponent(Array.isArray(raw) ? raw[0]! : raw ?? '');
       const code = await tm1.processes.getCode(name);
       return asJsonContent(uri, code);
     },
@@ -198,7 +198,7 @@ export function registerAllResources(
     },
     async (uri, vars) => {
       const raw = vars.name;
-      const name = decodeURIComponent(Array.isArray(raw) ? raw[0] : raw);
+      const name = decodeURIComponent(Array.isArray(raw) ? raw[0]! : raw ?? '');
       const rules = await tm1.cubes.getRules(name);
       return {
         contents: [

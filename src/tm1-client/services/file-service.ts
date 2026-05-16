@@ -68,7 +68,8 @@ export class FileService {
     if (parts.length === 0) return false;
     const buildUrl = (root: string): string => {
       const segs = parts.slice(0, -1).map((s) => `/Contents('${enc(s)}')`).join("");
-      const last = parts[parts.length - 1];
+      // parts.length > 0 is guarded above
+      const last = parts[parts.length - 1]!;
       return `/api/v1/Contents('${enc(root)}')${segs}/Contents('${enc(last)}')?$select=Name`;
     };
     const probe = async (url: string): Promise<boolean> => {
@@ -99,7 +100,8 @@ export class FileService {
     if (parts.length === 0) {
       throw new Error("upload: empty file name");
     }
-    const leaf = parts[parts.length - 1];
+    // parts.length > 0 is guarded above
+    const leaf = parts[parts.length - 1]!;
     const parentSegs = parts.slice(0, -1).map((s) => `/Contents('${enc(s)}')`).join("");
 
     const tryRoot = async (root: "Files" | "Blobs"): Promise<{ created: boolean; root: "Files" | "Blobs" }> => {

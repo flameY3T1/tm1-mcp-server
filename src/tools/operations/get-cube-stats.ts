@@ -49,7 +49,7 @@ async function fetchOne(tm1Client: TM1Client, cubeName: string): Promise<CubeSta
   const raw: Record<string, number | null> = {};
   const tuples = result.axes[1]?.tuples ?? [];
   for (let i = 0; i < tuples.length; i++) {
-    const memberName = tuples[i].members[0]?.name ?? `unknown_${i}`;
+    const memberName = tuples[i]!.members[0]?.name ?? `unknown_${i}`;
     const cell = result.cells[i];
     raw[memberName] = typeof cell?.value === "number" ? cell.value : null;
   }
@@ -120,7 +120,7 @@ export function registerGetCubeStats(server: McpServer, tm1Client: TM1Client) {
         if (r.status === "fulfilled") return r.value;
         const err = r.reason;
         const msg = err instanceof TM1Error ? `${err.code}: ${err.message}` : String(err);
-        return { cubeName: targets[i], raw: {}, error: msg };
+        return { cubeName: targets[i]!, raw: {}, error: msg };
       });
 
       const payload = { count: items.length, items };

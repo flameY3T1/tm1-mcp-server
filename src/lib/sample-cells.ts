@@ -51,7 +51,8 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
     throw new Error(`Cube '${cubeName}' has no dimensions`);
   }
 
-  const columnDim = args.axisDimension ?? dimensions[dimensions.length - 1];
+  // dimensions.length === 0 is guarded above; the fallback is always defined.
+  const columnDim = args.axisDimension ?? dimensions[dimensions.length - 1]!;
   if (!dimensions.includes(columnDim)) {
     throw new Error(
       `axisDimension '${columnDim}' is not a dimension of cube '${cubeName}' (dims: ${dimensions.join(", ")})`,
@@ -97,7 +98,7 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
   if (typeof colFilter === "string") {
     columnSet = `{${memberRef(columnDim, colFilter)}}`;
   } else if (Array.isArray(colFilter) && colFilter.length > 0) {
-    columnSet = `{${colFilter.map((e) => memberRef(columnDim, e)).join(",")}}`;
+    columnSet = `{${(colFilter as string[]).map((e) => memberRef(columnDim, e)).join(",")}}`;
   } else {
     columnSet = `{[${columnDim}].DefaultMember}`;
   }
@@ -106,7 +107,7 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
   if (rowSets.length === 0) {
     rowExpr = `{[${columnDim}].DefaultMember}`;
   } else if (rowSets.length === 1) {
-    rowExpr = rowSets[0];
+    rowExpr = rowSets[0]!;
   } else {
     rowExpr = rowSets.reduce((acc, s) => `CROSSJOIN(${acc},${s})`);
   }
@@ -136,7 +137,7 @@ export function transformSampleCells(args: TransformArgs): SampleCell[] {
   const axes = result.axes;
   if (axes.length === 0) return [];
 
-  const colAxis = axes[0];
+  const colAxis = axes[0]!;
   const rowAxis = axes[1] ?? { tuples: [{ members: [] }] };
 
   const colCount = colAxis.tuples.length;
@@ -155,6 +156,7 @@ export function transformSampleCells(args: TransformArgs): SampleCell[] {
     for (const m of rowTuple.members) coords[m.hierarchyName] = m.name;
 
     const c = result.cells[i];
+    if (!c) continue;
     out.push({
       coordinates: coords,
       value: c.value,

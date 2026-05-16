@@ -27,7 +27,7 @@ export function matchesProcessName(filename: string, processName: string): boole
 export function tsFromFilename(filename: string): number | null {
   const m = filename.match(TS_RE);
   if (!m) return null;
-  const s = m[1];
+  const s = m[1]!;
   const y = Number(s.slice(0, 4));
   const mo = Number(s.slice(4, 6)) - 1;
   const d = Number(s.slice(6, 8));

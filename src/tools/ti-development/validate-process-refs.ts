@@ -31,12 +31,12 @@ function scanCode(code: string, tab: Tab, regex: RegExp): Map<string, { tab: Tab
   const found = new Map<string, { tab: Tab; line: number; context: string }>();
   const lines = code.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
-    const ln = lines[i];
+    const ln = lines[i]!;
     if (/^\s*#/.test(ln)) continue;
     regex.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = regex.exec(ln)) !== null) {
-      const name = m[2];
+      const name = m[2]!;
       if (!found.has(name)) {
         found.set(name, { tab, line: i + 1, context: ln.trim().slice(0, 200) });
       }

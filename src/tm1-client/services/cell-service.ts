@@ -45,9 +45,9 @@ export class CellService {
       if (element.startsWith("[") && element.endsWith("]")) return `[${dim}].${element}`;
       return `[${dim}].[${element}]`;
     };
-    const qualified = dims.map((d, i) => qualify(d, elements[i]));
+    const qualified = dims.map((d, i) => qualify(d, elements[i]!));
 
-    const colMember = qualified[0];
+    const colMember = qualified[0]!;
     const whereParts = qualified.slice(1);
     const mdx =
       whereParts.length === 0
@@ -60,7 +60,7 @@ export class CellService {
     }>("POST", "/api/v1/ExecuteMDX?$expand=Cells($select=Value,FormattedValue)", { MDX: mdx });
 
     if (cellsetResponse.Cells && cellsetResponse.Cells.length > 0) {
-      return cellsetResponse.Cells[0].Value;
+      return cellsetResponse.Cells[0]!.Value;
     }
 
     return null;

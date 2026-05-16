@@ -28,7 +28,7 @@ function lineValue(line: string): string {
 function parseProcessName(lines: string[]): string | null {
   for (const line of lines) {
     const m = line.match(/^602,"(.+)"$/);
-    if (m) return m[1];
+    if (m) return m[1] ?? null;
     if (/^572,/.test(line)) break;
   }
   return null;
@@ -43,23 +43,25 @@ function parseSections(lines: string[]): {
   const map: Record<string, string[]> = { "572": [], "573": [], "574": [], "575": [] };
   const headers: Array<{ code: string; idx: number }> = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(SECTION_RE);
-    if (m) headers.push({ code: m[1], idx: i });
+    const m = lines[i]!.match(SECTION_RE);
+    if (m) headers.push({ code: m[1]!, idx: i });
   }
   for (let h = 0; h < headers.length; h++) {
-    const { code, idx } = headers[h];
-    const next = h + 1 < headers.length ? headers[h + 1].idx : lines.length;
+    const hdr = headers[h]!;
+    const { code, idx } = hdr;
+    const next = h + 1 < headers.length ? headers[h + 1]!.idx : lines.length;
     for (let j = idx + 1; j < next; j++) {
+      const ln = lines[j]!;
       // Stop at any non-section numeric header line (e.g. 576, 930)
-      if (/^\d{3},/.test(lines[j]) && !/^57[2345],/.test(lines[j])) break;
-      map[code].push(lines[j]);
+      if (/^\d{3},/.test(ln) && !/^57[2345],/.test(ln)) break;
+      map[code]!.push(ln);
     }
   }
   return {
-    prolog: map["572"].join("\n").trimEnd(),
-    metadata: map["573"].join("\n").trimEnd(),
-    data: map["574"].join("\n").trimEnd(),
-    epilog: map["575"].join("\n").trimEnd(),
+    prolog: map["572"]!.join("\n").trimEnd(),
+    metadata: map["573"]!.join("\n").trimEnd(),
+    data: map["574"]!.join("\n").trimEnd(),
+    epilog: map["575"]!.join("\n").trimEnd(),
   };
 }
 
@@ -74,10 +76,10 @@ function parseParameters(lines: string[]): ProcessParameter[] {
 
   let i = 0;
   while (i < pre.length) {
-    const m = pre[i].match(/^(560|561|590|637),(\d+)$/);
+    const m = pre[i]!.match(/^(560|561|590|637),(\d+)$/);
     if (m) {
-      const code = m[1];
-      const count = parseInt(m[2], 10);
+      const code = m[1]!;
+      const count = parseInt(m[2]!, 10);
       const data = pre.slice(i + 1, i + 1 + count);
       if (code === "560") names = data.map((l) => l.trim());
       else if (code === "561") types = data.map((l) => parseInt(l.trim(), 10) || 1);
@@ -122,10 +124,10 @@ function parseVariables(lines: string[]): ProcessVariable[] {
 
   let i = 0;
   while (i < pre.length) {
-    const m = pre[i].match(/^(577|578|579),(\d+)$/);
+    const m = pre[i]!.match(/^(577|578|579),(\d+)$/);
     if (m) {
-      const code = m[1];
-      const count = parseInt(m[2], 10);
+      const code = m[1]!;
+      const count = parseInt(m[2]!, 10);
       const data = pre.slice(i + 1, i + 1 + count);
       if (code === "577") names = data.map((l) => l.trim());
       else if (code === "578") types = data.map((l) => parseInt(l.trim(), 10) || 2);

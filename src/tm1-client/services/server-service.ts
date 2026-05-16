@@ -137,7 +137,7 @@ export class ServerService {
       if (sinceCompact.length >= 8) {
         entries = entries.filter((e) => {
           const m = e.filename.match(/(?:TM1ProcessError_|_)(\d{14})/) ?? e.filename.match(/_(\d{8,14})\.log$/i);
-          return m ? m[1] >= sinceCompact.slice(0, m[1].length) : true;
+          return m ? m[1]! >= sinceCompact.slice(0, m[1]!.length) : true;
         });
       }
     }

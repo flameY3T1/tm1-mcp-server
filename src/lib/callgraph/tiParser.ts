@@ -47,7 +47,7 @@ export function joinContinuationLines(lines: string[]): string[] {
   let pendingContent = '';
 
   for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i];
+    const raw = lines[i]!;
     const trimmed = raw.trim();
 
     // While inside an unterminated string literal, absorb every line as part
@@ -147,7 +147,7 @@ function parseBlock(
   let i = startIndex;
 
   while (i < lines.length) {
-    const rawLine = lines[i];
+    const rawLine = lines[i]!;
     const trimmed = rawLine.trim();
 
     // Skip blank lines and comments
@@ -219,12 +219,12 @@ function parseBlock(
     // Assignment: variable = expression;
     // Check for empty right-hand side: y =; or y = ;
     if (/^[A-Za-z_]\w*\s*=\s*;$/.test(trimmed)) {
-      const varName = trimmed.split(/\s*=/)[0].trim();
+      const varName = (trimmed.split(/\s*=/)[0] ?? '').trim();
       throw new ParseError(lineNum, `Leere Zuweisung in Zeile ${lineNum}: "${varName}" hat keinen Wert (z.B. ${varName} = 1; oder ${varName} = 'text';)`);
     }
     // First check if line looks like an assignment but is missing semicolon
     if (/^[A-Za-z_]\w*\s*=\s*.+$/.test(trimmed) && !trimmed.endsWith(';')) {
-      const upperFirst = trimmed.split(/[\s=(]/)[0].toUpperCase();
+      const upperFirst = (trimmed.split(/[\s=(]/)[0] ?? '').toUpperCase();
       if (!['IF', 'ELSEIF', 'ELSE', 'ENDIF', 'WHILE', 'END'].includes(upperFirst)) {
         throw new ParseError(lineNum, `Fehlendes Semikolon am Ende der Zeile ${lineNum}`);
       }
@@ -239,7 +239,7 @@ function parseBlock(
     // Function call: FunctionName(args...);
     // Check for missing semicolon on function calls
     if (/^[A-Za-z_]\w*\s*\(/.test(trimmed) && !trimmed.endsWith(';')) {
-      const upperFirst = trimmed.split(/[\s(]/)[0].toUpperCase();
+      const upperFirst = (trimmed.split(/[\s(]/)[0] ?? '').toUpperCase();
       if (!['IF', 'ELSEIF', 'WHILE'].includes(upperFirst)) {
         throw new ParseError(lineNum, `Fehlendes Semikolon am Ende der Zeile ${lineNum}`);
       }
@@ -286,7 +286,7 @@ interface IfParseResult {
 }
 
 function parseIfBlock(lines: string[], startIndex: number): IfParseResult {
-  const trimmed = lines[startIndex].trim();
+  const trimmed = lines[startIndex]!.trim();
   const lineNum = startIndex + 1;
   const condition = extractCondition(trimmed, 'IF');
 
@@ -300,7 +300,7 @@ function parseIfBlock(lines: string[], startIndex: number): IfParseResult {
 
   // Handle ELSEIF and ELSE clauses
   while (i < lines.length) {
-    const currentTrimmed = lines[i].trim();
+    const currentTrimmed = lines[i]!.trim();
     const currentUpper = currentTrimmed.toUpperCase();
 
     if (currentUpper === 'ENDIF;' || currentUpper === 'ENDIF') {
@@ -341,7 +341,7 @@ interface WhileParseResult {
 }
 
 function parseWhileBlock(lines: string[], startIndex: number): WhileParseResult {
-  const trimmed = lines[startIndex].trim();
+  const trimmed = lines[startIndex]!.trim();
   const lineNum = startIndex + 1;
   const condition = extractCondition(trimmed, 'WHILE');
 
@@ -403,8 +403,8 @@ function tryParseAssignment(line: string, lineNum: number): TiAssignment | null 
   const match = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+?)\s*;?\s*$/);
   if (!match) return null;
 
-  const variable = match[1];
-  const expression = match[2].trim();
+  const variable = match[1]!;
+  const expression = match[2]!.trim();
 
   // Don't match lines that look like comparisons (==) or keywords
   const upperVar = variable.toUpperCase();
@@ -431,9 +431,9 @@ function detectCellGet(expression: string): { fn: 'CellGetN' | 'CellGetS'; param
   const match = expression.match(/\b(CellGetN|CellGetS)\s*\(([^)]*)\)/i);
   if (!match) return undefined;
 
-  const normalizedFn: 'CellGetN' | 'CellGetS' = match[1].toUpperCase().includes('GETN') ? 'CellGetN' : 'CellGetS';
+  const normalizedFn: 'CellGetN' | 'CellGetS' = match[1]!.toUpperCase().includes('GETN') ? 'CellGetN' : 'CellGetS';
 
-  const paramsStr = match[2].trim();
+  const paramsStr = match[2]!.trim();
   const params = paramsStr ? splitParams(paramsStr) : [];
 
   return { fn: normalizedFn, params };
@@ -503,7 +503,7 @@ function tryParseFunctionCall(line: string, lineNum: number): TiFunctionCall | n
   const nameMatch = line.match(/^([A-Za-z_]\w*)\s*\(/);
   if (!nameMatch) return null;
 
-  const name = nameMatch[1];
+  const name = nameMatch[1]!;
 
   // Don't match IF/WHILE/ELSEIF as function calls
   const upperName = name.toUpperCase();
@@ -547,12 +547,12 @@ function hasTrailingEndif(line: string): boolean {
   const upper = line.toUpperCase();
   let inStr = false;
   for (let k = 0; k <= upper.length - 5; k++) {
-    const ch = line[k];
+    const ch = line[k] ?? '';
     if (ch === "'") { inStr = !inStr; continue; }
     if (inStr) { continue; }
     if (upper.slice(k, k + 5) === 'ENDIF') {
-      const prev = k > 0 ? line[k - 1] : '';
-      const next = k + 5 < line.length ? line[k + 5] : '';
+      const prev = k > 0 ? (line[k - 1] ?? '') : '';
+      const next = k + 5 < line.length ? (line[k + 5] ?? '') : '';
       if (/\w/.test(prev) || /\w/.test(next)) { continue; }
       return true;
     }
@@ -605,7 +605,7 @@ function parseInlineStatements(stmtTexts: string[], lineNum: number): TiStatemen
 function tryParseSingleLineIf(line: string, lineNum: number): TiIfBlock | null {
   const ifMatch = line.match(/^(IF\s*)\(/i);
   if (!ifMatch) { return null; }
-  const openParen = ifMatch[1].length;
+  const openParen = ifMatch[1]!.length;
 
   let depth = 1;
   let inStr = false;
@@ -630,12 +630,12 @@ function tryParseSingleLineIf(line: string, lineNum: number): TiIfBlock | null {
   let endifStart = -1;
   let inStr2 = false;
   for (let k = 0; k <= upperRest.length - 5; k++) {
-    const ch = rest[k];
+    const ch = rest[k] ?? '';
     if (ch === "'") { inStr2 = !inStr2; continue; }
     if (inStr2) { continue; }
     if (upperRest.slice(k, k + 5) === 'ENDIF') {
-      const prev = k > 0 ? rest[k - 1] : '';
-      const next = k + 5 < rest.length ? rest[k + 5] : '';
+      const prev = k > 0 ? (rest[k - 1] ?? '') : '';
+      const next = k + 5 < rest.length ? (rest[k + 5] ?? '') : '';
       if (/\w/.test(prev) || /\w/.test(next)) { continue; }
       endifStart = k;
     }

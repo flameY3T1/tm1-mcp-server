@@ -93,7 +93,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
         sendProgress(0, files.length, `starting install of ${files.length} files`);
 
         for (let i = 0; i < files.length; i++) {
-          const file = files[i];
+          const file = files[i]!;
           sendProgress(i, files.length, `processing ${path.basename(file)}`);
           if (stopped) {
             results.push({ file, processName: null, status: "skipped", error: "stopped after earlier failure" });

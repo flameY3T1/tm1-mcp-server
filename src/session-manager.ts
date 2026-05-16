@@ -272,7 +272,7 @@ export class SessionManager {
     if (!setCookie) return null;
 
     const match = setCookie.match(/TM1SessionId=([^;]+)/);
-    return match ? match[1] : null;
+    return match ? match[1] ?? null : null;
   }
 
 }

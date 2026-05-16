@@ -11,7 +11,7 @@ function buildArgIdxMap(paramName: string): ArgIdxMap {
   const map: ArgIdxMap = new Map();
   for (const [key, sig] of KNOWN_SIGNATURES.entries()) {
     for (let i = 0; i < sig.params.length; i++) {
-      if (sig.params[i].name.toLowerCase() === paramName && !map.has(key)) {
+      if (sig.params[i]!.name.toLowerCase() === paramName && !map.has(key)) {
         map.set(key, i);
         break;
       }
@@ -175,9 +175,9 @@ function resolveValueArg(arg: string, env: ProcessEnv): { resolution: CallParamR
 function extractCallParams(args: string[], env: ProcessEnv): CallParam[] {
   const params: CallParam[] = [];
   for (let i = 1; i + 1 < args.length; i += 2) {
-    const nameLit = extractStringLiteral(args[i]);
+    const nameLit = extractStringLiteral(args[i]!);
     if (nameLit === null) { continue; }
-    const { resolution, valueRaw } = resolveValueArg(args[i + 1], env);
+    const { resolution, valueRaw } = resolveValueArg(args[i + 1]!, env);
     params.push({ name: nameLit, resolution, valueRaw });
   }
   return params;
@@ -219,7 +219,7 @@ export function extractTiReferences(
   const assignRe = /^\s*([A-Za-z_]\w*)\s*=\s*(.+?)\s*;?\s*(?:#.*)?$/;
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx];
+    const line = lines[lineIdx]!;
     if (SECTION_MARKER_RE.test(line.trim()) || line.trim() === '') { continue; }
 
     const neutralized = neutralizeLine(line);
@@ -227,17 +227,17 @@ export function extractTiReferences(
 
     // Vor der Call-Erkennung: Zuweisungen in liveVars eintragen (last-assignment-wins).
     const aM = assignRe.exec(line);
-    if (aM && !aM[2].startsWith('=')) {
-      const varLc = aM[1].toLowerCase();
+    if (aM && !aM[2]!.startsWith('=')) {
+      const varLc = aM[1]!.toLowerCase();
       if (!baseEnv.paramsLc.has(varLc) && !baseEnv.datasourceVars.has(varLc)) {
-        liveVars.set(varLc, resolveExpression(aM[2], callerEnv));
+        liveVars.set(varLc, resolveExpression(aM[2]!, callerEnv));
       }
     }
 
     FUNC_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = FUNC_RE.exec(neutralized)) !== null) {
-      const funcLower = m[1].toLowerCase();
+      const funcLower = m[1]!.toLowerCase();
       const openParen = m.index + m[0].length - 1;
 
       let depth = 1;
@@ -257,16 +257,17 @@ export function extractTiReferences(
       const snippet = truncateSnippet(line);
       const pushRef = (kind: RefTargetKind, argIdx: number | undefined) => {
         if (argIdx === undefined || argIdx >= args.length) { return; }
-        let targetName = extractStringLiteral(args[argIdx]);
+        const argVal = args[argIdx]!;
+        let targetName = extractStringLiteral(argVal);
         if (targetName === null) {
-          const binding = resolveExpression(args[argIdx], callerEnv);
+          const binding = resolveExpression(argVal, callerEnv);
           if (binding.kind !== 'literal') { return; }
           targetName = binding.value;
         }
         const params = kind === 'process' && PROCESS_CALL_FUNCS.has(funcLower)
           ? extractCallParams(args, callerEnv)
           : undefined;
-        refs.push({ line: lineIdx, funcName: m![1], targetKind: kind, targetName, snippet, params });
+        refs.push({ line: lineIdx, funcName: m![1]!, targetKind: kind, targetName, snippet, params });
       };
       pushRef('cube',      CUBE_ARG_IDX.get(funcLower));
       pushRef('dimension', DIM_ARG_IDX.get(funcLower));
@@ -299,7 +300,7 @@ export function extractRulesReferences(text: string): RawRuleRef[] {
   let section: 'rules' | 'feeders' = 'rules';
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx].replace(/\r$/, '');
+    const line = lines[lineIdx]!.replace(/\r$/, '');
     const trimmed = line.trim();
     if (FEEDERS_MARKER_RE.test(trimmed)) { section = 'feeders'; continue; }
     if (trimmed === '' || trimmed.startsWith('#')) { continue; }

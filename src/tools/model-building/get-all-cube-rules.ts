@@ -18,7 +18,7 @@ function summarize(rulesText: string): CubeRuleSummary {
   let commentLineCount = 0;
   let feederBoundary = -1;
   for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
+    const trimmed = lines[i]!.trim();
     if (trimmed.startsWith("#")) commentLineCount++;
     if (feederBoundary < 0 && /^FEEDERS\s*;/i.test(trimmed)) feederBoundary = i;
   }
@@ -34,7 +34,7 @@ function summarize(rulesText: string): CubeRuleSummary {
   const feederCount = (cleanFeeders.match(/=>/g) ?? []).length;
   const cubeRefs = new Set<string>();
   for (const m of stripBlock(rulesText).matchAll(/\bDB\s*\(\s*['"]([^'"]+)['"]/gi)) {
-    cubeRefs.add(m[1]);
+    cubeRefs.add(m[1]!);
   }
   return {
     lineCount: lines.length,

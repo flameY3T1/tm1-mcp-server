@@ -29,7 +29,7 @@ export function registerResolveDefaultMembers(server: McpServer, tm1Client: TM1C
       const results = settled.map((s, i) => {
         if (s.status === "fulfilled") return s.value;
         const err = s.reason;
-        const item = items[i];
+        const item = items[i]!; // settled.length === items.length
         const message = err instanceof Error ? err.message : String(err);
         const code = err instanceof TM1Error ? err.code : TM1ErrorCode.TM1_ERROR;
         return {

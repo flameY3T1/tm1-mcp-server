@@ -109,7 +109,7 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
           const lines = code.split(/\r?\n/);
           for (let i = 0; i < lines.length; i++) {
             regex.lastIndex = 0;
-            const raw = lines[i];
+            const raw = lines[i]!;
             if (excludeCommented && COMMENT_RE.test(raw)) continue;
             if (regex.test(raw)) {
               const text = (maskSecrets ? maskCodeLine(raw) : raw).trim().slice(0, 240);

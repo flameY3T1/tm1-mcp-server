@@ -55,7 +55,7 @@ export function resolveExpression(expr: string, env: ProcessEnv): VarBinding {
 
   // String literal
   const strM = STRING_LITERAL_RE.exec(e);
-  if (strM) { return { kind: 'literal', value: strM[1] }; }
+  if (strM) { return { kind: 'literal', value: strM[1]! }; }
 
   // Numeric literal
   if (NUMERIC_LITERAL_RE.test(e)) { return { kind: 'literal', value: e }; }
@@ -142,7 +142,7 @@ export function buildProcessEnv(
   const limit = opts.stopAtLine !== undefined ? Math.min(opts.stopAtLine, lines.length) : lines.length;
 
   for (let i = 0; i < limit; i++) {
-    const raw = lines[i];
+    const raw = lines[i]!;
     const line = raw.replace(/\r$/, '');
     if (SECTION_MARKER_RE.test(line.trim()) || line.trim() === '') { continue; }
 
@@ -152,8 +152,8 @@ export function buildProcessEnv(
     // Skip if line does not look like a pure assignment (contains `==` or similar comparisons in condition context)
     const m = assignRe.exec(line);
     if (!m) { continue; }
-    const varName = m[1];
-    const rhs = m[2];
+    const varName = m[1]!;
+    const rhs = m[2]!;
 
     // Exclude cases where rhs starts with `=` (meaning `==` comparison) — already filtered by regex `=\s*(.+)` non-greedy
     // but `a == b` would match with varName='a' and rhs='= b'. Guard:

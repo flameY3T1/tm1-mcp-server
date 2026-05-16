@@ -34,7 +34,8 @@ export function registerClearCube(server: McpServer, tm1Client: TM1Client): void
       }
       await tm1Client.cubes.clear(cubeName, dimensions, tuples);
       const summary = dimensions
-        .map((d, i) => `${d}=${tuples[i].length === 0 ? "*" : tuples[i].join("|")}`)
+        // dimensions.length === tuples.length is guarded above
+        .map((d, i) => `${d}=${tuples[i]!.length === 0 ? "*" : tuples[i]!.join("|")}`)
         .join(", ");
       return actionResponse({ success: true, cubeName, summary });
     },
