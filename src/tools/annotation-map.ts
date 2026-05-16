@@ -9,15 +9,23 @@
 //   WRITE             POST-style creates / non-idempotent (toggle, write_cells)
 //   DESTRUCTIVE       delete / clear / unload / cancel / remove / invalidate /
 //                     execute (TI side effects)
-import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import { READ_ONLY, IDEMPOTENT_WRITE, WRITE, DESTRUCTIVE } from "./annotations.js";
+import {
+  READ_ONLY,
+  IDEMPOTENT_WRITE,
+  WRITE,
+  DESTRUCTIVE,
+  withVersion,
+  type Tm1ToolAnnotations,
+} from "./annotations.js";
 
-export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
+export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   // analysis
   tm1_analyze_callgraph: READ_ONLY,
   tm1_analyze_chore_graph: READ_ONLY,
   tm1_analyze_object_usage: READ_ONLY,
-  tm1_check_v12_readiness: READ_ONLY,
+  // v11-only: static gap-analysis specifically targeting v11 → v12 migration.
+  // Running on a v12 instance is a no-op (everything is already deprecated).
+  tm1_check_v12_readiness: withVersion(READ_ONLY, "v11"),
   tm1_find_orphan_dimensions: READ_ONLY,
   tm1_invalidate_callgraph_cache: IDEMPOTENT_WRITE,
 
@@ -126,14 +134,17 @@ export const ANNOTATION_MAP: Record<string, ToolAnnotations> = {
   tm1_copy_process: WRITE,
   tm1_create_process: WRITE,
   tm1_delete_process: DESTRUCTIVE,
-  tm1_diff_process_with_file: READ_ONLY,
-  tm1_export_process_to_pro: READ_ONLY,
+  // .pro is the v11 Planning Analytics Architect file format. v12 (Cloud
+  // Native) deploys via different tooling (TM1Web / git-of-records); .pro
+  // round-trip is meaningful only against v11 instances.
+  tm1_diff_process_with_file: withVersion(READ_ONLY, "v11"),
+  tm1_export_process_to_pro: withVersion(READ_ONLY, "v11"),
   tm1_get_all_processes_code: READ_ONLY,
   tm1_get_process_code: READ_ONLY,
   tm1_get_process_datasource: READ_ONLY,
   tm1_get_process_variables: READ_ONLY,
-  tm1_import_pro_file: IDEMPOTENT_WRITE,
-  tm1_install_pro_bundle: IDEMPOTENT_WRITE,
+  tm1_import_pro_file: withVersion(IDEMPOTENT_WRITE, "v11"),
+  tm1_install_pro_bundle: withVersion(IDEMPOTENT_WRITE, "v11"),
   tm1_search_code: READ_ONLY,
   tm1_update_process_code: IDEMPOTENT_WRITE,
   tm1_update_process_datasource: IDEMPOTENT_WRITE,

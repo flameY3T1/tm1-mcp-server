@@ -249,7 +249,9 @@ LLM-Onboarding-Prompt fehlt: Server-Topology, Naming-Conventions, `}`-Prefix fü
 `tm1_get_knowledge` liest aus `TM1_KNOWLEDGE_DIR`. Wenn unkonfiguriert = stille Degradation (kein Article, kein Hint). Sollte gebündelte Default-Artikel ausliefern (ti-syntax, mdx-patterns, tm1-rules) als NPM-Package-Assets.
 
 ### R2-21 — Keine v11-vs-v12 capability annotation per Tool
-`tm1_check_v12_readiness` global ✓, aber einzelne Tools (`tm1_install_pro_bundle`, `tm1_import_pro_file`) ohne Metadata wer sie verträgt. Tool-Description erwähnt es z.T., aber keine machine-readable Annotation. Vorschlag: `requiresVersion: "v12"` in `ToolAnnotations` extension.
+~~`tm1_check_v12_readiness` global ✓, aber einzelne Tools (`tm1_install_pro_bundle`, `tm1_import_pro_file`) ohne Metadata wer sie verträgt. Tool-Description erwähnt es z.T., aber keine machine-readable Annotation. Vorschlag: `requiresVersion: "v12"` in `ToolAnnotations` extension.~~
+
+**Done 2026-05-16.** `Tm1ToolAnnotations extends ToolAnnotations` with `requiresVersion?: "v11" | "v12" | "v11+" | "v12+"`. `withVersion(base, version)` helper composes without mutation. ANNOTATION_MAP value type widened. Tagged 5 v11-only tools: `tm1_check_v12_readiness`, `tm1_diff_process_with_file`, `tm1_export_process_to_pro`, `tm1_import_pro_file`, `tm1_install_pro_bundle`. Field survives JSON wire transport (verified in test) — MCP base schema is non-strict z.object, so unknown keys pass through. Server emits hint only; does not refuse mismatched calls (annotations are hints per spec). Tests `tests/unit/annotation-requires-version.test.ts`.
 
 ### R2-22 — Callgraph-Cache wird nicht auto-invalidiert
 Schema-Mutationen (`create_dimension`, `create_cube`, `update_process_code`, `set_cube_rules`) sollten Callgraph-Cache automatisch invalidieren. Aktuell muss User `tm1_invalidate_callgraph_cache` manuell aufrufen → stale graph silently möglich.

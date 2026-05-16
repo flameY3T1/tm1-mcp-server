@@ -2,6 +2,34 @@
 // guarantees. See https://modelcontextprotocol.io/specification on annotations.
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 
+// R2-21: TM1-specific annotation extension carrying machine-readable v11/v12
+// compatibility metadata. MCP's ToolAnnotationsSchema is a non-strict z.object,
+// so unknown keys pass through JSON serialization to clients (Zod strips them
+// only on .parse, and the SDK serializes on send without re-parsing).
+//
+// Semantics:
+//   "v11"   — only meaningful on v11 instances (e.g. .pro file ops, v12-readiness)
+//   "v12"   — only meaningful on v12 (Cloud Native) instances
+//   "v11+"  — works on v11 and later (default; usually omitted)
+//   "v12+"  — works on v12 and later (forward-looking new APIs)
+//
+// Clients (or wrapping agents) can read this from the tool listing and gate
+// invocation. The server does not refuse mismatched calls — annotations are
+// hints per MCP spec.
+export type Tm1RequiresVersion = "v11" | "v12" | "v11+" | "v12+";
+
+export interface Tm1ToolAnnotations extends ToolAnnotations {
+  requiresVersion?: Tm1RequiresVersion;
+}
+
+// Apply requiresVersion to a base annotation preset without mutating it.
+export function withVersion(
+  base: ToolAnnotations,
+  version: Tm1RequiresVersion,
+): Tm1ToolAnnotations {
+  return { ...base, requiresVersion: version };
+}
+
 // GET / list / search / analyze / validate / compile / diff — no server-side state change.
 export const READ_ONLY: ToolAnnotations = {
   readOnlyHint: true,
