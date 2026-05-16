@@ -65,10 +65,10 @@ export class ServerService {
    * GET /api/v1/TransactionLogEntries
    */
   async getTransactionLog(opts: {
-    top?: number;
-    cubeName?: string;
-    user?: string;
-    since?: string; // ISO timestamp
+    top?: number | undefined;
+    cubeName?: string | undefined;
+    user?: string | undefined;
+    since?: string | undefined; // ISO timestamp
   }): Promise<TransactionLogEntry[]> {
     const filters: string[] = [];
     if (opts.cubeName) filters.push(`Cube eq '${opts.cubeName.replace(/'/g, "''")}'`);
@@ -107,7 +107,7 @@ export class ServerService {
    * chronological newest-first. Filters (processName, since, top) are applied
    * client-side.
    */
-  async listErrorLogFiles(opts: { processName?: string; since?: string; top?: number } = {}): Promise<ErrorLogFile[]> {
+  async listErrorLogFiles(opts: { processName?: string | undefined; since?: string | undefined; top?: number | undefined } = {}): Promise<ErrorLogFile[]> {
     const top = opts.top ?? 50;
     const response = await this.http.request<{ value: Array<{ Filename?: string }> }>(
       "GET",

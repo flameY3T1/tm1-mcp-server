@@ -72,11 +72,11 @@ export interface TmReference {
   section: RefSection;
   line: number;                         // 0-based within section text
   snippet: string;                      // Trimmed source line (≤200 chars)
-  funcName?: string;                    // e.g. CellGetN, DB, ExecuteProcess
+  funcName?: string | undefined;        // e.g. CellGetN, DB, ExecuteProcess
   targetKind: RefTargetKind;
   targetName: string;
   /** Only set for ExecuteProcess/RunProcess references (targetKind = 'process'). */
-  params?: CallParam[];
+  params?: CallParam[] | undefined;
 }
 
 /** One task inside a chore: the scheduled process plus its fixed call-site params. */
@@ -151,7 +151,7 @@ interface RawTiRef {
   targetKind: RefTargetKind;
   targetName: string;
   snippet: string;
-  params?: CallParam[];
+  params?: CallParam[] | undefined;
 }
 
 /**
@@ -282,7 +282,7 @@ export function extractTiReferences(
 interface RawRuleRef {
   line: number;
   section: 'rules' | 'feeders';
-  funcName?: string;
+  funcName?: string | undefined;
   targetKind: 'cube' | 'dimension';
   targetName: string;
   snippet: string;

@@ -12,9 +12,9 @@ export interface SampleCellsBuildArgs {
   /** Max rows after NON EMPTY. 0 = no HEAD (full result). */
   maxCells: number;
   /** Per-dimension filters: single string → WHERE; array → axis member set. */
-  filters?: Record<string, SampleCellFilter>;
+  filters?: Record<string, SampleCellFilter> | undefined;
   /** Dimension placed on COLUMNS. Default: last cube dimension. */
-  axisDimension?: string;
+  axisDimension?: string | undefined;
   /** If true, restrict unfiltered dims to leaf members (level 0). */
   leavesOnly: boolean;
 }

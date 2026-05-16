@@ -11,7 +11,7 @@ interface FileResult {
   processName: string | null;
   status: "created" | "updated" | "skipped" | "preflight_failed" | "error";
   error?: string;
-  preflightErrors?: Array<{ procedure?: string; lineNumber?: number; message: string }>;
+  preflightErrors?: Array<{ procedure?: string | undefined; lineNumber?: number | undefined; message: string }>;
 }
 
 export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client) {

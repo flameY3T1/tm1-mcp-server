@@ -24,7 +24,7 @@ export interface TiAssignment {
   /** true wenn der Ausdruck CellGetN/CellGetS enthält */
   isExternal: boolean;
   /** Falls isExternal: Funktionsname und Parameter */
-  cellGetInfo?: { fn: 'CellGetN' | 'CellGetS'; params: string[] };
+  cellGetInfo?: { fn: 'CellGetN' | 'CellGetS'; params: string[] } | undefined;
   line: number;
 }
 

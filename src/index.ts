@@ -171,12 +171,15 @@ async function startHttpTransport(
 ): Promise<() => Promise<void>> {
   const allowedHost = `${config.httpHost}:${config.httpPort}`;
   const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // stateless mode
+    // sessionIdGenerator omitted → stateless mode
     enableDnsRebindingProtection: true,
     allowedHosts: [allowedHost, "127.0.0.1", "localhost"],
     allowedOrigins: config.httpAllowedOrigins,
   });
-  await server.connect(transport);
+  // Cast needed: StreamableHTTPServerTransport.onclose is `(() => void) | undefined`
+  // but Transport expects `() => void`; EOPT surfaces this library-internal mismatch.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await server.connect(transport as any);
 
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (!req.url || !req.url.startsWith("/mcp")) {

@@ -17,21 +17,21 @@ export type TM1ErrorCode = (typeof TM1ErrorCode)[keyof typeof TM1ErrorCode];
 
 export class TM1Error extends Error {
   readonly code: TM1ErrorCode;
-  readonly httpStatus?: number;
-  readonly endpoint?: string;
-  readonly details?: string;
+  readonly httpStatus?: number | undefined;
+  readonly endpoint?: string | undefined;
+  readonly details?: string | undefined;
   // Optional tool-context override. When set, takes precedence over
   // hintForCode(). Tools attach this via attachHint() to provide
   // operation-specific next steps (G4 from MCP best-practices review).
-  hintOverride?: string;
+  hintOverride?: string | undefined;
 
   constructor(opts: {
     code: TM1ErrorCode;
     message: string;
-    httpStatus?: number;
-    endpoint?: string;
-    details?: string;
-    hint?: string;
+    httpStatus?: number | undefined;
+    endpoint?: string | undefined;
+    details?: string | undefined;
+    hint?: string | undefined;
   }) {
     super(opts.message);
     this.name = "TM1Error";
@@ -51,17 +51,17 @@ export class TM1Error extends Error {
   toErrorPayload(): {
     code: TM1ErrorCode;
     message: string;
-    httpStatus?: number;
-    endpoint?: string;
-    details?: string;
+    httpStatus?: number | undefined;
+    endpoint?: string | undefined;
+    details?: string | undefined;
     hint: string;
   } {
     return {
       code: this.code,
       message: this.message,
-      httpStatus: this.httpStatus,
-      endpoint: this.endpoint,
-      details: this.details,
+      ...(this.httpStatus !== undefined && { httpStatus: this.httpStatus }),
+      ...(this.endpoint !== undefined && { endpoint: this.endpoint }),
+      ...(this.details !== undefined && { details: this.details }),
       hint: this.hint,
     };
   }
@@ -154,14 +154,14 @@ export interface ViewResult {
 }
 
 export interface ViewAxisSubsetRef {
-  dimensionName?: string;
-  hierarchyName?: string;
-  subsetName?: string;
-  expression?: string;
+  dimensionName?: string | undefined;
+  hierarchyName?: string | undefined;
+  subsetName?: string | undefined;
+  expression?: string | undefined;
 }
 
 export interface ViewTitleRef extends ViewAxisSubsetRef {
-  selectedElement?: string;
+  selectedElement?: string | undefined;
 }
 
 export interface NativeViewDefinition {
@@ -188,15 +188,15 @@ export interface ProcessParameter {
   name: string;
   type: "String" | "Numeric";
   defaultValue: string | number;
-  prompt?: string;
+  prompt?: string | undefined;
 }
 
 export interface ProcessVariable {
   name: string;
   type: "String" | "Numeric";
   position: number;
-  startByte?: number;
-  endByte?: number;
+  startByte?: number | undefined;
+  endByte?: number | undefined;
 }
 
 export interface ProcessCode {
@@ -214,27 +214,27 @@ export interface DataSource {
     | "ASCII"
     | "ODBC"
     | "TM1Process";
-  dataSourceNameForServer?: string;
-  dataSourceNameForClient?: string;
-  asciiDelimiterType?: string;
-  asciiDelimiterChar?: string;
-  asciiQuoteCharacter?: string;
-  asciiHeaderRecords?: number;
-  asciiDecimalSeparator?: string;
-  asciiThousandSeparator?: string;
-  usesUnicode?: boolean;
-  userName?: string;
-  password?: string;
-  oDBCConnection?: string;
-  query?: string;
-  view?: string;
-  subset?: string;
+  dataSourceNameForServer?: string | undefined;
+  dataSourceNameForClient?: string | undefined;
+  asciiDelimiterType?: string | undefined;
+  asciiDelimiterChar?: string | undefined;
+  asciiQuoteCharacter?: string | undefined;
+  asciiHeaderRecords?: number | undefined;
+  asciiDecimalSeparator?: string | undefined;
+  asciiThousandSeparator?: string | undefined;
+  usesUnicode?: boolean | undefined;
+  userName?: string | undefined;
+  password?: string | undefined;
+  oDBCConnection?: string | undefined;
+  query?: string | undefined;
+  view?: string | undefined;
+  subset?: string | undefined;
 }
 
 export interface ProcessResult {
   success: boolean;
   processErrorStatus: string;
-  errorLogFile?: string;
+  errorLogFile?: string | undefined;
 }
 
 export interface Chore {
@@ -251,13 +251,13 @@ export interface Chore {
 export interface ElementCreate {
   name: string;
   type: "Numeric" | "String" | "Consolidated";
-  components?: Array<{ name: string; weight: number }>;
+  components?: Array<{ name: string; weight: number }> | undefined;
 }
 
 export interface ElementUpdate {
-  newName?: string;
-  type?: "Numeric" | "String" | "Consolidated";
-  components?: Array<{ name: string; weight: number }>;
+  newName?: string | undefined;
+  type?: "Numeric" | "String" | "Consolidated" | undefined;
+  components?: Array<{ name: string; weight: number }> | undefined;
 }
 
 // ── New domain models (Phase 1) ───────────────────────────────────────────────
@@ -269,12 +269,12 @@ export interface Thread {
   state: string;
   function: string;
   objectName: string;
-  elapsedTime?: string;
-  objectType?: string;
-  lockType?: string;
-  waitTime?: string;
-  info?: string;
-  context?: string;
+  elapsedTime?: string | undefined;
+  objectType?: string | undefined;
+  lockType?: string | undefined;
+  waitTime?: string | undefined;
+  info?: string | undefined;
+  context?: string | undefined;
 }
 
 export interface Session {
@@ -321,6 +321,7 @@ export interface ChoreCreate {
   steps: ChoreStep[];
 }
 
+
 export interface ToolResult {
   content: Array<{
     type: "text";
@@ -332,19 +333,19 @@ export interface ToolResult {
 export interface ServerInfo {
   serverName: string;
   productVersion: string;
-  productEdition?: string;
-  adminHost?: string;
-  dataDirectory?: string;
-  timeZoneId?: string;
-  integratedSecurityMode?: string;
+  productEdition?: string | undefined;
+  adminHost?: string | undefined;
+  dataDirectory?: string | undefined;
+  timeZoneId?: string | undefined;
+  integratedSecurityMode?: string | undefined;
   extra: Record<string, unknown>;
 }
 
 export interface CompileResult {
   success: boolean;
   errors: Array<{
-    lineNumber?: number;
-    procedure?: string;
+    lineNumber?: number | undefined;
+    procedure?: string | undefined;
     message: string;
   }>;
 }
@@ -362,7 +363,7 @@ export interface ProcessCheckInput {
 
 export interface CubeView {
   name: string;
-  mdx?: string;
+  mdx?: string | undefined;
   private: boolean;
 }
 
@@ -385,16 +386,16 @@ export interface Subset {
   dimensionName: string;
   hierarchyName: string;
   private: boolean;
-  expression?: string;
+  expression?: string | undefined;
   elements: string[];
-  alias?: string;
+  alias?: string | undefined;
 }
 
 export interface SubsetCreate {
   name: string;
-  expression?: string;
-  elements?: string[];
-  alias?: string;
+  expression?: string | undefined;
+  elements?: string[] | undefined;
+  alias?: string | undefined;
 }
 
 export interface ElementAttributeValue {
@@ -415,15 +416,15 @@ export interface Client {
 
 export interface ClientCreate {
   name: string;
-  password?: string;
-  friendlyName?: string;
-  groups?: string[];
+  password?: string | undefined;
+  friendlyName?: string | undefined;
+  groups?: string[] | undefined;
 }
 
 export interface ClientUpdate {
-  password?: string;
-  friendlyName?: string;
-  enabled?: boolean;
+  password?: string | undefined;
+  friendlyName?: string | undefined;
+  enabled?: boolean | undefined;
 }
 
 export interface Group {

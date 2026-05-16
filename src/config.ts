@@ -8,7 +8,7 @@ export interface TM1Config {
   keepAliveIntervalMs: number;
   requestTimeoutMs: number;
   logLevel: "debug" | "info" | "warn" | "error";
-  logFile?: string;
+  logFile?: string | undefined;
   tm1Version: string;
   transport: "stdio" | "http";
   httpHost: string;

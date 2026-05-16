@@ -13,9 +13,9 @@ import { TM1Error, TM1ErrorCode, hintForCode } from "../types.js";
 interface UniformErrorPayload {
   code: TM1ErrorCode | string;
   message: string;
-  httpStatus?: number;
-  endpoint?: string;
-  details?: string;
+  httpStatus?: number | undefined;
+  endpoint?: string | undefined;
+  details?: string | undefined;
   hint: string;
 }
 

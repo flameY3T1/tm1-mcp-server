@@ -156,10 +156,10 @@ export class FileService {
    * - contains: list of case-insensitive substring matches, joined by `operator`
    */
   async search(opts: {
-    startswith?: string;
-    contains?: string[];
-    operator?: "and" | "or";
-    path?: string;
+    startswith?: string | undefined;
+    contains?: string[] | undefined;
+    operator?: "and" | "or" | undefined;
+    path?: string | undefined;
   }): Promise<string[]> {
     const operator = opts.operator ?? "and";
     const segments = opts.path ? opts.path.split("/").filter(Boolean) : [];

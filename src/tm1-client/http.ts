@@ -194,7 +194,7 @@ export class TM1HttpClient {
           },
           signal: controller.signal,
           dispatcher: getTm1Dispatcher(this.config),
-        } as RequestInit);
+        } as unknown as RequestInit);
       } finally {
         clearTimeout(timeout);
         unlink();
@@ -255,7 +255,7 @@ export class TM1HttpClient {
           body,
           signal: controller.signal,
           dispatcher: getTm1Dispatcher(this.config),
-        } as RequestInit);
+        } as unknown as RequestInit);
       } finally {
         clearTimeout(timeout);
         unlink();
@@ -313,7 +313,7 @@ export class TM1HttpClient {
         body: body !== undefined ? JSON.stringify(body) : isWriteMethod ? "" : undefined,
         signal: controller.signal,
         dispatcher: getTm1Dispatcher(this.config),
-      } as RequestInit);
+      } as unknown as RequestInit);
     } finally {
       clearTimeout(timeout);
       unlink();

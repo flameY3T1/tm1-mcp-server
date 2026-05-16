@@ -120,7 +120,7 @@ export class SubsetService {
     dimensionName: string,
     hierarchyName: string,
     subsetName: string,
-    update: { expression?: string; elements?: string[]; alias?: string },
+    update: { expression?: string | undefined; elements?: string[] | undefined; alias?: string | undefined },
   ): Promise<void> {
     const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Subsets('${enc(subsetName)}')`;
     const body: Record<string, unknown> = {};

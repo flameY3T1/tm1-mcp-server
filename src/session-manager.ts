@@ -82,7 +82,7 @@ export class SessionManager {
           },
           signal,
           dispatcher: getTm1Dispatcher(this.config),
-        } as RequestInit),
+        } as unknown as RequestInit),
     );
 
     // Always consume body to release connection
@@ -141,7 +141,7 @@ export class SessionManager {
             },
             signal,
             dispatcher: getTm1Dispatcher(this.config),
-          } as RequestInit),
+          } as unknown as RequestInit),
       );
     } catch (err) {
       if (err instanceof TimeoutError) {
@@ -251,7 +251,7 @@ export class SessionManager {
           "TM1-Session-Context": USER_AGENT,
         },
         dispatcher: getTm1Dispatcher(this.config),
-      } as RequestInit);
+      } as unknown as RequestInit);
 
       // Consume body to release connection
       await response.text();

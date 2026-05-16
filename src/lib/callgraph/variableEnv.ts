@@ -15,7 +15,7 @@ export type TiVarType = 'Numeric' | 'String';
 
 export type VarBinding =
   | { kind: 'literal'; value: string }                                               // resolved literal value (string content without quotes, or numeric text)
-  | { kind: 'param'; paramName: string; paramType?: TiVarType }                      // value comes directly from a process parameter
+  | { kind: 'param'; paramName: string; paramType?: TiVarType | undefined }           // value comes directly from a process parameter
   | { kind: 'datasource'; varName: string; varType: TiVarType }                      // value comes from a DataSource variable (one per processed row)
   | { kind: 'dynamic' };                                                             // cannot resolve (computed/IF/CellGet/concat/etc.)
 

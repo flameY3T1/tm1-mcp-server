@@ -44,10 +44,10 @@ export interface CallGraphNode {
    * Effective parameter environment AT this node (after call-site resolution).
    * Keys are lowercased param names. Only populated for downstream direction.
    */
-  env?: Map<string, EffectiveValue>;
+  env?: Map<string, EffectiveValue> | undefined;
   children: CallGraphNode[];
   cycle: boolean;
-  depthLimitReached?: boolean;
+  depthLimitReached?: boolean | undefined;
 }
 
 export type Direction = 'downstream' | 'upstream';
@@ -242,7 +242,7 @@ export interface UsageRef {
   sourceName: string;
   section: string;
   line: number;
-  funcName?: string;
+  funcName?: string | undefined;
   snippet: string;
 }
 

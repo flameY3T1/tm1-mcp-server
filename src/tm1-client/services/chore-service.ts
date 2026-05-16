@@ -96,7 +96,14 @@ export class ChoreService {
    */
   async update(
     choreName: string,
-    updates: Partial<Pick<ChoreCreate, "startTime" | "active" | "dstSensitive" | "executionMode" | "frequency" | "steps">>,
+    updates: {
+      startTime?: string | undefined;
+      active?: boolean | undefined;
+      dstSensitive?: boolean | undefined;
+      executionMode?: "SingleCommit" | "MultipleCommit" | undefined;
+      frequency?: ChoreCreate["frequency"] | undefined;
+      steps?: ChoreCreate["steps"] | undefined;
+    },
   ): Promise<void> {
     const path = `/api/v1/Chores('${enc(choreName)}')`;
     const body: Record<string, unknown> = {};

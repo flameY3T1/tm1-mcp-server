@@ -29,7 +29,7 @@ const STATE_SENSITIVE_URIS = new Set<string>(["tm1://server/state"]);
 export class SubscriptionRegistry {
   // URIs the client has asked us to push updates for.
   private readonly subscribed = new Set<string>();
-  private mutationListener?: (e: Tm1MutationEvent) => void;
+  private mutationListener?: ((e: Tm1MutationEvent) => void) | undefined;
 
   constructor(
     private readonly server: McpServer,
