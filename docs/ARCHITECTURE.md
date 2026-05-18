@@ -8,7 +8,7 @@ contributor adding TM1 calls or new tools.
 
 ```
 ┌──────────────────────────────────────────────┐
-│  src/tools/**            MCP tool surface    │  98 tools, one file each
+│  src/tools/**            MCP tool surface    │  107 tools, one file each
 │  (Zod schemas, MCP envelopes, validation)    │
 └──────────────────────┬───────────────────────┘
                        │ uses
