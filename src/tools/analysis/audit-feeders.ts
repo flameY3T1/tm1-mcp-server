@@ -4,16 +4,18 @@ import type { TM1Client } from "../../tm1-client.js";
 import { parseRules } from "../../lib/callgraph/rulesParser.js";
 import { extractBracketLists } from "../../lib/feeders/brackets.js";
 import {
-  detectBroaderThanRule,
   detectOrphanFeeder,
   detectWildcardBracket,
 } from "../../lib/feeders/static-heuristics.js";
 import { isControlName } from "../../lib/control-name.js";
 
-type FindingRule =
-  | "feeder_broader_than_rule"
-  | "wildcard_bracket"
-  | "orphan_feeder";
+// NOTE: S1 (feeder_broader_than_rule) intentionally deferred to P2.
+// detectBroaderThanRule is exported from static-heuristics for future use
+// but is NOT wired into this MVP. The first live-run on a v11 production
+// model surfaced 91 % false positives because the entry-count comparison
+// is too crude without cube dimension-order resolution (REST lookup). S1
+// re-lands once the dim-order resolver ships.
+type FindingRule = "wildcard_bracket" | "orphan_feeder";
 
 interface Finding {
   cube: string;
@@ -29,11 +31,13 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
     [
       "Bulk-scan cube rules for likely overfeeding patterns (P1 MVP, static",
       "only — no REST element-type lookups yet). Detects: wildcard feeder",
-      "brackets (no concrete elements), feeders strictly broader than the",
-      "densest rule LHS in the same cube, and orphan feeders whose elements",
-      "don't appear in any rule LHS. Severity is always 'hint' at this",
-      "stage; runtime evidence (}StatsByCube sparsity + memory) lands in a",
-      "later phase. Control objects ('}'-prefix) excluded by default.",
+      "brackets (no concrete elements) and orphan feeders whose elements",
+      "appear in zero rule LHS. Severity is always 'hint' at this stage;",
+      "runtime evidence (}StatsByCube sparsity + memory) lands in a later",
+      "phase. 'feeder_broader_than_rule' is intentionally deferred until",
+      "cube dimension-order resolution lands — early heuristic produced",
+      "91 % false positives on positional-feeder-heavy production cubes.",
+      "Control objects ('}'-prefix) excluded by default.",
     ].join(" "),
     {
       cubes: z
@@ -87,6 +91,11 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
           if (line.section !== "feeders") continue;
           if (line.isBlank || line.isComment) continue;
           if (/^feeders\s*;?\s*$/i.test(line.trimmed)) continue;
+          // Multi-line feeders put the `=>` and RHS on a continuation line.
+          // Treat such continuations as already-covered by the preceding
+          // feeder's LHS — skip them so we don't double-count or evaluate
+          // an RHS bracket as if it were the LHS.
+          if (/^=>/.test(line.trimmed)) continue;
           const lists = extractBracketLists(line.trimmed);
           if (lists.length === 0) continue;
           feederLinesScanned++;
@@ -110,22 +119,11 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
               rule: "orphan_feeder",
               feeder: line.trimmed,
             });
-            continue;
-          }
-          if (detectBroaderThanRule(feederLhs, ruleLhs)) {
-            findings.push({
-              cube: c.cubeName,
-              line: line.lineIndex + 1,
-              severity: "hint",
-              rule: "feeder_broader_than_rule",
-              feeder: line.trimmed,
-            });
           }
         }
       }
 
       const byRule: Record<FindingRule, number> = {
-        feeder_broader_than_rule: 0,
         wildcard_bracket: 0,
         orphan_feeder: 0,
       };
@@ -165,7 +163,8 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 truncated: { findings: truncated },
                 findings: trimmed,
                 rulesetSource:
-                  "Static heuristics S1/S4/S6 — see docs/feeders-audit-spec.md.",
+                  "Static heuristics S4 (wildcard_bracket) + S6 (orphan_feeder). " +
+                  "S1 (feeder_broader_than_rule) deferred to P2 — see docs/feeders-audit-spec.md.",
               },
               null,
               2,

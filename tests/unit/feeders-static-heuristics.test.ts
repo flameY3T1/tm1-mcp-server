@@ -60,6 +60,24 @@ describe("detectBroaderThanRule — S1", () => {
     const feeder = lhs("['A','B']");
     expect(detectBroaderThanRule(feeder, [])).toBe(false);
   });
+
+  it("ignores rules that share no element with the feeder (different cell-space)", () => {
+    const ruleLhs = [lhs("['X','Y','Z','W','V']")];
+    const feeder = lhs("['A','B']");
+    // No overlap → S6 / orphan concern, not S1. Suppresses ~91 % live-test noise.
+    expect(detectBroaderThanRule(feeder, ruleLhs)).toBe(false);
+  });
+
+  it("uses the densest OVERLAPPING rule, not the absolute densest", () => {
+    const ruleLhs = [
+      lhs("['X','Y','Z','W','V','U','T']"), // 7 entries, zero overlap
+      lhs("['A','B','C']"), // 3 entries, overlaps on A
+    ];
+    const feeder = lhs("['A']");
+    // Only the 3-entry rule overlaps; feeder=1 < 3 → flag. The 7-entry rule
+    // is ignored because it targets a different cell-space.
+    expect(detectBroaderThanRule(feeder, ruleLhs)).toBe(true);
+  });
 });
 
 describe("detectOrphanFeeder — S6", () => {

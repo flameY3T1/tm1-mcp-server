@@ -76,7 +76,10 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.invalidCount).toBe(0);
   });
 
-  it("flags feeder broader than the cube's densest rule (S1)", async () => {
+  it("does NOT flag feeder_broader_than_rule (S1 deferred to P2)", async () => {
+    // S1 produced 91 % false positives on the live test server; rule has
+    // 5 entries, feeder has 2, but P1 ships only S4 + S6. Once cube dim-
+    // order resolution lands in P2, S1 re-activates.
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
@@ -95,11 +98,8 @@ describe("tm1_audit_feeders tool", () => {
     });
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({}));
-    expect(out.status).toBe("fail");
-    expect(out.summary.byRule.feeder_broader_than_rule).toBe(1);
-    expect(out.findings[0].rule).toBe("feeder_broader_than_rule");
-    expect(out.findings[0].severity).toBe("hint");
-    expect(out.findings[0].cube).toBe("Sales");
+    expect(out.summary.byRule.feeder_broader_than_rule).toBeUndefined();
+    expect(out.status).toBe("pass");
   });
 
   it("flags orphan feeders whose elements don't appear in any rule (S6)", async () => {
@@ -206,7 +206,7 @@ describe("tm1_audit_feeders tool", () => {
             "skipcheck;",
             "['A','B','C','D'] = N: 1;",
             "feeders;",
-            ...Array.from({ length: 6 }, () => "['A','B'] => ['D'];"),
+            ...Array.from({ length: 6 }, () => "[] => ['D'];"),
           ].join("\n"),
           skipCheck: true,
         },
@@ -217,6 +217,34 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.invalidCount).toBe(6);
     expect(out.findings).toHaveLength(3);
     expect(out.truncated.findings).toBe(true);
+  });
+
+  it("skips `=> [...]` continuation lines (multi-line feeder)", async () => {
+    // Real-world cubes split a feeder across two lines; the second starts
+    // with `=>`. The continuation must not be counted as a separate feeder.
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "MultiLine",
+          rulesText: [
+            "skipcheck;",
+            "['A','B','C'] = N: 1;",
+            "feeders;",
+            "[]",
+            "=> ['C'];",
+          ].join("\n"),
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    // One feeder logically (wildcard LHS line). Continuation line filtered out.
+    expect(out.scanned.feederLines).toBe(1);
+    expect(out.invalidCount).toBe(1);
+    expect(out.findings[0].rule).toBe("wildcard_bracket");
   });
 
   it("uses positional element bag for orphan detection (real feeder style)", async () => {

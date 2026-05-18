@@ -43,13 +43,20 @@ export function detectWildcardBracket(list: BracketList): boolean {
 }
 
 /**
- * S1 · Feeder broader than rule — the feeder LHS pins fewer dims than any
- * rule LHS in the same cube. Without cube dim-order resolution (REST lookup,
- * deferred to P2), we use entry-count as a proxy: a feeder with strictly
- * fewer constraints than the densest rule of the cube is suspicious.
+ * S1 · Feeder broader than rule — the feeder LHS pins fewer dims than the
+ * **overlapping** rule LHS that it most plausibly serves. We approximate
+ * "serves" via shared element names: a rule only counts as comparable when
+ * its LHS shares at least one element with the feeder LHS, otherwise the
+ * two are targeting different cell-spaces and a count comparison is noise.
  *
- * Returns false when no rules exist (cube has feeders without rules — orphan
- * territory, flagged by S6 instead).
+ * Without cube dim-order resolution (REST lookup, deferred to P2), this
+ * remains a heuristic — an early live run on a v11 cube otherwise flagged
+ * 91 % of feeders as broader-than-rule because every rule LHS in the cube
+ * was a candidate baseline. Restricting to overlapping rules collapses that
+ * to the cases that actually share semantic context.
+ *
+ * Returns false when no rules overlap (cube has feeders without matching
+ * rules — orphan territory, flagged by S6 instead).
  */
 export function detectBroaderThanRule(
   feeder: BracketList,
@@ -57,11 +64,25 @@ export function detectBroaderThanRule(
 ): boolean {
   if (feeder.entries.length === 0) return false;
   if (ruleLhsList.length === 0) return false;
-  let densest = 0;
-  for (const r of ruleLhsList) {
-    if (r.entries.length > densest) densest = r.entries.length;
+  const feederElems = collectElementBag(feeder);
+  if (feederElems.size === 0) return false;
+
+  let densestOverlapping = 0;
+  for (const rule of ruleLhsList) {
+    const ruleElems = collectElementBag(rule);
+    let overlaps = false;
+    for (const e of feederElems) {
+      if (ruleElems.has(e)) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (overlaps && rule.entries.length > densestOverlapping) {
+      densestOverlapping = rule.entries.length;
+    }
   }
-  return feeder.entries.length < densest;
+  if (densestOverlapping === 0) return false;
+  return feeder.entries.length < densestOverlapping;
 }
 
 /**

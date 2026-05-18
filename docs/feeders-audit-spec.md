@@ -22,7 +22,7 @@ References:
 
 1. **Feeder broader than rule** — rule LHS specifies 5 dims, feeder LHS only specifies 2 → feeder fires on all combos of the unspecified 3.
 2. **Feeder to a Consolidated (C-level) member** — feeds every descendant N-level cell, even those without a real rule pendant.
-3. **Missing `IFEED` / `STET` on conditional rule** — rule uses `IF(value=0, STET, …)` but feeder fires unconditionally → all candidates fed.
+3. **Unconditional feeder for conditional rule** — rule uses `IF(value=0, STET, …)` but feeder fires unconditionally → all candidates fed. (TM1 has no `IFEED` keyword; the fix is wrapping the feeder LHS in plain `IF(…)`.)
 4. **Wildcard / unscoped bracket** — `['Dim']` (no element) or `[]` — fires per dimension element.
 5. **`DB()` feeder without `skipcheck;` on target** — cross-cube feed cascades through unscoped consolidations.
 6. **Alternate-hierarchy double feed** — element belongs to two hierarchies; unqualified feeder feeds via both.
@@ -78,14 +78,17 @@ Output schema (sketch):
 
 ## Static heuristics (mode: "static")
 
-### S1 · Feeder broader than rule (most common)
+### S1 · Feeder broader than rule (most common) — **deferred to P2**
 
-Compare each feeder LHS against the set of rule LHS in the same cube.
-
-- A rule LHS is a list of `(dim, elem)` pairs (or positional element list).
-- A feeder LHS likewise.
-- **Heuristic:** If a feeder's `(dim, elem)` set is a **strict subset** of every rule LHS that "intersects" it, flag as broader-than-rule.
-- Edge: feeders intentionally use rollup C-level for one side — needs C-level detection (S2) to not false-positive.
+Initial implementation compared entry counts against the densest overlapping
+rule LHS; live-test on a v11 production cube on 2026-05-18 produced 91 %
+false positives because rules routinely pin more dims (qualified syntax)
+than the cube actually has, while feeders use positional shorthand. The
+proxy collapses without cube dimension-order resolution — the function
+`detectBroaderThanRule` remains exported for unit tests, but is unwired
+from the tool until P2 ships an `Elements?$select=Type` + dim-order
+resolver. After that lands, S1 compares against (total cube dims minus
+constraints pinned in feeder LHS) instead of guessing from entry counts.
 
 ### S2 · Feeder targets Consolidated element
 
@@ -94,11 +97,21 @@ Requires element-type lookup (one REST call per distinct element in feeders). Ca
 - For each LHS element referenced in any feeder, batch-fetch `Elements?$select=Name,Type&$filter=Name in (…)` per hierarchy.
 - If `Type == "Consolidated"`, flag the feeder line. Severity = `hint`.
 
-### S3 · Missing IFEED/STET for conditional rule
+### S3 · Conditional rule without conditional feeder
 
-- Scan rules section for `IF(…, …, STET, …)` or implicit conditional patterns.
-- For each such rule, locate the matching feeder. If feeder LHS isn't wrapped in `IF`/`IFEED`/`STET`, flag.
-- AST help: we already detect `isFeedstrings`; we don't yet detect `STET` per-line — add a `hasStet: boolean` line flag in `parseRules`.
+Terminology note (corrected 2026-05-18): TM1 has **STET** (rules-side keyword
+meaning "leave this cell untouched") and plain **`IF()`** (works in both rules
+and feeders). There is no `IFEED` keyword — earlier drafts of this spec called
+it that erroneously.
+
+- Scan rules section: a line is *conditional* if it contains `STET` or wraps
+  its RHS in `IF(…)`.
+- For each such rule, locate the matching feeder. If the feeder LHS isn't
+  itself guarded by an `IF(…)` (Cubewise-style conditional feeder), flag it
+  — unconditional feeder + conditional rule = feed-everything overshoot.
+- AST help: we already detect `isSkipcheck`/`isFeedstrings`; we don't yet
+  detect `STET` or LHS-`IF` per line — add `hasStet: boolean` and
+  `hasIfGuard: boolean` line flags in `parseRules`.
 
 ### S4 · Wildcard / unscoped bracket
 
@@ -146,7 +159,7 @@ Cube stats existing in this repo: `tm1_get_cube_stats`. Reuse the same service m
    - Batch `Elements?$select=Name,Type` per `(dim, hierarchy)`
    - LRU keyed by `(dim, hier, elem) → "Numeric" | "Consolidated" | "String"`
    - One scan = at most N cache misses per (dim, hier) regardless of how many feeders reference elements
-4. **`hasStet` + `hasIfeed` line flags in `parseRules`** — minor extension to existing AST (additive, same pattern as `hasFeedstrings` from MED-3 fix).
+4. **`hasStet` + `hasIfGuard` line flags in `parseRules`** — minor extension to existing AST (additive, same pattern as `hasFeedstrings` from MED-3 fix). `hasIfGuard` = the line begins with `IF(` regardless of section.
 
 ## Risks / open questions
 
@@ -159,18 +172,20 @@ Cube stats existing in this repo: `tm1_get_cube_stats`. Reuse the same service m
 
 | Phase | Scope | Exit |
 |---|---|---|
-| P0 | Positional bracket parser + tests | parser handles ≥95% of feeder lines from probe rerun |
-| P1 | Static heuristics S1, S4, S6 (no REST lookups) | tool registers, returns findings on test server |
-| P2 | S2 + S5 (requires element-type cache) | C-level + DB-target-skipcheck findings live |
-| P3 | S3 (requires `hasStet` AST extension) | conditional-rule findings live |
+| P0 | Positional bracket parser + tests | parser handles ≥95 % of feeder lines from probe rerun ✓ (95.08 %) |
+| P1 | Static heuristics S4 + S6 (no REST lookups) | tool registers, returns findings on test server ✓ |
+| P2 | S1 (with cube dim-order) + S2 + S5 (element-type cache) | C-level + DB-target-skipcheck + properly-gated breadth findings live |
+| P3 | S3 (requires `hasStet` + `hasIfGuard` AST extension) | conditional-rule findings live |
 | P4 | Runtime mode (`}StatsByCube` MDX + sparsity scoring) | runtime-evidence severity escalates findings |
 | P5 | False-positive tuning on bigger model + doc update | tool documented, default `severityThreshold` calibrated |
 
-P0 + P1 = MVP shippable on its own.
+P0 + P1 = MVP shippable on its own. S1 moved from P1 to P2 after live-test
+on 2026-05-18 showed the entry-count proxy was unreliable; resolving cube
+dim count is a prerequisite (one REST call per cube — cheap).
 
 ## Out of scope (later, separate tools)
 
 - Underfeeding detection (rule without feeder).
 - Feeder graph visualisation (callgraph-like UI).
-- Auto-suggesting `IFEED` / `STET` rewrites.
+- Auto-suggesting `IF(…)` / `STET` rewrites.
 - Alternate-hierarchy double-feed detection (needs hierarchy-graph build-up — defer).
