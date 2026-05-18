@@ -20,6 +20,7 @@ import {
   extractDbCalls,
   parseBracketDimRefs,
 } from "../src/lib/callgraph/rulesLinter.js";
+import { extractBracketLists } from "../src/lib/feeders/brackets.js";
 
 interface CubePatterns {
   cube: string;
@@ -36,6 +37,14 @@ interface CubePatterns {
   feedersWithElements: number;
   /** Feeder lines whose LHS bracket list looks wildcard-ish (no element token). */
   feedersWildcardish: number;
+  /** Feeder lines whose LHS uses the new positional parser successfully. */
+  feedersParsedNew: number;
+  /** Feeder lines whose LHS is fully positional under the new parser. */
+  feedersPositional: number;
+  /** Feeder lines whose LHS is fully qualified under the new parser. */
+  feedersQualified: number;
+  /** Feeder lines whose LHS mixes positional + qualified under the new parser. */
+  feedersMixed: number;
   /** Rules lines using `IF(...)` on the LHS — conditional rule that needs IFEED. */
   conditionalRules: number;
   /** Feeder line samples (max 3). */
@@ -56,6 +65,10 @@ function classifyCube(cube: string, rulesText: string): CubePatterns | null {
   let feedersWithDb = 0;
   let feedersWithElements = 0;
   let feedersWildcardish = 0;
+  let feedersParsedNew = 0;
+  let feedersPositional = 0;
+  let feedersQualified = 0;
+  let feedersMixed = 0;
   let conditionalRules = 0;
   const samplesFeeders: string[] = [];
   const samplesRules: string[] = [];
@@ -83,6 +96,16 @@ function classifyCube(cube: string, rulesText: string): CubePatterns | null {
       if (hasAnyElement) feedersWithElements++;
       if (looksWildcard) feedersWildcardish++;
 
+      // New parser: positional + qualified + mixed coverage.
+      const newLists = extractBracketLists(line.trimmed.split("=>")[0] ?? line.trimmed);
+      if (newLists.length > 0 && newLists[0]!.entries.length > 0) {
+        feedersParsedNew++;
+        const first = newLists[0]!;
+        if (first.isMixed) feedersMixed++;
+        else if (first.isPositional) feedersPositional++;
+        else feedersQualified++;
+      }
+
       if (samplesFeeders.length < 3 && line.trimmed.length > 0) {
         samplesFeeders.push(line.trimmed);
       }
@@ -100,6 +123,10 @@ function classifyCube(cube: string, rulesText: string): CubePatterns | null {
     feedersWithDb,
     feedersWithElements,
     feedersWildcardish,
+    feedersParsedNew,
+    feedersPositional,
+    feedersQualified,
+    feedersMixed,
     conditionalRules,
     samplesFeeders,
     samplesRules,
@@ -132,8 +159,26 @@ async function main() {
     sumFeedersWithDb: patterns.reduce((a, p) => a + p.feedersWithDb, 0),
     sumFeedersWildcardish: patterns.reduce((a, p) => a + p.feedersWildcardish, 0),
     sumFeedersWithElements: patterns.reduce((a, p) => a + p.feedersWithElements, 0),
+    sumFeedersParsedNew: patterns.reduce((a, p) => a + p.feedersParsedNew, 0),
+    sumFeedersPositional: patterns.reduce((a, p) => a + p.feedersPositional, 0),
+    sumFeedersQualified: patterns.reduce((a, p) => a + p.feedersQualified, 0),
+    sumFeedersMixed: patterns.reduce((a, p) => a + p.feedersMixed, 0),
     sumConditionalRules: patterns.reduce((a, p) => a + p.conditionalRules, 0),
   };
+
+  // Coverage check vs P0 exit criterion (>=95% of non-marker feeder lines).
+  const totalNonMarkerFeederLines = patterns.reduce(
+    (a, p) =>
+      a +
+      p.feedersLines -
+      // Subtract `Feeders;` marker line if present (1 per cube with feeders).
+      (p.feedersLines > 0 ? 1 : 0),
+    0,
+  );
+  const parserCoverage =
+    totalNonMarkerFeederLines === 0
+      ? 1
+      : totals.sumFeedersParsedNew / totalNonMarkerFeederLines;
 
   const topByFeederCount = [...patterns]
     .sort((a, b) => b.feedersLines - a.feedersLines)
@@ -151,6 +196,8 @@ async function main() {
   console.log(JSON.stringify(
     {
       totals,
+      parserCoverage,
+      totalNonMarkerFeederLines,
       topByFeederCount,
       conditionalRulesNoIfeedCount: conditionalRulesNoIfeed.length,
       conditionalRulesNoIfeedSamples: conditionalRulesNoIfeed.slice(0, 5),
