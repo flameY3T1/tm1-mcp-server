@@ -16,13 +16,10 @@ import {
   groupByCohort,
   type ProcessVarInput,
 } from "../../lib/complexity/cross-process.js";
-
 const SCOPE_VALUES = ["processes", "rules", "consistency"] as const;
 type Scope = (typeof SCOPE_VALUES)[number];
 
 const SCOPE_DEFAULT: ReadonlyArray<Scope> = ["processes", "rules", "consistency"];
-
-const isControlName = (n: string): boolean => n.startsWith("}");
 
 export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -69,7 +66,10 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
         .default(0)
         .describe(
           "Filter: only include entries whose score is >= this value (applied " +
-            "alongside topN). Default 0 (no filter).",
+            "alongside topN). Default 0 (no filter). When > 0, surviving " +
+            "process/rules entries also drive status='fail'; at 0, status is " +
+            "informational and only consistency issues (variable clusters, " +
+            "type conflicts) trigger 'fail'.",
         ),
     },
     async ({ scope, includeControl, topN, scoreThreshold }) => {
@@ -83,12 +83,12 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
       const processVarInputs: ProcessVarInput[] = [];
 
       // ── Processes ──────────────────────────────────────────────────────
+      // getAllCode / getAllRules apply the control-prefix filter server-side
+      // via OData ($filter=not startswith(Name,'}')), so we trust the service
+      // and don't double-filter here.
       if (want("processes") || want("consistency")) {
         const all = await tm1Client.processes.getAllCode(includeControl);
-        const filtered = includeControl
-          ? all
-          : all.filter((p) => !isControlName(p.name));
-        for (const p of filtered) {
+        for (const p of all) {
           processMetrics.push(
             computeProcessMetrics(p.name, {
               prolog: p.prolog,
@@ -99,7 +99,7 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
           );
         }
         if (want("consistency")) {
-          for (const p of filtered) {
+          for (const p of all) {
             const vars = await tm1Client.processes.getVariables(p.name);
             processVarInputs.push({
               process: p.name,
@@ -113,10 +113,7 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
       const rulesMetrics: RulesMetrics[] = [];
       if (want("rules")) {
         const all = await tm1Client.cubes.getAllRules(includeControl);
-        const filtered = includeControl
-          ? all
-          : all.filter((r) => !isControlName(r.cubeName));
-        for (const r of filtered) {
+        for (const r of all) {
           rulesMetrics.push(computeRulesMetrics(r.cubeName, r.rulesText));
         }
       }
@@ -144,12 +141,18 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
         .filter((m) => m.score >= scoreThreshold)
         .slice(0, topN);
 
+      // At default scoreThreshold=0 the score formula (loc + 2*branches +
+      // 3*nesting) is >= 1 for any non-empty process, so gating status on
+      // topProcesses/topRules would mark every run "fail". Gate process/rules
+      // contributions to status only when the caller opted into a threshold.
+      const thresholdActive = scoreThreshold > 0;
+      const consistencyIssues =
+        consistency !== null &&
+        (consistency.variableClusters.length > 0 ||
+          consistency.typeConflicts.length > 0);
       const status =
-        (consistency &&
-          (consistency.variableClusters.length > 0 ||
-            consistency.typeConflicts.length > 0)) ||
-        topProcesses.length > 0 ||
-        topRules.length > 0
+        consistencyIssues ||
+        (thresholdActive && (topProcesses.length > 0 || topRules.length > 0))
           ? "fail"
           : "pass";
 

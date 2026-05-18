@@ -52,7 +52,11 @@ const SERVER_RESERVED_CHARS = new Set([
   ",",
 ]);
 
-/** Allowed pattern for TI process variable identifiers (must start with letter). */
+/**
+ * Allowed pattern for TI process variable identifiers (must start with letter).
+ * Backtick is included because TI tolerates it in data-source column references
+ * (e.g., `\`col_name\``-style identifiers exported from SQL/ODBC sources).
+ */
 const PROCESS_VAR_ALLOWED = /^[A-Za-z][A-Za-z0-9.$%_`]*$/;
 
 /** Conservative TM1 name length cap (cube/dim/process historically 256). */

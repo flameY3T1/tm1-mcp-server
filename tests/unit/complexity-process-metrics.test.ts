@@ -77,6 +77,24 @@ describe("computeTabMetrics", () => {
     expect(m.loc).toBe(1);
     expect(m.blankLines).toBe(0);
   });
+
+  it("handles CRLF line endings without injecting stray newlines", () => {
+    const src = `IF(x=1);\r\n  y=2;\r\nENDIF;\r\n`;
+    const m = computeTabMetrics(src);
+    expect(m.parseError).toBe(false);
+    expect(m.branches).toBe(1);
+    expect(m.maxNesting).toBe(1);
+    expect(m.loc).toBe(3);
+    expect(m.blankLines).toBe(1);
+  });
+
+  it("handles CRLF condensed multi-statement lines (bedrock + Windows export)", () => {
+    const src = `IF(x=1);y=2;ENDIF;\r\nz=3;\r\n`;
+    const m = computeTabMetrics(src);
+    expect(m.parseError).toBe(false);
+    expect(m.branches).toBe(1);
+    expect(m.maxNesting).toBe(1);
+  });
 });
 
 describe("computeProcessMetrics", () => {

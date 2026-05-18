@@ -200,7 +200,6 @@ describe("tm1_audit_naming tool", () => {
 
   it("paginates element scan across multiple pages", async () => {
     const fake = makeFakeServer();
-    // 7 elements, page size 3 → expect 3 fetch pages (3+3+1) + 1 count probe
     const names = ["e1", "e2", "e3", "e4", "e5", "e6", "e7"];
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8.01100",
@@ -215,10 +214,68 @@ describe("tm1_audit_naming tool", () => {
         maxElementsPerDim: 1000,
       }),
     );
-    // Force tiny page via override; vitest re-runs handler with overrides below.
     expect(out.scanned.elements).toBe(7);
     expect(out.invalidCount).toBe(0);
     expect(out.elementsSkipped.length).toBe(0);
+  });
+
+  it("paginates element scan via $skip across multiple HTTP pages", async () => {
+    // Zod schema clamps elementsPageSize to min(1000), so verify multi-page
+    // $skip behaviour against a dimension whose count exceeds one page.
+    const total = 2500;
+    const names = Array.from({ length: total }, (_, i) => `e${i}`);
+    const fake = makeFakeServer();
+    let requestCount = 0;
+    const tm1 = {
+      server: { getInfo: async () => ({ productVersion: "11.8.01100" }) },
+      cubes: { list: async () => [] },
+      dimensions: {
+        list: async () => [{ name: "Big", hierarchies: ["Big"] }],
+      },
+      processes: { list: async () => [], getVariables: async () => [] },
+      chores: { list: async () => [] },
+      views: { list: async () => [] },
+      subsets: { list: async () => [] },
+      request: async (_method: string, path: string) => {
+        requestCount++;
+        const m = ELEMENTS_RE.exec(path);
+        if (!m) throw new Error(`unexpected path: ${path}`);
+        const qs = new URLSearchParams(m[3]!);
+        const top = Number(qs.get("$top") ?? names.length);
+        const skip = Number(qs.get("$skip") ?? 0);
+        const wantCount = qs.get("$count") === "true";
+        const value = names.slice(skip, skip + top).map((Name) => ({ Name }));
+        return wantCount ? { "@odata.count": names.length, value } : { value };
+      },
+    } as unknown as Parameters<typeof registerAuditNaming>[1];
+    registerAuditNaming(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({
+        scope: ["elements"],
+        elementsPageSize: 1000,
+        maxElementsPerDim: 1000000,
+      }),
+    );
+    expect(out.scanned.elements).toBe(total);
+    // Pages: probe (skip=0, count=true) + skip=1000 + skip=2000 → 3 requests.
+    expect(requestCount).toBe(3);
+  });
+
+  it("reports scanned.dimensions when only hierarchies are in scope", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8.01100",
+      dimensions: [
+        { name: "Product", hierarchies: ["Product", "ByBrand"] },
+        { name: "Time", hierarchies: ["Time"] },
+      ],
+    });
+    registerAuditNaming(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ scope: ["hierarchies"] }),
+    );
+    expect(out.scanned.hierarchies).toBe(3);
+    expect(out.scanned.dimensions).toBe(2);
   });
 
   it("respects elementsPageSize for paginated reads", async () => {

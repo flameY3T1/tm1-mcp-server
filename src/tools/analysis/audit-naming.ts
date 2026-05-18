@@ -8,6 +8,7 @@ import {
   type TM1MajorVersion,
   type Violation,
 } from "../../lib/naming/rules.js";
+import { isControlName } from "../../lib/control-name.js";
 
 interface Finding {
   objectKind: ObjectKind;
@@ -37,8 +38,6 @@ const SCOPE_DEFAULT: ReadonlyArray<Scope> = [
   "processes",
   "chores",
 ];
-
-const isControlName = (n: string): boolean => n.startsWith("}");
 
 const enc = encodeURIComponent;
 
@@ -174,8 +173,11 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         const filtered = includeControl
           ? dims
           : dims.filter((d) => !isControlName(d.name));
+        // Always reflect dims we fetched/traversed — even when "dimensions" is
+        // not in scope, the hierarchy / element / subset walk visited them, so
+        // reporting 0 would understate the scan footprint.
+        scanned.dimensions = filtered.length;
         if (want("dimensions")) {
-          scanned.dimensions = filtered.length;
           for (const d of filtered) addIfInvalid(d.name, "dimension");
         }
         if (want("hierarchies")) {

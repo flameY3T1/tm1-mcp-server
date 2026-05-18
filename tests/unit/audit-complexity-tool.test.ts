@@ -44,13 +44,24 @@ interface FakeArgs {
 }
 
 function makeFakeTM1Client(args: FakeArgs) {
+  // Mirrors the real services, which apply $filter=not startswith(Name,'}')
+  // server-side when includeControl=false.
+  const isControl = (n: string) => n.startsWith("}");
   return {
     server: { getInfo: async () => ({ productVersion: args.productVersion }) },
     processes: {
-      getAllCode: async () => args.processes ?? [],
+      getAllCode: async (includeControl = false) => {
+        const all = args.processes ?? [];
+        return includeControl ? all : all.filter((p) => !isControl(p.name));
+      },
       getVariables: async (name: string) => args.variables?.[name] ?? [],
     },
-    cubes: { getAllRules: async () => args.rules ?? [] },
+    cubes: {
+      getAllRules: async (includeControl = false) => {
+        const all = args.rules ?? [];
+        return includeControl ? all : all.filter((r) => !isControl(r.cubeName));
+      },
+    },
   } as unknown as Parameters<typeof registerAuditComplexity>[1];
 }
 
@@ -172,6 +183,43 @@ describe("tm1_audit_complexity tool", () => {
     expect(out.scanned.processes).toBe(30);
     expect(out.topProcesses).toHaveLength(5);
     expect(out.truncated.processes).toBe(true);
+  });
+
+  it("status=pass when only trivial processes exist and no consistency issues", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      processes: [
+        { name: "Tiny", prolog: "x=1;", metadata: "", data: "", epilog: "" },
+      ],
+    });
+    registerAuditComplexity(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ scope: ["processes"] }));
+    expect(out.scanned.processes).toBe(1);
+    expect(out.topProcesses).toHaveLength(1);
+    expect(out.status).toBe("pass");
+  });
+
+  it("status=fail when scoreThreshold>0 is met by topProcesses", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      processes: [
+        {
+          name: "Big",
+          prolog: "IF(a=1);\n  IF(b=1);\n    c=1;\n  ENDIF;\nENDIF;",
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
+      ],
+    });
+    registerAuditComplexity(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ scope: ["processes"], scoreThreshold: 5 }),
+    );
+    expect(out.topProcesses.length).toBeGreaterThan(0);
+    expect(out.status).toBe("fail");
   });
 
   it("scoreThreshold filters low-score entries", async () => {

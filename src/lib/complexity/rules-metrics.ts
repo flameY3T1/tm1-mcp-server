@@ -35,10 +35,11 @@ export interface RulesMetrics {
 }
 
 const RULE_LINE_RE = /^\[/;
-const FEEDSTRINGS_RE = /^feedstrings\s*;?\s*$/i;
 
 function stripQuotes(s: string): string {
-  return s.replace(/^['"]|['"]$/g, "");
+  // Strip matching pair only — leave mismatched quotes alone so we don't
+  // mangle an already-broken extracted argument (`'Foo"` stays `'Foo"`).
+  return s.replace(/^(['"])(.*)\1$/, "$2");
 }
 
 export function computeRulesMetrics(cube: string, rulesText: string): RulesMetrics {
@@ -65,7 +66,6 @@ export function computeRulesMetrics(cube: string, rulesText: string): RulesMetri
   let ruleCount = 0;
   let feederCount = 0;
   let commentLines = 0;
-  let hasFeedstrings = false;
   let dbCallCount = 0;
   const coupled = new Set<string>();
 
@@ -78,7 +78,6 @@ export function computeRulesMetrics(cube: string, rulesText: string): RulesMetri
     if (line.section === "rules") {
       rulesLoc++;
       if (RULE_LINE_RE.test(line.trimmed)) ruleCount++;
-      if (FEEDSTRINGS_RE.test(line.trimmed)) hasFeedstrings = true;
     } else {
       feedersLoc++;
       if (RULE_LINE_RE.test(line.trimmed)) feederCount++;
@@ -107,7 +106,7 @@ export function computeRulesMetrics(cube: string, rulesText: string): RulesMetri
     commentLines,
     commentRatio,
     hasSkipcheck: ast.hasSkipcheck,
-    hasFeedstrings,
+    hasFeedstrings: ast.hasFeedstrings,
     dbCallCount,
     coupledCubes,
     score,
