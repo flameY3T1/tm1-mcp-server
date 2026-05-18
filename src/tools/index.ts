@@ -122,6 +122,7 @@ import { registerFindOrphanDimensions } from "./analysis/find-orphan-dimensions.
 import { registerCheckV12Readiness } from "./analysis/check-v12-readiness.js";
 import { registerAuditNaming } from "./analysis/audit-naming.js";
 import { registerAuditComplexity } from "./analysis/audit-complexity.js";
+import { registerAuditFeeders } from "./analysis/audit-feeders.js";
 
 // Security tools
 import { registerListClients } from "./security/list-clients.js";
@@ -254,6 +255,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerCheckV12Readiness(server, tm1Client);
   registerAuditNaming(server, tm1Client);
   registerAuditComplexity(server, tm1Client);
+  registerAuditFeeders(server, tm1Client);
 
   // Security
   registerListClients(server, tm1Client);
