@@ -47,6 +47,36 @@ describe("computeTabMetrics", () => {
     expect(m.maxNesting).toBe(0);
     expect(m.parseError).toBe(false);
   });
+
+  it("parses bedrock-style condensed multi-statement lines", () => {
+    const src = `IF(x=1);y=2;ENDIF;`;
+    const m = computeTabMetrics(src);
+    expect(m.parseError).toBe(false);
+    expect(m.branches).toBe(1);
+    expect(m.maxNesting).toBe(1);
+  });
+
+  it("does not split semicolons inside single-quoted strings", () => {
+    const src = `s = 'a;b;c';\nx = 1;`;
+    const m = computeTabMetrics(src);
+    expect(m.parseError).toBe(false);
+    expect(m.loc).toBe(2);
+  });
+
+  it("counts nested while+if on single condensed line", () => {
+    const src = `WHILE(n<10);IF(n=5);x=1;ENDIF;n=n+1;END;`;
+    const m = computeTabMetrics(src);
+    expect(m.parseError).toBe(false);
+    expect(m.branches).toBe(2);
+    expect(m.maxNesting).toBe(2);
+  });
+
+  it("preserves raw line counts (LOC) when source is condensed", () => {
+    const src = `IF(x=1);y=2;ENDIF;`;
+    const m = computeTabMetrics(src);
+    expect(m.loc).toBe(1);
+    expect(m.blankLines).toBe(0);
+  });
 });
 
 describe("computeProcessMetrics", () => {

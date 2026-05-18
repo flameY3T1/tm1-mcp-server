@@ -53,6 +53,57 @@ export interface ProcessCodeInput {
 
 const TABS: ReadonlyArray<TiTab> = ["prolog", "metadata", "data", "epilog"];
 
+// Bedrock-generated TI processes pack many statements onto one line (e.g.
+// `IF(x);y=1;ENDIF;`). The parser is line-oriented for some block keywords,
+// so we normalize by inserting a newline after every top-level `;` (outside
+// of strings and `#` line-comments) before parsing. Raw LOC counts use the
+// original source via classifyLines.
+function splitMultiStatementLines(src: string): string {
+  let out = "";
+  let inString = false;
+  let inLineComment = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (inLineComment) {
+      out += c;
+      if (c === "\n") inLineComment = false;
+      continue;
+    }
+    if (inString) {
+      out += c;
+      if (c === "'") {
+        if (src[i + 1] === "'") {
+          out += "'";
+          i++;
+        } else {
+          inString = false;
+        }
+      }
+      continue;
+    }
+    if (c === "'") {
+      inString = true;
+      out += c;
+      continue;
+    }
+    if (c === "#") {
+      inLineComment = true;
+      out += c;
+      continue;
+    }
+    if (c === ";") {
+      out += ";";
+      const next = src[i + 1];
+      if (next !== undefined && next !== "\n" && next !== "\r") {
+        out += "\n";
+      }
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
 function classifyLines(src: string): {
   loc: number;
   commentLines: number;
@@ -96,7 +147,7 @@ function walk(
 
 export function computeTabMetrics(src: string): TabMetrics {
   const counts = classifyLines(src);
-  const parseRes = parseTiCode(src);
+  const parseRes = parseTiCode(splitMultiStatementLines(src));
   const acc = { branches: 0, maxNesting: 0 };
   let parseError = false;
   if (parseRes.ok) {
