@@ -23,6 +23,7 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_analyze_callgraph: READ_ONLY,
   tm1_analyze_chore_graph: READ_ONLY,
   tm1_analyze_object_usage: READ_ONLY,
+  tm1_audit_naming: READ_ONLY,
   // v11-only: static gap-analysis specifically targeting v11 → v12 migration.
   // Running on a v12 instance is a no-op (everything is already deprecated).
   tm1_check_v12_readiness: withVersion(READ_ONLY, "v11"),

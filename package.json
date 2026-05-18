@@ -25,7 +25,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "lint:no-flat-api": "node scripts/check-no-flat-tm1-methods.mjs",
-    "verify": "npm run typecheck && npm run lint:no-flat-api && npm test",
+    "lint:annotations": "node scripts/check-annotation-coverage.mjs",
+    "verify": "npm run typecheck && npm run lint:no-flat-api && npm run lint:annotations && npm test",
     "tools:list": "node scripts/gen-tool-list.mjs",
     "tools:update-readme": "node scripts/gen-tool-list.mjs --write-readme"
   },

@@ -8,56 +8,21 @@
 //   <!-- TOOLS-AUTOGEN:END -->
 //
 // Drift prevention. Add `npm run tools:update-readme` to pre-commit.
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
+import { scanTools } from "./lib/scan-tools.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 const toolsDir = join(root, "src", "tools");
 
-function* walk(dir) {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    const st = statSync(full);
-    if (st.isDirectory()) yield* walk(full);
-    else if (entry.endsWith(".ts")) yield full;
-  }
-}
-
-// Match either:
-//   server.tool("name", "desc", ...)
-//   server.tool("name", [ "line1", "line2" ].join("..."), ...)
-// First-arg name is captured; desc form is captured as either literal or
-// array-of-literals joined by separator.
-const TOOL_RE =
-  /server\.tool\(\s*"([^"]+)"\s*,\s*(?:"((?:[^"\\]|\\.)*)"|\[([\s\S]*?)\]\s*\.join\(\s*"((?:[^"\\]|\\.)*)"\s*\))/g;
-const STRING_LITERAL_RE = /"((?:[^"\\]|\\.)*)"/g;
-
 const groups = new Map();
 let total = 0;
-for (const file of walk(toolsDir)) {
-  const src = readFileSync(file, "utf8");
-  const rel = relative(toolsDir, file);
-  const group = rel.split("/")[0];
-  let m;
-  while ((m = TOOL_RE.exec(src)) !== null) {
-    const [, name, descLiteral, arrBody, sep] = m;
-    let desc;
-    if (descLiteral !== undefined) {
-      desc = descLiteral;
-    } else {
-      const parts = [];
-      let lm;
-      const lr = new RegExp(STRING_LITERAL_RE.source, "g");
-      while ((lm = lr.exec(arrBody)) !== null) parts.push(lm[1]);
-      desc = parts.join(sep);
-    }
-    if (!groups.has(group)) groups.set(group, []);
-    groups.get(group).push({ name, desc, file: rel });
-    total++;
-  }
+for (const t of scanTools(toolsDir)) {
+  if (!groups.has(t.group)) groups.set(t.group, []);
+  groups.get(t.group).push(t);
+  total++;
 }
 
 function render(headingLevel = "#") {
