@@ -1,6 +1,6 @@
 # Analyse: tm1-dev-mcp → tm1-mcp-server
 
-Vergleich des MCP-Servers `/home/user/tm1-dev-mcp` mit eigenem Server zur Identifikation übernehmenswerter Patterns.
+Vergleich des Referenz-MCP-Servers `tm1-dev-mcp` mit eigenem Server zur Identifikation übernehmenswerter Patterns.
 
 Datum: 2026-04-30
 
