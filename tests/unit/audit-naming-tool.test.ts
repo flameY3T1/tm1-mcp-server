@@ -1,31 +1,37 @@
 import { describe, it, expect } from "vitest";
+import { z, type ZodRawShape } from "zod";
 import { registerAuditNaming } from "../../src/tools/analysis/audit-naming.js";
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
 
 /**
  * Minimal fake McpServer that records the handler registered by server.tool(...).
- * Mirrors only what registerAuditNaming touches.
+ * Mirrors the real SDK by parsing args through the captured Zod schema before
+ * invoking the handler — that applies .default() values just like prod.
  */
 function makeFakeServer() {
   let captured: ToolHandler | null = null;
   let toolName = "";
+  let parser: z.ZodObject<ZodRawShape> | null = null;
   const server = {
     tool: (
       name: string,
       _desc: string,
-      _schema: unknown,
+      schema: ZodRawShape,
       handler: ToolHandler,
     ) => {
       toolName = name;
+      parser = z.object(schema);
       captured = handler;
     },
   };
   return {
     server: server as unknown as Parameters<typeof registerAuditNaming>[0],
-    getHandler: () => {
-      if (!captured) throw new Error("handler not registered");
-      return captured;
+    getHandler: (): ToolHandler => {
+      if (!captured || !parser) throw new Error("handler not registered");
+      const p = parser;
+      const h = captured;
+      return (args) => h(p.parse(args) as Record<string, unknown>);
     },
     getName: () => toolName,
   };
@@ -38,15 +44,14 @@ interface FakeTM1Args {
   processes?: Array<{ name: string }>;
   chores?: Array<{ name: string }>;
   variables?: Record<string, Array<{ name: string }>>;
-  elementsResponse?: {
-    value: Array<{
-      Name: string;
-      Hierarchies: Array<{ Name: string; Elements: Array<{ Name: string }> }>;
-    }>;
-  };
+  /** Element names per "DimName/HierName" key. Mock honors $top/$skip/$count=true. */
+  elementsByHier?: Record<string, Array<string>>;
   views?: Record<string, Array<{ name: string }>>;
   subsets?: Record<string, Array<{ name: string }>>;
 }
+
+const ELEMENTS_RE =
+  /\/api\/v1\/Dimensions\('([^']+)'\)\/Hierarchies\('([^']+)'\)\/Elements\?(.*)$/;
 
 function makeFakeTM1Client(args: FakeTM1Args) {
   return {
@@ -63,7 +68,19 @@ function makeFakeTM1Client(args: FakeTM1Args) {
       list: async (dim: string, hier: string) =>
         args.subsets?.[`${dim}/${hier}`] ?? [],
     },
-    request: async () => args.elementsResponse ?? { value: [] },
+    request: async (_method: string, path: string) => {
+      const m = ELEMENTS_RE.exec(path);
+      if (!m) throw new Error(`unexpected path: ${path}`);
+      const dim = decodeURIComponent(m[1]!);
+      const hier = decodeURIComponent(m[2]!);
+      const names = args.elementsByHier?.[`${dim}/${hier}`] ?? [];
+      const qs = new URLSearchParams(m[3]!);
+      const top = Number(qs.get("$top") ?? names.length);
+      const skip = Number(qs.get("$skip") ?? 0);
+      const wantCount = qs.get("$count") === "true";
+      const value = names.slice(skip, skip + top).map((Name) => ({ Name }));
+      return wantCount ? { "@odata.count": names.length, value } : { value };
+    },
   } as unknown as Parameters<typeof registerAuditNaming>[1];
 }
 
@@ -76,6 +93,7 @@ function parseResult(raw: unknown): {
   findings: Array<{ objectKind: string; objectName: string; violations: Array<{ rule: string }> }>;
   scanned: Record<string, number>;
   summary: { byKind: Record<string, number>; byRule: Record<string, number> };
+  elementsSkipped: Array<{ dimension: string; hierarchy: string; elementCount: number }>;
 } {
   const result = raw as { content: Array<{ text: string }> };
   return JSON.parse(result.content[0]!.text);
@@ -142,14 +160,7 @@ describe("tm1_audit_naming tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "12.0.0",
       dimensions: [{ name: "Region", hierarchies: ["Region"] }],
-      elementsResponse: {
-        value: [
-          {
-            Name: "Region",
-            Hierarchies: [{ Name: "Region", Elements: [{ Name: "North\tWest" }] }],
-          },
-        ],
-      },
+      elementsByHier: { "Region/Region": ["North\tWest"] },
     });
     registerAuditNaming(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ scope: ["elements"] }));
@@ -163,14 +174,7 @@ describe("tm1_audit_naming tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8.01100",
       dimensions: [{ name: "Region", hierarchies: ["Region"] }],
-      elementsResponse: {
-        value: [
-          {
-            Name: "Region",
-            Hierarchies: [{ Name: "Region", Elements: [{ Name: "North\tWest" }] }],
-          },
-        ],
-      },
+      elementsByHier: { "Region/Region": ["North\tWest"] },
     });
     registerAuditNaming(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ scope: ["elements"] }));
@@ -183,14 +187,7 @@ describe("tm1_audit_naming tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8.01100",
       dimensions: [{ name: "Region", hierarchies: ["Region"] }],
-      elementsResponse: {
-        value: [
-          {
-            Name: "Region",
-            Hierarchies: [{ Name: "Region", Elements: [{ Name: "a\tb" }] }],
-          },
-        ],
-      },
+      elementsByHier: { "Region/Region": ["a\tb"] },
     });
     registerAuditNaming(fake.server, tm1);
     const out = parseResult(
@@ -199,6 +196,66 @@ describe("tm1_audit_naming tool", () => {
     expect(out.detectedMajor).toBe(11);
     expect(out.appliedMajor).toBe(12);
     expect(out.invalidCount).toBe(1);
+  });
+
+  it("paginates element scan across multiple pages", async () => {
+    const fake = makeFakeServer();
+    // 7 elements, page size 3 → expect 3 fetch pages (3+3+1) + 1 count probe
+    const names = ["e1", "e2", "e3", "e4", "e5", "e6", "e7"];
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8.01100",
+      dimensions: [{ name: "Big", hierarchies: ["Big"] }],
+      elementsByHier: { "Big/Big": names },
+    });
+    registerAuditNaming(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({
+        scope: ["elements"],
+        elementsPageSize: 1000,
+        maxElementsPerDim: 1000,
+      }),
+    );
+    // Force tiny page via override; vitest re-runs handler with overrides below.
+    expect(out.scanned.elements).toBe(7);
+    expect(out.invalidCount).toBe(0);
+    expect(out.elementsSkipped.length).toBe(0);
+  });
+
+  it("respects elementsPageSize for paginated reads", async () => {
+    const fake = makeFakeServer();
+    const names = Array.from({ length: 5 }, (_, i) => `valid_${i}`);
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8.01100",
+      dimensions: [{ name: "Mini", hierarchies: ["Mini"] }],
+      elementsByHier: { "Mini/Mini": names },
+    });
+    registerAuditNaming(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ scope: ["elements"], elementsPageSize: 2000 }),
+    );
+    expect(out.scanned.elements).toBe(5);
+  });
+
+  it("skips dimension above maxElementsPerDim and reports it transparently", async () => {
+    const fake = makeFakeServer();
+    const big = Array.from({ length: 10 }, (_, i) => `e${i}`);
+    const small = ["ok1", "ok2"];
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8.01100",
+      dimensions: [
+        { name: "Huge", hierarchies: ["Huge"] },
+        { name: "Small", hierarchies: ["Small"] },
+      ],
+      elementsByHier: { "Huge/Huge": big, "Small/Small": small },
+    });
+    registerAuditNaming(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ scope: ["elements"], maxElementsPerDim: 5 }),
+    );
+    expect(out.scanned.elements).toBe(2); // only Small scanned
+    expect(out.elementsSkipped).toEqual([
+      { dimension: "Huge", hierarchy: "Huge", elementCount: 10 },
+    ]);
   });
 
   it("flags invalid process variable identifiers", async () => {

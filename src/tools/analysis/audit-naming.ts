@@ -40,6 +40,14 @@ const SCOPE_DEFAULT: ReadonlyArray<Scope> = [
 
 const isControlName = (n: string): boolean => n.startsWith("}");
 
+const enc = encodeURIComponent;
+
+interface SkippedElementGroup {
+  dimension: string;
+  hierarchy: string;
+  elementCount: number;
+}
+
 export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_naming",
@@ -60,8 +68,9 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .describe(
           "Object kinds to audit. Default: cubes, dimensions, hierarchies, processes, chores. " +
-            "Add 'elements' for one bulk OData call over all element names, 'processVariables' " +
-            "for per-process variable scans, 'views'/'subsets' for per-cube/per-hier listings.",
+            "Add 'elements' for a per-hierarchy paginated element-name scan (skips hierarchies " +
+            "above maxElementsPerDim — reported in elementsSkipped). 'processVariables' triggers " +
+            "per-process variable scans; 'views'/'subsets' do per-cube/per-hier listings.",
         ),
       includeControl: z
         .boolean()
@@ -83,8 +92,38 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
           "Override auto-detected TM1 major version. Use '12' to apply v12-only rules (e.g., TAB " +
             "in element names) against a v11 server.",
         ),
+      elementsPageSize: z
+        .number()
+        .int()
+        .min(1000)
+        .max(100000)
+        .optional()
+        .default(25000)
+        .describe(
+          "Element-scan page size for $top/$skip pagination. Bounded to keep each response " +
+            "well below the V8 string limit (~512 MB). Default 25000.",
+        ),
+      maxElementsPerDim: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .default(50000)
+        .describe(
+          "Skip element-scan for any (dimension, hierarchy) whose element count exceeds this " +
+            "threshold. Skipped groups are reported under `elementsSkipped` so the skip is " +
+            "transparent, not silent. Default 50000 (mirrors the typical SAP-bulk-dim cutoff). " +
+            "Raise to e.g. 10_000_000 to scan everything via pagination.",
+        ),
     },
-    async ({ scope, includeControl, maxFindings, versionOverride }) => {
+    async ({
+      scope,
+      includeControl,
+      maxFindings,
+      versionOverride,
+      elementsPageSize,
+      maxElementsPerDim,
+    }) => {
       const activeScope: ReadonlyArray<Scope> =
         scope && scope.length > 0 ? scope : SCOPE_DEFAULT;
       const want = (s: Scope) => activeScope.includes(s);
@@ -155,24 +194,54 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         }));
       }
 
-      // ── Elements (single bulk OData call) ──────────────────────────────
-      if (want("elements")) {
-        const path =
-          "/api/v1/Dimensions?$select=Name&$expand=Hierarchies($select=Name;$expand=Elements($select=Name))";
-        type ElementBulk = {
-          value: Array<{
-            Name: string;
-            Hierarchies: Array<{ Name: string; Elements: Array<{ Name: string }> }>;
-          }>;
-        };
-        const resp = await tm1Client.request<ElementBulk>("GET", path);
+      // ── Elements (per-dim/per-hierarchy, server-side paginated) ────────
+      // Single-bulk OData call previously crashed Node on large models
+      // ("Cannot create a string longer than 0x1fffffe8 characters") because
+      // response.text() buffers the full response body into one V8 string.
+      // Probe + page strategy: first page asks for $count=true so we learn the
+      // total in one round-trip without hitting the /$count endpoint (TM1 v11
+      // returns text/plain there and rejects the Accept: application/json sent
+      // by the shared HTTP client). If total > maxElementsPerDim we discard the
+      // first page and report the skip transparently; otherwise we keep paging
+      // via $top/$skip so no single response approaches the V8 string limit.
+      const elementsSkipped: SkippedElementGroup[] = [];
+      if (want("elements") && dimensionsForChildren) {
         let elemCount = 0;
-        for (const d of resp.value) {
-          if (!includeControl && isControlName(d.Name)) continue;
-          for (const h of d.Hierarchies) {
-            for (const e of h.Elements) {
+        for (const d of dimensionsForChildren) {
+          for (const h of d.hierarchies) {
+            const basePath =
+              `/api/v1/Dimensions('${enc(d.name)}')/Hierarchies('${enc(h)}')` +
+              `/Elements?$select=Name&$top=${elementsPageSize}`;
+            const firstPage = await tm1Client.request<{
+              "@odata.count"?: number;
+              value: Array<{ Name: string }>;
+            }>("GET", `${basePath}&$skip=0&$count=true`);
+            const total = firstPage["@odata.count"] ?? firstPage.value.length;
+            if (total > maxElementsPerDim) {
+              elementsSkipped.push({
+                dimension: d.name,
+                hierarchy: h,
+                elementCount: total,
+              });
+              continue;
+            }
+            for (const e of firstPage.value) {
               elemCount++;
-              addIfInvalid(e.Name, "element", `${d.Name} / ${h.Name}`);
+              addIfInvalid(e.Name, "element", `${d.name} / ${h}`);
+            }
+            let skip = firstPage.value.length;
+            let lastPageSize = firstPage.value.length;
+            while (lastPageSize === elementsPageSize && skip < total) {
+              const page = await tm1Client.request<{ value: Array<{ Name: string }> }>(
+                "GET",
+                `${basePath}&$skip=${skip}`,
+              );
+              for (const e of page.value) {
+                elemCount++;
+                addIfInvalid(e.Name, "element", `${d.name} / ${h}`);
+              }
+              lastPageSize = page.value.length;
+              skip += page.value.length;
             }
           }
         }
@@ -284,6 +353,7 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
                 summary: { byKind, byRule },
                 truncated,
                 findings: trimmed,
+                elementsSkipped,
                 rulesetSource:
                   "IBM PA naming-conventions (2.0 + 3.1) — hard rules only (server-reserved chars, control prefix, length 256, element leading +/-, TAB in v12 elements, process-var identifier).",
               },
