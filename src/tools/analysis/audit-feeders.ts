@@ -121,6 +121,13 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         .describe(
           "Runtime: flag cube when memoryTotal (MB) ≥ this value. Default 1024 (1 GiB).",
         ),
+      severityThreshold: z
+        .enum(["none", "hint", "evidence"])
+        .optional()
+        .default("hint")
+        .describe(
+          "pass/fail boundary on `status`. none: always pass. hint (default): fail on any finding. evidence: fail only when runtime evidence is present — useful for CI gates that should not block on static-only hints.",
+        ),
     },
     async ({
       cubes,
@@ -130,6 +137,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       mode,
       sparsityThreshold,
       memoryThresholdMb,
+      severityThreshold,
     }) => {
       const serverInfo = await tm1Client.server.getInfo();
       const all = await tm1Client.cubes.getAllRules(includeControl);
@@ -363,7 +371,14 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       const truncated = findings.length > topN;
       const trimmed = findings.slice(0, topN);
 
-      const status = findings.length > 0 ? "fail" : "pass";
+      let status: "pass" | "fail";
+      if (severityThreshold === "none") {
+        status = "pass";
+      } else if (severityThreshold === "evidence") {
+        status = bySeverity.evidence > 0 ? "fail" : "pass";
+      } else {
+        status = findings.length > 0 ? "fail" : "pass";
+      }
 
       return {
         content: [
@@ -378,6 +393,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 s1MinPinnedRatio,
                 sparsityThreshold,
                 memoryThresholdMb,
+                severityThreshold,
                 scanned: {
                   cubes: cubesScanned,
                   feederLines: feederLinesScanned,

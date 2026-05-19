@@ -453,6 +453,74 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.findings[0].rule).toBe("wildcard_bracket");
   });
 
+  it("severityThreshold='none' always returns status pass even with findings", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Wild",
+          rulesText: "skipcheck;\n['A','B']=N:1;\nfeeders;\n[]=>['B'];",
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ severityThreshold: "none" }),
+    );
+    expect(out.status).toBe("pass");
+    expect(out.invalidCount).toBeGreaterThan(0);
+  });
+
+  it("severityThreshold='evidence' returns pass when only hints are present", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Wild",
+          rulesText: "skipcheck;\n['A','B']=N:1;\nfeeders;\n[]=>['B'];",
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ severityThreshold: "evidence" }),
+    );
+    expect(out.summary.bySeverity.hint).toBeGreaterThan(0);
+    expect(out.summary.bySeverity.evidence).toBe(0);
+    expect(out.status).toBe("pass");
+  });
+
+  it("severityThreshold='evidence' returns fail when runtime evidence present", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Sparse",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        Sparse: {
+          "Total Memory Used": 1_000_000,
+          "Number of Populated Numeric Cells": 5,
+          "Number of Fed Cells": 100_000,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ mode: "both", severityThreshold: "evidence" }),
+    );
+    expect(out.summary.bySeverity.evidence).toBeGreaterThan(0);
+    expect(out.status).toBe("fail");
+  });
+
   it("runtime mode skips static heuristics — emits only cube-level findings", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({

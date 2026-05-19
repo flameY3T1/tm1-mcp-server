@@ -192,7 +192,7 @@ the S1/S2 static findings.
 | P2 | S1 (cube dim-order) + S2 (element-type cache) + S5 (cross-cube skipcheck) ✓ | C-level + DB-target-skipcheck + properly-gated breadth findings live |
 | P3 | S3 (`hasStet` + `hasIfGuard` AST extension) ✓ | conditional-rule findings live |
 | P4 | Runtime mode (`}StatsByCube` MDX + sparsity scoring) ✓ | runtime-evidence severity escalates findings |
-| P5 | False-positive tuning on bigger model + doc update | tool documented, default `severityThreshold` calibrated |
+| P5 | `severityThreshold` param + operator docs ✓ (calibration deferred — needs bigger model) | tool documented, CI gate available; threshold tuning awaits a larger production cube |
 
 P0 + P1 = MVP shippable on its own. S1 moved from P1 to P2 after live-test
 on 2026-05-18 showed the entry-count proxy was unreliable; resolving cube
