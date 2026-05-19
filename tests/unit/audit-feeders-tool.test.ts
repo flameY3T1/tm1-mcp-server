@@ -209,6 +209,53 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.summary.byRule.db_feeder_without_skipcheck).toBe(0);
   });
 
+  it("flags missing_conditional_feeder (S3) when rule has STET but feeder has no IF guard", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      dims: { Sales: ["Region", "Time"] },
+      rules: [
+        {
+          cubeName: "Sales",
+          rulesText: [
+            "skipcheck;",
+            "['DE','2026'] = N: IF(1=1, STET, 0);",
+            "feeders;",
+            "['DE','2026'] => ['DE','2026'];",
+          ].join("\n"),
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.missing_conditional_feeder).toBe(1);
+    expect(out.findings[0].rule).toBe("missing_conditional_feeder");
+  });
+
+  it("does not flag missing_conditional_feeder when feeder line has IF guard", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      dims: { Sales: ["Region", "Time"] },
+      rules: [
+        {
+          cubeName: "Sales",
+          rulesText: [
+            "skipcheck;",
+            "['DE','2026'] = N: IF(1=1, STET, 0);",
+            "feeders;",
+            "IF(1=1, ['DE','2026'] => ['DE','2026'], 0);",
+          ].join("\n"),
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.missing_conditional_feeder).toBe(0);
+  });
+
   it("flags feeder_to_consolidated (S2) on consolidated LHS element", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({

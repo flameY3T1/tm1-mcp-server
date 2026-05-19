@@ -180,7 +180,7 @@ Cube stats existing in this repo: `tm1_get_cube_stats`. Reuse the same service m
 | P0 | Positional bracket parser + tests | parser handles ≥95 % of feeder lines from probe rerun ✓ (95.08 %) |
 | P1 | Static heuristics S4 + S6 (no REST lookups) | tool registers, returns findings on test server ✓ |
 | P2 | S1 (cube dim-order) + S2 (element-type cache) + S5 (cross-cube skipcheck) ✓ | C-level + DB-target-skipcheck + properly-gated breadth findings live |
-| P3 | S3 (requires `hasStet` + `hasIfGuard` AST extension) | conditional-rule findings live |
+| P3 | S3 (`hasStet` + `hasIfGuard` AST extension) ✓ | conditional-rule findings live |
 | P4 | Runtime mode (`}StatsByCube` MDX + sparsity scoring) | runtime-evidence severity escalates findings |
 | P5 | False-positive tuning on bigger model + doc update | tool documented, default `severityThreshold` calibrated |
 

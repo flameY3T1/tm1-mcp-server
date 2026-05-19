@@ -7,6 +7,7 @@ import {
   detectBroaderThanRule,
   detectDbFeederWithoutSkipcheck,
   detectFeederToConsolidated,
+  detectMissingConditionalFeeder,
   detectOrphanFeeder,
   detectWildcardBracket,
 } from "../../lib/feeders/static-heuristics.js";
@@ -17,6 +18,7 @@ type FindingRule =
   | "wildcard_bracket"
   | "feeder_to_consolidated"
   | "feeder_broader_than_rule"
+  | "missing_conditional_feeder"
   | "db_feeder_without_skipcheck"
   | "orphan_feeder";
 
@@ -33,12 +35,13 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_feeders",
     [
-      "Bulk-scan cube rules for likely overfeeding patterns (P2: static",
+      "Bulk-scan cube rules for likely overfeeding patterns (P3: static",
       "heuristics with REST-backed element-type lookups). Detects: wildcard",
       "brackets (S4), feeders targeting consolidated elements (S2), feeders",
-      "broader than the cube's dim count (S1), DB() feeders into cubes",
-      "without `skipcheck;` (S5), and orphan feeders whose elements appear",
-      "in zero rule LHS (S6). Severity is always 'hint' — runtime evidence",
+      "broader than the cube's dim count (S1), unguarded feeders covering",
+      "STET/IF()-conditional rules (S3), DB() feeders into cubes without",
+      "`skipcheck;` (S5), and orphan feeders whose elements appear in zero",
+      "rule LHS (S6). Severity is always 'hint' — runtime evidence",
       "(`}StatsByCube` sparsity + memory) lands in a later phase. Control",
       "objects ('}'-prefix) excluded by default.",
     ].join(" "),
@@ -115,11 +118,16 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         const cubeDimCount = cubeDimNames.length;
 
         const ruleLhs = [];
+        const conditionalRuleLhs = [];
         for (const line of ast.lines) {
           if (line.section !== "rules") continue;
           if (line.isBlank || line.isComment) continue;
           const lists = extractBracketLists(line.trimmed);
-          if (lists.length > 0) ruleLhs.push(lists[0]!);
+          if (lists.length === 0) continue;
+          ruleLhs.push(lists[0]!);
+          if (line.hasStet || line.hasIfGuard) {
+            conditionalRuleLhs.push(lists[0]!);
+          }
         }
 
         for (const line of ast.lines) {
@@ -153,6 +161,14 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
             } else if (detectBroaderThanRule(feederLhs, cubeDimCount, s1MinPinnedRatio)) {
               lhsRuleHit = "feeder_broader_than_rule";
               lhsDetail = `pins ${feederLhs.entries.length}/${cubeDimCount} dims`;
+            } else if (
+              detectMissingConditionalFeeder(
+                feederLhs,
+                line.hasIfGuard,
+                conditionalRuleLhs,
+              )
+            ) {
+              lhsRuleHit = "missing_conditional_feeder";
             } else if (detectOrphanFeeder(feederLhs, ruleLhs)) {
               lhsRuleHit = "orphan_feeder";
             }
@@ -187,6 +203,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         wildcard_bracket: 0,
         feeder_to_consolidated: 0,
         feeder_broader_than_rule: 0,
+        missing_conditional_feeder: 0,
         db_feeder_without_skipcheck: 0,
         orphan_feeder: 0,
       };
@@ -229,7 +246,8 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 findings: trimmed,
                 rulesetSource:
                   "Static heuristics S1 (feeder_broader_than_rule), S2 (feeder_to_consolidated), " +
-                  "S4 (wildcard_bracket), S5 (db_feeder_without_skipcheck), S6 (orphan_feeder). " +
+                  "S3 (missing_conditional_feeder), S4 (wildcard_bracket), " +
+                  "S5 (db_feeder_without_skipcheck), S6 (orphan_feeder). " +
                   "See docs/feeders-audit-spec.md.",
               },
               null,
