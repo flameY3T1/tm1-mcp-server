@@ -76,6 +76,50 @@ export function detectBroaderThanRule(
 }
 
 /**
+ * Pair a feeder LHS with the rule LHS that shares the most element-bag
+ * elements. Returns the best-match rule (overlap ≥ 1) or null. Ties go to
+ * the first match for determinism. Used by S1 so we can compare feeder
+ * pinning against the rule it actually feeds rather than against the
+ * cube-width ratio fallback.
+ */
+export function findMatchingRule(
+  feederLhs: BracketList,
+  ruleLhsList: readonly BracketList[],
+): BracketList | null {
+  if (ruleLhsList.length === 0) return null;
+  const feederBag = collectElementBag(feederLhs);
+  if (feederBag.size === 0) return null;
+  let best: BracketList | null = null;
+  let bestOverlap = 0;
+  for (const r of ruleLhsList) {
+    const rbag = collectElementBag(r);
+    let overlap = 0;
+    for (const v of rbag) if (feederBag.has(v)) overlap++;
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      best = r;
+    }
+  }
+  return bestOverlap > 0 ? best : null;
+}
+
+/**
+ * S1 (rule-paired variant) · Feeder broader than its matched rule.
+ *
+ * Strict comparison: flag iff `feeder.pinned < matchedRule.pinned`. Equal
+ * pinning is the idiomatic 1:1 TM1 N: pattern (e.g. `[M:A] => [M:B]`
+ * feeding `[M:B] = N: [M:A] - ...;`) and must NOT be flagged — empirical
+ * audits showed ~92 % FP rate before pairing was introduced.
+ */
+export function detectBroaderThanMatchedRule(
+  feeder: BracketList,
+  matchedRule: BracketList,
+): boolean {
+  if (feeder.entries.length === 0) return false;
+  return feeder.entries.length < matchedRule.entries.length;
+}
+
+/**
  * S2 · Feeder targets consolidated element.
  *
  * For each entry in the feeder LHS, resolve `(dim, hier, elem)` and look up

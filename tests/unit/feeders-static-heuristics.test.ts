@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   detectWildcardBracket,
   detectBroaderThanRule,
+  detectBroaderThanMatchedRule,
+  findMatchingRule,
   detectOrphanFeeder,
   collectElementBag,
 } from "../../src/lib/feeders/static-heuristics.js";
@@ -73,6 +75,66 @@ describe("detectBroaderThanRule — S1 (ratio-based)", () => {
   it("does not flag feeder pinning MORE entries than cube has dims (malformed/safer to ignore)", () => {
     const feeder = lhs("['A','B','C','D','E','F']");
     expect(detectBroaderThanRule(feeder, 4)).toBe(false);
+  });
+});
+
+describe("findMatchingRule — pair feeder with rule by element-bag overlap", () => {
+  it("returns null when no rules supplied", () => {
+    expect(findMatchingRule(lhs("['A']"), [])).toBeNull();
+  });
+
+  it("returns null when feeder has no concrete elements", () => {
+    expect(findMatchingRule(lhs("[]"), [lhs("['A']")])).toBeNull();
+  });
+
+  it("returns null when no rule shares any element with the feeder", () => {
+    const rules = [lhs("['X','Y']"), lhs("['M','N']")];
+    expect(findMatchingRule(lhs("['A','B']"), rules)).toBeNull();
+  });
+
+  it("picks the rule with the highest element-bag overlap", () => {
+    const r1 = lhs("['A','B']"); // overlap 1
+    const r2 = lhs("['A','B','C']"); // overlap 2 (best)
+    const r3 = lhs("['X']"); // overlap 0
+    const match = findMatchingRule(lhs("['B','C']"), [r1, r2, r3]);
+    expect(match).toBe(r2);
+  });
+
+  it("matches via qualified element values (Dim:Elem)", () => {
+    const rules = [lhs("['Measure:AvailableDays']")];
+    const feeder = lhs("['Measure:AvailableDays']");
+    expect(findMatchingRule(feeder, rules)).toBe(rules[0]);
+  });
+
+  it("ties broken deterministically — returns the first rule with the top overlap", () => {
+    const r1 = lhs("['A','B']");
+    const r2 = lhs("['A','B']");
+    const match = findMatchingRule(lhs("['A','B']"), [r1, r2]);
+    expect(match).toBe(r1);
+  });
+});
+
+describe("detectBroaderThanMatchedRule — S1 rule-pairing variant", () => {
+  it("flags when feeder pins fewer dims than its matched rule", () => {
+    const feeder = lhs("['A']"); // 1 pinned
+    const rule = lhs("['A','B']"); // 2 pinned
+    expect(detectBroaderThanMatchedRule(feeder, rule)).toBe(true);
+  });
+
+  it("does NOT flag when feeder and rule pin equally (idiomatic 1:1 N: pattern)", () => {
+    const feeder = lhs("['Measure:WorkDays']");
+    const rule = lhs("['Measure:AvailableDays']");
+    expect(detectBroaderThanMatchedRule(feeder, rule)).toBe(false);
+  });
+
+  it("does NOT flag when feeder pins MORE than its rule (feeder is narrower → safe)", () => {
+    const feeder = lhs("['Account:X','Measure:Y']"); // 2
+    const rule = lhs("['Measure:Y']"); // 1
+    expect(detectBroaderThanMatchedRule(feeder, rule)).toBe(false);
+  });
+
+  it("returns false on empty feeder bracket (S4 territory)", () => {
+    expect(detectBroaderThanMatchedRule(lhs("[]"), lhs("['A']"))).toBe(false);
   });
 });
 

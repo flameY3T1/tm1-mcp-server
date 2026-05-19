@@ -4,12 +4,14 @@ import type { TM1Client } from "../../tm1-client.js";
 import { parseRules } from "../../lib/callgraph/rulesParser.js";
 import { extractBracketLists } from "../../lib/feeders/brackets.js";
 import {
+  detectBroaderThanMatchedRule,
   detectBroaderThanRule,
   detectDbFeederWithoutSkipcheck,
   detectFeederToConsolidated,
   detectMissingConditionalFeeder,
   detectOrphanFeeder,
   detectWildcardBracket,
+  findMatchingRule,
 } from "../../lib/feeders/static-heuristics.js";
 import { ElementTypeCache } from "../../lib/feeders/element-type-cache.js";
 import {
@@ -95,7 +97,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(0.5)
         .describe(
-          "S1 broader-than-rule ratio gate: flag when (feederConstraintCount / cubeTotalDims) < this value. Default 0.5.",
+          "S1 ratio-fallback gate (only used when no rule shares any element with the feeder.RHS): flag when (feederConstraintCount / cubeTotalDims) < this value. Default 0.5. Rule-paired comparison (feeder.pinned < matchedRule.pinned) is preferred when a match is found.",
         ),
       mode: z
         .enum(["static", "runtime", "both"])
@@ -220,19 +222,46 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
             if (cons) {
               lhsRuleHit = "feeder_to_consolidated";
               lhsDetail = `${cons.dim}:${cons.elem}`;
-            } else if (detectBroaderThanRule(feederLhs, cubeDimCount, s1MinPinnedRatio)) {
-              lhsRuleHit = "feeder_broader_than_rule";
-              lhsDetail = `pins ${feederLhs.entries.length}/${cubeDimCount} dims`;
-            } else if (
-              detectMissingConditionalFeeder(
-                feederLhs,
-                line.hasIfGuard,
-                conditionalRuleLhs,
-              )
-            ) {
-              lhsRuleHit = "missing_conditional_feeder";
-            } else if (detectOrphanFeeder(feederLhs, ruleLhs)) {
-              lhsRuleHit = "orphan_feeder";
+            } else if (!isCrossCubeDbFeeder(line.trimmed)) {
+              // Cross-cube DB-feeders: rule lives in target cube; S5 covers
+              // their DB-feeder risk so skip S1 here.
+              // Pair by feeder.RHS ⇄ rule.LHS — the feeder marks cells the
+              // rule writes, so the target bracket is the right signal.
+              // Falls back to feeder.LHS when RHS isn't a plain bracket.
+              const feederRhs = lists.length > 1 ? lists[1]! : null;
+              const matchBracket = feederRhs ?? feederLhs;
+              const matchedRule = findMatchingRule(matchBracket, ruleLhs);
+              if (matchedRule) {
+                if (detectBroaderThanMatchedRule(feederLhs, matchedRule)) {
+                  lhsRuleHit = "feeder_broader_than_rule";
+                  lhsDetail = `pins ${feederLhs.entries.length} vs rule ${matchedRule.entries.length}`;
+                }
+              } else if (detectBroaderThanRule(feederLhs, cubeDimCount, s1MinPinnedRatio)) {
+                lhsRuleHit = "feeder_broader_than_rule";
+                lhsDetail = `pins ${feederLhs.entries.length}/${cubeDimCount} dims (no matching rule — ratio fallback)`;
+              }
+            }
+            if (!lhsRuleHit) {
+              if (
+                detectMissingConditionalFeeder(
+                  feederLhs,
+                  line.hasIfGuard,
+                  conditionalRuleLhs,
+                )
+              ) {
+                lhsRuleHit = "missing_conditional_feeder";
+              } else {
+                // Orphan check: feeder.RHS (target cells) should share an
+                // element with some rule.LHS (cells the rule writes). The
+                // feeder.LHS (source) typically uses different elements from
+                // its rule's LHS — using LHS here false-flagged the idiomatic
+                // 1:1 pattern as orphan.
+                const feederRhs = lists.length > 1 ? lists[1]! : null;
+                const orphanBracket = feederRhs ?? feederLhs;
+                if (detectOrphanFeeder(orphanBracket, ruleLhs)) {
+                  lhsRuleHit = "orphan_feeder";
+                }
+              }
             }
           }
 
@@ -424,4 +453,14 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       };
     },
   );
+}
+
+/**
+ * Cross-cube DB-feeder: the feeder line writes into another cube via DB(...).
+ * Static-scan can't pair these with a local rule because the rule lives in
+ * the *target* cube, not the source. S5 (db_feeder_without_skipcheck) already
+ * covers their DB-feeder risk profile, so S1 skips them.
+ */
+function isCrossCubeDbFeeder(lineText: string): boolean {
+  return /=>\s*DB\s*\(/i.test(lineText);
 }

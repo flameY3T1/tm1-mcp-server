@@ -126,7 +126,10 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.invalidCount).toBe(0);
   });
 
-  it("degrades S1 gracefully when cube dim-order resolver fails (zero S1 findings)", async () => {
+  it("S1 still fires via rule-match even when cube dim-order resolver fails", async () => {
+    // Rule-pairing doesn't depend on cubeTotalDims — element-bag overlap
+    // works from rule text alone, so a dim resolver failure no longer
+    // suppresses S1 (only the ratio fallback needs the dim count).
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
@@ -145,12 +148,12 @@ describe("tm1_audit_feeders tool", () => {
     });
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({}));
-    expect(out.summary.byRule.feeder_broader_than_rule).toBe(0);
+    expect(out.summary.byRule.feeder_broader_than_rule).toBe(1);
     expect(out.scanned.dimResolveFailures).toBe(1);
-    expect(out.status).toBe("pass");
+    expect(out.findings[0].detail).toBe("pins 2 vs rule 5");
   });
 
-  it("flags feeder_broader_than_rule (S1) when cube has more dims than feeder pins", async () => {
+  it("flags feeder_broader_than_rule (S1) when feeder pins fewer dims than its rule", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
@@ -172,7 +175,56 @@ describe("tm1_audit_feeders tool", () => {
     const out = parseResult(await fake.getHandler()({}));
     expect(out.summary.byRule.feeder_broader_than_rule).toBe(1);
     expect(out.findings[0].rule).toBe("feeder_broader_than_rule");
-    expect(out.findings[0].detail).toBe("pins 2/5 dims");
+    expect(out.findings[0].detail).toBe("pins 2 vs rule 5");
+  });
+
+  it("does NOT flag S1 on idiomatic 1:1 N: feeder/rule pattern (same pinning)", async () => {
+    // Real-world FP eliminated by rule-pairing: feeder pins 1 dim, rule
+    // pins 1 dim — equal, so feeder is correctly sized.
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      dims: { Cap: ["D1", "D2", "D3", "D4", "D5", "D6"] },
+      rules: [
+        {
+          cubeName: "Cap",
+          rulesText: [
+            "skipcheck;",
+            "['Measure:AvailableDays'] = N: ['Measure:WorkDaysPlanned'] - ['Measure:VacationDays'];",
+            "feeders;",
+            "['Measure:WorkDaysPlanned'] => ['Measure:AvailableDays'];",
+          ].join("\n"),
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.feeder_broader_than_rule).toBe(0);
+    expect(out.status).toBe("pass");
+  });
+
+  it("skips S1 for cross-cube DB-feeders (rule lives in target cube)", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      dims: { Source: ["D1", "D2", "D3", "D4", "D5", "D6", "D7"] },
+      rules: [
+        {
+          cubeName: "Source",
+          rulesText: [
+            "skipcheck;",
+            "['Measure:Local'] = N: 1;",
+            "feeders;",
+            "['Measure:Local'] => DB('Target', !D1, !D2, !D3, !D4, !D5, !D6, 'Local');",
+          ].join("\n"),
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.feeder_broader_than_rule).toBe(0);
   });
 
   it("flags db_feeder_without_skipcheck (S5) on DB() target lacking skipcheck", async () => {

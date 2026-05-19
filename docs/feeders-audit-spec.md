@@ -81,19 +81,36 @@ Output schema (sketch):
 ### S1 · Feeder broader than rule (most common)
 
 Each bracket entry — positional, qualified, or set-form — pins exactly one
-dimension. S1 compares `cubeTotalDims` (from the dim-order resolver) with
-`feeder.entries.length` and flags when the **pinned ratio**
-`feeder.entries.length / cubeTotalDims < s1MinPinnedRatio` (default `0.5`).
+dimension. S1 pairs each feeder with the rule it most likely feeds and
+flags only when the feeder is structurally broader than that rule.
 
-Ratio gate (not absolute) is required to scale across cube widths:
+**Pairing**: `feeder.RHS` (the bracket on the right of `=>`) is matched
+against every rule LHS by element-bag overlap; the rule with the highest
+overlap wins. Feeder source elements (LHS) and rule target elements (LHS)
+are usually different in idiomatic TM1 (`['M:Src'] => ['M:Tgt']` feeding
+`['M:Tgt'] = N: ['M:Src'] - …`), so the RHS overlap is the structural link.
 
-| 2026-05-18 (P1, entry-count vs densest rule)       | 91 % false positives |
-| 2026-05-19 (P2 a, absolute threshold = 2 unpinned) | 98 % false positives |
-| 2026-05-19 (P2 b, ratio < 0.5)                     | accepted             |
+**Flag**: `feeder.LHS.entries.length < matchedRule.LHS.entries.length`.
+Equal pinning is the idiomatic 1:1 N: pattern and is **not** flagged.
 
-On 13-dim cubes, positional feeders idiomatically pin 7–8 dims because TM1
-fills the unpinned positions with default members; flagging every such
-feeder drowns out the genuinely-too-broad ones.
+**Fallback**: when no rule shares any element with the feeder.RHS — and
+the feeder isn't a cross-cube `=> DB(...)` (whose rule lives in the
+target cube, covered by S5) — drop back to the ratio gate
+`feeder.entries.length / cubeTotalDims < s1MinPinnedRatio` (default `0.5`)
+so cubes with non-trivial rule sets but unusual feeder shapes still get
+some signal.
+
+Iteration history:
+
+| 2026-05-18 (P1, entry-count vs densest rule)       | 91 % false positives  |
+| 2026-05-19 (P2 a, absolute threshold = 2 unpinned) | 98 % false positives  |
+| 2026-05-19 (P2 b, ratio < 0.5)                     | accepted              |
+| 2026-05-19 (P6, rule-pairing on feeder.RHS)        | ~92 % FP eliminated   |
+
+The ratio gate alone scaled across cube widths but still over-flagged
+idiomatic 1:1 patterns where the feeder is correctly dimensioned for
+its rule. Rule-pairing is the structurally correct signal; the ratio
+remains as a fallback for unmatched feeders.
 
 ### S2 · Feeder targets Consolidated element
 
