@@ -197,6 +197,9 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
           if (line.section !== "feeders") continue;
           if (line.isBlank || line.isComment) continue;
           if (/^feeders\s*;?\s*$/i.test(line.trimmed)) continue;
+          // Multi-line feeders place `=>` and the RHS on a continuation line.
+          // The preceding feeder's LHS already covered it — skip so we don't
+          // re-score the RHS bracket as if it were the LHS.
           if (/^=>/.test(line.trimmed)) continue;
           const lists = extractBracketLists(line.trimmed);
           if (lists.length === 0) continue;

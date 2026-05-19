@@ -25,7 +25,7 @@ describe("computeRulesMetrics", () => {
     expect(m.feederCount).toBe(1);
     expect(m.commentLines).toBe(1);
     expect(m.rulesLoc).toBe(3);
-    expect(m.feedersLoc).toBe(2);
+    expect(m.feedersLoc).toBe(1);
   });
 
   it("detects feedstrings directive", () => {

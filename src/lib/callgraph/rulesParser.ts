@@ -60,6 +60,12 @@ export function parseRules(text: string): RulesAst {
       hasFeedstrings = true;
       feedstringsLine = lineIndex;
     }
+    // Capture section BEFORE the marker flips state: the `FEEDERS;` marker
+    // line itself belongs to the rules section it closes — only the lines
+    // that follow it carry `section: 'feeders'`. Otherwise consumers that
+    // iterate `section === 'feeders'` would sweep the marker too unless
+    // they also test `isFeedersMarker`.
+    const section: 'rules' | 'feeders' = inFeeders ? 'feeders' : 'rules';
     if (isFeedersMarker) {
       feedersCount++;
       if (feedersCount === 1) { feedersLineIndex = lineIndex; }
@@ -77,7 +83,7 @@ export function parseRules(text: string): RulesAst {
       isFeedersMarker,
       hasStet,
       hasIfGuard,
-      section: inFeeders ? 'feeders' : 'rules',
+      section,
     };
   });
 

@@ -50,7 +50,16 @@ export class ElementTypeCache {
     const inflight = this.pending.get(slotKey);
     if (inflight) return inflight;
 
-    const p = (async () => {
+    // Resolver is created and registered eagerly so the in-flight slot is
+    // populated before any await hands control back to other callers; the
+    // actual REST work runs inside the returned promise.
+    let resolve!: (v: Map<string, ElementType> | null) => void;
+    const p = new Promise<Map<string, ElementType> | null>((r) => {
+      resolve = r;
+    });
+    this.pending.set(slotKey, p);
+
+    void (async () => {
       try {
         const h = await this.hierarchy.get(dim, hier);
         const m = new Map<string, ElementType>();
@@ -60,15 +69,15 @@ export class ElementTypeCache {
           }
         }
         this.slots.set(slotKey, m);
-        return m;
+        resolve(m);
       } catch {
         this.slots.set(slotKey, null);
-        return null;
+        resolve(null);
       } finally {
         this.pending.delete(slotKey);
       }
     })();
-    this.pending.set(slotKey, p);
+
     return p;
   }
 }

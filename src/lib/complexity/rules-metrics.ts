@@ -75,6 +75,8 @@ export function computeRulesMetrics(cube: string, rulesText: string): RulesMetri
       commentLines++;
       continue;
     }
+    // Section markers (`feeders;`) are dividers, not code — skip from LOC.
+    if (line.isFeedersMarker) continue;
     if (line.section === "rules") {
       rulesLoc++;
       if (RULE_LINE_RE.test(line.trimmed)) ruleCount++;

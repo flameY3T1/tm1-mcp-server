@@ -1,6 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { parseRules } from "../../src/lib/callgraph/rulesParser.js";
 
+describe("parseRules — section assignment", () => {
+  it("classifies FEEDERS; marker line as the closing line of 'rules' (not as 'feeders')", () => {
+    const ast = parseRules(
+      ["skipcheck;", "['A'] = N: 1;", "feeders;", "['A'] => ['B'];"].join("\n"),
+    );
+    // skipcheck + rule
+    expect(ast.lines[0]!.section).toBe("rules");
+    expect(ast.lines[1]!.section).toBe("rules");
+    // FEEDERS; marker — last line of rules section
+    expect(ast.lines[2]!.section).toBe("rules");
+    expect(ast.lines[2]!.isFeedersMarker).toBe(true);
+    // Actual feeder follows
+    expect(ast.lines[3]!.section).toBe("feeders");
+  });
+});
+
 describe("parseRules — hasStet flag", () => {
   it("flags rule line that contains STET", () => {
     const ast = parseRules("['A'] = N: IF(1=1, STET, 0);");
