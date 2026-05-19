@@ -204,6 +204,33 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.status).toBe("pass");
   });
 
+  it("skips S6 (orphan) for cross-cube DB-feeders too", async () => {
+    // Cross-cube DB-feeder: target cells live in another cube. Local
+    // orphan check can't see the matching rule there, so S6 must skip
+    // these (S5 already covers DB-skipcheck risk).
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      dims: { Source: ["D1", "D2", "D3"] },
+      rules: [
+        {
+          cubeName: "Source",
+          rulesText: [
+            "skipcheck;",
+            "['Measure:Group'] = N: ['Measure:Local'] * 1;",
+            "feeders;",
+            "['Measure:Local'] => ['Measure:Group'];",
+            "['Measure:Local'] => DB('Target', !D1, !D2, 'Local');",
+          ].join("\n"),
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.orphan_feeder).toBe(0);
+  });
+
   it("skips S1 for cross-cube DB-feeders (rule lives in target cube)", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({

@@ -250,12 +250,13 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 )
               ) {
                 lhsRuleHit = "missing_conditional_feeder";
-              } else {
-                // Orphan check: feeder.RHS (target cells) should share an
-                // element with some rule.LHS (cells the rule writes). The
-                // feeder.LHS (source) typically uses different elements from
-                // its rule's LHS — using LHS here false-flagged the idiomatic
-                // 1:1 pattern as orphan.
+              } else if (!isCrossCubeDbFeeder(line.trimmed)) {
+                // Cross-cube DB-feeders: target rules live in another cube,
+                // so a local orphan check can't see them. S5 covers the
+                // DB-skipcheck risk; skip S6 here to avoid false orphans.
+                // Orphan check uses feeder.RHS (target cells) so it pairs
+                // with rule.LHS (cells the rule writes) — feeder.LHS uses
+                // different elements in the idiomatic 1:1 pattern.
                 const feederRhs = lists.length > 1 ? lists[1]! : null;
                 const orphanBracket = feederRhs ?? feederLhs;
                 if (detectOrphanFeeder(orphanBracket, ruleLhs)) {
