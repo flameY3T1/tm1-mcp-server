@@ -228,6 +228,7 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       // truncation in `elementsTruncated` — never a silent skip. No single
       // response approaches the V8 string limit thanks to $top.
       const elementsTruncated: TruncatedElementGroup[] = [];
+      let totalElementsInScope = 0;
       if (want("elements") && dimensionsForChildren) {
         let elemCount = 0;
         for (const d of dimensionsForChildren) {
@@ -240,6 +241,7 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
               value: Array<{ Name: string }>;
             }>("GET", `${basePath}&$skip=0&$count=true`);
             const total = firstPage["@odata.count"] ?? firstPage.value.length;
+            totalElementsInScope += total;
             const scanLimit = Math.min(total, maxElementsPerDim);
 
             let scannedHere = 0;
@@ -384,6 +386,7 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         summary: { byKind, byRule },
         truncated,
         elementsTruncated,
+        totalElementsInScope,
         rulesetSource:
           "IBM PA naming-conventions (2.0 + 3.1) — hard rules only (server-reserved chars, control prefix, length 256, element leading +/-, TAB in v12 elements, process-var identifier).",
       };

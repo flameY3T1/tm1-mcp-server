@@ -110,6 +110,7 @@ function parseResult(raw: unknown): {
     elementCount: number;
     scannedCount: number;
   }>;
+  totalElementsInScope: number;
 } {
   const result = raw as { content: Array<{ text: string }> };
   return JSON.parse(result.content[0]!.text);
@@ -464,6 +465,38 @@ describe("tm1_audit_naming tool", () => {
       expect(cubeGroup.dimension).toBeUndefined();
       expect(cubeGroup.sampleNames).toEqual(["Bad;X", "Bad;Y"]);
       expect(procGroup.totalCount).toBe(1);
+    });
+
+    it("reports totalElementsInScope (scanned + truncated remainder)", async () => {
+      const fake = makeFakeServer();
+      const big = Array.from({ length: 10 }, (_, i) => `e${i}`);
+      const small = ["ok1", "ok2"];
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8.01100",
+        dimensions: [
+          { name: "Huge", hierarchies: ["Huge"] },
+          { name: "Small", hierarchies: ["Small"] },
+        ],
+        elementsByHier: { "Huge/Huge": big, "Small/Small": small },
+      });
+      registerAuditNaming(fake.server, tm1);
+      const out = parseResult(
+        await fake.getHandler()({ scope: ["elements"], maxElementsPerDim: 5 }),
+      );
+      // scanned: 5 from Huge + 2 from Small = 7. Total: 10 + 2 = 12.
+      expect(out.scanned.elements).toBe(7);
+      expect(out.totalElementsInScope).toBe(12);
+    });
+
+    it("totalElementsInScope is 0 when elements not in scope", async () => {
+      const fake = makeFakeServer();
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8.01100",
+        cubes: [{ name: "Sales" }],
+      });
+      registerAuditNaming(fake.server, tm1);
+      const out = parseResult(await fake.getHandler()({ scope: ["cubes"] }));
+      expect(out.totalElementsInScope).toBe(0);
     });
 
     it("summary=false (default) keeps legacy findings[] response", async () => {
