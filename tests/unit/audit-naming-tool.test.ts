@@ -84,13 +84,24 @@ function makeFakeTM1Client(args: FakeTM1Args) {
   } as unknown as Parameters<typeof registerAuditNaming>[1];
 }
 
+interface FindingGroup {
+  objectKind: string;
+  parent?: string;
+  dimension?: string;
+  hierarchy?: string;
+  ruleBreakdown: Record<string, number>;
+  sampleNames: string[];
+  totalCount: number;
+}
+
 function parseResult(raw: unknown): {
   status: string;
   detectedMajor: number;
   appliedMajor: number;
   invalidCount: number;
   truncated: boolean;
-  findings: Array<{ objectKind: string; objectName: string; violations: Array<{ rule: string }> }>;
+  findings?: Array<{ objectKind: string; objectName: string; violations: Array<{ rule: string }> }>;
+  findingsByGroup?: FindingGroup[];
   scanned: Record<string, number>;
   summary: { byKind: Record<string, number>; byRule: Record<string, number> };
   elementsTruncated: Array<{
@@ -363,5 +374,109 @@ describe("tm1_audit_naming tool", () => {
     expect(out.scanned.cubes).toBe(1);
     expect(out.scanned.processes).toBe(0);
     expect(out.invalidCount).toBe(1);
+  });
+
+  describe("summary mode", () => {
+    it("summary=true swaps findings[] for findingsByGroup[] and omits truncation", async () => {
+      const fake = makeFakeServer();
+      const elements = ["Bad;1", "Bad;2", "Bad;3", "Bad;4"];
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8.01100",
+        dimensions: [{ name: "Produkt", hierarchies: ["Produkt"] }],
+        elementsByHier: { "Produkt/Produkt": elements },
+      });
+      registerAuditNaming(fake.server, tm1);
+      const out = parseResult(
+        await fake.getHandler()({ scope: ["elements"], summary: true, maxFindings: 2 }),
+      );
+      expect(out.invalidCount).toBe(4);
+      expect(out.findings).toBeUndefined();
+      expect(out.truncated).toBe(false);
+      expect(out.findingsByGroup).toBeDefined();
+      expect(out.findingsByGroup!.length).toBe(1);
+      const g = out.findingsByGroup![0]!;
+      expect(g.objectKind).toBe("element");
+      expect(g.dimension).toBe("Produkt");
+      expect(g.hierarchy).toBe("Produkt");
+      expect(g.totalCount).toBe(4);
+      expect(g.ruleBreakdown).toEqual({ server_reserved_char: 4 });
+    });
+
+    it("summary aggregates rule counts per (objectKind, parent) group", async () => {
+      const fake = makeFakeServer();
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8.01100",
+        dimensions: [
+          { name: "DimA", hierarchies: ["DimA"] },
+          { name: "DimB", hierarchies: ["DimB"] },
+        ],
+        elementsByHier: {
+          "DimA/DimA": ["Bad;1", "Bad;2", "+leading"],
+          "DimB/DimB": ["Bad;3"],
+        },
+      });
+      registerAuditNaming(fake.server, tm1);
+      const out = parseResult(
+        await fake.getHandler()({ scope: ["elements"], summary: true }),
+      );
+      expect(out.findingsByGroup!.length).toBe(2);
+      const dimA = out.findingsByGroup!.find((g) => g.dimension === "DimA")!;
+      const dimB = out.findingsByGroup!.find((g) => g.dimension === "DimB")!;
+      expect(dimA.totalCount).toBe(3);
+      expect(dimA.ruleBreakdown.server_reserved_char).toBe(2);
+      expect(dimA.ruleBreakdown.element_leading_arithmetic).toBe(1);
+      expect(dimB.totalCount).toBe(1);
+      expect(dimB.ruleBreakdown.server_reserved_char).toBe(1);
+    });
+
+    it("summary samples first 3 element names per group", async () => {
+      const fake = makeFakeServer();
+      const names = ["Bad;A", "Bad;B", "Bad;C", "Bad;D", "Bad;E"];
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8.01100",
+        dimensions: [{ name: "Big", hierarchies: ["Big"] }],
+        elementsByHier: { "Big/Big": names },
+      });
+      registerAuditNaming(fake.server, tm1);
+      const out = parseResult(
+        await fake.getHandler()({ scope: ["elements"], summary: true }),
+      );
+      const g = out.findingsByGroup![0]!;
+      expect(g.sampleNames.length).toBe(3);
+      expect(g.sampleNames).toEqual(["Bad;A", "Bad;B", "Bad;C"]);
+    });
+
+    it("summary groups non-element kinds under objectKind without parent", async () => {
+      const fake = makeFakeServer();
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8.01100",
+        cubes: [{ name: "Bad;X" }, { name: "Bad;Y" }],
+        processes: [{ name: "Bad;Proc" }],
+      });
+      registerAuditNaming(fake.server, tm1);
+      const out = parseResult(
+        await fake.getHandler()({ scope: ["cubes", "processes"], summary: true }),
+      );
+      const cubeGroup = out.findingsByGroup!.find((g) => g.objectKind === "cube")!;
+      const procGroup = out.findingsByGroup!.find((g) => g.objectKind === "process")!;
+      expect(cubeGroup.totalCount).toBe(2);
+      expect(cubeGroup.parent).toBeUndefined();
+      expect(cubeGroup.dimension).toBeUndefined();
+      expect(cubeGroup.sampleNames).toEqual(["Bad;X", "Bad;Y"]);
+      expect(procGroup.totalCount).toBe(1);
+    });
+
+    it("summary=false (default) keeps legacy findings[] response", async () => {
+      const fake = makeFakeServer();
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8.01100",
+        cubes: [{ name: "Bad;X" }],
+      });
+      registerAuditNaming(fake.server, tm1);
+      const out = parseResult(await fake.getHandler()({}));
+      expect(out.findings).toBeDefined();
+      expect(out.findingsByGroup).toBeUndefined();
+      expect(out.findings!.length).toBe(1);
+    });
   });
 });

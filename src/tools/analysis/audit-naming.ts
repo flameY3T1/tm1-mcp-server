@@ -120,6 +120,19 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
             "scannedCount, so the partial scan is transparent. Default 100000. Raise (e.g. " +
             "10_000_000) to scan everything; lower for faster audits on huge models.",
         ),
+      summary: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Aggregate findings instead of returning per-object detail. When true, " +
+            "swaps the `findings` array for `findingsByGroup` — one entry per " +
+            "(objectKind, parent) group with `ruleBreakdown`, `sampleNames` (up to 3), " +
+            "and `totalCount`. Recommended for audit reports on large models (e.g. dims " +
+            "with thousands of element findings) where per-object detail is not needed " +
+            "and `maxFindings`-capped output would be misleading. `truncated` is " +
+            "always false in summary mode since no findings are dropped.",
+        ),
     },
     async ({
       scope,
@@ -128,6 +141,7 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       versionOverride,
       elementsPageSize,
       maxElementsPerDim,
+      summary,
     }) => {
       const activeScope: ReadonlyArray<Scope> =
         scope && scope.length > 0 ? scope : SCOPE_DEFAULT;
@@ -349,40 +363,91 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         return a.objectName.localeCompare(b.objectName);
       });
 
-      const truncated = findings.length > maxFindings;
+      const truncated = !summary && findings.length > maxFindings;
       const trimmed = findings.slice(0, maxFindings);
 
       const totalScanned = Object.values(scanned).reduce((a, b) => a + b, 0);
       const status = findings.length === 0 ? "pass" : "fail";
 
+      const findingsByGroup = summary ? buildFindingsByGroup(findings) : undefined;
+
+      const payload: Record<string, unknown> = {
+        status,
+        productVersion: serverInfo.productVersion,
+        detectedMajor,
+        appliedMajor: major,
+        scope: activeScope,
+        includeControl,
+        scanned,
+        totalScanned,
+        invalidCount: findings.length,
+        summary: { byKind, byRule },
+        truncated,
+        elementsTruncated,
+        rulesetSource:
+          "IBM PA naming-conventions (2.0 + 3.1) — hard rules only (server-reserved chars, control prefix, length 256, element leading +/-, TAB in v12 elements, process-var identifier).",
+      };
+      if (summary) {
+        payload.findingsByGroup = findingsByGroup;
+      } else {
+        payload.findings = trimmed;
+      }
+
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(
-              {
-                status,
-                productVersion: serverInfo.productVersion,
-                detectedMajor,
-                appliedMajor: major,
-                scope: activeScope,
-                includeControl,
-                scanned,
-                totalScanned,
-                invalidCount: findings.length,
-                summary: { byKind, byRule },
-                truncated,
-                findings: trimmed,
-                elementsTruncated,
-                rulesetSource:
-                  "IBM PA naming-conventions (2.0 + 3.1) — hard rules only (server-reserved chars, control prefix, length 256, element leading +/-, TAB in v12 elements, process-var identifier).",
-              },
-              null,
-              2,
-            ),
+            text: JSON.stringify(payload, null, 2),
           },
         ],
       };
     },
   );
+}
+
+const SAMPLE_SIZE = 3;
+
+interface FindingGroup {
+  objectKind: ObjectKind;
+  parent?: string;
+  dimension?: string;
+  hierarchy?: string;
+  ruleBreakdown: Record<string, number>;
+  sampleNames: string[];
+  totalCount: number;
+}
+
+function buildFindingsByGroup(findings: Finding[]): FindingGroup[] {
+  const groups = new Map<string, FindingGroup>();
+  for (const f of findings) {
+    const key = `${f.objectKind} ${f.parent ?? ""}`;
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        objectKind: f.objectKind,
+        ruleBreakdown: {},
+        sampleNames: [],
+        totalCount: 0,
+      };
+      if (f.parent !== undefined) {
+        g.parent = f.parent;
+        // Element/subset parent format is "Dim / Hier"; split for caller convenience.
+        const split = f.parent.split(" / ");
+        if (split.length === 2) {
+          g.dimension = split[0]!;
+          g.hierarchy = split[1]!;
+        }
+      }
+      groups.set(key, g);
+    }
+    g.totalCount++;
+    for (const v of f.violations) {
+      g.ruleBreakdown[v.rule] = (g.ruleBreakdown[v.rule] ?? 0) + 1;
+    }
+    if (g.sampleNames.length < SAMPLE_SIZE) g.sampleNames.push(f.objectName);
+  }
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.objectKind !== b.objectKind) return a.objectKind.localeCompare(b.objectKind);
+    return (a.parent ?? "").localeCompare(b.parent ?? "");
+  });
 }
