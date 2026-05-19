@@ -35,16 +35,18 @@ const SCOPE_DEFAULT: ReadonlyArray<Scope> = [
   "cubes",
   "dimensions",
   "hierarchies",
+  "elements",
   "processes",
   "chores",
 ];
 
 const enc = encodeURIComponent;
 
-interface SkippedElementGroup {
+interface TruncatedElementGroup {
   dimension: string;
   hierarchy: string;
   elementCount: number;
+  scannedCount: number;
 }
 
 export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
@@ -57,19 +59,22 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       "v12 element names, invalid process-variable identifiers).",
       "Auto-detects the TM1 major version via /api/v1/Configuration/ProductVersion to apply",
       "v12-only rules (TAB in element names). Default scope covers cubes, dimensions,",
-      "hierarchies, processes, and chores — opt in to 'elements', 'processVariables',",
-      "'views', or 'subsets' explicitly since those drive extra REST calls or large payloads.",
-      "Control objects ('}'-prefixed) are excluded by default.",
+      "hierarchies, elements, processes, and chores — elements are checked across all",
+      "dimensions but capped at maxElementsPerDim per (dim, hier) (default 100k, paged in",
+      "25k blocks); larger dims are truncated transparently via `elementsTruncated`. Opt in",
+      "to 'processVariables', 'views', or 'subsets' explicitly since they drive extra REST",
+      "calls or large payloads. Control objects ('}'-prefixed) are excluded by default.",
     ].join(" "),
     {
       scope: z
         .array(z.enum(SCOPE_VALUES))
         .optional()
         .describe(
-          "Object kinds to audit. Default: cubes, dimensions, hierarchies, processes, chores. " +
-            "Add 'elements' for a per-hierarchy paginated element-name scan (skips hierarchies " +
-            "above maxElementsPerDim — reported in elementsSkipped). 'processVariables' triggers " +
-            "per-process variable scans; 'views'/'subsets' do per-cube/per-hier listings.",
+          "Object kinds to audit. Default: cubes, dimensions, hierarchies, elements, " +
+            "processes, chores. Element scan is per (dimension, hierarchy), paginated via " +
+            "$top/$skip; oversized hierarchies are truncated at maxElementsPerDim and " +
+            "reported in elementsTruncated. 'processVariables' triggers per-process variable " +
+            "scans; 'views'/'subsets' do per-cube/per-hier listings.",
         ),
       includeControl: z
         .boolean()
@@ -107,12 +112,13 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         .int()
         .min(1)
         .optional()
-        .default(50000)
+        .default(100000)
         .describe(
-          "Skip element-scan for any (dimension, hierarchy) whose element count exceeds this " +
-            "threshold. Skipped groups are reported under `elementsSkipped` so the skip is " +
-            "transparent, not silent. Default 50000 (mirrors the typical SAP-bulk-dim cutoff). " +
-            "Raise to e.g. 10_000_000 to scan everything via pagination.",
+          "Per-(dimension, hierarchy) cap on elements scanned. When total exceeds the cap, " +
+            "only the first N elements are checked (paginated via elementsPageSize) and the " +
+            "truncation is reported under `elementsTruncated` with both totalCount and " +
+            "scannedCount, so the partial scan is transparent. Default 100000. Raise (e.g. " +
+            "10_000_000) to scan everything; lower for faster audits on huge models.",
         ),
     },
     async ({
@@ -203,10 +209,11 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       // Probe + page strategy: first page asks for $count=true so we learn the
       // total in one round-trip without hitting the /$count endpoint (TM1 v11
       // returns text/plain there and rejects the Accept: application/json sent
-      // by the shared HTTP client). If total > maxElementsPerDim we discard the
-      // first page and report the skip transparently; otherwise we keep paging
-      // via $top/$skip so no single response approaches the V8 string limit.
-      const elementsSkipped: SkippedElementGroup[] = [];
+      // by the shared HTTP client). If total > maxElementsPerDim we still scan
+      // the first N elements (paginated by elementsPageSize) and report the
+      // truncation in `elementsTruncated` — never a silent skip. No single
+      // response approaches the V8 string limit thanks to $top.
+      const elementsTruncated: TruncatedElementGroup[] = [];
       if (want("elements") && dimensionsForChildren) {
         let elemCount = 0;
         for (const d of dimensionsForChildren) {
@@ -219,31 +226,42 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
               value: Array<{ Name: string }>;
             }>("GET", `${basePath}&$skip=0&$count=true`);
             const total = firstPage["@odata.count"] ?? firstPage.value.length;
-            if (total > maxElementsPerDim) {
-              elementsSkipped.push({
-                dimension: d.name,
-                hierarchy: h,
-                elementCount: total,
-              });
-              continue;
-            }
-            for (const e of firstPage.value) {
+            const scanLimit = Math.min(total, maxElementsPerDim);
+
+            let scannedHere = 0;
+            const firstSliceEnd = Math.min(firstPage.value.length, scanLimit);
+            for (let i = 0; i < firstSliceEnd; i++) {
+              const e = firstPage.value[i]!;
               elemCount++;
+              scannedHere++;
               addIfInvalid(e.Name, "element", `${d.name} / ${h}`);
             }
             let skip = firstPage.value.length;
             let lastPageSize = firstPage.value.length;
-            while (lastPageSize === elementsPageSize && skip < total) {
+            while (lastPageSize === elementsPageSize && scannedHere < scanLimit) {
               const page = await tm1Client.request<{ value: Array<{ Name: string }> }>(
                 "GET",
                 `${basePath}&$skip=${skip}`,
               );
-              for (const e of page.value) {
+              const remaining = scanLimit - scannedHere;
+              const sliceEnd = Math.min(page.value.length, remaining);
+              for (let i = 0; i < sliceEnd; i++) {
+                const e = page.value[i]!;
                 elemCount++;
+                scannedHere++;
                 addIfInvalid(e.Name, "element", `${d.name} / ${h}`);
               }
               lastPageSize = page.value.length;
               skip += page.value.length;
+            }
+
+            if (total > maxElementsPerDim) {
+              elementsTruncated.push({
+                dimension: d.name,
+                hierarchy: h,
+                elementCount: total,
+                scannedCount: scannedHere,
+              });
             }
           }
         }
@@ -355,7 +373,7 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
                 summary: { byKind, byRule },
                 truncated,
                 findings: trimmed,
-                elementsSkipped,
+                elementsTruncated,
                 rulesetSource:
                   "IBM PA naming-conventions (2.0 + 3.1) — hard rules only (server-reserved chars, control prefix, length 256, element leading +/-, TAB in v12 elements, process-var identifier).",
               },

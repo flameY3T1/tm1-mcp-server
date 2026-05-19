@@ -93,7 +93,12 @@ function parseResult(raw: unknown): {
   findings: Array<{ objectKind: string; objectName: string; violations: Array<{ rule: string }> }>;
   scanned: Record<string, number>;
   summary: { byKind: Record<string, number>; byRule: Record<string, number> };
-  elementsSkipped: Array<{ dimension: string; hierarchy: string; elementCount: number }>;
+  elementsTruncated: Array<{
+    dimension: string;
+    hierarchy: string;
+    elementCount: number;
+    scannedCount: number;
+  }>;
 } {
   const result = raw as { content: Array<{ text: string }> };
   return JSON.parse(result.content[0]!.text);
@@ -216,7 +221,7 @@ describe("tm1_audit_naming tool", () => {
     );
     expect(out.scanned.elements).toBe(7);
     expect(out.invalidCount).toBe(0);
-    expect(out.elementsSkipped.length).toBe(0);
+    expect(out.elementsTruncated.length).toBe(0);
   });
 
   it("paginates element scan via $skip across multiple HTTP pages", async () => {
@@ -293,7 +298,7 @@ describe("tm1_audit_naming tool", () => {
     expect(out.scanned.elements).toBe(5);
   });
 
-  it("skips dimension above maxElementsPerDim and reports it transparently", async () => {
+  it("truncates dimension above maxElementsPerDim and reports it transparently", async () => {
     const fake = makeFakeServer();
     const big = Array.from({ length: 10 }, (_, i) => `e${i}`);
     const small = ["ok1", "ok2"];
@@ -309,9 +314,9 @@ describe("tm1_audit_naming tool", () => {
     const out = parseResult(
       await fake.getHandler()({ scope: ["elements"], maxElementsPerDim: 5 }),
     );
-    expect(out.scanned.elements).toBe(2); // only Small scanned
-    expect(out.elementsSkipped).toEqual([
-      { dimension: "Huge", hierarchy: "Huge", elementCount: 10 },
+    expect(out.scanned.elements).toBe(7); // first 5 of Huge + all 2 of Small
+    expect(out.elementsTruncated).toEqual([
+      { dimension: "Huge", hierarchy: "Huge", elementCount: 10, scannedCount: 5 },
     ]);
   });
 
