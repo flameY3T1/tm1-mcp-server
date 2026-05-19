@@ -55,8 +55,11 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
     [
       "Bulk-scan all TM1 objects against IBM Planning Analytics naming conventions",
       "(PA 2.0 + 3.1 naming-conventions doc). Pass/fail per object — only HARD violations",
-      "are reported (reserved characters, control prefix, length, element leading +/-, TAB in",
-      "v12 element names, invalid process-variable identifiers).",
+      "are reported (reserved characters, control prefix, 256-char length on cube/dim/view/",
+      "subset/process/chore names, element leading +/-, TAB in v12 element names, invalid",
+      "process-variable identifiers). Element/attribute names have NO length check — IBM",
+      "docs define no hard server limit for elements, and TM1 v11 accepts long element",
+      "names via REST.",
       "Auto-detects the TM1 major version via /api/v1/Configuration/ProductVersion to apply",
       "v12-only rules (TAB in element names). Default scope covers cubes, dimensions,",
       "hierarchies, elements, processes, and chores — elements are checked across all",

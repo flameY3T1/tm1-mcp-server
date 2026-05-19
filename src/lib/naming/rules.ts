@@ -213,8 +213,13 @@ export function checkName(
     return violations;
   }
 
-  const length = checkLength(name);
-  if (length) violations.push(length);
+  // Elements/attributes have no IBM-defined hard length limit; the 256-char
+  // cap is only documented for cube/dim/view/subset/process/chore names.
+  // TM1 v11 servers accept element names well beyond 256 chars via REST.
+  if (kind !== "element" && kind !== "attribute") {
+    const length = checkLength(name);
+    if (length) violations.push(length);
+  }
 
   const whitespace = checkLeadingTrailingWhitespace(name);
   if (whitespace) violations.push(whitespace);

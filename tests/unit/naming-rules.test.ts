@@ -75,6 +75,18 @@ describe("checkName — element (PA 2.0 v11)", () => {
     const v = checkName("Foo;Bar", "element", 11);
     expect(v.some((x) => x.rule === "server_reserved_char")).toBe(true);
   });
+
+  it("does NOT flag length on long element names (no hard server limit)", () => {
+    const long = "e".repeat(500);
+    const v = checkName(long, "element", 11);
+    expect(v.some((x) => x.rule === "length_exceeds")).toBe(false);
+  });
+
+  it("does NOT flag length on long attribute names", () => {
+    const long = "a".repeat(500);
+    const v = checkName(long, "attribute", 11);
+    expect(v.some((x) => x.rule === "length_exceeds")).toBe(false);
+  });
 });
 
 describe("checkName — processVariable", () => {
