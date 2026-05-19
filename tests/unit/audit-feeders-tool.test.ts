@@ -453,6 +453,34 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.findings[0].rule).toBe("wildcard_bracket");
   });
 
+  it("runtime mode skips static heuristics — emits only cube-level findings", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Wild",
+          rulesText: ["skipcheck;", "['A','B'] = N: 1;", "feeders;", "[] => ['B'];"].join("\n"),
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        Wild: {
+          "Total Memory Used": 100,
+          "Number of Populated Numeric Cells": 5,
+          "Number of Fed Cells": 10,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    // No wildcard finding emitted: static scan suppressed.
+    expect(out.summary.byRule.wildcard_bracket).toBe(0);
+    expect(out.scanned.feederLines).toBe(0);
+    // Cube-level findings still run.
+    expect(out.runtimeStats.Wild.available).toBe(true);
+  });
+
   it("runtime mode flags cube_low_sparsity when populated/fed under threshold", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({

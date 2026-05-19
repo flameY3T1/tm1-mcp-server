@@ -58,11 +58,11 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       "heuristics S1–S6 detect wildcard brackets, feeders into consolidated",
       "elements, feeders broader than the cube's dim count, unguarded",
       "feeders over STET/IF()-conditional rules, DB() feeders into cubes",
-      "lacking `skipcheck;`, and orphan feeders. Runtime mode (`mode:",
-      "\"runtime\" | \"both\"`) layers `}StatsByCube` evidence on top:",
-      "cubes with sparsity below `sparsityThreshold` or memory above",
-      "`memoryThresholdMb` raise cube-level findings AND escalate existing",
-      "static findings on the same cube from severity `hint` → `evidence`.",
+      "lacking `skipcheck;`, and orphan feeders. Mode `runtime` returns",
+      "only `}StatsByCube` cube-level findings (sparsity + memory) with no",
+      "static scan. Mode `both` runs static scan AND fetches runtime stats;",
+      "static findings on cubes carrying runtime evidence are escalated from",
+      "severity `hint` to `evidence`.",
       "Graceful degrade when `}StatsByCube` is absent. Control objects",
       "('}'-prefix) excluded by default.",
     ].join(" "),
@@ -102,7 +102,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default("static")
         .describe(
-          "Static-only scan (default), runtime-only (}StatsByCube cube-level findings), or both (static + evidence escalation).",
+          "static: rule-text heuristics only (default). runtime: }StatsByCube cube-level findings only (no static scan). both: static scan + runtime evidence + severity escalation on overlap.",
         ),
       sparsityThreshold: z
         .number()
@@ -152,6 +152,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       let cubesScanned = 0;
       let feederLinesScanned = 0;
       let dimResolveFailures = 0;
+      const wantsStatic = mode === "static" || mode === "both";
 
       for (const c of all) {
         if (targetSet && !targetSet.has(c.cubeName)) continue;
@@ -159,6 +160,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         cubesScanned++;
         scannedCubeNames.push(c.cubeName);
         if (!c.rulesText || c.rulesText.trim() === "") continue;
+        if (!wantsStatic) continue;
 
         const ast = parseRules(c.rulesText);
 
