@@ -35,7 +35,8 @@ async function main() {
   registerAuditFeeders(fakeServer, tm1);
   if (!handler || !parser) throw new Error("tool did not register");
 
-  const args = parser.parse({});
+  const mode = process.env.AUDIT_MODE ?? "static";
+  const args = parser.parse({ mode });
   const result = (await handler(args)) as { content: Array<{ text: string }> };
   console.log(result.content[0]!.text);
 

@@ -39,6 +39,8 @@ interface FakeArgs {
   dims?: Record<string, string[]>;
   /** Map of "dim|hierarchy" -> { elemName: type } for the element-type cache. */
   elements?: Record<string, Record<string, "Numeric" | "Consolidated" | "String">>;
+  /** Map of cubeName -> }StatsByCube measure values (drives runtime mode). Throws on miss. */
+  cubeStats?: Record<string, Record<string, number>>;
 }
 
 function makeFakeTM1Client(args: FakeArgs) {
@@ -70,6 +72,28 @@ function makeFakeTM1Client(args: FakeArgs) {
             parents: [],
             children: [],
           })),
+        };
+      },
+    },
+    cells: {
+      executeMdx: async (mdx: string) => {
+        // Extract cube name from `{[}PerfCubes].[}PerfCubes].[<name>]}`.
+        const m = mdx.match(/\.\[}PerfCubes]\.\[([^\]]+)]/);
+        if (!m) throw new Error(`fake executeMdx: cannot parse cube from MDX`);
+        const cubeName = m[1]!;
+        const stats = args.cubeStats?.[cubeName];
+        if (!stats) throw new Error(`fake executeMdx: }StatsByCube unavailable for ${cubeName}`);
+        const entries = Object.entries(stats);
+        return {
+          axes: [
+            { tuples: [] },
+            {
+              tuples: entries.map(([name]) => ({
+                members: [{ name }],
+              })),
+            },
+          ],
+          cells: entries.map(([, v]) => ({ value: v })),
         };
       },
     },
@@ -427,6 +451,125 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.scanned.feederLines).toBe(1);
     expect(out.invalidCount).toBe(1);
     expect(out.findings[0].rule).toBe("wildcard_bracket");
+  });
+
+  it("runtime mode flags cube_low_sparsity when populated/fed under threshold", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Sparse",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        Sparse: {
+          "Total Memory Used": 1_000_000,
+          "Number of Populated Numeric Cells": 5,
+          "Number of Fed Cells": 100_000,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.summary.byRule.cube_low_sparsity).toBe(1);
+    const ev = out.findings.find((f: { rule: string }) => f.rule === "cube_low_sparsity");
+    expect(ev.severity).toBe("evidence");
+    expect(out.runtimeStats.Sparse.sparsity).toBeLessThan(0.01);
+  });
+
+  it("runtime mode flags cube_high_memory above threshold", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Heavy",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        Heavy: {
+          "Total Memory Used": 2 * 1024 * 1024 * 1024, // 2 GiB
+          "Number of Populated Numeric Cells": 100,
+          "Number of Fed Cells": 100,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.summary.byRule.cube_high_memory).toBe(1);
+    expect(out.runtimeStats.Heavy.memoryMb).toBeGreaterThan(1024);
+  });
+
+  it("mode both escalates static findings on cubes with runtime evidence", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Wild",
+          rulesText: ["skipcheck;", "['A','B'] = N: 1;", "feeders;", "[] => ['B'];"].join("\n"),
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        Wild: {
+          "Total Memory Used": 1_000_000,
+          "Number of Populated Numeric Cells": 1,
+          "Number of Fed Cells": 1_000_000,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "both" }));
+    // Wildcard finding plus cube_low_sparsity. Both severity = evidence.
+    const wildcard = out.findings.find((f: { rule: string }) => f.rule === "wildcard_bracket");
+    expect(wildcard.severity).toBe("evidence");
+    expect(out.summary.bySeverity.evidence).toBeGreaterThanOrEqual(2);
+  });
+
+  it("runtime mode degrades gracefully when }StatsByCube fetch fails", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "NoStats",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      // cubeStats intentionally omitted → executeMdx throws.
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.scanned.runtimeFailures).toBe(1);
+    expect(out.runtimeStats.NoStats.available).toBe(false);
+    expect(out.summary.byRule.cube_low_sparsity).toBe(0);
+    expect(out.summary.byRule.cube_high_memory).toBe(0);
+  });
+
+  it("default mode static does not call }StatsByCube", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Plain",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      // No cubeStats: would throw if called.
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.mode).toBe("static");
+    expect(out.runtimeStats).toBeUndefined();
   });
 
   it("uses positional element bag for orphan detection (real feeder style)", async () => {

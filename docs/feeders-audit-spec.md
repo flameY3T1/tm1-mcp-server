@@ -136,20 +136,30 @@ it that erroneously.
 
 ## Runtime evidence (mode: "runtime" / "both")
 
-One MDX against `}StatsByCube` per scan (not per cube). Returns:
+Shipped 2026-05-19. One `}StatsByCube` MDX per scanned cube, run in parallel
+via `Promise.allSettled`. Reuses the fetcher at `src/lib/cube-stats/fetcher.ts`
+shared with `tm1_get_cube_stats`.
 
-| Measure | Reading |
-|---|---|
-| `totalMemoryBytes` | RAM footprint per cube → top-N flag |
-| `populated cell count` | actual non-empty cells |
-| `fed cell count` | cells the feeder graph has marked |
-| `sparsity = populated / fed` | <X% → `evidence` for overfeeding |
+| Measure                     | Reading                                                            | Default gate                           |
+|-----------------------------|--------------------------------------------------------------------|----------------------------------------|
+| `memoryTotal` / `memoryMb`  | RAM footprint per cube                                             | `cube_high_memory` when ≥ 1024 MB      |
+| `populatedNumeric`          | actual non-empty cells                                             | feeds sparsity                         |
+| `fedCells`                  | cells the feeder graph has marked                                  | feeds sparsity                         |
+| `sparsity = populated / fed`| share of fed cells that carry data                                 | `cube_low_sparsity` when `< 0.01`      |
 
-`}StatsByCube` not always present (depends on perf-monitor setup). Tool must:
-- detect cube absence and degrade gracefully (`runtimeStats: null`, message in output)
-- never fail the whole scan because runtime mode unavailable
+Findings: `cube_low_sparsity` and `cube_high_memory` carry severity
+`evidence`. Every existing static finding on the same cube is then
+escalated from `hint` to `evidence` in the response.
 
-Cube stats existing in this repo: `tm1_get_cube_stats`. Reuse the same service method to avoid duplicating the MDX.
+`}StatsByCube` is not always present (depends on perf-monitor setup). The
+tool degrades per-cube: a failed fetch records `available: false` and an
+`error` string under `runtimeStats[cubeName]`; the scan continues. Static
+findings on the same cube remain at severity `hint`.
+
+Live test 2026-05-19 (7 cubes, mode `both`): 7/7 stats fetched, 1 cube
+flagged both `cube_low_sparsity` (0.47 %) and `cube_high_memory` (1.3 GiB)
+— the production cube `Cube_FP_alt` we already suspected from
+the S1/S2 static findings.
 
 ## Prerequisites (must build before tool ships)
 
@@ -181,7 +191,7 @@ Cube stats existing in this repo: `tm1_get_cube_stats`. Reuse the same service m
 | P1 | Static heuristics S4 + S6 (no REST lookups) | tool registers, returns findings on test server ✓ |
 | P2 | S1 (cube dim-order) + S2 (element-type cache) + S5 (cross-cube skipcheck) ✓ | C-level + DB-target-skipcheck + properly-gated breadth findings live |
 | P3 | S3 (`hasStet` + `hasIfGuard` AST extension) ✓ | conditional-rule findings live |
-| P4 | Runtime mode (`}StatsByCube` MDX + sparsity scoring) | runtime-evidence severity escalates findings |
+| P4 | Runtime mode (`}StatsByCube` MDX + sparsity scoring) ✓ | runtime-evidence severity escalates findings |
 | P5 | False-positive tuning on bigger model + doc update | tool documented, default `severityThreshold` calibrated |
 
 P0 + P1 = MVP shippable on its own. S1 moved from P1 to P2 after live-test

@@ -12,6 +12,11 @@ import {
   detectWildcardBracket,
 } from "../../lib/feeders/static-heuristics.js";
 import { ElementTypeCache } from "../../lib/feeders/element-type-cache.js";
+import {
+  computeSparsity,
+  fetchCubeStats,
+  type CubeStatsItem,
+} from "../../lib/cube-stats/fetcher.js";
 import { isControlName } from "../../lib/control-name.js";
 
 type FindingRule =
@@ -20,30 +25,46 @@ type FindingRule =
   | "feeder_broader_than_rule"
   | "missing_conditional_feeder"
   | "db_feeder_without_skipcheck"
-  | "orphan_feeder";
+  | "orphan_feeder"
+  | "cube_low_sparsity"
+  | "cube_high_memory";
+
+type Severity = "hint" | "evidence";
 
 interface Finding {
   cube: string;
   line: number;
-  severity: "hint";
+  severity: Severity;
   rule: FindingRule;
   feeder: string;
   detail?: string;
+}
+
+interface RuntimeStats {
+  available: boolean;
+  memoryTotal: number | null;
+  memoryMb: number | null;
+  fedCells: number | null;
+  populatedNumeric: number | null;
+  sparsity: number | null;
+  error?: string;
 }
 
 export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_feeders",
     [
-      "Bulk-scan cube rules for likely overfeeding patterns (P3: static",
-      "heuristics with REST-backed element-type lookups). Detects: wildcard",
-      "brackets (S4), feeders targeting consolidated elements (S2), feeders",
-      "broader than the cube's dim count (S1), unguarded feeders covering",
-      "STET/IF()-conditional rules (S3), DB() feeders into cubes without",
-      "`skipcheck;` (S5), and orphan feeders whose elements appear in zero",
-      "rule LHS (S6). Severity is always 'hint' — runtime evidence",
-      "(`}StatsByCube` sparsity + memory) lands in a later phase. Control",
-      "objects ('}'-prefix) excluded by default.",
+      "Bulk-scan cube rules for likely overfeeding patterns (P4). Static",
+      "heuristics S1–S6 detect wildcard brackets, feeders into consolidated",
+      "elements, feeders broader than the cube's dim count, unguarded",
+      "feeders over STET/IF()-conditional rules, DB() feeders into cubes",
+      "lacking `skipcheck;`, and orphan feeders. Runtime mode (`mode:",
+      "\"runtime\" | \"both\"`) layers `}StatsByCube` evidence on top:",
+      "cubes with sparsity below `sparsityThreshold` or memory above",
+      "`memoryThresholdMb` raise cube-level findings AND escalate existing",
+      "static findings on the same cube from severity `hint` → `evidence`.",
+      "Graceful degrade when `}StatsByCube` is absent. Control objects",
+      "('}'-prefix) excluded by default.",
     ].join(" "),
     {
       cubes: z
@@ -76,14 +97,44 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         .describe(
           "S1 broader-than-rule ratio gate: flag when (feederConstraintCount / cubeTotalDims) < this value. Default 0.5.",
         ),
+      mode: z
+        .enum(["static", "runtime", "both"])
+        .optional()
+        .default("static")
+        .describe(
+          "Static-only scan (default), runtime-only (}StatsByCube cube-level findings), or both (static + evidence escalation).",
+        ),
+      sparsityThreshold: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .default(0.01)
+        .describe(
+          "Runtime: flag cube when populatedNumeric / fedCells < this value. Default 0.01 (under 1 % of fed cells carry data).",
+        ),
+      memoryThresholdMb: z
+        .number()
+        .min(0)
+        .optional()
+        .default(1024)
+        .describe(
+          "Runtime: flag cube when memoryTotal (MB) ≥ this value. Default 1024 (1 GiB).",
+        ),
     },
-    async ({ cubes, topN, includeControl, s1MinPinnedRatio }) => {
+    async ({
+      cubes,
+      topN,
+      includeControl,
+      s1MinPinnedRatio,
+      mode,
+      sparsityThreshold,
+      memoryThresholdMb,
+    }) => {
       const serverInfo = await tm1Client.server.getInfo();
       const all = await tm1Client.cubes.getAllRules(includeControl);
       const targetSet = cubes && cubes.length > 0 ? new Set(cubes) : null;
 
-      // Pre-build skipcheck lookup from every cube's rules AST. Case-folding
-      // matches TM1 semantics (cube names compare case-insensitively).
       const skipcheckMap = new Map<string, boolean>();
       for (const c of all) {
         if (!c.rulesText) continue;
@@ -97,6 +148,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       const elementTypeCache = new ElementTypeCache(tm1Client.hierarchies);
 
       const findings: Finding[] = [];
+      const scannedCubeNames: string[] = [];
       let cubesScanned = 0;
       let feederLinesScanned = 0;
       let dimResolveFailures = 0;
@@ -105,6 +157,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         if (targetSet && !targetSet.has(c.cubeName)) continue;
         if (!includeControl && isControlName(c.cubeName)) continue;
         cubesScanned++;
+        scannedCubeNames.push(c.cubeName);
         if (!c.rulesText || c.rulesText.trim() === "") continue;
 
         const ast = parseRules(c.rulesText);
@@ -134,10 +187,6 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
           if (line.section !== "feeders") continue;
           if (line.isBlank || line.isComment) continue;
           if (/^feeders\s*;?\s*$/i.test(line.trimmed)) continue;
-          // Multi-line feeders put the `=>` and RHS on a continuation line.
-          // Treat such continuations as already-covered by the preceding
-          // feeder's LHS — skip them so we don't double-count or evaluate
-          // an RHS bracket as if it were the LHS.
           if (/^=>/.test(line.trimmed)) continue;
           const lists = extractBracketLists(line.trimmed);
           if (lists.length === 0) continue;
@@ -199,6 +248,92 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         }
       }
 
+      // ─── Runtime evidence (mode: runtime | both) ────────────────────────
+      const wantsRuntime = mode === "runtime" || mode === "both";
+      const runtimeStats: Record<string, RuntimeStats> = {};
+      let runtimeAvailableCount = 0;
+      let runtimeFailureCount = 0;
+
+      if (wantsRuntime && scannedCubeNames.length > 0) {
+        const settled = await Promise.allSettled(
+          scannedCubeNames.map((name) => fetchCubeStats(tm1Client, name)),
+        );
+        for (let i = 0; i < settled.length; i++) {
+          const cubeName = scannedCubeNames[i]!;
+          const r = settled[i]!;
+          if (r.status !== "fulfilled") {
+            runtimeFailureCount++;
+            runtimeStats[cubeName] = {
+              available: false,
+              memoryTotal: null,
+              memoryMb: null,
+              fedCells: null,
+              populatedNumeric: null,
+              sparsity: null,
+              error: String(r.reason),
+            };
+            continue;
+          }
+          const stats: CubeStatsItem = r.value;
+          const memoryTotal =
+            typeof stats.memoryTotal === "number" ? stats.memoryTotal : null;
+          const memoryMb =
+            memoryTotal !== null ? Number((memoryTotal / 1_048_576).toFixed(2)) : null;
+          const fedCells = typeof stats.fedCells === "number" ? stats.fedCells : null;
+          const populatedNumeric =
+            typeof stats.populatedNumeric === "number" ? stats.populatedNumeric : null;
+          const sparsity = computeSparsity(stats);
+          const stat: RuntimeStats = {
+            available: true,
+            memoryTotal,
+            memoryMb,
+            fedCells,
+            populatedNumeric,
+            sparsity,
+          };
+          runtimeStats[cubeName] = stat;
+          runtimeAvailableCount++;
+
+          // Cube-level findings (severity: evidence).
+          if (sparsity !== null && sparsity < sparsityThreshold) {
+            findings.push({
+              cube: cubeName,
+              line: 0,
+              severity: "evidence",
+              rule: "cube_low_sparsity",
+              feeder: "",
+              detail: `sparsity=${sparsity.toFixed(4)} (populated ${populatedNumeric ?? "?"} / fed ${fedCells ?? "?"})`,
+            });
+          }
+          if (memoryMb !== null && memoryMb >= memoryThresholdMb) {
+            findings.push({
+              cube: cubeName,
+              line: 0,
+              severity: "evidence",
+              rule: "cube_high_memory",
+              feeder: "",
+              detail: `${memoryMb} MB`,
+            });
+          }
+        }
+
+        // Escalate static findings on cubes with runtime evidence.
+        const evidenceCubes = new Set<string>();
+        for (const f of findings) {
+          if (
+            f.severity === "evidence" &&
+            (f.rule === "cube_low_sparsity" || f.rule === "cube_high_memory")
+          ) {
+            evidenceCubes.add(f.cube);
+          }
+        }
+        for (const f of findings) {
+          if (f.severity === "hint" && evidenceCubes.has(f.cube)) {
+            f.severity = "evidence";
+          }
+        }
+      }
+
       const byRule: Record<FindingRule, number> = {
         wildcard_bracket: 0,
         feeder_to_consolidated: 0,
@@ -206,10 +341,14 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         missing_conditional_feeder: 0,
         db_feeder_without_skipcheck: 0,
         orphan_feeder: 0,
+        cube_low_sparsity: 0,
+        cube_high_memory: 0,
       };
+      const bySeverity: Record<Severity, number> = { hint: 0, evidence: 0 };
       const byCube: Record<string, number> = {};
       for (const f of findings) {
         byRule[f.rule]++;
+        bySeverity[f.severity]++;
         byCube[f.cube] = (byCube[f.cube] ?? 0) + 1;
       }
 
@@ -232,22 +371,28 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
               {
                 status,
                 productVersion: serverInfo.productVersion,
-                mode: "static",
+                mode,
                 includeControl,
                 s1MinPinnedRatio,
+                sparsityThreshold,
+                memoryThresholdMb,
                 scanned: {
                   cubes: cubesScanned,
                   feederLines: feederLinesScanned,
                   dimResolveFailures,
+                  runtimeAvailable: runtimeAvailableCount,
+                  runtimeFailures: runtimeFailureCount,
                 },
                 invalidCount: findings.length,
-                summary: { byRule, byCube },
+                summary: { byRule, bySeverity, byCube },
                 truncated: { findings: truncated },
                 findings: trimmed,
+                runtimeStats: wantsRuntime ? runtimeStats : undefined,
                 rulesetSource:
                   "Static heuristics S1 (feeder_broader_than_rule), S2 (feeder_to_consolidated), " +
                   "S3 (missing_conditional_feeder), S4 (wildcard_bracket), " +
                   "S5 (db_feeder_without_skipcheck), S6 (orphan_feeder). " +
+                  "Runtime evidence: cube_low_sparsity + cube_high_memory via }StatsByCube. " +
                   "See docs/feeders-audit-spec.md.",
               },
               null,
