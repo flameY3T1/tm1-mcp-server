@@ -145,7 +145,7 @@ shared with `tm1_get_cube_stats`.
 | `memoryTotal` / `memoryMb`  | RAM footprint per cube                                             | `cube_high_memory` when ≥ 1024 MB      |
 | `populatedNumeric`          | actual non-empty cells                                             | feeds sparsity                         |
 | `fedCells`                  | cells the feeder graph has marked                                  | feeds sparsity                         |
-| `sparsity = populated / fed`| share of fed cells that carry data                                 | `cube_low_sparsity` when `< 0.01`      |
+| `sparsity = populated / fed`| share of fed cells that carry data                                 | `cube_low_sparsity` when `< 0.10` (default; tune via `sparsityThreshold`) |
 
 Findings: `cube_low_sparsity` and `cube_high_memory` carry severity
 `evidence`. Every existing static finding on the same cube is then

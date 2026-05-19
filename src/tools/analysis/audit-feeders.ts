@@ -109,9 +109,9 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         .min(0)
         .max(1)
         .optional()
-        .default(0.01)
+        .default(0.10)
         .describe(
-          "Runtime: flag cube when populatedNumeric / fedCells < this value. Default 0.01 (under 1 % of fed cells carry data).",
+          "Runtime: flag cube when populatedNumeric / fedCells < this value. Default 0.10 (under 10 % of fed cells carry data — typical factor-10x overfeeding threshold). Lower (e.g. 0.01) for stricter audits that only flag extreme cases; raise (e.g. 0.20) to catch milder overfeeding.",
         ),
       memoryThresholdMb: z
         .number()

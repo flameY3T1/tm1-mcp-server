@@ -576,6 +576,35 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.runtimeStats.Sparse.sparsity).toBeLessThan(0.01);
   });
 
+  it("default sparsityThreshold (0.10) flags ~9% sparsity overfeeding cube", async () => {
+    // Real-world case: overfed-cube had 167M fed vs 15M populated
+    // (~9.3% sparsity) — a clear factor-10x overfeeding hotspot that the
+    // old 0.01 default missed entirely.
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Cube_Personnel",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        Cube_Personnel: {
+          "Total Memory Used": 1_000_000,
+          "Number of Populated Numeric Cells": 15_000_000,
+          "Number of Fed Cells": 167_000_000,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.summary.byRule.cube_low_sparsity).toBe(1);
+    expect(out.runtimeStats.Cube_Personnel.sparsity).toBeGreaterThan(0.05);
+    expect(out.runtimeStats.Cube_Personnel.sparsity).toBeLessThan(0.10);
+  });
+
   it("runtime mode flags cube_high_memory above threshold", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
