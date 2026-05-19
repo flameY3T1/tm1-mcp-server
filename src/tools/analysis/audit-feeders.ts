@@ -4,18 +4,21 @@ import type { TM1Client } from "../../tm1-client.js";
 import { parseRules } from "../../lib/callgraph/rulesParser.js";
 import { extractBracketLists } from "../../lib/feeders/brackets.js";
 import {
+  detectBroaderThanRule,
+  detectDbFeederWithoutSkipcheck,
+  detectFeederToConsolidated,
   detectOrphanFeeder,
   detectWildcardBracket,
 } from "../../lib/feeders/static-heuristics.js";
+import { ElementTypeCache } from "../../lib/feeders/element-type-cache.js";
 import { isControlName } from "../../lib/control-name.js";
 
-// NOTE: S1 (feeder_broader_than_rule) intentionally deferred to P2.
-// detectBroaderThanRule is exported from static-heuristics for future use
-// but is NOT wired into this MVP. The first live-run on a v11 production
-// model surfaced 91 % false positives because the entry-count comparison
-// is too crude without cube dimension-order resolution (REST lookup). S1
-// re-lands once the dim-order resolver ships.
-type FindingRule = "wildcard_bracket" | "orphan_feeder";
+type FindingRule =
+  | "wildcard_bracket"
+  | "feeder_to_consolidated"
+  | "feeder_broader_than_rule"
+  | "db_feeder_without_skipcheck"
+  | "orphan_feeder";
 
 interface Finding {
   cube: string;
@@ -23,21 +26,21 @@ interface Finding {
   severity: "hint";
   rule: FindingRule;
   feeder: string;
+  detail?: string;
 }
 
 export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_feeders",
     [
-      "Bulk-scan cube rules for likely overfeeding patterns (P1 MVP, static",
-      "only — no REST element-type lookups yet). Detects: wildcard feeder",
-      "brackets (no concrete elements) and orphan feeders whose elements",
-      "appear in zero rule LHS. Severity is always 'hint' at this stage;",
-      "runtime evidence (}StatsByCube sparsity + memory) lands in a later",
-      "phase. 'feeder_broader_than_rule' is intentionally deferred until",
-      "cube dimension-order resolution lands — early heuristic produced",
-      "91 % false positives on positional-feeder-heavy production cubes.",
-      "Control objects ('}'-prefix) excluded by default.",
+      "Bulk-scan cube rules for likely overfeeding patterns (P2: static",
+      "heuristics with REST-backed element-type lookups). Detects: wildcard",
+      "brackets (S4), feeders targeting consolidated elements (S2), feeders",
+      "broader than the cube's dim count (S1), DB() feeders into cubes",
+      "without `skipcheck;` (S5), and orphan feeders whose elements appear",
+      "in zero rule LHS (S6). Severity is always 'hint' — runtime evidence",
+      "(`}StatsByCube` sparsity + memory) lands in a later phase. Control",
+      "objects ('}'-prefix) excluded by default.",
     ].join(" "),
     {
       cubes: z
@@ -61,15 +64,39 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(false)
         .describe("Include control objects ('}'-prefix). Default false."),
+      s1MinPinnedRatio: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .default(0.5)
+        .describe(
+          "S1 broader-than-rule ratio gate: flag when (feederConstraintCount / cubeTotalDims) < this value. Default 0.5.",
+        ),
     },
-    async ({ cubes, topN, includeControl }) => {
+    async ({ cubes, topN, includeControl, s1MinPinnedRatio }) => {
       const serverInfo = await tm1Client.server.getInfo();
       const all = await tm1Client.cubes.getAllRules(includeControl);
       const targetSet = cubes && cubes.length > 0 ? new Set(cubes) : null;
 
+      // Pre-build skipcheck lookup from every cube's rules AST. Case-folding
+      // matches TM1 semantics (cube names compare case-insensitively).
+      const skipcheckMap = new Map<string, boolean>();
+      for (const c of all) {
+        if (!c.rulesText) continue;
+        skipcheckMap.set(c.cubeName.toLowerCase(), parseRules(c.rulesText).hasSkipcheck);
+      }
+      const lookupSkipcheck = (cubeName: string): boolean | null => {
+        const v = skipcheckMap.get(cubeName.toLowerCase());
+        return v === undefined ? null : v;
+      };
+
+      const elementTypeCache = new ElementTypeCache(tm1Client.hierarchies);
+
       const findings: Finding[] = [];
       let cubesScanned = 0;
       let feederLinesScanned = 0;
+      let dimResolveFailures = 0;
 
       for (const c of all) {
         if (targetSet && !targetSet.has(c.cubeName)) continue;
@@ -78,6 +105,14 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         if (!c.rulesText || c.rulesText.trim() === "") continue;
 
         const ast = parseRules(c.rulesText);
+
+        let cubeDimNames: string[] = [];
+        try {
+          cubeDimNames = await tm1Client.cubes.getDimensionNames(c.cubeName);
+        } catch {
+          dimResolveFailures++;
+        }
+        const cubeDimCount = cubeDimNames.length;
 
         const ruleLhs = [];
         for (const line of ast.lines) {
@@ -101,23 +136,48 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
           feederLinesScanned++;
           const feederLhs = lists[0]!;
 
+          let lhsRuleHit: FindingRule | null = null;
+          let lhsDetail: string | undefined;
+
           if (detectWildcardBracket(feederLhs)) {
-            findings.push({
-              cube: c.cubeName,
-              line: line.lineIndex + 1,
-              severity: "hint",
-              rule: "wildcard_bracket",
-              feeder: line.trimmed,
-            });
-            continue;
+            lhsRuleHit = "wildcard_bracket";
+          } else {
+            const cons = await detectFeederToConsolidated(
+              feederLhs,
+              cubeDimNames,
+              elementTypeCache,
+            );
+            if (cons) {
+              lhsRuleHit = "feeder_to_consolidated";
+              lhsDetail = `${cons.dim}:${cons.elem}`;
+            } else if (detectBroaderThanRule(feederLhs, cubeDimCount, s1MinPinnedRatio)) {
+              lhsRuleHit = "feeder_broader_than_rule";
+              lhsDetail = `pins ${feederLhs.entries.length}/${cubeDimCount} dims`;
+            } else if (detectOrphanFeeder(feederLhs, ruleLhs)) {
+              lhsRuleHit = "orphan_feeder";
+            }
           }
-          if (detectOrphanFeeder(feederLhs, ruleLhs)) {
+
+          if (lhsRuleHit) {
             findings.push({
               cube: c.cubeName,
               line: line.lineIndex + 1,
               severity: "hint",
-              rule: "orphan_feeder",
+              rule: lhsRuleHit,
               feeder: line.trimmed,
+              ...(lhsDetail !== undefined ? { detail: lhsDetail } : {}),
+            });
+          }
+
+          const dbTarget = detectDbFeederWithoutSkipcheck(line.trimmed, lookupSkipcheck);
+          if (dbTarget) {
+            findings.push({
+              cube: c.cubeName,
+              line: line.lineIndex + 1,
+              severity: "hint",
+              rule: "db_feeder_without_skipcheck",
+              feeder: line.trimmed,
+              detail: dbTarget,
             });
           }
         }
@@ -125,6 +185,9 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
 
       const byRule: Record<FindingRule, number> = {
         wildcard_bracket: 0,
+        feeder_to_consolidated: 0,
+        feeder_broader_than_rule: 0,
+        db_feeder_without_skipcheck: 0,
         orphan_feeder: 0,
       };
       const byCube: Record<string, number> = {};
@@ -154,17 +217,20 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 productVersion: serverInfo.productVersion,
                 mode: "static",
                 includeControl,
+                s1MinPinnedRatio,
                 scanned: {
                   cubes: cubesScanned,
                   feederLines: feederLinesScanned,
+                  dimResolveFailures,
                 },
                 invalidCount: findings.length,
                 summary: { byRule, byCube },
                 truncated: { findings: truncated },
                 findings: trimmed,
                 rulesetSource:
-                  "Static heuristics S4 (wildcard_bracket) + S6 (orphan_feeder). " +
-                  "S1 (feeder_broader_than_rule) deferred to P2 — see docs/feeders-audit-spec.md.",
+                  "Static heuristics S1 (feeder_broader_than_rule), S2 (feeder_to_consolidated), " +
+                  "S4 (wildcard_bracket), S5 (db_feeder_without_skipcheck), S6 (orphan_feeder). " +
+                  "See docs/feeders-audit-spec.md.",
               },
               null,
               2,

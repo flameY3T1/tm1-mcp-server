@@ -78,17 +78,22 @@ Output schema (sketch):
 
 ## Static heuristics (mode: "static")
 
-### S1 · Feeder broader than rule (most common) — **deferred to P2**
+### S1 · Feeder broader than rule (most common)
 
-Initial implementation compared entry counts against the densest overlapping
-rule LHS; live-test on a v11 production cube on 2026-05-18 produced 91 %
-false positives because rules routinely pin more dims (qualified syntax)
-than the cube actually has, while feeders use positional shorthand. The
-proxy collapses without cube dimension-order resolution — the function
-`detectBroaderThanRule` remains exported for unit tests, but is unwired
-from the tool until P2 ships an `Elements?$select=Type` + dim-order
-resolver. After that lands, S1 compares against (total cube dims minus
-constraints pinned in feeder LHS) instead of guessing from entry counts.
+Each bracket entry — positional, qualified, or set-form — pins exactly one
+dimension. S1 compares `cubeTotalDims` (from the dim-order resolver) with
+`feeder.entries.length` and flags when the **pinned ratio**
+`feeder.entries.length / cubeTotalDims < s1MinPinnedRatio` (default `0.5`).
+
+Ratio gate (not absolute) is required to scale across cube widths:
+
+| 2026-05-18 (P1, entry-count vs densest rule)       | 91 % false positives |
+| 2026-05-19 (P2 a, absolute threshold = 2 unpinned) | 98 % false positives |
+| 2026-05-19 (P2 b, ratio < 0.5)                     | accepted             |
+
+On 13-dim cubes, positional feeders idiomatically pin 7–8 dims because TM1
+fills the unpinned positions with default members; flagging every such
+feeder drowns out the genuinely-too-broad ones.
 
 ### S2 · Feeder targets Consolidated element
 
@@ -174,14 +179,16 @@ Cube stats existing in this repo: `tm1_get_cube_stats`. Reuse the same service m
 |---|---|---|
 | P0 | Positional bracket parser + tests | parser handles ≥95 % of feeder lines from probe rerun ✓ (95.08 %) |
 | P1 | Static heuristics S4 + S6 (no REST lookups) | tool registers, returns findings on test server ✓ |
-| P2 | S1 (with cube dim-order) + S2 + S5 (element-type cache) | C-level + DB-target-skipcheck + properly-gated breadth findings live |
+| P2 | S1 (cube dim-order) + S2 (element-type cache) + S5 (cross-cube skipcheck) ✓ | C-level + DB-target-skipcheck + properly-gated breadth findings live |
 | P3 | S3 (requires `hasStet` + `hasIfGuard` AST extension) | conditional-rule findings live |
 | P4 | Runtime mode (`}StatsByCube` MDX + sparsity scoring) | runtime-evidence severity escalates findings |
 | P5 | False-positive tuning on bigger model + doc update | tool documented, default `severityThreshold` calibrated |
 
 P0 + P1 = MVP shippable on its own. S1 moved from P1 to P2 after live-test
 on 2026-05-18 showed the entry-count proxy was unreliable; resolving cube
-dim count is a prerequisite (one REST call per cube — cheap).
+dim count is a prerequisite (one REST call per cube — cheap). P2 shipped
+2026-05-19 with the dim-order resolver, `ElementTypeCache`, and a
+cross-cube skipcheck lookup pre-built from every cube's rules AST.
 
 ## Out of scope (later, separate tools)
 

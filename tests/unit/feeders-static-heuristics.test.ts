@@ -31,52 +31,48 @@ describe("detectWildcardBracket — S4", () => {
   });
 });
 
-describe("detectBroaderThanRule — S1", () => {
-  it("flags feeder with strictly fewer constraints than the rule it covers", () => {
-    const ruleLhs = [lhs("['A','B','C','D','E']")];
+describe("detectBroaderThanRule — S1 (ratio-based)", () => {
+  it("flags feeder pinning under half of cube dims (default ratio 0.5)", () => {
     const feeder = lhs("['A','B']");
-    expect(detectBroaderThanRule(feeder, ruleLhs)).toBe(true);
+    expect(detectBroaderThanRule(feeder, 7)).toBe(true); // 2/7 ≈ 0.286 < 0.5
   });
 
-  it("does not flag feeder with same number of constraints as the rule", () => {
-    const ruleLhs = [lhs("['A','B','C']")];
+  it("does not flag feeder pinning all cube dims", () => {
+    const feeder = lhs("['A','B','C','D','E']");
+    expect(detectBroaderThanRule(feeder, 5)).toBe(false);
+  });
+
+  it("does not flag wide-cube positional feeder hitting half (13-dim live test)", () => {
+    const feeder = lhs("['A','B','C','D','E','F','G']"); // 7 pinned
+    expect(detectBroaderThanRule(feeder, 13)).toBe(false); // 7/13 ≈ 0.538 ≥ 0.5
+  });
+
+  it("flags wide-cube positional feeder just under half", () => {
+    const feeder = lhs("['A','B','C','D','E','F']"); // 6 pinned
+    expect(detectBroaderThanRule(feeder, 13)).toBe(true); // 6/13 ≈ 0.462 < 0.5
+  });
+
+  it("respects custom ratio", () => {
     const feeder = lhs("['A','B','C']");
-    expect(detectBroaderThanRule(feeder, ruleLhs)).toBe(false);
+    // 3/5 = 0.6
+    expect(detectBroaderThanRule(feeder, 5, 0.5)).toBe(false);
+    expect(detectBroaderThanRule(feeder, 5, 0.7)).toBe(true);
   });
 
-  it("does not flag feeder with MORE constraints than the rule", () => {
-    const ruleLhs = [lhs("['A','B']")];
-    const feeder = lhs("['A','B','C','D']");
-    expect(detectBroaderThanRule(feeder, ruleLhs)).toBe(false);
+  it("returns false on empty bracket (S4 territory)", () => {
+    const feeder = lhs("[]");
+    expect(detectBroaderThanRule(feeder, 5)).toBe(false);
   });
 
-  it("uses the densest rule as comparison baseline", () => {
-    const ruleLhs = [lhs("['A','B']"), lhs("['A','B','C','D','E']")];
+  it("returns false when cubeTotalDims is zero or negative (resolver failure)", () => {
     const feeder = lhs("['A','B']");
-    expect(detectBroaderThanRule(feeder, ruleLhs)).toBe(true);
+    expect(detectBroaderThanRule(feeder, 0)).toBe(false);
+    expect(detectBroaderThanRule(feeder, -1)).toBe(false);
   });
 
-  it("returns false when no rules exist (cube has feeders without rules)", () => {
-    const feeder = lhs("['A','B']");
-    expect(detectBroaderThanRule(feeder, [])).toBe(false);
-  });
-
-  it("ignores rules that share no element with the feeder (different cell-space)", () => {
-    const ruleLhs = [lhs("['X','Y','Z','W','V']")];
-    const feeder = lhs("['A','B']");
-    // No overlap → S6 / orphan concern, not S1. Suppresses ~91 % live-test noise.
-    expect(detectBroaderThanRule(feeder, ruleLhs)).toBe(false);
-  });
-
-  it("uses the densest OVERLAPPING rule, not the absolute densest", () => {
-    const ruleLhs = [
-      lhs("['X','Y','Z','W','V','U','T']"), // 7 entries, zero overlap
-      lhs("['A','B','C']"), // 3 entries, overlaps on A
-    ];
-    const feeder = lhs("['A']");
-    // Only the 3-entry rule overlaps; feeder=1 < 3 → flag. The 7-entry rule
-    // is ignored because it targets a different cell-space.
-    expect(detectBroaderThanRule(feeder, ruleLhs)).toBe(true);
+  it("does not flag feeder pinning MORE entries than cube has dims (malformed/safer to ignore)", () => {
+    const feeder = lhs("['A','B','C','D','E','F']");
+    expect(detectBroaderThanRule(feeder, 4)).toBe(false);
   });
 });
 

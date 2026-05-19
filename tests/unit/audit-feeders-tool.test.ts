@@ -35,6 +35,10 @@ function makeFakeServer() {
 interface FakeArgs {
   productVersion: string;
   rules?: Array<{ cubeName: string; rulesText: string; skipCheck: boolean }>;
+  /** Map of cubeName -> ordered dimension names. Missing entry => getDimensionNames throws. */
+  dims?: Record<string, string[]>;
+  /** Map of "dim|hierarchy" -> { elemName: type } for the element-type cache. */
+  elements?: Record<string, Record<string, "Numeric" | "Consolidated" | "String">>;
 }
 
 function makeFakeTM1Client(args: FakeArgs) {
@@ -45,6 +49,28 @@ function makeFakeTM1Client(args: FakeArgs) {
       getAllRules: async (includeControl = false) => {
         const all = args.rules ?? [];
         return includeControl ? all : all.filter((r) => !isControl(r.cubeName));
+      },
+      getDimensionNames: async (cubeName: string) => {
+        const dims = args.dims?.[cubeName];
+        if (!dims) throw new Error(`no dims for ${cubeName}`);
+        return dims;
+      },
+    },
+    hierarchies: {
+      get: async (dim: string, hier: string) => {
+        const key = `${dim}|${hier}`;
+        const elems = args.elements?.[key] ?? {};
+        return {
+          name: hier,
+          dimensionName: dim,
+          elements: Object.entries(elems).map(([name, type]) => ({
+            name,
+            type,
+            level: 0,
+            parents: [],
+            children: [],
+          })),
+        };
       },
     },
   } as unknown as Parameters<typeof registerAuditFeeders>[1];
@@ -76,10 +102,7 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.invalidCount).toBe(0);
   });
 
-  it("does NOT flag feeder_broader_than_rule (S1 deferred to P2)", async () => {
-    // S1 produced 91 % false positives on the live test server; rule has
-    // 5 entries, feeder has 2, but P1 ships only S4 + S6. Once cube dim-
-    // order resolution lands in P2, S1 re-activates.
+  it("degrades S1 gracefully when cube dim-order resolver fails (zero S1 findings)", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
@@ -98,8 +121,120 @@ describe("tm1_audit_feeders tool", () => {
     });
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({}));
-    expect(out.summary.byRule.feeder_broader_than_rule).toBeUndefined();
+    expect(out.summary.byRule.feeder_broader_than_rule).toBe(0);
+    expect(out.scanned.dimResolveFailures).toBe(1);
     expect(out.status).toBe("pass");
+  });
+
+  it("flags feeder_broader_than_rule (S1) when cube has more dims than feeder pins", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      dims: { Sales: ["D1", "D2", "D3", "D4", "D5"] },
+      rules: [
+        {
+          cubeName: "Sales",
+          rulesText: [
+            "skipcheck;",
+            "['A','B','C','D','E'] = N: 1;",
+            "feeders;",
+            "['A','B'] => ['E'];",
+          ].join("\n"),
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.feeder_broader_than_rule).toBe(1);
+    expect(out.findings[0].rule).toBe("feeder_broader_than_rule");
+    expect(out.findings[0].detail).toBe("pins 2/5 dims");
+  });
+
+  it("flags db_feeder_without_skipcheck (S5) on DB() target lacking skipcheck", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Source",
+          rulesText: [
+            "skipcheck;",
+            "['A'] = N: 1;",
+            "feeders;",
+            "['A'] => DB('Target', 'X', 'Y');",
+          ].join("\n"),
+          skipCheck: true,
+        },
+        {
+          cubeName: "Target",
+          rulesText: "['X','Y'] = N: 1;",
+          skipCheck: false,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.db_feeder_without_skipcheck).toBe(1);
+    const f = out.findings.find(
+      (x: { rule: string }) => x.rule === "db_feeder_without_skipcheck",
+    );
+    expect(f.detail).toBe("Target");
+  });
+
+  it("does not flag db_feeder_without_skipcheck when target has skipcheck", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Source",
+          rulesText: [
+            "skipcheck;",
+            "['A'] = N: 1;",
+            "feeders;",
+            "['A'] => DB('Target', 'X', 'Y');",
+          ].join("\n"),
+          skipCheck: true,
+        },
+        {
+          cubeName: "Target",
+          rulesText: "skipcheck;\n['X','Y'] = N: 1;",
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.db_feeder_without_skipcheck).toBe(0);
+  });
+
+  it("flags feeder_to_consolidated (S2) on consolidated LHS element", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      dims: { Sales: ["Region"] },
+      elements: {
+        "Region|Region": { Total: "Consolidated", DE: "Numeric" },
+      },
+      rules: [
+        {
+          cubeName: "Sales",
+          rulesText: [
+            "skipcheck;",
+            "['DE'] = N: 1;",
+            "feeders;",
+            "['Total'] => ['DE'];",
+          ].join("\n"),
+          skipCheck: true,
+        },
+      ],
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.summary.byRule.feeder_to_consolidated).toBe(1);
+    expect(out.findings[0].rule).toBe("feeder_to_consolidated");
+    expect(out.findings[0].detail).toBe("Region:Total");
   });
 
   it("flags orphan feeders whose elements don't appear in any rule (S6)", async () => {
