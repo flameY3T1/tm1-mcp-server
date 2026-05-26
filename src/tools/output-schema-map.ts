@@ -271,8 +271,4 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_unload_cube: asOutputSchema(MutationResultSchema),
   tm1_update_chore: asOutputSchema(MutationResultSchema),
   tm1_update_client: asOutputSchema(MutationResultSchema),
-
-  // ── Intentionally NOT mapped ──────────────────────────────────────────────
-  // tm1_get_knowledge returns raw markdown article text, not structured JSON.
-  // No outputSchema applies; the Proxy passes through `content[0].text` as-is.
 };

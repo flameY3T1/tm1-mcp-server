@@ -1,9 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../tm1-client.js";
 
-// Knowledge base
-import { registerGetKnowledge } from "./knowledge/get-knowledge.js";
-
 // Metadata tools
 import { registerListCubes } from "./metadata/list-cubes.js";
 import { registerListDimensions } from "./metadata/list-dimensions.js";
@@ -266,7 +263,4 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerListGroups(server, tm1Client);
   registerAssignClientGroup(server, tm1Client);
   registerRemoveClientGroup(server, tm1Client);
-
-  // Knowledge base
-  registerGetKnowledge(server);
 }

@@ -85,10 +85,6 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_get_cube_stats: READ_ONLY,
   tm1_unload_cube: DESTRUCTIVE,
   tm1_set_cube_rules: IDEMPOTENT_WRITE,
-  // tm1_get_knowledge returns plain markdown text (article content) so
-  // no entry in OUTPUT_SCHEMA_MAP — text passthrough is sufficient and
-  // wrapping in JSON would degrade the client-side rendering experience.
-  tm1_get_knowledge: READ_ONLY,
 
   // operations
   tm1_diagnose_process_error: READ_ONLY,
