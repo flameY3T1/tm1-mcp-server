@@ -26,7 +26,7 @@ Endpoints für read-only Daten und Workflow-Templates.
 | Konflikt | Vorschlag |
 |---|---|
 | `tm1_resolve_default_member` (1x) + `_members` (1–64) | Singular droppen — Plural akzeptiert N=1 |
-| `tm1_list_processes` + `_grouped` | `groupBy?` Param auf `list_processes`, `_grouped` droppen |
+| ~~`tm1_list_processes` + `_grouped`~~ | ~~Merge via `groupBy?` Param~~ — **verworfen**, beide behalten (siehe §7) |
 | `tm1_get_process_variables` / `update_process_variables` | droppen — selten ohne Code-Update gebraucht; `upsert_process` deckt Bundle |
 | `tm1_get_process_parameters` / `update_process_parameters` | droppen — gleicher Grund |
 | `tm1_get_cube_rules` vs `get_all_cube_rules` | beide behalten (Single-Object vs Map-Return verschieden) |
@@ -49,12 +49,12 @@ Netto: 6 Tools weg ohne Funktionsverlust.
 ## 3) 🔴 DROP — komplett raus
 
 - `tm1_resolve_default_member` (durch Plural)
-- `tm1_list_processes_grouped` (in `list_processes` als Param)
+- ~~`tm1_list_processes_grouped`~~ — **verworfen**, beide behalten (siehe §7)
 - `tm1_get_process_variables` / `_parameters` (4 Tools — selten atomar)
 - `tm1_check_v12_readiness` (→ Skill `tm1-v12-migration`)
-- `tm1_get_knowledge` — **ersatzlos**, Skill `tm1-knowledge` deckt bereits ab, basiert auf gleichem Inhalt
+- `tm1_get_knowledge` — **ersatzlos**, Skill `tm1-knowledge` deckt bereits ab (✅ umgesetzt 2026-05-26, commit be5cbe7)
 
-Netto: ~8 Tools weniger → 97. Plus 2 neue Skills (`tm1-v12-migration`, `tm1-deploy-pro`).
+Netto: ~7 Tools weniger → 100. Plus 2 neue Skills (`tm1-v12-migration`, `tm1-deploy-pro`).
 
 ---
 
@@ -74,7 +74,7 @@ Atomar + einzigartig:
 
 ## 5) Empfohlene Reihenfolge
 
-1. **Phase 1 (klein, sofort):** Singular `resolve_default_member`, `list_processes_grouped`, 4× variables/parameters, `tm1_get_knowledge` → 7 Tools weg
+1. **Phase 1 (klein, sofort):** Singular `resolve_default_member`, 4× variables/parameters, `tm1_get_knowledge` (✅ erledigt) → 6 Tools weg
 2. **Phase 2:** `tm1-v12-migration` Skill bauen → `check_v12_readiness` Tool droppen
 3. **Phase 3:** `tm1-deploy-pro` Skill als Workflow-Composer für `.pro`-Lifecycle
 
@@ -95,7 +95,29 @@ LLM priorisiert besser wenn Frequenz explizit.
 
 Entscheidungen aus User-Review:
 
-- [x] `tm1_get_knowledge` → **ersatzlos droppen** (Skill `tm1-knowledge` existiert bereits, basiert auf gleichem Inhalt; kein Fallback für Nicht-Claude-Clients nötig)
+- [x] `tm1_get_knowledge` → **ersatzlos droppen** (Skill `tm1-knowledge` existiert bereits, basiert auf gleichem Inhalt; kein Fallback für Nicht-Claude-Clients nötig). Umgesetzt 2026-05-26, commit `be5cbe7`. Bundle `knowledge/` + `package.json files`-Eintrag ebenfalls entfernt.
+
+- [x] `tm1_list_processes_grouped` → **NICHT mergen, beide behalten**
+
+  **Begründung — Output-Shapes divergieren strukturell:**
+
+  | | `list_processes` (flat) | `list_processes_grouped` |
+  |---|---|---|
+  | Response | `{total, count, offset, has_more, next_offset, items[]}` Pagination-Envelope | `{totalProcesses, groupCount, prefixSegments, groups[]}` ohne Pagination |
+  | Row-Shape | `{name, parameters?}` | `{prefix, count, processes?}` |
+  | Filter | `nameContains`, `nameRegex`, `nameNotContains`, `excludePattern` | nur `excludePattern` |
+  | Projection | `fields=['name']` für skinny payload | n/a |
+  | Pagination | `limit/offset/fetchAll` | komplett nicht (groups bleiben klein) |
+
+  Merge über `groupBy?`-Param würde **conditional return type** erzwingen:
+  - `output-schema-map.ts` müsste `z.union` registrieren → Caller muss
+    `if (response.items) … else …` discriminieren
+  - Output-Validierung wird unklarer (discriminated union statt einfache Shape)
+  - Filter-Semantik divergiert (grouped pre-filtert vor Aggregation, flat
+    post-filtert pro Page)
+
+  Sauberer Output-Contract pro Tool > Tool-Count-Einsparung. Vergleichbarer
+  Trade-off wie bei `get_cube_rules` vs `get_all_cube_rules` (auch beide behalten).
 
 Noch offen:
 - [ ] _ggf. weitere Punkte_
