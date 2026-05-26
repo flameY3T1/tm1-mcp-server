@@ -118,19 +118,19 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       if (parsed.parameters.length > 0) {
         await withToolHint(
           tm1Client.processes.updateParameters(processName, parsed.parameters),
-          `Parameter update failed for '${processName}'. Code applied but parameters missing. Inspect parsed parameters and call tm1_update_process_parameters directly to recover.`,
+          `Parameter update failed for '${processName}'. Code applied but parameters missing. Inspect parsed parameters and re-run tm1_upsert_process with mode=update + parameters=[...] to recover.`,
         );
       }
       if (parsed.variables.length > 0) {
         await withToolHint(
           tm1Client.processes.updateVariables(processName, parsed.variables),
-          `Variable update failed for '${processName}'. Code+parameters applied but variables missing. tm1_update_process_variables to recover.`,
+          `Variable update failed for '${processName}'. Code+parameters applied but variables missing. tm1_upsert_process with mode=update + variables=[...] to recover.`,
         );
       }
       if (parsed.dataSource.type !== "None") {
         await withToolHint(
           tm1Client.processes.updateDataSource(processName, parsed.dataSource),
-          `Datasource update failed for '${processName}' (type=${parsed.dataSource.type}). Code+params+vars applied. Verify datasource credentials/path (ASCII file existence, ODBC DSN, view name) and call tm1_update_process_datasource directly.`,
+          `Datasource update failed for '${processName}' (type=${parsed.dataSource.type}). Code+params+vars applied. Verify datasource credentials/path (ASCII file existence, ODBC DSN, view name) and re-run tm1_upsert_process with mode=update + dataSource={...} to recover.`,
         );
       }
 

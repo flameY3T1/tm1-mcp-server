@@ -24,14 +24,9 @@ import { registerWriteCells } from "./celldata/write-cells.js";
 // TI development tools (process CRUD, execution, code, params, datasource)
 import { registerExecuteProcess } from "./ti-development/execute-process.js";
 import { registerGetProcessParameters } from "./ti-development/get-process-parameters.js";
-import { registerCreateProcess } from "./ti-development/create-process.js";
 import { registerGetProcessCode } from "./ti-development/get-process-code.js";
-import { registerUpdateProcessCode } from "./ti-development/update-process-code.js";
 import { registerGetProcessDatasource } from "./ti-development/get-process-datasource.js";
-import { registerUpdateProcessDatasource } from "./ti-development/update-process-datasource.js";
-import { registerUpdateProcessParameters } from "./ti-development/update-process-parameters.js";
 import { registerGetProcessVariables } from "./ti-development/get-process-variables.js";
-import { registerUpdateProcessVariables } from "./ti-development/update-process-variables.js";
 import { registerDeleteProcess } from "./ti-development/delete-process.js";
 import { registerCopyProcess } from "./ti-development/copy-process.js";
 import { registerCompileProcess } from "./ti-development/compile-process.js";
@@ -156,15 +151,11 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerExecuteProcess(server, tm1Client);
   registerGetProcessParameters(server, tm1Client);
 
-  // TI development
-  registerCreateProcess(server, tm1Client);
+  // TI development — writes go through registerUpsertProcess (bundled),
+  // reads remain atomic for inspection without pulling full process code.
   registerGetProcessCode(server, tm1Client);
-  registerUpdateProcessCode(server, tm1Client);
   registerGetProcessDatasource(server, tm1Client);
-  registerUpdateProcessDatasource(server, tm1Client);
-  registerUpdateProcessParameters(server, tm1Client);
   registerGetProcessVariables(server, tm1Client);
-  registerUpdateProcessVariables(server, tm1Client);
   registerDeleteProcess(server, tm1Client);
   registerCopyProcess(server, tm1Client);
   registerCompileProcess(server, tm1Client);

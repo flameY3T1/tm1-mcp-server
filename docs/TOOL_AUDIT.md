@@ -2,9 +2,10 @@
 
 Stand: 2026-05-26. Diskussions-Entwurf — nicht alle Punkte sind beschlossen.
 
-**Scope:** 105 Tools über 13 Kategorien. Server hat zusätzlich MCP **Prompts**
-(`tm1_orientation`) + MCP **Resources** (`tm1://...` URIs) als alternative
-Endpoints für read-only Daten und Workflow-Templates.
+**Scope ursprünglich:** 105 Tools über 13 Kategorien.
+**Aktueller Stand:** 102 Tools über 12 Kategorien (nach Drops vom 2026-05-26).
+Server hat zusätzlich MCP **Prompts** (`tm1_orientation`) + MCP **Resources**
+(`tm1://...` URIs) als alternative Endpoints für read-only Daten und Workflow-Templates.
 
 ---
 
@@ -27,12 +28,11 @@ Endpoints für read-only Daten und Workflow-Templates.
 |---|---|
 | `tm1_resolve_default_member` (1x) + `_members` (1–64) | Singular droppen — Plural akzeptiert N=1 |
 | ~~`tm1_list_processes` + `_grouped`~~ | ~~Merge via `groupBy?` Param~~ — **verworfen**, beide behalten (siehe §7) |
-| `tm1_get_process_variables` / `update_process_variables` | droppen — selten ohne Code-Update gebraucht; `upsert_process` deckt Bundle |
-| `tm1_get_process_parameters` / `update_process_parameters` | droppen — gleicher Grund |
+| TI-Einzel-Tools vs. `upsert_process` (5 Tools: `create_process`, `update_process_code/parameters/variables/datasource`) | **Linie B umgesetzt** — alle 5 ersatzlos durch `upsert_process` abgedeckt (✅ 2026-05-26, siehe §7) |
 | `tm1_get_cube_rules` vs `get_all_cube_rules` | beide behalten (Single-Object vs Map-Return verschieden) |
 | `tm1_check_process_code` vs `compile_process` | beide behalten (lokal vs server-side, Beschreibung schärfen) |
 
-Netto: 6 Tools weg ohne Funktionsverlust.
+Netto: 5 Tools weg (Linie B). Resolve-Singular noch offen.
 
 ---
 
@@ -48,13 +48,15 @@ Netto: 6 Tools weg ohne Funktionsverlust.
 
 ## 3) 🔴 DROP — komplett raus
 
-- `tm1_resolve_default_member` (durch Plural)
+- `tm1_resolve_default_member` (durch Plural) — **noch offen**
 - ~~`tm1_list_processes_grouped`~~ — **verworfen**, beide behalten (siehe §7)
-- `tm1_get_process_variables` / `_parameters` (4 Tools — selten atomar)
-- `tm1_check_v12_readiness` (→ Skill `tm1-v12-migration`)
-- `tm1_get_knowledge` — **ersatzlos**, Skill `tm1-knowledge` deckt bereits ab (✅ umgesetzt 2026-05-26, commit be5cbe7)
+- ~~`tm1_get_process_variables` / `_parameters`~~ — **erweitert zu Linie B (siehe nächster Punkt)**
+- **Linie B (5 Tools):** `tm1_create_process`, `tm1_update_process_code`, `tm1_update_process_parameters`, `tm1_update_process_variables`, `tm1_update_process_datasource` — **ersatzlos**, alle abgedeckt durch `tm1_upsert_process` (✅ umgesetzt 2026-05-26)
+- `tm1_check_v12_readiness` (→ Skill `tm1-v12-migration`) — **noch offen**, blockiert auf Skill-Build
+- `tm1_get_knowledge` — **ersatzlos**, Skill `tm1-knowledge` deckt ab (✅ umgesetzt 2026-05-26, commit `be5cbe7`)
 
-Netto: ~7 Tools weniger → 100. Plus 2 neue Skills (`tm1-v12-migration`, `tm1-deploy-pro`).
+Netto bisher: 6 Tools weniger → 102. Noch offen: `resolve_default_member` (Singular) + `check_v12_readiness` (skill-pending).
+Plus 2 neue Skills geplant (`tm1-v12-migration`, `tm1-deploy-pro`).
 
 ---
 
@@ -74,7 +76,10 @@ Atomar + einzigartig:
 
 ## 5) Empfohlene Reihenfolge
 
-1. **Phase 1 (klein, sofort):** Singular `resolve_default_member`, 4× variables/parameters, `tm1_get_knowledge` (✅ erledigt) → 6 Tools weg
+1. **Phase 1 (klein, sofort):**
+   - `tm1_get_knowledge` (✅ umgesetzt) — Skill bereits vorhanden
+   - **Linie B** (✅ umgesetzt) — 5 atomic process write tools durch `upsert_process` ersetzt
+   - `tm1_resolve_default_member` (Singular) — noch offen
 2. **Phase 2:** `tm1-v12-migration` Skill bauen → `check_v12_readiness` Tool droppen
 3. **Phase 3:** `tm1-deploy-pro` Skill als Workflow-Composer für `.pro`-Lifecycle
 
@@ -83,8 +88,8 @@ Atomar + einzigartig:
 ## 6) Lifecycle-Tags (Doku-Empfehlung)
 
 Frequenz in tool descriptions:
-- **HOT** (täglich): `list_*`, `execute_mdx`, `write_cells`, `get/update_process_code`, `execute_process`, `audit_*`
-- **WARM** (wöchentlich): `create_*`, `upsert_process`, `validate_process_refs`, `diagnose_*`
+- **HOT** (täglich): `list_*`, `execute_mdx`, `write_cells`, `get_process_code`, `upsert_process`, `execute_process`, `audit_*`
+- **WARM** (wöchentlich): `create_*` (cube/dim/element/chore/client/subset/view), `validate_process_refs`, `diagnose_*`
 - **COLD** (admin/selten): `clear_cube`, `unload_cube`, `invalidate_callgraph_cache`, `cancel_thread`, `list_sessions`
 
 LLM priorisiert besser wenn Frequenz explizit.
@@ -119,5 +124,23 @@ Entscheidungen aus User-Review:
   Sauberer Output-Contract pro Tool > Tool-Count-Einsparung. Vergleichbarer
   Trade-off wie bei `get_cube_rules` vs `get_all_cube_rules` (auch beide behalten).
 
+- [x] **Linie B** — 5 TI-Einzel-Tools durch `upsert_process` ersetzt (umgesetzt 2026-05-26):
+  - Dropped: `tm1_create_process`, `tm1_update_process_code`, `tm1_update_process_parameters`, `tm1_update_process_variables`, `tm1_update_process_datasource`
+  - Read-Atome (`tm1_get_process_code/datasource/variables`, `tm1_get_process_parameters`) bleiben — atomic reads ohne Schreib-Pfad-Redundanz
+
+  **Begründung:**
+  - `upsert_process` deckt alle 5 Operationen via optionale Felder (`prolog`/`metadata`/`data`/`epilog`, `parameters`, `variables`, `dataSource`) + `mode: 'create'|'update'|'upsert'`
+  - LLM lernt **eine** Schreib-Operation für TI (mental model klarer)
+  - Atomic-bundle Trail (`appliedSteps[]`) → Failure-Reporting steht
+  - Pattern-Bruch zu `create_cube`/`create_dimension`/etc. bewusst akzeptiert: TI hat 5 Sub-Resources, Cube/Dim nicht — Asymmetrie inhaltlich begründbar
+  - **Latenz-Trade-off:** `upsert` macht `processes.list()` für Existenzcheck → ~50–500ms Overhead pro Update. Akzeptiert für sauberere Tool-Surface.
+
+  **Mitgeändert:**
+  - `tm1_check_process_code` Description (verweis auf `upsert_process`)
+  - `tm1_import_pro_file` Recovery-Hints (Param/Variable/Datasource Failure → re-run `upsert_process`)
+  - Output-Schema-Map + Annotation-Map Entries entfernt
+  - Test-Suites (`output-schema-map.test.ts`, `output-schema-additional-properties.test.ts`) angepasst
+
 Noch offen:
-- [ ] _ggf. weitere Punkte_
+- [ ] `tm1_resolve_default_member` (Singular) — Plural deckt N=1 funktional, kostet aber Array-Wrap. Entscheidung pending.
+- [ ] `tm1_check_v12_readiness` — blockiert auf `tm1-v12-migration` Skill-Build (Phase 2)

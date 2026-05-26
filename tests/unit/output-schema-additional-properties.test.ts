@@ -30,7 +30,6 @@ const TOOLS_WITH_EXTRAS: string[] = [
   "tm1_create_client",
   "tm1_create_element",
   "tm1_create_element_attribute",
-  "tm1_create_process",
   "tm1_create_subset",
   "tm1_delete_element",
   "tm1_delete_process",
@@ -38,10 +37,6 @@ const TOOLS_WITH_EXTRAS: string[] = [
   "tm1_move_element",
   "tm1_update_element",
   "tm1_update_element_attribute_value",
-  "tm1_update_process_code",
-  "tm1_update_process_datasource",
-  "tm1_update_process_parameters",
-  "tm1_update_process_variables",
   "tm1_update_subset",
   "tm1_write_cells",
   // Bespoke schemas that also rely on .passthrough()

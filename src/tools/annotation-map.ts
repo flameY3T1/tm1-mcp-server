@@ -131,7 +131,6 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_check_process_code: READ_ONLY,
   tm1_compile_process: READ_ONLY,
   tm1_copy_process: WRITE,
-  tm1_create_process: WRITE,
   tm1_delete_process: DESTRUCTIVE,
   // .pro is the v11 Planning Analytics Architect file format. v12 (Cloud
   // Native) deploys via different tooling (TM1Web / git-of-records); .pro
@@ -145,10 +144,6 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_import_pro_file: withVersion(IDEMPOTENT_WRITE, "v11"),
   tm1_install_pro_bundle: withVersion(IDEMPOTENT_WRITE, "v11"),
   tm1_search_code: READ_ONLY,
-  tm1_update_process_code: IDEMPOTENT_WRITE,
-  tm1_update_process_datasource: IDEMPOTENT_WRITE,
-  tm1_update_process_parameters: IDEMPOTENT_WRITE,
-  tm1_update_process_variables: IDEMPOTENT_WRITE,
   tm1_upsert_process: IDEMPOTENT_WRITE,
   tm1_validate_process_refs: READ_ONLY,
 

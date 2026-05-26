@@ -42,7 +42,7 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
     "tm1_check_process_code",
     [
       "Validate TI process code WITHOUT saving it on the server (POST /api/v1/CompileProcess unbound).",
-      "Pre-flight check before tm1_create_process / tm1_update_process_code to avoid create-with-rollback patterns.",
+      "Pre-flight check before tm1_upsert_process to avoid create-with-rollback patterns.",
       "Returns 'valid' or a list of syntax errors with procedure (Prolog/Metadata/Data/Epilog) and line number.",
       "All procedure tabs default to empty strings if omitted; pass only the tabs you want to validate.",
     ].join(" "),
