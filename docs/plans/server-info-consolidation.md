@@ -1,8 +1,22 @@
 # Plan — Server-Meta Tool Consolidation
 
-**Status:** Draft / awaiting execution
+**Status:** ✅ SHIPPED — commit `d8eff1c` (2026-05-26), pushed to `origin/main`
 **Date:** 2026-05-26
 **Scope:** Merge `tm1_get_server_capabilities` into `tm1_get_server_info`. `tm1_get_server_state` bleibt.
+
+## Result
+
+- Tool count 102 → 101
+- `tm1_get_server_info` jetzt liefert curated grouped output (modelling/ti/rules/mtq/jobQueuing/memory/logging/http/security) + `_raw` blob
+- `tm1_get_server_state` unverändert (counts + connection unique)
+- 616 tests pass, lint green, live MCP smoke verified post-restart
+- Option B umgesetzt: raw `extra` blob bleibt unter `_raw` als escape-hatch (no breaking change)
+
+**Live verification (post-restart):**
+- `tm1_get_server_capabilities` → tool weg aus MCP liste ✓
+- `tm1_get_server_info` → grouped sections present, `_raw` populated ✓
+- Spot-checks: `ti.maximumTILockObjects: 2000`, `mtq.numberOfThreadsToUse: 11`, `security.sslEnabled: true`, `security.securityPackageName: "Kerberos"` — alle korrekt aus raw extracted
+- `tm1_get_server_state` → counts + capabilities subset unchanged ✓
 
 ---
 
