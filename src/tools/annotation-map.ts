@@ -90,7 +90,6 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_diagnose_process_error: READ_ONLY,
   tm1_get_error_log_content: READ_ONLY,
   tm1_get_message_log: READ_ONLY,
-  tm1_get_server_capabilities: READ_ONLY,
   tm1_get_server_info: READ_ONLY,
   tm1_get_server_state: READ_ONLY,
   tm1_list_error_logs: READ_ONLY,

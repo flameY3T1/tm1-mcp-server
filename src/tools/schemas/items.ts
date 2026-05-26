@@ -70,7 +70,16 @@ export const ServerInfoSchema = z
     dataDirectory: z.string().optional(),
     timeZoneId: z.string().optional(),
     integratedSecurityMode: z.string().optional(),
-    extra: z.record(z.string(), z.unknown()),
+    modelling: z.unknown(),
+    ti: z.unknown(),
+    rules: z.unknown(),
+    mtq: z.unknown(),
+    jobQueuing: z.unknown(),
+    memory: z.unknown(),
+    logging: z.unknown(),
+    http: z.unknown(),
+    security: z.unknown(),
+    _raw: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 
@@ -660,23 +669,8 @@ export const DefaultMembersBulkResultSchema = z.object({
   ),
 });
 
-// Server capabilities/state snapshots curate config flags whose surface differs
+// Server state snapshot curates a few config flags whose surface differs
 // per TM1 build — every section is permissive (.passthrough()).
-export const ServerCapabilitiesResultSchema = z
-  .object({
-    server: z.unknown(),
-    modelling: z.unknown(),
-    ti: z.unknown(),
-    rules: z.unknown(),
-    mtq: z.unknown(),
-    jobQueuing: z.unknown(),
-    memory: z.unknown(),
-    logging: z.unknown(),
-    http: z.unknown(),
-    security: z.unknown(),
-  })
-  .passthrough();
-
 export const ServerStateResultSchema = z
   .object({
     connected: z.boolean(),

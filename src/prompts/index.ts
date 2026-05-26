@@ -80,7 +80,7 @@ export function registerAllPrompts(server: McpServer): void {
           "- Cube rules edits: validate first with `tm1_check_cube_rule` before `tm1_set_cube_rules`.",
           "",
           "## When in doubt",
-          "Call `tm1_get_server_info` and `tm1_get_server_capabilities` first to check version (v11/v12) and feature flags (MTQ, JobQueuing, AllowSeparateNandCRules).",
+          "Call `tm1_get_server_info` first to check version (v11/v12) and feature flags (MTQ, JobQueuing, AllowSeparateNandCRules).",
         ].join("\n"),
       ),
   );
@@ -191,7 +191,7 @@ export function registerAllPrompts(server: McpServer): void {
           "- SKIPCHECK at the top, FEEDERS section structure",
           "- ratio measures with explicit N: + C: branches (consolidations should not sum ratios)",
           "- feeder coverage for every rules-fed cell",
-          "- AllowSeparateNandCRules expectations (check via tm1_get_server_capabilities)",
+          "- AllowSeparateNandCRules expectations (check via tm1_get_server_info)",
           "",
           "Suggest changes as a unified diff.",
         ].join("\n"),

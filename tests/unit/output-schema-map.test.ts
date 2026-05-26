@@ -127,7 +127,6 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_get_process_datasource",
         "tm1_get_process_parameters",
         "tm1_get_process_variables",
-        "tm1_get_server_capabilities",
         "tm1_get_server_info",
         "tm1_get_server_state",
         "tm1_get_subset",

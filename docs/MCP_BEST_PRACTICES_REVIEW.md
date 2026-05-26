@@ -58,7 +58,7 @@ Spec: "Support both JSON and Markdown formats. JSON for programmatic, Markdown f
 
 Status (post-fix 2026-05-09):
 - alle 14 `tm1_list_*` Tools haben `format: "json"|"markdown"` Param.
-- 13 hochwertige `tm1_get_*` Tools wired: `get_server_info`, `get_server_state`, `get_server_capabilities`, `get_cube_stats`, `get_message_log`, `get_transaction_log`, `get_process_parameters`, `get_process_variables`, `get_process_datasource`, `get_ancestors`, `get_descendants`, `get_element_attribute_values`, `get_client`.
+- 12 hochwertige `tm1_get_*` Tools wired: `get_server_info`, `get_server_state`, `get_cube_stats`, `get_message_log`, `get_transaction_log`, `get_process_parameters`, `get_process_variables`, `get_process_datasource`, `get_ancestors`, `get_descendants`, `get_element_attribute_values`, `get_client`.
 
 Helper: `src/tools/format.ts` (FORMAT_SCHEMA, pageResponse, wrappedPageResponse, payloadResponse, renderTable, renderKV).
 

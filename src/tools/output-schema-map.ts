@@ -57,7 +57,6 @@ import {
   ProcessVariableSchema,
   ProcessesGroupedResultSchema,
   SearchCodeResultSchema,
-  ServerCapabilitiesResultSchema,
   ServerInfoSchema,
   ServerStateResultSchema,
   SessionItemSchema,
@@ -237,7 +236,6 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   // ── Phase 2i: hierarchy navigation, server snapshots, diagnostics ────────
   tm1_get_ancestors: asOutputSchema(AncestorsResultSchema),
   tm1_get_descendants: asOutputSchema(DescendantsResultSchema),
-  tm1_get_server_capabilities: asOutputSchema(ServerCapabilitiesResultSchema),
   tm1_get_server_state: asOutputSchema(ServerStateResultSchema),
   tm1_list_processes_grouped: asOutputSchema(ProcessesGroupedResultSchema),
   tm1_diagnose_process_error: asOutputSchema(DiagnoseProcessErrorResultSchema),

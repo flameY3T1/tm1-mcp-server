@@ -141,6 +141,24 @@ Entscheidungen aus User-Review:
   - Output-Schema-Map + Annotation-Map Entries entfernt
   - Test-Suites (`output-schema-map.test.ts`, `output-schema-additional-properties.test.ts`) angepasst
 
+- [x] **Linie C** — `tm1_get_server_capabilities` → `tm1_get_server_info` gemerged (umgesetzt 2026-05-26):
+  - Dropped: `tm1_get_server_capabilities`
+  - `tm1_get_server_info` jetzt curated grouped output (modelling/ti/rules/mtq/jobQueuing/memory/logging/http/security) + `_raw` für Power-User-Pfade
+  - `tm1_get_server_state` bleibt — counts + connection-flag sind unique
+
+  **Begründung:**
+  - Beide Tools holten aus identischer Quelle (`/Configuration` + `/ActiveConfiguration` via `info.extra`) — `capabilities` war reine Curation-Layer ohne eigene API-Call
+  - Agent musste raten welches Tool für welchen Flag → mental model unnötig fragmentiert
+  - `info` als Single-Source-Of-Truth für TM1 cfg, `state` als Health-Snapshot
+  - `_raw` escape-hatch verhindert breaking change für tief-pulende Konsumenten
+
+  **Mitgeändert:**
+  - `ServerCapabilitiesResultSchema` gelöscht; `ServerInfoSchema` extended (modelling/ti/rules/mtq/jobQueuing/memory/logging/http/security + `_raw`)
+  - Output-Schema-Map + Annotation-Map Entries entfernt
+  - Prompts (`src/prompts/index.ts:83,194`) auf `tm1_get_server_info` umgezogen
+  - Test (`output-schema-map.test.ts`) Entry entfernt
+  - Plan-Dokument: `docs/plans/server-info-consolidation.md`
+
 Noch offen:
 - [ ] `tm1_resolve_default_member` (Singular) — Plural deckt N=1 funktional, kostet aber Array-Wrap. Entscheidung pending.
 - [ ] `tm1_check_v12_readiness` — blockiert auf `tm1-v12-migration` Skill-Build (Phase 2)
