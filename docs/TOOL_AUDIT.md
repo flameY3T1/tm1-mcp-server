@@ -26,13 +26,13 @@ Server hat zusätzlich MCP **Prompts** (`tm1_orientation`) + MCP **Resources**
 
 | Konflikt | Vorschlag |
 |---|---|
-| `tm1_resolve_default_member` (1x) + `_members` (1–64) | Singular droppen — Plural akzeptiert N=1 |
+| ~~`tm1_resolve_default_member` (1x) + `_members` (1–64)~~ | ~~Singular droppen — Plural akzeptiert N=1~~ — **verworfen 2026-05-27**, beide behalten (Output-Shape + Error-Semantik divergieren, analog `list_processes` Entscheidung) |
 | ~~`tm1_list_processes` + `_grouped`~~ | ~~Merge via `groupBy?` Param~~ — **verworfen**, beide behalten (siehe §7) |
 | TI-Einzel-Tools vs. `upsert_process` (5 Tools: `create_process`, `update_process_code/parameters/variables/datasource`) | **Linie B umgesetzt** — alle 5 ersatzlos durch `upsert_process` abgedeckt (✅ 2026-05-26, siehe §7) |
 | `tm1_get_cube_rules` vs `get_all_cube_rules` | beide behalten (Single-Object vs Map-Return verschieden) |
 | `tm1_check_process_code` vs `compile_process` | beide behalten (lokal vs server-side, Beschreibung schärfen) |
 
-Netto: 5 Tools weg (Linie B). Resolve-Singular noch offen.
+Netto: 5 Tools weg (Linie B). Resolve-Singular bleibt (Shape-Divergenz).
 
 ---
 
@@ -40,23 +40,22 @@ Netto: 5 Tools weg (Linie B). Resolve-Singular noch offen.
 
 | Tool | Begründung | Migration |
 |---|---|---|
-| `tm1_check_v12_readiness` | Compound aus naming + complexity + pattern-grep | Skill `tm1-v12-migration` orchestriert existierende Audits, Tool droppen |
+| ~~`tm1_check_v12_readiness`~~ | ~~Compound aus naming + complexity + pattern-grep~~ | **verworfen 2026-05-27** — Tool hat eigenen Scanner (`v12-compat/scanner.ts`, Ruleset `vscode-tm1-ti@cf73b93`), nicht trivial aus `audit_naming` + `audit_complexity` rekonstruierbar. Behalten. |
 | `tm1_diagnose_process_error` | Workflow: list_logs → get_content → siblings | Hybrid: Tool für Latenz behalten + MCP-Prompt zusätzlich registrieren |
-| `.pro`-Lifecycle (`import_pro_file` / `export_process_to_pro` / `install_pro_bundle` / `diff_process_with_file`) | Atomare Bausteine, aber 3-stufiger Standardworkflow | Tools behalten, Workflow-Skill `tm1-deploy-pro` als Composer |
+| ~~`.pro`-Lifecycle (`import_pro_file` / `export_process_to_pro` / `install_pro_bundle` / `diff_process_with_file`)~~ | ~~Atomare Bausteine, aber 3-stufiger Standardworkflow~~ | **verworfen 2026-05-27** — Workflows theoretisch, kein realer Bedarf. Atome reichen. |
 
 ---
 
 ## 3) 🔴 DROP — komplett raus
 
-- `tm1_resolve_default_member` (durch Plural) — **noch offen**
+- ~~`tm1_resolve_default_member` (durch Plural)~~ — **verworfen 2026-05-27**, Shape + Error-Semantik divergieren
 - ~~`tm1_list_processes_grouped`~~ — **verworfen**, beide behalten (siehe §7)
 - ~~`tm1_get_process_variables` / `_parameters`~~ — **erweitert zu Linie B (siehe nächster Punkt)**
 - **Linie B (5 Tools):** `tm1_create_process`, `tm1_update_process_code`, `tm1_update_process_parameters`, `tm1_update_process_variables`, `tm1_update_process_datasource` — **ersatzlos**, alle abgedeckt durch `tm1_upsert_process` (✅ umgesetzt 2026-05-26)
-- `tm1_check_v12_readiness` (→ Skill `tm1-v12-migration`) — **noch offen**, blockiert auf Skill-Build
+- ~~`tm1_check_v12_readiness` (→ Skill `tm1-v12-migration`)~~ — **verworfen 2026-05-27**, dedizierter Scanner mit eigenem Ruleset, behalten
 - `tm1_get_knowledge` — **ersatzlos**, Skill `tm1-knowledge` deckt ab (✅ umgesetzt 2026-05-26, commit `be5cbe7`)
 
-Netto bisher: 6 Tools weniger → 102. Noch offen: `resolve_default_member` (Singular) + `check_v12_readiness` (skill-pending).
-Plus 2 neue Skills geplant (`tm1-v12-migration`, `tm1-deploy-pro`).
+Netto: 6 Tools weniger → 102. Audit-Backlog abgeschlossen. (`tm1-deploy-pro`, `tm1-v12-migration` Skill, Singular-Drop alle verworfen 2026-05-27.)
 
 ---
 
@@ -79,9 +78,9 @@ Atomar + einzigartig:
 1. **Phase 1 (klein, sofort):**
    - `tm1_get_knowledge` (✅ umgesetzt) — Skill bereits vorhanden
    - **Linie B** (✅ umgesetzt) — 5 atomic process write tools durch `upsert_process` ersetzt
-   - `tm1_resolve_default_member` (Singular) — noch offen
-2. **Phase 2:** `tm1-v12-migration` Skill bauen → `check_v12_readiness` Tool droppen
-3. **Phase 3:** `tm1-deploy-pro` Skill als Workflow-Composer für `.pro`-Lifecycle
+   - ~~`tm1_resolve_default_member` (Singular)~~ — **verworfen 2026-05-27**, beide behalten
+2. ~~**Phase 2:** `tm1-v12-migration` Skill bauen → `check_v12_readiness` Tool droppen~~ — **verworfen 2026-05-27**, Tool hat eigenen Scanner, behalten
+3. ~~**Phase 3:** `tm1-deploy-pro` Skill als Workflow-Composer für `.pro`-Lifecycle~~ — **verworfen 2026-05-27** (theoretischer Bedarf, kein realer Use-Case)
 
 ---
 
@@ -159,6 +158,52 @@ Entscheidungen aus User-Review:
   - Test (`output-schema-map.test.ts`) Entry entfernt
   - Plan-Dokument: `docs/plans/server-info-consolidation.md`
 
-Noch offen:
-- [ ] `tm1_resolve_default_member` (Singular) — Plural deckt N=1 funktional, kostet aber Array-Wrap. Entscheidung pending.
-- [ ] `tm1_check_v12_readiness` — blockiert auf `tm1-v12-migration` Skill-Build (Phase 2)
+- [x] `tm1_resolve_default_member` (Singular) → **NICHT droppen, beide behalten** (verworfen 2026-05-27)
+
+  **Begründung — Output-Shape + Error-Semantik divergieren:**
+
+  | | Singular | Plural |
+  |---|---|---|
+  | Input | `{dimensionName, hierarchyName?}` | `{items: [{...}]}` 1–64 |
+  | Output | flat result | `{results: [...]}` |
+  | Errors | wirft (try/catch) | embedded `.error` pro item, call wirft nie |
+  | Parallelism | n/a | `Promise.allSettled` |
+
+  Drop würde N=1 Caller zwingen: Input-Array-Wrap + Output-`results[0]`-Unwrap + Error-Handling-Wechsel (catch → `.error`-Check). Pattern-Konsistenz mit `list_processes` / `_grouped` Entscheidung (auch beide behalten wegen Shape-Divergenz).
+
+- [x] View-Tools (5x) → **NICHT mergen, alle 5 behalten** (verworfen 2026-05-27)
+
+  **Begründung — 5 disjunkte REST-Endpoints + Verbs:**
+
+  | Tool | Zweck | Endpoint |
+  |---|---|---|
+  | `tm1_get_view` | execute view, return cells | POST `…/Views('y')/tm1.Execute` |
+  | `tm1_get_view_definition` | Struktur only (MDX ODER NativeView axes), keine Execution | GET `…/Views('y')?$expand=…` |
+  | `tm1_list_views` | Inventar (public+private), paginated, MDX snippet | GET `…/Cubes('x')/Views,PrivateViews` |
+  | `tm1_create_mdx_view` | persistiert MDX view | POST `…/Cubes('x')/Views` |
+  | `tm1_delete_view` | löscht public view | DELETE `…/Views('y')` |
+
+  `get_view` ⇆ `get_view_definition`: execute vs inspect — Definition spart Cells-Download bei großen Views (Cross-Ref bereits in Description). `list_views` ⇆ `get_view_definition`: Inventar-Snippet vs Full-Detail. CRUD-Pattern (`create_*` / `delete_*`) konsistent mit `delete_cube` / `delete_dimension` / `delete_process`.
+
+- [x] `tm1_list_sessions` ⇆ `tm1_list_threads` → **NICHT mergen, beide behalten** (verworfen 2026-05-27)
+
+  **Begründung — distinkte REST-Endpoints, komplementäre Workflows:**
+
+  | | `list_sessions` | `list_threads` |
+  |---|---|---|
+  | Endpoint | `/Sessions?$expand=Threads,User` | `/Threads` |
+  | Shape | session-zentriert, nested threads, `active` flag + User | flat workload-list, inkl. System/Chore/External threads |
+  | Felder | `lockType`, `waitTime`, per-thread `info` | `context`, `elapsedTime` |
+  | Use-Case | "wer ist verbunden" | "was läuft gerade" |
+
+  Threads-Endpoint enthält Workloads ohne Session (Chore-Runs, System-Threads) — kein Subset von Sessions-Expand.
+
+- [x] `tm1_check_v12_readiness` → **NICHT droppen, behalten** (verworfen 2026-05-27)
+
+  **Begründung — dedizierter Scanner, kein Compound:**
+  - `src/lib/v12-compat/scanner.ts` mit Ruleset-Source `vscode-tm1-ti@cf73b93 / tiSignatures.ts (synced 2026-05-12)`
+  - Strukturierte Findings (severity/category/objectKind/section/line/function/issue/suggestion) — nicht aus `audit_naming` + `audit_complexity` rekonstruierbar
+  - Read-only 2 REST-Calls (Processes + Cubes/Rules), token-effizient bei >50 Processes
+  - Skill-Compose würde Ruleset-Pflege auf Client-Seite verlagern, schlechter
+
+Audit-Backlog abgeschlossen 2026-05-27.
