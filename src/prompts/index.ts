@@ -186,6 +186,7 @@ export function registerAllPrompts(server: McpServer): void {
           `2. **Syntax check**: \`tm1_check_cube_rule(cube="${cubeName}", rules=<text from step 1>)\` — surface line-numbered errors before any change.`,
           `3. **Stats correlation**: \`tm1_get_cube_stats(cubeName="${cubeName}")\` — fed-cell-count vs populated-numeric, feeder efficiency.`,
           `4. **Reference impact**: \`tm1_analyze_object_usage(objectType="cube", objectName="${cubeName}")\` — what depends on this cube's calculated cells.`,
+          `5. **Per-cell verification (v11)**: pick a populated rule cell via \`tm1_sample_cells(cubeName="${cubeName}")\`, then \`tm1_trace_cell_calculation\` (why has it this value) and \`tm1_check_feeders\` / \`tm1_trace_feeders\` (does it feed correctly) to confirm suspected feeder findings at runtime.`,
           "",
           "Comment on:",
           "- SKIPCHECK at the top, FEEDERS section structure",

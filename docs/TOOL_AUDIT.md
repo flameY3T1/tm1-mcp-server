@@ -3,7 +3,8 @@
 Stand: 2026-05-26. Diskussions-Entwurf — nicht alle Punkte sind beschlossen.
 
 **Scope ursprünglich:** 105 Tools über 13 Kategorien.
-**Aktueller Stand:** 102 Tools über 12 Kategorien (nach Drops vom 2026-05-26).
+**Aktueller Stand:** 105 Tools über 12 Kategorien (102 nach Drops vom 2026-05-26;
++`tm1_save_data`, +3 Feeder-/Cell-Tracing-Tools am 2026-06-06, siehe `GAP_ANALYSIS.md`).
 Server hat zusätzlich MCP **Prompts** (`tm1_orientation`) + MCP **Resources**
 (`tm1://...` URIs) als alternative Endpoints für read-only Daten und Workflow-Templates.
 

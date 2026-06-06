@@ -17,10 +17,20 @@ export function registerTraceFeeders(server: McpServer, tm1Client: TM1Client): v
       elements: z
         .array(z.string())
         .describe("Element names for each dimension of the cube, in cube dimension order"),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(1000)
+        .max(3600000)
+        .optional()
+        .describe("Override the default request timeout (ms, 1000–3600000). Traces over deep consolidations can be slow."),
     },
-    async ({ cubeName, elements }, extra) => {
+    async ({ cubeName, elements, timeoutMs }, extra) => {
       const result = await withToolHint(
-        tm1Client.cells.traceFeeders(cubeName, elements, { signal: extra?.signal }),
+        tm1Client.cells.traceFeeders(cubeName, elements, {
+          signal: extra?.signal,
+          ...(timeoutMs ? { timeoutMs } : {}),
+        }),
         `TraceFeeders failed for cube '${cubeName}'. Verify dimension order/elements via tm1_list_cubes; alternate hierarchies are not supported. On v12 this action is unavailable.`,
       );
       return {

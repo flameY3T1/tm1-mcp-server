@@ -31,11 +31,19 @@ export function registerTraceCellCalculation(server: McpServer, tm1Client: TM1Cl
         .max(200)
         .optional()
         .describe("Maximum components per node (default 20). Excess children are dropped and the node marked truncated."),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(1000)
+        .max(3600000)
+        .optional()
+        .describe("Override the default request timeout (ms, 1000–3600000). Traces over deep consolidations can be slow."),
     },
-    async ({ cubeName, elements, maxDepth, maxComponents }, extra) => {
+    async ({ cubeName, elements, maxDepth, maxComponents, timeoutMs }, extra) => {
       const tree = await withToolHint(
         tm1Client.cells.traceCellCalculation(cubeName, elements, maxDepth, maxComponents, {
           signal: extra?.signal,
+          ...(timeoutMs ? { timeoutMs } : {}),
         }),
         `TraceCellCalculation failed for cube '${cubeName}'. Verify dimension order/elements via tm1_list_cubes; alternate hierarchies are not supported. On v12 this action is unavailable.`,
       );

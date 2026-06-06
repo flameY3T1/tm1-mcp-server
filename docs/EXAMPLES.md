@@ -367,6 +367,49 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
 }
 ```
 
+### 9.4 Why is this cell X / empty? (calculation trace, v11)
+
+```json
+{
+  "tool": "tm1_trace_cell_calculation",
+  "args": {
+    "cubeName": "Cube_PnL_Integration",
+    "elements": ["2026_01", "Budget", "CC_SAP", "ACC_GrossSalary", "EUR", "AmountGroup"],
+    "maxDepth": 3,
+    "maxComponents": 10
+  }
+}
+```
+
+Returns the recursive component tree (rule/consolidation/simple, values, rule
+statements) — follows DB() references across cubes. `truncated: true` marks cut
+branches; re-run with that node's `tuple`/`cube` to drill deeper.
+
+### 9.5 Does this cell feed correctly? (feeder trace, v11)
+
+```json
+{
+  "tool": "tm1_trace_feeders",
+  "args": {
+    "cubeName": "Cube_PnL_Integration",
+    "elements": ["2026_01", "Budget", "CC_SAP", "ACC_GrossSalary", "EUR", "AmountLocal"]
+  }
+}
+```
+
+Returns the cells this cell feeds plus the feeder statements that fire.
+`tm1_check_feeders` (same args) verifies feeder coverage instead — an empty
+result means no broken feeders detected.
+
+### 9.6 Persist data to disk (v11)
+
+```json
+{ "tool": "tm1_save_data", "args": { "cube": "Sales" } }
+```
+
+Omit `cube` for SaveDataAll. Run after write sessions; truncates the
+transaction log for saved cubes.
+
 ---
 
 ## 10. Code-graph analysis
