@@ -7,7 +7,7 @@ export function registerCheckFeeders(server: McpServer, tm1Client: TM1Client): v
   server.tool(
     "tm1_check_feeders",
     [
-      "Check the feeders of a cell: returns the cells fed by this cell, each with a fed flag — fed=false marks a broken or missing feeder (the classic cause of empty consolidated/rule cells).",
+      "Check the feeders of a cell: verifies feeder coverage for the cells underlying this cell and returns the problematic ones with a fed flag — fed=false marks a broken or missing feeder (the classic cause of empty consolidated/rule cells). An empty result means no feeder problems were detected (live-verified on 11.8: fully-fed areas return []).",
       "Per-cell runtime check; complements tm1_audit_feeders (static rule analysis).",
       "Elements address the default hierarchy, in cube dimension order (discover with tm1_list_cubes).",
       "v11 only. Related: tm1_trace_feeders (statements involved), tm1_trace_cell_calculation (why has this cell value X).",

@@ -266,11 +266,20 @@ export class CellService {
     opts?: RequestOptions,
   ): Promise<CalculationTraceNode> {
     const binds = await this.tupleBinds(cubeName, elements);
+    // Components is a complex-type collection — nested nav-prop expand uses
+    // the path form (Components/Tuple); ($levels=...) is rejected by 11.8.
+    // Each path segment covers exactly one tree level, so emit one
+    // Components/.../{Tuple,Cube} pair per requested depth — without them,
+    // deeper nodes carry values but no coordinates (and no cube for
+    // cross-cube DB() components), making drill-down impossible.
+    const expandParts = ["Tuple($select=Name)"];
+    for (let level = 1; level <= maxDepth; level++) {
+      const prefix = "Components/".repeat(level);
+      expandParts.push(`${prefix}Tuple($select=Name)`, `${prefix}Cube($select=Name)`);
+    }
     const response = await this.http.request<RawCalcComponent>(
       "POST",
-      // Components is a complex-type collection — nested nav-prop expand uses
-      // the path form (Components/Tuple); ($levels=...) is rejected by 11.8.
-      `/api/v1/Cubes('${enc(cubeName)}')/tm1.TraceCellCalculation?$expand=Tuple($select=Name),Components/Tuple($select=Name)`,
+      `/api/v1/Cubes('${enc(cubeName)}')/tm1.TraceCellCalculation?$expand=${expandParts.join(",")}`,
       { "Tuple@odata.bind": binds },
       opts,
     );
