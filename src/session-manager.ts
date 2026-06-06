@@ -1,6 +1,6 @@
 import type { TM1Config } from "./config.js";
 import { createLogger } from "./logger.js";
-import { getTm1Dispatcher } from "./tm1-client/dispatcher.js";
+import { getTm1Dispatcher, tm1Fetch } from "./tm1-client/dispatcher.js";
 import type pino from "pino";
 
 const USER_AGENT = "tm1-mcp-server/1.0.0";
@@ -71,7 +71,7 @@ export class SessionManager {
       this.config.requestTimeoutMs,
       "Authentication",
       (signal) =>
-        fetch(url, {
+        tm1Fetch(url, {
           method: "GET",
           headers: {
             Authorization: `Basic ${credentials}`,
@@ -131,7 +131,7 @@ export class SessionManager {
         this.config.requestTimeoutMs,
         "Keep-alive",
         (signal) =>
-          fetch(url, {
+          tm1Fetch(url, {
             method: "GET",
             headers: {
               Cookie: `TM1SessionId=${this.sessionCookie}`,
@@ -242,7 +242,7 @@ export class SessionManager {
     this.logger.info("Logging out from TM1");
 
     try {
-      const response = await fetch(url, {
+      const response = await tm1Fetch(url, {
         method: "DELETE",
         headers: {
           Cookie: `TM1SessionId=${this.sessionCookie}`,

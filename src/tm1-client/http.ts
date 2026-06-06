@@ -5,7 +5,7 @@ import type { TM1Config } from "../config.js";
 import type { SessionManager } from "../session-manager.js";
 import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
-import { getTm1Dispatcher } from "./dispatcher.js";
+import { getTm1Dispatcher, tm1Fetch } from "./dispatcher.js";
 import { invalidateCallgraphCache } from "../lib/callgraph/tm1-adapter.js";
 import { tm1Events } from "../lib/tm1-events.js";
 
@@ -183,7 +183,7 @@ export class TM1HttpClient {
       const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
       const unlink = linkAbortSignals(controller, opts?.signal);
       try {
-        return await fetch(url, {
+        return await tm1Fetch(url, {
           method,
           headers: {
             Cookie: `TM1SessionId=${c}`,
@@ -242,7 +242,7 @@ export class TM1HttpClient {
       const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
       const unlink = linkAbortSignals(controller, opts?.signal);
       try {
-        return await fetch(url, {
+        return await tm1Fetch(url, {
           method,
           headers: {
             Cookie: `TM1SessionId=${c}`,
@@ -307,7 +307,7 @@ export class TM1HttpClient {
     }
 
     try {
-      return await fetch(url, {
+      return await tm1Fetch(url, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : isWriteMethod ? "" : undefined,
