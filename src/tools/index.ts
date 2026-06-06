@@ -20,6 +20,9 @@ import { registerGetView } from "./celldata/get-view.js";
 import { registerGetViewDefinition } from "./celldata/get-view-definition.js";
 import { registerSampleCells } from "./celldata/sample-cells.js";
 import { registerWriteCells } from "./celldata/write-cells.js";
+import { registerCheckFeeders } from "./celldata/check-feeders.js";
+import { registerTraceFeeders } from "./celldata/trace-feeders.js";
+import { registerTraceCellCalculation } from "./celldata/trace-cell-calculation.js";
 
 // TI development tools (process CRUD, execution, code, params, datasource)
 import { registerExecuteProcess } from "./ti-development/execute-process.js";
@@ -169,6 +172,9 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerUpsertProcess(server, tm1Client);
   registerInstallProBundle(server, tm1Client);
   registerCheckWritableCoords(server, tm1Client);
+  registerCheckFeeders(server, tm1Client);
+  registerTraceFeeders(server, tm1Client);
+  registerTraceCellCalculation(server, tm1Client);
 
   // Dimension management
   registerCreateDimension(server, tm1Client);

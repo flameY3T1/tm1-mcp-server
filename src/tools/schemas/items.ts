@@ -522,6 +522,41 @@ export const CopyProcessResultSchema = z.object({
 //   - tree shape    {start, direction, mode, tree}
 //   - summary shape {start, direction, mode, summary}
 // Modeled as one passthrough schema with all fields optional except none.
+// ── Feeder / calculation tracing (v11 cell diagnostics) ─────────────────────
+
+export const FedCellDescriptorSchema = z.object({
+  cube: z.string(),
+  tuple: z.array(z.string()),
+  fed: z.boolean(),
+});
+
+export const CheckFeedersResultSchema = z.object({
+  count: z.number().int(),
+  unfedCount: z.number().int(),
+  fedCells: z.array(FedCellDescriptorSchema),
+});
+
+export const TraceFeedersResultSchema = z.object({
+  count: z.number().int(),
+  fedCells: z.array(FedCellDescriptorSchema),
+  statements: z.array(z.string()),
+});
+
+// Recursive component tree — children typed as unknown (same precedent as
+// CallgraphResultSchema.tree) to avoid recursive JSON-schema emission.
+export const CalculationTraceResultSchema = z
+  .object({
+    type: z.string().optional(),
+    status: z.string().optional(),
+    value: CellValueSchema,
+    cube: z.string().optional(),
+    tuple: z.array(z.string()).optional(),
+    statements: z.array(z.string()).optional(),
+    components: z.array(z.unknown()).optional(),
+    truncated: z.boolean().optional(),
+  })
+  .passthrough();
+
 export const CallgraphResultSchema = z
   .object({
     warning: z.string().optional(),

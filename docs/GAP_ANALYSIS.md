@@ -24,7 +24,7 @@ siehe `TOOL_AUDIT.md` §7).
 | Gap | REST-API | Aufwand | Begründung |
 |---|---|---|---|
 | **Sandbox-Tools** (`list/create/publish/discard`) | `/Sandboxes`, `tm1.Publish`, `tm1.DiscardChanges` | M | Planner-Workflows komplett unabgedeckt. What-if-Analysen, sicheres Testen von Writes ohne Basis-Daten zu berühren. Nur Erwähnung in `v12-compat/deprecated-ti.ts`, keine Tools. |
-| **Feeder-/Cell-Tracing** (`tm1_trace_cell`, `tm1_check_feeders`) | `tm1.TraceCellCalculation`, `tm1.TraceFeeders`, `tm1.CheckFeeders` | M | Rule-Debugging Nr.-1-Schmerzpunkt. `tm1_audit_feeders` (statisch) existiert, aber kein Per-Cell-Trace: "warum ist diese Zelle leer/falsch?" Perfekte Ergänzung zum bestehenden Audit. |
+| ~~**Feeder-/Cell-Tracing**~~ | `tm1.TraceCellCalculation`, `tm1.TraceFeeders`, `tm1.CheckFeeders` | M | **UMGESETZT 2026-06-06**: `tm1_check_feeders`, `tm1_trace_feeders`, `tm1_trace_cell_calculation` (Tree mit maxDepth/maxComponents-Truncation). Alle v11-only annotiert, Endpoints live verifiziert. |
 | **`tm1_get_audit_log`** | `/AuditLogEntries` | S | Compliance/Forensik: wer hat wann Metadaten/Security geändert. Message-/Transaction-/Error-Log vorhanden, AuditLog fehlt (Grep: nur Erwähnung in server-info). |
 | **`tm1_create_native_view`** | `/Cubes('x')/Views` (NativeView) | S | Nur MDX-Views erstellbar (`tm1_create_mdx_view`). Native Views mit Subsets sind Standard als TI-Datasource und für Zeros-Suppression-Exporte. Lesen geht (`get_view_definition`), Schreiben fehlt. |
 
@@ -70,7 +70,7 @@ Empfehlung: zusammen mit Feeder-Tracing (P2) ein `tm1-rule-debug`-Skill — Trac
 1. ~~**`tm1_save_data`**~~ — umgesetzt 2026-06-06 (Tool 102).
 2. ~~**Destruktive Ops absichern**~~ — war bereits umgesetzt (R2-10, `confirm.ts`).
 3. **Sandbox-Tools** — M, neue Nutzergruppe (Planner).
-4. **Feeder-/Cell-Tracing** — M, stärkt vorhandene Audit-Stärke. `CheckFeeders`-Action in $metadata bestätigt.
+4. ~~**Feeder-/Cell-Tracing**~~ — umgesetzt 2026-06-06 (Tools 103–105).
 5. **`tm1_get_audit_log` + `tm1_create_native_view`** — je S, rundet Lücken ab.
 6. **Multi-Instanz** — L, eigenes Design-Dokument vorab (`docs/plans/`).
 

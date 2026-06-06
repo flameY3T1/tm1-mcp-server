@@ -568,4 +568,121 @@ describe("TM1Client – Cell Data Methods", () => {
       expect(url).toContain("/api/v1/Cubes('Sales%20Data')/tm1.Unload");
     });
   });
+
+  // ── feeder / calculation tracing ───────────────────────────────────────────
+
+  describe("cell tracing", () => {
+    const cubeMeta = {
+      Name: "SalesCube",
+      Dimensions: [{ Name: "Time" }, { Name: "Region" }],
+    };
+
+    describe("checkFeeders()", () => {
+      it("binds the tuple and maps fed-cell descriptors", async () => {
+        fetchSpy
+          .mockResolvedValueOnce(mockResponse(cubeMeta))
+          .mockResolvedValueOnce(
+            mockResponse({
+              value: [
+                { Cube: { Name: "TargetCube" }, Tuple: [{ Name: "2024" }, { Name: "EU" }], Fed: true },
+                { Cube: { Name: "TargetCube" }, Tuple: [{ Name: "2024" }, { Name: "US" }], Fed: false },
+              ],
+            }),
+          );
+
+        const result = await client.cells.checkFeeders("SalesCube", ["2024", "Total"]);
+
+        expect(result).toEqual([
+          { cube: "TargetCube", tuple: ["2024", "EU"], fed: true },
+          { cube: "TargetCube", tuple: ["2024", "US"], fed: false },
+        ]);
+
+        const [url, opts] = fetchSpy.mock.calls[1];
+        expect(url).toContain("/api/v1/Cubes('SalesCube')/tm1.CheckFeeders");
+        const body = JSON.parse(opts.body);
+        expect(body["Tuple@odata.bind"]).toEqual([
+          "Dimensions('Time')/Hierarchies('Time')/Elements('2024')",
+          "Dimensions('Region')/Hierarchies('Region')/Elements('Total')",
+        ]);
+      });
+
+      it("rejects tuple length mismatch without calling the action", async () => {
+        fetchSpy.mockResolvedValueOnce(mockResponse(cubeMeta));
+
+        await expect(client.cells.checkFeeders("SalesCube", ["2024"])).rejects.toThrow(
+          /2 dimension\(s\)/,
+        );
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("traceFeeders()", () => {
+      it("maps fed cells and statements", async () => {
+        fetchSpy
+          .mockResolvedValueOnce(mockResponse(cubeMeta))
+          .mockResolvedValueOnce(
+            mockResponse({
+              FedCells: [{ Cube: { Name: "SalesCube" }, Tuple: [{ Name: "2024" }, { Name: "EU" }], Fed: true }],
+              Statements: ["['Units'] => ['Revenue'];"],
+            }),
+          );
+
+        const result = await client.cells.traceFeeders("SalesCube", ["2024", "EU"]);
+
+        expect(result.fedCells).toHaveLength(1);
+        expect(result.statements).toEqual(["['Units'] => ['Revenue'];"]);
+        const [url] = fetchSpy.mock.calls[1];
+        expect(url).toContain("/tm1.TraceFeeders");
+      });
+    });
+
+    describe("traceCellCalculation()", () => {
+      it("maps the component tree and truncates by depth and width", async () => {
+        const leaf = (n: string, v: number) => ({
+          Type: "Simple",
+          Status: "Data",
+          Value: v,
+          Tuple: [{ Name: n }, { Name: "EU" }],
+          Components: [],
+        });
+        fetchSpy
+          .mockResolvedValueOnce(mockResponse(cubeMeta))
+          .mockResolvedValueOnce(
+            mockResponse({
+              Type: "Consolidation",
+              Status: "Data",
+              Value: 6,
+              Tuple: [{ Name: "Total" }, { Name: "EU" }],
+              Statements: [],
+              Components: [
+                {
+                  Type: "Consolidation",
+                  Status: "Data",
+                  Value: 5,
+                  Tuple: [{ Name: "H1" }, { Name: "EU" }],
+                  Components: [leaf("Jan", 2), leaf("Feb", 3)],
+                },
+                leaf("Adj", 1),
+                leaf("Extra", 0),
+              ],
+            }),
+          );
+
+        const tree = await client.cells.traceCellCalculation("SalesCube", ["Total", "EU"], 1, 2);
+
+        expect(tree.type).toBe("Consolidation");
+        expect(tree.value).toBe(6);
+        expect(tree.tuple).toEqual(["Total", "EU"]);
+        // width: 3 children, maxComponents=2 → 2 kept + truncated flag
+        expect(tree.components).toHaveLength(2);
+        expect(tree.truncated).toBe(true);
+        // depth: maxDepth=1 → grandchildren cut, child marked truncated
+        expect(tree.components![0]!.truncated).toBe(true);
+        expect(tree.components![0]!.components).toBeUndefined();
+        const [url] = fetchSpy.mock.calls[1];
+        expect(url).toContain("/tm1.TraceCellCalculation");
+        expect(url).toContain("Components/Tuple($select=Name)");
+      });
+    });
+  });
 });

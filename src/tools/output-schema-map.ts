@@ -14,8 +14,10 @@ import { z } from "zod";
 import { pageShapeFor } from "./schemas/common.js";
 import { asOutputSchema } from "./schemas/output-schema.js";
 import {
+  CalculationTraceResultSchema,
   CallgraphResultSchema,
   CellValueSchema,
+  CheckFeedersResultSchema,
   ChoreGraphResultSchema,
   ChoreItemSchema,
   DefaultMemberResolutionSchema,
@@ -57,6 +59,7 @@ import {
   ProcessVariableSchema,
   ProcessesGroupedResultSchema,
   SearchCodeResultSchema,
+  TraceFeedersResultSchema,
   ServerInfoSchema,
   ServerStateResultSchema,
   SessionItemSchema,
@@ -114,6 +117,9 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
 
   // ── Phase 2a: validation/check tools ──────────────────────────────────────
   tm1_check_writable_coords: asOutputSchema(WritableCoordsResultSchema),
+  tm1_check_feeders: asOutputSchema(CheckFeedersResultSchema),
+  tm1_trace_feeders: asOutputSchema(TraceFeedersResultSchema),
+  tm1_trace_cell_calculation: asOutputSchema(CalculationTraceResultSchema),
   tm1_validate_process_refs: asOutputSchema(ValidateProcessRefsResultSchema),
 
   // ── Phase 2b: get_* single entity (JSON-returning subset) ─────────────────

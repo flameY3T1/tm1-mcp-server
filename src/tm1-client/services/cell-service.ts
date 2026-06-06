@@ -5,7 +5,13 @@
 //
 // See docs/ARCHITECTURE.md for the layering.
 import { TM1Error, TM1ErrorCode } from "../../types.js";
-import type { CellValue, MdxResult } from "../../types.js";
+import type {
+  CalculationTraceNode,
+  CellValue,
+  FedCellDescriptor,
+  FeederTraceResult,
+  MdxResult,
+} from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
 import { transformCellsetResponse } from "./cellset-transform.js";
 
@@ -173,4 +179,152 @@ export class CellService {
       }
     }
   }
+
+  /**
+   * Resolve the cube's dimension order and build Tuple@odata.bind paths for
+   * the cell-bound trace actions. Elements address the default hierarchy
+   * (same name as the dimension) — alternate hierarchies are not supported
+   * by these diagnostics tools.
+   */
+  private async tupleBinds(cubeName: string, elements: string[]): Promise<string[]> {
+    const cubeMeta = await this.http.request<{ Dimensions: Array<{ Name: string }> }>(
+      "GET",
+      `/api/v1/Cubes('${enc(cubeName)}')?$expand=Dimensions($select=Name)`,
+    );
+    const dims = cubeMeta.Dimensions.map((d) => d.Name);
+    if (elements.length !== dims.length) {
+      throw new TM1Error({
+        code: TM1ErrorCode.VALIDATION_ERROR,
+        message: `Cube '${cubeName}' has ${dims.length} dimension(s) (${dims.join(", ")}) but ${elements.length} element(s) were given`,
+      });
+    }
+    return dims.map(
+      (d, i) => `Dimensions('${enc(d)}')/Hierarchies('${enc(d)}')/Elements('${enc(elements[i]!)}')`,
+    );
+  }
+
+  /**
+   * Check the feeders of a cell: returns the cells fed by this cell with a
+   * Fed flag per target — Fed=false marks a broken/missing feeder. v11 only.
+   * POST /api/v1/Cubes('{cube}')/tm1.CheckFeeders
+   */
+  async checkFeeders(
+    cubeName: string,
+    elements: string[],
+    opts?: RequestOptions,
+  ): Promise<FedCellDescriptor[]> {
+    const binds = await this.tupleBinds(cubeName, elements);
+    const response = await this.http.request<{
+      value?: Array<RawFedCell>;
+    }>(
+      "POST",
+      `/api/v1/Cubes('${enc(cubeName)}')/tm1.CheckFeeders?$expand=Cube($select=Name),Tuple($select=Name)`,
+      { "Tuple@odata.bind": binds },
+      opts,
+    );
+    return (response.value ?? []).map(mapFedCell);
+  }
+
+  /**
+   * Trace the feeders of a cell: returns the cells this cell feeds plus the
+   * feeder statements involved. v11 only.
+   * POST /api/v1/Cubes('{cube}')/tm1.TraceFeeders
+   */
+  async traceFeeders(
+    cubeName: string,
+    elements: string[],
+    opts?: RequestOptions,
+  ): Promise<FeederTraceResult> {
+    const binds = await this.tupleBinds(cubeName, elements);
+    const response = await this.http.request<{
+      FedCells?: Array<RawFedCell>;
+      Statements?: string[];
+    }>(
+      "POST",
+      `/api/v1/Cubes('${enc(cubeName)}')/tm1.TraceFeeders?$expand=FedCells/Cube($select=Name),FedCells/Tuple($select=Name)`,
+      { "Tuple@odata.bind": binds },
+      opts,
+    );
+    return {
+      fedCells: (response.FedCells ?? []).map(mapFedCell),
+      statements: response.Statements ?? [],
+    };
+  }
+
+  /**
+   * Trace how a cell value is calculated: recursive component tree with
+   * per-component type (consolidation/rule), status, value, and rule
+   * statements. The server returns the full tree; maxDepth/maxComponents
+   * truncate client-side to keep responses bounded. v11 only.
+   * POST /api/v1/Cubes('{cube}')/tm1.TraceCellCalculation
+   */
+  async traceCellCalculation(
+    cubeName: string,
+    elements: string[],
+    maxDepth = 3,
+    maxComponents = 20,
+    opts?: RequestOptions,
+  ): Promise<CalculationTraceNode> {
+    const binds = await this.tupleBinds(cubeName, elements);
+    const response = await this.http.request<RawCalcComponent>(
+      "POST",
+      // Components is a complex-type collection — nested nav-prop expand uses
+      // the path form (Components/Tuple); ($levels=...) is rejected by 11.8.
+      `/api/v1/Cubes('${enc(cubeName)}')/tm1.TraceCellCalculation?$expand=Tuple($select=Name),Components/Tuple($select=Name)`,
+      { "Tuple@odata.bind": binds },
+      opts,
+    );
+    return mapCalcComponent(response, maxDepth, maxComponents);
+  }
+}
+
+// Raw OData shapes for the trace actions. Cube/Tuple are navigation
+// properties — present only when the $expand is honored, hence optional.
+interface RawFedCell {
+  Cube?: { Name?: string };
+  Tuple?: Array<{ Name?: string }>;
+  Fed?: boolean;
+}
+
+interface RawCalcComponent {
+  Type?: string;
+  Status?: string;
+  Value?: CellValue;
+  Cube?: { Name?: string };
+  Tuple?: Array<{ Name?: string }>;
+  Statements?: string[];
+  Components?: RawCalcComponent[];
+}
+
+function mapFedCell(raw: RawFedCell): FedCellDescriptor {
+  return {
+    cube: raw.Cube?.Name ?? "",
+    tuple: (raw.Tuple ?? []).map((t) => t.Name ?? ""),
+    fed: raw.Fed === true,
+  };
+}
+
+function mapCalcComponent(
+  raw: RawCalcComponent,
+  depthLeft: number,
+  maxComponents: number,
+): CalculationTraceNode {
+  const node: CalculationTraceNode = { value: raw.Value ?? null };
+  if (raw.Type !== undefined) node.type = raw.Type;
+  if (raw.Status !== undefined) node.status = raw.Status;
+  if (raw.Cube?.Name !== undefined) node.cube = raw.Cube.Name;
+  if (raw.Tuple !== undefined) node.tuple = raw.Tuple.map((t) => t.Name ?? "");
+  if (raw.Statements !== undefined && raw.Statements.length > 0) node.statements = raw.Statements;
+
+  const children = raw.Components ?? [];
+  if (children.length > 0) {
+    if (depthLeft <= 0) {
+      node.truncated = true;
+    } else {
+      const kept = children.slice(0, maxComponents);
+      node.components = kept.map((c) => mapCalcComponent(c, depthLeft - 1, maxComponents));
+      if (children.length > maxComponents) node.truncated = true;
+    }
+  }
+  return node;
 }

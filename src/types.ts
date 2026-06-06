@@ -146,6 +146,31 @@ export interface MdxAxis {
   }>;
 }
 
+// Feeder / calculation tracing (tm1.CheckFeeders / TraceFeeders /
+// TraceCellCalculation, all v11; bound to Cube, keyed by element tuple).
+export interface FedCellDescriptor {
+  cube: string;
+  tuple: string[];
+  fed: boolean;
+}
+
+export interface FeederTraceResult {
+  fedCells: FedCellDescriptor[];
+  statements: string[];
+}
+
+export interface CalculationTraceNode {
+  type?: string;
+  status?: string;
+  value: CellValue;
+  cube?: string;
+  tuple?: string[];
+  statements?: string[];
+  components?: CalculationTraceNode[];
+  /** Set when children were cut off by maxDepth / maxComponents. */
+  truncated?: boolean;
+}
+
 export interface ViewResult {
   cubeName: string;
   viewName: string;

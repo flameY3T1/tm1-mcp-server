@@ -34,6 +34,11 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
 
   // celldata
   tm1_check_writable_coords: READ_ONLY,
+  // v11-only cell diagnostics: CheckFeeders/TraceFeeders/TraceCellCalculation
+  // actions are not exposed by the v12 REST API.
+  tm1_check_feeders: withVersion(READ_ONLY, "v11"),
+  tm1_trace_feeders: withVersion(READ_ONLY, "v11"),
+  tm1_trace_cell_calculation: withVersion(READ_ONLY, "v11"),
   tm1_execute_mdx: READ_ONLY,
   tm1_get_cell_value: READ_ONLY,
   tm1_get_view: READ_ONLY,
