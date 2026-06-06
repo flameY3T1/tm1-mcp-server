@@ -259,6 +259,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_delete_view: asOutputSchema(MutationResultSchema),
   tm1_execute_chore: asOutputSchema(MutationResultSchema),
   tm1_remove_client_group: asOutputSchema(MutationResultSchema),
+  tm1_save_data: asOutputSchema(MutationResultSchema),
   tm1_set_cube_rules: asOutputSchema(MutationResultSchema),
   tm1_toggle_chore: asOutputSchema(MutationResultSchema),
   tm1_unload_cube: asOutputSchema(MutationResultSchema),

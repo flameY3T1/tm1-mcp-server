@@ -16,8 +16,8 @@ siehe `TOOL_AUDIT.md` §7).
 
 | Gap | REST-API | Aufwand | Begründung |
 |---|---|---|---|
-| **`tm1_save_data`** (SaveDataAll, optional pro Cube) | `tm1.SaveData` / Cube-Action | XS | Tägliche Admin-Operation. Nach jeder Write-Session Pflicht, sonst Datenverlust-Risiko bei Server-Crash. Einziger Weg aktuell: TI-Prozess schreiben. |
-| **`confirm`-Param auf destruktiven Tools** | — | S | `delete_cube`, `delete_dimension`, `delete_process`, `clear_cube` löschen ohne Rückfrage (R2-10, im Code nicht vorhanden — Grep leer). Alternativ: MCP-Elicitation statt Param. |
+| ~~`tm1_save_data`~~ | unbound `ExecuteProcessWithReturn` (`SaveDataAll;`/`CubeSaveData`) | XS | **UMGESETZT 2026-06-06.** Keine native SaveData-OData-Action ($metadata verifiziert) — läuft als unbound TI. v11-only (`requiresVersion`-Annotation). Live-getestet. |
+| ~~`confirm`-Param auf destruktiven Tools~~ | — | — | **EXISTIERT BEREITS** (`src/tools/confirm.ts`, R2-10): `requireConfirm` auf delete_cube/_dimension/_process, clear_cube. Ursprüngliche Gap-Meldung war Grep-Fehler (falscher Verzeichnisname). |
 
 ### P2 — hoher Impact, mittlerer Aufwand
 
@@ -44,7 +44,7 @@ siehe `TOOL_AUDIT.md` §7).
 | # | Thema | Status / Vorschlag |
 |---|---|---|
 | A1 | **Multi-Instanz** (s.o. P3) | Größter struktureller Hebel. Service-Composition-Pattern bleibt — Registry liefert pro Instanz einen Service-Satz. |
-| A2 | **MCP-Elicitation für destruktive Ops** | Moderner als `confirm`-Param: Server fordert Bestätigung über Protokoll an. Löst R2-10 eleganter; Fallback `confirm`-Param für Clients ohne Elicitation-Support. |
+| A2 | **MCP-Elicitation für destruktive Ops** | `confirm`-Param existiert bereits (R2-10 umgesetzt). Elicitation wäre optionales Upgrade: Bestätigung über Protokoll statt Param-Wiederholung. Prio niedrig. |
 | A3 | **Progress-Notifications** (R2-02, offen) | 5 Long-Running-Tools (`import_pro_file`, `analyze_callgraph`, `search_code`, `install_pro_bundle`, `diff_process_with_file`). UX, prio mittel. |
 | A4 | **Resource-Subscriptions** (R2-05, offen) | server-state/threads/sessions ohne Polling. Prio niedrig, erst bei realem HTTP-Multi-Client-Einsatz. |
 | A5 | **Auto-Invalidate Callgraph nach Schema-Mutationen** (R2-22, offen) | `upsert_process`/`delete_process` → Cache-Invalidierung automatisch statt manuell. S-Aufwand, klarer Korrektheitsgewinn. |
@@ -67,10 +67,10 @@ Empfehlung: zusammen mit Feeder-Tracing (P2) ein `tm1-rule-debug`-Skill — Trac
 
 ## 4. Empfohlene Reihenfolge
 
-1. **`tm1_save_data`** — XS, sofortiger Alltagsnutzen.
-2. **Destruktive Ops absichern** (Elicitation + `confirm`-Fallback) — S, Sicherheitsgewinn.
+1. ~~**`tm1_save_data`**~~ — umgesetzt 2026-06-06 (Tool 102).
+2. ~~**Destruktive Ops absichern**~~ — war bereits umgesetzt (R2-10, `confirm.ts`).
 3. **Sandbox-Tools** — M, neue Nutzergruppe (Planner).
-4. **Feeder-/Cell-Tracing** — M, stärkt vorhandene Audit-Stärke.
+4. **Feeder-/Cell-Tracing** — M, stärkt vorhandene Audit-Stärke. `CheckFeeders`-Action in $metadata bestätigt.
 5. **`tm1_get_audit_log` + `tm1_create_native_view`** — je S, rundet Lücken ab.
 6. **Multi-Instanz** — L, eigenes Design-Dokument vorab (`docs/plans/`).
 

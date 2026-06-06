@@ -103,6 +103,55 @@ export class ProcessService {
   }
 
   /**
+   * Persist in-memory cube data to disk — SaveDataAll (all cubes) or
+   * CubeSaveData (single cube). The REST API exposes no native SaveData
+   * action ($metadata verified), so this routes through the service-root
+   * ExecuteProcessWithReturn (available since 11.3) with an unbound TI
+   * process — no persistent process object is created. v11-only: both TI
+   * functions are removed in v12 (cloud engine persists automatically).
+   * POST /api/v1/ExecuteProcessWithReturn
+   */
+  async saveData(cubeName?: string, opts?: RequestOptions): Promise<ProcessResult> {
+    const prolog =
+      cubeName !== undefined
+        ? `CubeSaveData('${cubeName.replace(/'/g, "''")}');`
+        : "SaveDataAll;";
+    const body = {
+      Process: {
+        Name: "}tm1-mcp-save-data",
+        HasSecurityAccess: false,
+        PrologProcedure: prolog,
+        MetadataProcedure: "",
+        DataProcedure: "",
+        EpilogProcedure: "",
+        DataSource: { Type: "None" },
+      },
+    };
+
+    try {
+      const response = await this.http.request<{
+        ProcessExecuteStatusCode?: string;
+        ErrorLogFile?: { Filename?: string } | null;
+      }>("POST", "/api/v1/ExecuteProcessWithReturn", body, opts);
+      const status = response?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
+      return {
+        success: status === "CompletedSuccessfully",
+        processErrorStatus: status,
+        errorLogFile: response?.ErrorLogFile?.Filename,
+      };
+    } catch (error) {
+      if (error instanceof TM1Error) {
+        return {
+          success: false,
+          processErrorStatus: error.details ?? error.message,
+          errorLogFile: undefined,
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Get the parameters of a TI process.
    * GET /api/v1/Processes('{name}')/Parameters
    */

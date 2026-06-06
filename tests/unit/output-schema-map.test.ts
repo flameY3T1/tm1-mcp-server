@@ -155,6 +155,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         "tm1_resolve_default_member",
         "tm1_resolve_default_members",
         "tm1_sample_cells",
+        "tm1_save_data",
         "tm1_search_code",
         "tm1_search_files",
         "tm1_set_cube_rules",

@@ -252,4 +252,56 @@ describe("TM1Client – Process Execution Methods", () => {
       expect(url).toContain("Processes('My%20Process')");
     });
   });
+
+  // ── saveData() ────────────────────────────────────────────────────────────
+
+  describe("saveData()", () => {
+    it("should run SaveDataAll as unbound process when no cube is given", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ProcessExecuteStatusCode: "CompletedSuccessfully" }),
+      );
+
+      const result = await client.processes.saveData();
+
+      expect(result).toEqual({
+        success: true,
+        processErrorStatus: "CompletedSuccessfully",
+        errorLogFile: undefined,
+      });
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/ExecuteProcessWithReturn");
+      expect(opts.method).toBe("POST");
+      const body = JSON.parse(opts.body);
+      expect(body.Process.PrologProcedure).toBe("SaveDataAll;");
+      expect(body.Process.DataSource).toEqual({ Type: "None" });
+    });
+
+    it("should run CubeSaveData for a single cube and escape quotes", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ProcessExecuteStatusCode: "CompletedSuccessfully" }),
+      );
+
+      await client.processes.saveData("Bob's Cube");
+
+      const [, opts] = fetchSpy.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.Process.PrologProcedure).toBe("CubeSaveData('Bob''s Cube');");
+    });
+
+    it("should report failure status and error log file", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ProcessExecuteStatusCode: "CompletedWithMessages",
+          ErrorLogFile: { Filename: "TM1ProcessError_x.log" },
+        }),
+      );
+
+      const result = await client.processes.saveData();
+
+      expect(result.success).toBe(false);
+      expect(result.processErrorStatus).toBe("CompletedWithMessages");
+      expect(result.errorLogFile).toBe("TM1ProcessError_x.log");
+    });
+  });
 });

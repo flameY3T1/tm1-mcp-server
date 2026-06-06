@@ -97,6 +97,9 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_list_threads: READ_ONLY,
   tm1_cancel_thread: DESTRUCTIVE,
   tm1_get_transaction_log: READ_ONLY,
+  // Idempotent: repeat runs converge on the same end state (disk == memory).
+  // v11-only: SaveDataAll/CubeSaveData removed in v12 (auto-persistence).
+  tm1_save_data: withVersion(IDEMPOTENT_WRITE, "v11"),
 
   // ti-development (process execution / params)
   tm1_execute_process: DESTRUCTIVE,
