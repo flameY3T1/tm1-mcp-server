@@ -1,0 +1,42 @@
+<evaluation>
+   <qa_pair>
+      <question>The TM1 server has exactly one scheduled chore. The orchestration process that this chore runs executes another process internally to check the plan. What is the name of that internally executed process?</question>
+      <answer>Validate.Plan</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>There is a TI process that copies resource planning data from a source version to a target version. What is the default value of its target version parameter?</question>
+      <answer>FC_01</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>Among all non-control cubes on the server, which cube is built from the highest number of dimensions? Answer with the cube name.</question>
+      <answer>Cube_Resource</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>In the cube that tracks personnel costs and headcount, a rule computes full-time equivalents from headcount. Which measure is headcount multiplied by in that rule? Answer with the measure element name.</question>
+      <answer>EmploymentRate</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>A feeder statement in the personnel cost cube feeds cells in a different cube so that profit-and-loss aggregation is triggered. Which cube receives this cross-cube feeder? Answer with the cube name.</question>
+      <answer>Cube_PnL_Integration</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>In the cube that calculates margins on subcontracted work, all four rule-calculated measures are ultimately fed by one single input measure. What is the name of that measure?</question>
+      <answer>PlannedDays</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>The compliance cube contains a rule that raises a risk flag when cumulative days exceed a limit. That limit is read from a numeric attribute on the supplier dimension. What is the exact name of that attribute?</question>
+      <answer>AUEG_LimitMonths</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>The employee dimension has an alternate hierarchy that groups staff by seniority level. How many consolidated elements does this alternate hierarchy contain? Answer with a number only.</question>
+      <answer>9</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>In the monthly time dimension, what is the name of the single topmost consolidation element (the element with no parents at the highest level)?</question>
+      <answer>Total_Time</answer>
+   </qa_pair>
+   <qa_pair>
+      <question>Exactly one cube on the server contains both a customer dimension and a supplier dimension. What is the name of that cube?</question>
+      <answer>Cube_Subcontractor_Margin</answer>
+   </qa_pair>
+</evaluation>
