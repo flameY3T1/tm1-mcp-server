@@ -245,6 +245,30 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
 }
 ```
 
+### 6.2b Create a native (subset-based) view — TI datasource / suppressed export
+
+```json
+{
+  "tool": "tm1_create_native_view",
+  "args": {
+    "cubeName": "Sales",
+    "viewName": "v_Sales_Export",
+    "rows": [{ "dimension": "Region", "subset": "EU_Countries" }],
+    "columns": [{ "dimension": "Month", "expression": "{TM1SUBSETALL([Month])}" }],
+    "titles": [
+      { "dimension": "Version", "elements": ["Actual"], "selected": "Actual" },
+      { "dimension": "Year", "expression": "{TM1SUBSETALL([Year])}", "selected": "2026" }
+    ],
+    "suppressEmptyRows": true
+  }
+}
+```
+
+Every cube dimension must appear in exactly one of rows/columns/titles. Per
+axis entry exactly one subset source: registered `subset`, MDX `expression`,
+or explicit `elements` (the latter two create anonymous subsets). Titles
+require `selected` — TM1 rejects title subsets without a selected element.
+
 ### 6.3 Create a subset from an MDX expression
 
 ```json
@@ -409,6 +433,25 @@ result means no broken feeders detected.
 
 Omit `cube` for SaveDataAll. Run after write sessions; truncates the
 transaction log for saved cubes.
+
+### 9.7 Who changed what? (audit log, v11)
+
+```json
+{
+  "tool": "tm1_get_audit_log",
+  "args": {
+    "objectType": "Dimension",
+    "since": "2026-06-01T00:00:00Z",
+    "includeDetails": true,
+    "format": "markdown"
+  }
+}
+```
+
+Metadata/security changes (logins, object edits, chore runs) — complements the
+transaction log (cell writes). Requires `AuditLogOn=T` in tm1s.cfg; an empty
+result on an active server usually means auditing is disabled (check
+`auditLogEnabled` in `tm1_get_server_info`).
 
 ---
 

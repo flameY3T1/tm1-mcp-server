@@ -4,6 +4,8 @@
 //
 // See docs/ARCHITECTURE.md for the layering.
 import type {
+  AuditLogDetail,
+  AuditLogEntry,
   CellValue,
   ErrorLogFile,
   MessageLogEntry,
@@ -58,6 +60,65 @@ export class ServerService {
       level: (e.Level ?? "").toUpperCase(),
       message: e.Message ?? e.Text ?? "",
     }));
+  }
+
+  /**
+   * Fetch recent TM1 audit log entries (metadata/security changes), newest
+   * first. Requires AuditLogOn=T in tm1s.cfg — with auditing disabled the
+   * entity set is empty.
+   * GET /api/v1/AuditLogEntries
+   */
+  async getAuditLog(opts: {
+    top?: number | undefined;
+    user?: string | undefined;
+    objectType?: string | undefined;
+    objectName?: string | undefined;
+    since?: string | undefined; // ISO timestamp
+    until?: string | undefined; // ISO timestamp
+    includeDetails?: boolean | undefined;
+  }): Promise<AuditLogEntry[]> {
+    const esc = (s: string): string => s.replace(/'/g, "''");
+    const filters: string[] = [];
+    if (opts.user) filters.push(`UserName eq '${esc(opts.user)}'`);
+    if (opts.objectType) filters.push(`ObjectType eq '${esc(opts.objectType)}'`);
+    if (opts.objectName) filters.push(`ObjectName eq '${esc(opts.objectName)}'`);
+    if (opts.since) filters.push(`TimeStamp ge ${opts.since}`);
+    if (opts.until) filters.push(`TimeStamp le ${opts.until}`);
+
+    const top = opts.top ?? 100;
+    const qs: string[] = [`$top=${top}`, `$orderby=${enc("TimeStamp desc")}`];
+    if (filters.length > 0) qs.push(`$filter=${enc(filters.join(" and "))}`);
+    if (opts.includeDetails) qs.push("$expand=AuditDetails");
+
+    type RawDetail = {
+      ID?: number;
+      TimeStamp?: string;
+      UserName?: string;
+      Description?: string;
+      ObjectType?: string;
+      ObjectName?: string;
+    };
+    type RawEntry = RawDetail & { AuditDetails?: RawDetail[] };
+
+    const response = await this.http.request<{ value: RawEntry[] }>(
+      "GET",
+      `/api/v1/AuditLogEntries?${qs.join("&")}`,
+    );
+
+    const mapDetail = (d: RawDetail): AuditLogDetail => ({
+      id: d.ID ?? 0,
+      timestamp: d.TimeStamp ?? "",
+      user: d.UserName ?? "",
+      description: d.Description ?? "",
+      objectType: d.ObjectType ?? "",
+      objectName: d.ObjectName ?? "",
+    });
+
+    return response.value.map((e): AuditLogEntry => {
+      const entry: AuditLogEntry = mapDetail(e);
+      if (e.AuditDetails !== undefined) entry.details = e.AuditDetails.map(mapDetail);
+      return entry;
+    });
   }
 
   /**

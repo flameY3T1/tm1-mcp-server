@@ -102,6 +102,9 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_list_threads: READ_ONLY,
   tm1_cancel_thread: DESTRUCTIVE,
   tm1_get_transaction_log: READ_ONLY,
+  // v11-only: /AuditLogEntries (file-based audit log) is not exposed by the
+  // v12 REST API.
+  tm1_get_audit_log: withVersion(READ_ONLY, "v11"),
   // Idempotent: repeat runs converge on the same end state (disk == memory).
   // v11-only: SaveDataAll/CubeSaveData removed in v12 (auto-persistence).
   tm1_save_data: withVersion(IDEMPOTENT_WRITE, "v11"),
@@ -156,6 +159,7 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
 
   // views
   tm1_create_mdx_view: WRITE,
+  tm1_create_native_view: WRITE,
   tm1_delete_view: DESTRUCTIVE,
   tm1_list_views: READ_ONLY,
 };

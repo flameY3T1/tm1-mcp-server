@@ -98,6 +98,19 @@ export const TransactionLogEntrySchema = z.object({
   newValue: CellValueSchema,
 });
 
+const AuditLogDetailSchema = z.object({
+  id: z.number().int(),
+  timestamp: z.string(),
+  user: z.string(),
+  description: z.string(),
+  objectType: z.string(),
+  objectName: z.string(),
+});
+
+export const AuditLogEntrySchema = AuditLogDetailSchema.extend({
+  details: z.array(AuditLogDetailSchema).optional(),
+});
+
 export const ErrorLogFileSchema = z.object({
   filename: z.string(),
   lastUpdated: z.string().optional(),

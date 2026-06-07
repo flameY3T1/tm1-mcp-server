@@ -195,6 +195,37 @@ export interface NativeViewDefinition {
   rows: ViewAxisSubsetRef[];
 }
 
+/**
+ * Axis spec for creating a native view. Exactly one subset source per axis:
+ * a registered subset name, an MDX expression, or an explicit element list.
+ */
+export interface NativeViewAxisSpec {
+  dimension: string;
+  /** Defaults to the dimension name (same-named hierarchy). */
+  hierarchy?: string | undefined;
+  subset?: string | undefined;
+  expression?: string | undefined;
+  elements?: string[] | undefined;
+}
+
+export interface NativeViewTitleSpec extends NativeViewAxisSpec {
+  /**
+   * Title element shown as selected; must be in the subset. Required by TM1 —
+   * createNative() rejects title specs without it (optional here only so the
+   * validation is reachable).
+   */
+  selected?: string | undefined;
+}
+
+export interface NativeViewCreate {
+  columns: NativeViewAxisSpec[];
+  rows: NativeViewAxisSpec[];
+  titles?: NativeViewTitleSpec[] | undefined;
+  suppressEmptyColumns?: boolean | undefined;
+  suppressEmptyRows?: boolean | undefined;
+  formatString?: string | undefined;
+}
+
 export interface ViewDefinition {
   cubeName: string;
   viewName: string;
@@ -318,6 +349,21 @@ export interface MessageLogEntry {
   timestamp: string;
   level: string;
   message: string;
+}
+
+/** One audit detail row (nested under an AuditLogEntry). */
+export interface AuditLogDetail {
+  id: number;
+  timestamp: string;
+  user: string;
+  description: string;
+  objectType: string;
+  objectName: string;
+}
+
+/** One /AuditLogEntries row; details present only when expanded. */
+export interface AuditLogEntry extends AuditLogDetail {
+  details?: AuditLogDetail[] | undefined;
 }
 
 export interface CubeRules {

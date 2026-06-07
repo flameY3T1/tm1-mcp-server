@@ -40,6 +40,7 @@ describe("R2-21: requiresVersion annotation extension", () => {
       "tm1_check_feeders",
       "tm1_trace_feeders",
       "tm1_trace_cell_calculation",
+      "tm1_get_audit_log",
     ];
 
     it.each(v11OnlyTools)("%s is tagged requiresVersion='v11'", (tool) => {

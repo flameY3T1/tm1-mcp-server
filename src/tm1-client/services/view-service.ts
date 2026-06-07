@@ -6,7 +6,15 @@
 //
 // See docs/ARCHITECTURE.md for the layering.
 import { TM1Error, TM1ErrorCode } from "../../types.js";
-import type { CellValue, CubeView, ViewDefinition, ViewResult } from "../../types.js";
+import type {
+  CellValue,
+  CubeView,
+  NativeViewAxisSpec,
+  NativeViewCreate,
+  NativeViewTitleSpec,
+  ViewDefinition,
+  ViewResult,
+} from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 import { transformCellsetResponse } from "./cellset-transform.js";
 
@@ -150,12 +158,19 @@ export class ViewService {
       };
     }
 
-    const subsetExpand =
-      "Subset($select=Name,Expression;$expand=Hierarchy($select=Name;$expand=Dimension($select=Name)))";
-    const nativeExpand =
-      `Titles($expand=${subsetExpand},Selected($select=Name)),` +
-      `Columns($expand=${subsetExpand}),` +
-      `Rows($expand=${subsetExpand})`;
+    // Titles/Columns/Rows are complex-type collections — TM1 11.8 rejects
+    // parenthesized expand options directly on them ("Expecting '/' after
+    // property of complex type in expand path") AND pure path form past the
+    // entity ("Expecting qualified entity type"). Working syntax
+    // (live-verified on 11.8): path through the complex part, parenthesized
+    // options from the first entity (Subset) on.
+    const subsetExpand = "Subset($expand=Hierarchy($expand=Dimension))";
+    const nativeExpand = [
+      `Titles/${subsetExpand}`,
+      "Titles/Selected",
+      `Columns/${subsetExpand}`,
+      `Rows/${subsetExpand}`,
+    ].join(",");
     const nativePath = `/api/v1/Cubes('${enc(cubeName)}')/${resolvedSeg}('${enc(viewName)}')/tm1.NativeView?$expand=${nativeExpand}`;
 
     let native: RawNative;
@@ -215,6 +230,77 @@ export class ViewService {
         MDX: mdx,
       },
     );
+  }
+
+  /**
+   * Create a public native view on a cube. Each axis entry references exactly
+   * one subset source: a registered subset (`subset`), an MDX expression
+   * (`expression`), or an explicit element list (`elements`). The latter two
+   * create anonymous (view-private) subsets server-side.
+   * POST /api/v1/Cubes('{c}')/Views with @odata.type = #ibm.tm1.api.v1.NativeView
+   */
+  async createNative(
+    cubeName: string,
+    viewName: string,
+    spec: NativeViewCreate,
+  ): Promise<void> {
+    const hierPath = (a: NativeViewAxisSpec): string =>
+      `Dimensions('${a.dimension}')/Hierarchies('${a.hierarchy ?? a.dimension}')`;
+
+    const mapAxis = (a: NativeViewAxisSpec): Record<string, unknown> => {
+      const sources = [a.subset, a.expression, a.elements].filter((s) => s !== undefined);
+      if (sources.length !== 1) {
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message:
+            `Axis spec for dimension '${a.dimension}' must set exactly one of ` +
+            `subset, expression, or elements.`,
+          endpoint: `/api/v1/Cubes('${cubeName}')/Views`,
+        });
+      }
+      if (a.subset !== undefined) {
+        return { "Subset@odata.bind": `${hierPath(a)}/Subsets('${a.subset}')` };
+      }
+      if (a.expression !== undefined) {
+        return { Subset: { "Hierarchy@odata.bind": hierPath(a), Expression: a.expression } };
+      }
+      return {
+        Subset: {
+          "Hierarchy@odata.bind": hierPath(a),
+          "Elements@odata.bind": (a.elements ?? []).map((e) => `${hierPath(a)}/Elements('${e}')`),
+        },
+      };
+    };
+
+    const mapTitle = (t: NativeViewTitleSpec): Record<string, unknown> => {
+      // TM1 rejects title subsets without a selected element (400: "Selected
+      // element was not specified on Title axis subset.") — fail fast here.
+      if (t.selected === undefined) {
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message:
+            `Title spec for dimension '${t.dimension}' requires a selected element ` +
+            `(TM1 rejects title subsets without one).`,
+          endpoint: `/api/v1/Cubes('${cubeName}')/Views`,
+        });
+      }
+      const axis = mapAxis(t);
+      axis["Selected@odata.bind"] = `${hierPath(t)}/Elements('${t.selected}')`;
+      return axis;
+    };
+
+    const body: Record<string, unknown> = {
+      "@odata.type": "#ibm.tm1.api.v1.NativeView",
+      Name: viewName,
+      Columns: spec.columns.map(mapAxis),
+      Rows: spec.rows.map(mapAxis),
+      Titles: (spec.titles ?? []).map(mapTitle),
+      SuppressEmptyColumns: spec.suppressEmptyColumns ?? false,
+      SuppressEmptyRows: spec.suppressEmptyRows ?? false,
+    };
+    if (spec.formatString !== undefined) body.FormatString = spec.formatString;
+
+    await this.http.request<void>("POST", `/api/v1/Cubes('${enc(cubeName)}')/Views`, body);
   }
 
   /**

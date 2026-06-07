@@ -79,6 +79,7 @@ import { registerCheckCubeRule } from "./model-building/check-cube-rule.js";
 // View tools
 import { registerListViews } from "./views/list-views.js";
 import { registerCreateMdxView } from "./views/create-mdx-view.js";
+import { registerCreateNativeView } from "./views/create-native-view.js";
 import { registerDeleteView } from "./views/delete-view.js";
 
 // Scheduling tools
@@ -94,6 +95,7 @@ import { registerGetThreads } from "./operations/get-threads.js";
 import { registerGetServerInfo } from "./operations/get-server-info.js";
 import { registerGetServerState } from "./operations/get-server-state.js";
 import { registerGetTransactionLog } from "./operations/get-transaction-log.js";
+import { registerGetAuditLog } from "./operations/get-audit-log.js";
 import { registerGetSessions } from "./operations/get-sessions.js";
 import { registerListErrorLogs } from "./operations/list-error-logs.js";
 import { registerGetErrorLogContent } from "./operations/get-error-log-content.js";
@@ -211,6 +213,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   // Views
   registerListViews(server, tm1Client);
   registerCreateMdxView(server, tm1Client);
+  registerCreateNativeView(server, tm1Client);
   registerDeleteView(server, tm1Client);
 
   // Scheduling
@@ -226,6 +229,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerGetServerInfo(server, tm1Client);
   registerGetServerState(server, tm1Client);
   registerGetTransactionLog(server, tm1Client);
+  registerGetAuditLog(server, tm1Client);
   registerGetSessions(server, tm1Client);
   registerListErrorLogs(server, tm1Client);
   registerGetErrorLogContent(server, tm1Client);
