@@ -61,7 +61,9 @@ Won't-fix bleibt: HTTP-Auth/Token-Binding (R2-08/09) — stdio-Default, kein Rem
 
 ## 3. Skill-/Wissens-Gaps (out-of-repo, bestehender Backlog)
 
-Aus `improvements_consolidated` offen geblieben — kein MCP-Server-Code:
+**Out-of-scope für dieses Repo (2026-06-07):** dieses Repo ist nur der MCP-Server.
+Skills/Knowledge-Files leben beim Consumer (Client-Seite), nicht hier. Liste bleibt
+als Referenz stehen:
 
 - **`tm1-rule-debug`-Skill**: jetzt voll möglich — die geshippten Trace-Tools + `tm1_audit_feeders` + `review-ti` ergeben kompletten Debugging-Workflow (statisch finden → per Zelle verifizieren). Erste Stufe bereits im `tm1_rules_review`-Prompt (Schritt 5).
 - **`tm1-monitor`-Skill**: Thread-Monitoring, Error-Log-Triage, Transaction-Audit als geführter Workflow (Tools existieren alle).
@@ -72,7 +74,8 @@ Aus `improvements_consolidated` offen geblieben — kein MCP-Server-Code:
 
 ## 4. Empfohlene Reihenfolge (offen)
 
-*Keine offenen Tool-Gaps mehr.* Verbleibend nur Skill-/Wissens-Backlog (§3).
+*Keine offenen Tool-Gaps mehr.* Skill-/Wissens-Backlog (§3) ist out-of-scope —
+dieses Repo umfasst nur den MCP-Server.
 
 Won't-do (2026-06-07): **Multi-Instanz** (Instanzwahl via MCP-Client-Config, s. A1) und **Sandbox-Tools** (Planner-Workflows kein Use-Case dieses Servers).
 
