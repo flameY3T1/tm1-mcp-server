@@ -29,6 +29,11 @@ function isSafeHttpMethod(method: string): boolean {
 export interface RequestOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
+  // Disable the safe-method network-retry loop for this call. Use for
+  // deterministically-slow endpoints (e.g. the transaction log) where a
+  // timeout means "too much data", not a transient blip — retrying just
+  // multiplies the wait. Default: retries enabled for safe methods.
+  retry?: boolean;
 }
 
 // Link an external AbortSignal (e.g. from RequestHandlerExtra.signal) to a
@@ -84,7 +89,8 @@ export class TM1HttpClient {
   ): Promise<T> {
     const url = `${this.config.baseUrl}${path}`;
     const isSafeMethod = isSafeHttpMethod(method);
-    const maxAttempts = isSafeMethod ? MAX_NETWORK_RETRIES : 0;
+    const allowRetry = opts?.retry !== false;
+    const maxAttempts = isSafeMethod && allowRetry ? MAX_NETWORK_RETRIES : 0;
     let lastError: unknown;
 
     for (let attempt = 0; attempt <= maxAttempts; attempt++) {

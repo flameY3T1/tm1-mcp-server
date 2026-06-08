@@ -6,18 +6,20 @@ import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../for
 export function registerGetTransactionLog(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
     "tm1_get_transaction_log",
-    "Fetch recent TM1 transaction log entries (cell writes), newest first. Optional filters: cube, user, since. NOTE: this endpoint scans the whole log server-side and is slow — a cheap preflight probe runs first to fail fast if it is unreachable or you lack rights; pass `since` to bound the scan.",
+    "Fetch recent TM1 transaction log entries (cell writes), newest first. Optional filters: cube, user, and a since/until time range. NOTE: the endpoint scans the log server-side and a full scan can take minutes-to-hours. A cheap preflight probe fails fast on unreachable/no-rights; without `since` the server walks expanding time windows backward (10min→1y) and stops once `top` rows are found, so it never triggers a full scan. Pass since/until (from-to) to bound it explicitly.",
     {
       top: z.number().int().min(1).max(1000).optional().default(100)
         .describe("Max entries to return (default: 100, max: 1000)"),
       cubeName: z.string().optional().describe("Filter to one cube"),
       user: z.string().optional().describe("Filter to one user"),
       since: z.string().optional()
-        .describe("Only entries on or after this timestamp, interpreted as UTC. Accepts a date '2026-04-17' or datetime '2026-04-17T00:00:00' (a 'Z'/offset is added if missing). Strongly recommended to bound the otherwise-slow full-log scan."),
+        .describe("Lower bound — only entries on or after this timestamp (UTC). Date '2026-04-17' or datetime '2026-04-17T00:00:00' (a 'Z' is added if missing). When omitted, expanding backward windows are used instead of a full scan."),
+      until: z.string().optional()
+        .describe("Upper bound — only entries on or before this timestamp (UTC). Same format as since. Combine with since for an explicit from-to range; with neither, the window anchor is now."),
       ...FORMAT_SCHEMA,
     },
-    async ({ top, cubeName, user, since, format }) => {
-      const entries = await tm1Client.server.getTransactionLog({ top, cubeName, user, since });
+    async ({ top, cubeName, user, since, until, format }) => {
+      const entries = await tm1Client.server.getTransactionLog({ top, cubeName, user, since, until });
       const payload = { count: entries.length, entries };
       type Row = (typeof entries)[number];
       const columns: Column<Row>[] = [

@@ -5,19 +5,6 @@ import { TM1Error, TM1ErrorCode } from "../../src/types.js";
 import { toOdataDateTime } from "../../src/tm1-client/services/server-service.js";
 import type { TM1Config } from "../../src/config.js";
 
-describe("toOdataDateTime", () => {
-  it("appends Z to a zoneless datetime (TM1 rejects bare datetimes)", () => {
-    expect(toOdataDateTime("2026-06-08T00:00:00")).toBe("2026-06-08T00:00:00Z");
-  });
-  it("expands a date-only value to start-of-day UTC", () => {
-    expect(toOdataDateTime("2026-06-08")).toBe("2026-06-08T00:00:00Z");
-  });
-  it("leaves an already-zoned value untouched", () => {
-    expect(toOdataDateTime("2026-06-08T00:00:00Z")).toBe("2026-06-08T00:00:00Z");
-    expect(toOdataDateTime("2026-06-08T00:00:00+02:00")).toBe("2026-06-08T00:00:00+02:00");
-  });
-});
-
 const mockLogger = {
   info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn(),
   fatal: vi.fn(), trace: vi.fn(), child: vi.fn().mockReturnThis(),
@@ -47,7 +34,24 @@ function mockResponse(body: unknown, status = 200): Response {
   } as unknown as Response;
 }
 
-describe("TM1Client – getTransactionLog() preflight probe", () => {
+const ENTRY = (cube: string) => ({
+  TimeStamp: "2026-06-08T10:00:00Z", User: "admin", Cube: cube, Tuple: ["x"], OldValue: 1, NewValue: 2,
+});
+
+describe("toOdataDateTime", () => {
+  it("appends Z to a zoneless datetime (TM1 rejects bare datetimes)", () => {
+    expect(toOdataDateTime("2026-06-08T00:00:00")).toBe("2026-06-08T00:00:00Z");
+  });
+  it("expands a date-only value to start-of-day UTC", () => {
+    expect(toOdataDateTime("2026-06-08")).toBe("2026-06-08T00:00:00Z");
+  });
+  it("leaves an already-zoned value untouched", () => {
+    expect(toOdataDateTime("2026-06-08T00:00:00Z")).toBe("2026-06-08T00:00:00Z");
+    expect(toOdataDateTime("2026-06-08T00:00:00+02:00")).toBe("2026-06-08T00:00:00+02:00");
+  });
+});
+
+describe("TM1Client – getTransactionLog()", () => {
   let fetchSpy: ReturnType<typeof vi.fn>;
   let client: TM1Client;
 
@@ -68,38 +72,71 @@ describe("TM1Client – getTransactionLog() preflight probe", () => {
     vi.unstubAllGlobals();
   });
 
-  it("probes with bare $top=1 (no orderby/filter) then runs the real query", async () => {
+  it("preflight-probes with a bare $top=1 (no orderby/filter)", async () => {
     fetchSpy
       .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
-      .mockResolvedValueOnce(
-        mockResponse({ value: [{ TimeStamp: "2026-06-01T10:00:00", User: "admin", Cube: "Sales", Tuple: ["a"], OldValue: 1, NewValue: 2 }] }),
-      ); // real
+      .mockResolvedValueOnce(mockResponse({ value: [ENTRY("Sales")] })); // window 1
 
-    const entries = await client.server.getTransactionLog({ top: 50 });
+    await client.server.getTransactionLog({ top: 1 });
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
     const probeUrl = fetchSpy.mock.calls[0][0] as string;
     expect(probeUrl).toContain("$top=1");
     expect(probeUrl).not.toContain("$orderby");
     expect(probeUrl).not.toContain("$filter");
-    const realUrl = fetchSpy.mock.calls[1][0] as string;
-    expect(realUrl).toContain("$orderby=TimeStamp desc");
-    expect(realUrl).toContain("$top=50");
-    expect(entries).toHaveLength(1);
   });
 
-  it("normalizes a zoneless `since` into a Z-suffixed $filter (TM1 needs a zone)", async () => {
+  it("no `since`: queries an expanding window and stops once top rows are found", async () => {
     fetchSpy
       .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
-      .mockResolvedValueOnce(mockResponse({ value: [] })); // real
+      .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A"), ENTRY("B")] })); // window 1 has >= top
 
-    await client.server.getTransactionLog({ since: "2026-06-08T00:00:00" });
+    const entries = await client.server.getTransactionLog({ top: 2 });
 
-    const realUrl = decodeURIComponent(fetchSpy.mock.calls[1][0] as string);
-    expect(realUrl).toContain("TimeStamp ge 2026-06-08T00:00:00Z");
+    expect(entries).toHaveLength(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(2); // probe + 1 window only
+    const w1 = decodeURIComponent(fetchSpy.mock.calls[1][0] as string);
+    expect(w1).toContain("$orderby=TimeStamp desc");
+    expect(w1).toContain("TimeStamp ge "); // a window lower bound was applied
+    expect(w1).toContain("Z"); // UTC literal
   });
 
-  it("rethrows PERMISSION_DENIED from the probe and skips the heavy query", async () => {
+  it("no `since`: widens the window when the first is short", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
+      .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A")] })) // window 1 short (<top)
+      .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A"), ENTRY("B")] })); // window 2 enough
+
+    const entries = await client.server.getTransactionLog({ top: 2 });
+
+    expect(entries).toHaveLength(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(3); // probe + 2 windows
+  });
+
+  it("explicit `since` runs a single bounded query (no windowing) with a Z literal", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
+      .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A")] })); // single query
+
+    await client.server.getTransactionLog({ since: "2026-06-08T00:00:00", top: 100 });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2); // probe + one query, no widening
+    const url = decodeURIComponent(fetchSpy.mock.calls[1][0] as string);
+    expect(url).toContain("TimeStamp ge 2026-06-08T00:00:00Z");
+  });
+
+  it("since + until produces a from-to range filter", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
+      .mockResolvedValueOnce(mockResponse({ value: [] })); // single query
+
+    await client.server.getTransactionLog({ since: "2026-06-01", until: "2026-06-08", top: 10 });
+
+    const url = decodeURIComponent(fetchSpy.mock.calls[1][0] as string);
+    expect(url).toContain("TimeStamp ge 2026-06-01T00:00:00Z");
+    expect(url).toContain("TimeStamp le 2026-06-08T00:00:00Z");
+  });
+
+  it("rethrows PERMISSION_DENIED from the probe and skips the query", async () => {
     fetchSpy.mockResolvedValueOnce(
       mockResponse({ error: { code: "65", message: "ObjectSecurityNoReadRights" } }, 400),
     );
@@ -107,22 +144,31 @@ describe("TM1Client – getTransactionLog() preflight probe", () => {
     await expect(client.server.getTransactionLog({})).rejects.toMatchObject({
       code: TM1ErrorCode.PERMISSION_DENIED,
     });
-    expect(fetchSpy).toHaveBeenCalledTimes(1); // probe only, real query skipped
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("maps a non-permission probe failure to an actionable TM1_ERROR", async () => {
-    fetchSpy.mockResolvedValue(
-      mockResponse({ error: { message: "Internal error" } }, 500),
-    );
+  it("explicit `since` surfaces an actionable error when the query fails", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe ok
+      .mockResolvedValue(mockResponse({ error: { message: "boom" } }, 500)); // query fails
 
     try {
-      await client.server.getTransactionLog({});
+      await client.server.getTransactionLog({ since: "2026-06-01" });
       expect.unreachable("should have thrown");
     } catch (e) {
       const err = e as TM1Error;
       expect(err.code).toBe(TM1ErrorCode.TM1_ERROR);
-      expect(err.message).toContain("Transaction log preflight failed");
-      expect(err.hint).toContain("Narrow the query");
+      expect(err.message).toContain("time range is too large");
+      expect(err.hint).toContain("from-to");
     }
+  });
+
+  it("no `since`: a window failure stops widening and returns what was collected", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe ok
+      .mockResolvedValue(mockResponse({ error: { message: "boom" } }, 500)); // every window fails
+
+    const entries = await client.server.getTransactionLog({ top: 5 });
+    expect(entries).toEqual([]); // degraded, not thrown
   });
 });

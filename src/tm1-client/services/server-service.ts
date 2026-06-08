@@ -21,6 +21,28 @@ import type { TM1HttpClient } from "../http.js";
 // NO $orderby, NO $filter, so TM1 can stop after the first row and the result
 // is at most one entry — bounded by a short timeout to fail fast.
 const TXLOG_PROBE_TIMEOUT_MS = 8000;
+// Per-window query timeout. Each windowed/bounded query runs once (no retry),
+// so a timeout means the range is too large/dense — not a transient blip.
+const TXLOG_QUERY_TIMEOUT_MS = 20000;
+// Expanding lookback windows (ms) for the no-`since` adaptive backfill. We walk
+// backward from the anchor, widening until `top` rows are collected or the last
+// window is exhausted — so an open-ended call never triggers a full-log scan.
+const TXLOG_BACKFILL_WINDOWS_MS = [
+  10 * 60_000, // 10 min
+  60 * 60_000, // 1 h
+  6 * 3_600_000, // 6 h
+  24 * 3_600_000, // 1 d
+  3 * 86_400_000, // 3 d
+  7 * 86_400_000, // 7 d
+  30 * 86_400_000, // 30 d
+  90 * 86_400_000, // 90 d
+  365 * 86_400_000, // 1 y
+];
+
+// Format an epoch-ms instant as an OData UTC literal (second precision, no ms).
+function epochToOData(ms: number): string {
+  return `${new Date(ms).toISOString().slice(0, 19)}Z`;
+}
 
 /**
  * Normalize a user timestamp into an OData v4 DateTimeOffset literal for a
@@ -152,39 +174,119 @@ export class ServerService {
     top?: number | undefined;
     cubeName?: string | undefined;
     user?: string | undefined;
-    since?: string | undefined; // ISO timestamp
+    since?: string | undefined; // ISO timestamp (lower bound)
+    until?: string | undefined; // ISO timestamp (upper bound)
   }): Promise<TransactionLogEntry[]> {
-    const filters: string[] = [];
-    if (opts.cubeName) filters.push(`Cube eq '${opts.cubeName.replace(/'/g, "''")}'`);
-    if (opts.user) filters.push(`User eq '${opts.user.replace(/'/g, "''")}'`);
-    if (opts.since) filters.push(`TimeStamp ge ${toOdataDateTime(opts.since)}`);
-    // Preflight: bare $top=1 (no orderby/filter) with a short timeout. Fails
-    // fast with actionable guidance instead of hanging the heavy query for
-    // minutes when the log is unresponsive or the caller lacks read rights.
+    const top = opts.top ?? 100;
+
+    // Preflight: bare $top=1 (no orderby/filter) — cheap reachability/permission
+    // gate that fails fast instead of hanging.
     await this.probeTransactionLog();
 
-    const top = opts.top ?? 100;
-    const qs: string[] = [`$top=${top}`, `$orderby=TimeStamp desc`];
+    // Explicit lower bound → a single bounded query [since, until].
+    if (opts.since !== undefined) {
+      return this.queryTransactionLog({
+        top,
+        cubeName: opts.cubeName,
+        user: opts.user,
+        since: opts.since,
+        until: opts.until,
+      });
+    }
+
+    // No lower bound → adaptive backward windowing from `until` (or now). An
+    // unbounded TransactionLogEntries scan takes minutes-to-hours; instead we
+    // probe expanding windows and stop as soon as we have `top` rows. If a wide
+    // window times out we keep the rows already collected rather than failing.
+    const anchorMs =
+      opts.until !== undefined ? Date.parse(toOdataDateTime(opts.until)) : Date.now();
+    let collected: TransactionLogEntry[] = [];
+    for (const windowMs of TXLOG_BACKFILL_WINDOWS_MS) {
+      let entries: TransactionLogEntry[];
+      try {
+        entries = await this.queryTransactionLog({
+          top,
+          cubeName: opts.cubeName,
+          user: opts.user,
+          since: epochToOData(anchorMs - windowMs),
+          until: opts.until,
+        });
+      } catch (err) {
+        // Permission/auth must surface; a window timeout just stops widening.
+        if (
+          err instanceof TM1Error &&
+          (err.code === TM1ErrorCode.PERMISSION_DENIED || err.code === TM1ErrorCode.AUTH_FAILED)
+        ) {
+          throw err;
+        }
+        break;
+      }
+      if (entries.length >= top) return entries;
+      collected = entries;
+    }
+    return collected;
+  }
+
+  /**
+   * Single bounded TransactionLogEntries query. Runs once (retry disabled) under
+   * a dedicated timeout: the endpoint is deterministically slow, so a timeout
+   * means "range too large", not a transient blip. PERMISSION_DENIED/AUTH_FAILED
+   * pass through; anything else becomes an actionable "narrow the range" error.
+   */
+  private async queryTransactionLog(q: {
+    top: number;
+    cubeName?: string | undefined;
+    user?: string | undefined;
+    since?: string | undefined;
+    until?: string | undefined;
+  }): Promise<TransactionLogEntry[]> {
+    const filters: string[] = [];
+    if (q.cubeName) filters.push(`Cube eq '${q.cubeName.replace(/'/g, "''")}'`);
+    if (q.user) filters.push(`User eq '${q.user.replace(/'/g, "''")}'`);
+    if (q.since) filters.push(`TimeStamp ge ${toOdataDateTime(q.since)}`);
+    if (q.until) filters.push(`TimeStamp le ${toOdataDateTime(q.until)}`);
+    const qs: string[] = [`$top=${q.top}`, `$orderby=TimeStamp desc`];
     if (filters.length > 0) qs.push(`$filter=${enc(filters.join(" and "))}`);
     const path = `/api/v1/TransactionLogEntries?${qs.join("&")}`;
-    const response = await this.http.request<{
-      value: Array<{
-        TimeStamp?: string;
-        User?: string;
-        Cube?: string;
-        Tuple?: string[];
-        OldValue?: CellValue;
-        NewValue?: CellValue;
-      }>;
-    }>("GET", path);
-    return response.value.map((e) => ({
-      timestamp: e.TimeStamp ?? "",
-      user: e.User ?? "",
-      cubeName: e.Cube ?? "",
-      elements: e.Tuple ?? [],
-      oldValue: e.OldValue ?? null,
-      newValue: e.NewValue ?? null,
-    }));
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TXLOG_QUERY_TIMEOUT_MS);
+    try {
+      const response = await this.http.request<{
+        value: Array<{
+          TimeStamp?: string;
+          User?: string;
+          Cube?: string;
+          Tuple?: string[];
+          OldValue?: CellValue;
+          NewValue?: CellValue;
+        }>;
+      }>("GET", path, undefined, { signal: controller.signal, retry: false });
+      return response.value.map((e) => ({
+        timestamp: e.TimeStamp ?? "",
+        user: e.User ?? "",
+        cubeName: e.Cube ?? "",
+        elements: e.Tuple ?? [],
+        oldValue: e.OldValue ?? null,
+        newValue: e.NewValue ?? null,
+      }));
+    } catch (err) {
+      if (
+        err instanceof TM1Error &&
+        (err.code === TM1ErrorCode.PERMISSION_DENIED || err.code === TM1ErrorCode.AUTH_FAILED)
+      ) {
+        throw err;
+      }
+      throw new TM1Error({
+        code: TM1ErrorCode.TM1_ERROR,
+        message: `Transaction log query exceeded ${TXLOG_QUERY_TIMEOUT_MS / 1000}s — the time range is too large or dense.`,
+        endpoint: path,
+        details: err instanceof Error ? err.message : String(err),
+        hint: "Bound the scan with a narrower since/until (from-to) range, or add cubeName/user.",
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**
