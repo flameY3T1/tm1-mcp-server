@@ -226,6 +226,48 @@ describe("TM1Client", () => {
       }
     });
 
+    it("should throw PERMISSION_DENIED for 400 ObjectSecurityNoReadRights", async () => {
+      // TM1 returns security denials as HTTP 400 with a security message, not 403
+      // — e.g. a non-admin reading the }DimensionProperties control cube.
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 400,
+          body: { error: { code: "65", message: "ObjectSecurityNoReadRights" } },
+        }),
+      );
+
+      try {
+        await client.testRequest("POST", "/api/v1/ExecuteMDX");
+        expect.unreachable("Should have thrown");
+      } catch (e) {
+        expect(e).toBeInstanceOf(TM1Error);
+        const err = e as TM1Error;
+        expect(err.code).toBe(TM1ErrorCode.PERMISSION_DENIED);
+        expect(err.httpStatus).toBe(400);
+        expect(err.details).toBe("ObjectSecurityNoReadRights");
+      }
+    });
+
+    it("keeps VALIDATION-style 400s as generic (not a security message)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 400,
+          body: { error: { message: { value: "Syntax error in MDX statement" } } },
+        }),
+      );
+
+      try {
+        await client.testRequest("POST", "/api/v1/ExecuteMDX");
+        expect.unreachable("Should have thrown");
+      } catch (e) {
+        const err = e as TM1Error;
+        expect(err.code).toBe(TM1ErrorCode.TM1_ERROR);
+        expect(err.httpStatus).toBe(400);
+      }
+    });
+
     it("should throw NOT_FOUND for 404", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({

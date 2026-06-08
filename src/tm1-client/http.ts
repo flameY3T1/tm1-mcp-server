@@ -361,6 +361,20 @@ export class TM1HttpClient {
     endpoint: string,
     details?: string,
   ): TM1Error {
+    // TM1 signals object-level security denial via the error MESSAGE, often
+    // with HTTP 400 (not 403) — e.g. reading a control cube as a non-admin
+    // returns 400 {"error":{"code":"65","message":"ObjectSecurityNoReadRights"}}.
+    // Classify by message so the caller gets PERMISSION_DENIED + its actionable
+    // hint instead of a generic TM1_ERROR. Verified live with a cube-only user.
+    if (details && /No(Read|Write|Admin)Rights|ObjectSecurity|SecurityAccess|not\s+authori[sz]ed/i.test(details)) {
+      return new TM1Error({
+        code: TM1ErrorCode.PERMISSION_DENIED,
+        message: details,
+        httpStatus: status,
+        endpoint,
+        details,
+      });
+    }
     switch (status) {
       case 401:
         return new TM1Error({

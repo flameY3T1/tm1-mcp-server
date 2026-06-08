@@ -57,7 +57,17 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
         // Invalid changedSince throws TM1Error(VALIDATION_ERROR); the index.ts
         // proxy formats it into the uniform error envelope.
         const since = changedSince !== undefined ? normalizeChangedSince(changedSince) : undefined;
-        const stamps = await tm1Client.dimensions.getLastUpdatedMap();
+        // }DimensionProperties is a control cube — a caller without read rights
+        // gets a security error. When changedSince was requested the filter
+        // can't be honoured, so surface it; when only includeLastUpdated was
+        // asked, degrade to lastUpdated:null so the base dimension list survives.
+        let stamps: Map<string, string>;
+        try {
+          stamps = await tm1Client.dimensions.getLastUpdatedMap();
+        } catch (err) {
+          if (since !== undefined) throw err;
+          stamps = new Map();
+        }
         dimensions = dimensions.map((d) => ({
           ...d,
           lastUpdated: decodeTm1Timestamp(stamps.get(d.name) ?? null),
