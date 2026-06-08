@@ -9,7 +9,7 @@ Tested against TM1 11.8 via REST API (Basic Auth).
 
 ## Features
 
-102 tools across 12 categories:
+107 tools across 12 categories:
 
 | Category | Tools |
 |---|---|
@@ -79,6 +79,7 @@ For multi-client / remote setups, switch to MCP **Streamable HTTP**:
 TM1_MCP_TRANSPORT=http
 TM1_MCP_HTTP_HOST=127.0.0.1   # default — bind loopback only
 TM1_MCP_HTTP_PORT=3000        # default
+TM1_MCP_HTTP_ALLOWED_ORIGINS= # optional, comma-separated extra Origins past DNS-rebinding protection
 ```
 
 Then `npm start` exposes a single `POST /mcp` endpoint speaking JSON-RPC
