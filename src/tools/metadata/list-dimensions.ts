@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
 import {
   decodeTm1Timestamp,
   normalizeChangedSince,
@@ -55,24 +54,9 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
 
       const wantLastUpdated = includeLastUpdated || changedSince !== undefined;
       if (wantLastUpdated) {
-        let since: string | undefined;
-        if (changedSince !== undefined) {
-          try {
-            since = normalizeChangedSince(changedSince);
-          } catch (e) {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: JSON.stringify({
-                    error: e instanceof TM1Error ? e.message : `Invalid changedSince: ${String(e)}`,
-                  }),
-                },
-              ],
-              isError: true,
-            };
-          }
-        }
+        // Invalid changedSince throws TM1Error(VALIDATION_ERROR); the index.ts
+        // proxy formats it into the uniform error envelope.
+        const since = changedSince !== undefined ? normalizeChangedSince(changedSince) : undefined;
         const stamps = await tm1Client.dimensions.getLastUpdatedMap();
         dimensions = dimensions.map((d) => ({
           ...d,

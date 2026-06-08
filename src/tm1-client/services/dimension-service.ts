@@ -55,6 +55,7 @@ export function normalizeChangedSince(input: string): string {
     throw new TM1Error({
       code: TM1ErrorCode.VALIDATION_ERROR,
       message: `Invalid changedSince '${input}': need at least a full date (e.g. 2026-04-01).`,
+      details: input,
     });
   }
   return digits.padEnd(14, "0").slice(0, 14);
