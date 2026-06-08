@@ -18,6 +18,30 @@ import type { RequestOptions, TM1HttpClient } from "../http.js";
 
 const enc = encodeURIComponent;
 
+// Encode a TI parameter for the OData write body.
+//
+// `Type` uses the tm1.ProcessVariableType enum (String=1, Numeric=2 — verified
+// against the live $metadata). On v11 TM1 actually ignores this field and
+// classifies the parameter from the JSON type of `Value`, so the decisive part
+// is coercing `Value` to match the declared `type`: a Numeric parameter whose
+// defaultValue arrived as the string "0" would otherwise be stored as String.
+function encodeParameter(p: ProcessParameter): Record<string, unknown> {
+  const numeric = p.type === "Numeric";
+  let value: string | number;
+  if (numeric) {
+    const n = Number(p.defaultValue);
+    value = Number.isFinite(n) ? n : 0;
+  } else {
+    value = String(p.defaultValue);
+  }
+  return {
+    Name: p.name,
+    Type: numeric ? 2 : 1,
+    Value: value,
+    ...(p.prompt ? { Prompt: p.prompt } : {}),
+  };
+}
+
 export class ProcessService {
   constructor(private readonly http: TM1HttpClient) {}
 
@@ -458,19 +482,8 @@ export class ProcessService {
    */
   async updateParameters(processName: string, params: ProcessParameter[]): Promise<void> {
     const path = `/api/v1/Processes('${enc(processName)}')`;
-    // FIXME: write-direction Type encoding is INVERTED relative to OData metadata
-    // (tm1.ProcessVariableType maps String=1, Numeric=2 — opposite of below).
-    // TM1 v11 currently accepts both because of enum coercion leniency, but
-    // this could silently mis-classify params. Tracked for follow-up; needs
-    // a live PATCH+read roundtrip test before the safer string-name encoding
-    // can be shipped without behavior risk.
     const body = {
-      Parameters: params.map((p) => ({
-        Name: p.name,
-        Type: p.type === "Numeric" ? 1 : 2,
-        Value: p.defaultValue,
-        ...(p.prompt ? { Prompt: p.prompt } : {}),
-      })),
+      Parameters: params.map(encodeParameter),
     };
     await this.http.request<void>("PATCH", path, body);
   }
@@ -529,12 +542,7 @@ export class ProcessService {
     };
 
     if (input.parameters) {
-      processBody.Parameters = input.parameters.map((p) => ({
-        Name: p.name,
-        Type: p.type === "Numeric" ? 1 : 2,
-        Value: p.defaultValue,
-        ...(p.prompt ? { Prompt: p.prompt } : {}),
-      }));
+      processBody.Parameters = input.parameters.map(encodeParameter);
     }
 
     if (input.variables) {

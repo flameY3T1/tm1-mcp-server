@@ -447,12 +447,12 @@ describe("TM1Client – TI Development Methods", () => {
       expect(opts.method).toBe("PATCH");
       const body = JSON.parse(opts.body);
       expect(body.Parameters).toEqual([
-        { Name: "pFile", Type: 2, Value: "/data/in.csv", Prompt: "File path" },
-        { Name: "pYear", Type: 1, Value: 2024 },
+        { Name: "pFile", Type: 1, Value: "/data/in.csv", Prompt: "File path" },
+        { Name: "pYear", Type: 2, Value: 2024 },
       ]);
     });
 
-    it("should map Numeric type to 1 and String type to 2", async () => {
+    it("should map String type to 1 and Numeric type to 2 (OData enum)", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
       await client.processes.updateParameters("TestProcess", [
@@ -462,8 +462,8 @@ describe("TM1Client – TI Development Methods", () => {
 
       const [, opts] = fetchSpy.mock.calls[0];
       const body = JSON.parse(opts.body);
-      expect(body.Parameters[0].Type).toBe(1);
-      expect(body.Parameters[1].Type).toBe(2);
+      expect(body.Parameters[0].Type).toBe(2);
+      expect(body.Parameters[1].Type).toBe(1);
     });
 
     it("should send empty Parameters array when no params provided", async () => {

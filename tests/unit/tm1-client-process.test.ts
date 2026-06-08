@@ -304,4 +304,65 @@ describe("TM1Client – Process Execution Methods", () => {
       expect(result.errorLogFile).toBe("TM1ProcessError_x.log");
     });
   });
+
+  // Regression: TM1 v11 ignores the parameter `Type` field and classifies a
+  // parameter from the JSON type of `Value`. Encoding must coerce `Value` to
+  // the declared `type` (and emit the correct OData enum: String=1, Numeric=2),
+  // otherwise a Numeric param whose default arrives as a string is stored as
+  // String. Verified against a live PATCH+read roundtrip.
+  describe("updateParameters() – parameter encoding", () => {
+    it("encodes Numeric as Type 2 and coerces a string default to a number", async () => {
+      fetchSpy.mockResolvedValueOnce(mock204Response());
+
+      await client.processes.updateParameters("Proc", [
+        { name: "pNum", type: "Numeric", defaultValue: "0" },
+      ]);
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/Processes('Proc')");
+      expect(opts.method).toBe("PATCH");
+      const body = JSON.parse(opts.body);
+      expect(body.Parameters[0]).toEqual({ Name: "pNum", Type: 2, Value: 0 });
+      expect(typeof body.Parameters[0].Value).toBe("number");
+    });
+
+    it("encodes String as Type 1 and coerces a number default to a string", async () => {
+      fetchSpy.mockResolvedValueOnce(mock204Response());
+
+      await client.processes.updateParameters("Proc", [
+        { name: "pStr", type: "String", defaultValue: 0 },
+      ]);
+
+      const [, opts] = fetchSpy.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.Parameters[0]).toEqual({ Name: "pStr", Type: 1, Value: "0" });
+      expect(typeof body.Parameters[0].Value).toBe("string");
+    });
+
+    it("falls back to 0 for a Numeric default that is not a finite number", async () => {
+      fetchSpy.mockResolvedValueOnce(mock204Response());
+
+      await client.processes.updateParameters("Proc", [
+        { name: "pNum", type: "Numeric", defaultValue: "abc" },
+      ]);
+
+      const [, opts] = fetchSpy.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.Parameters[0].Value).toBe(0);
+    });
+
+    it("includes Prompt only when present", async () => {
+      fetchSpy.mockResolvedValueOnce(mock204Response());
+
+      await client.processes.updateParameters("Proc", [
+        { name: "pNum", type: "Numeric", defaultValue: 1, prompt: "Year" },
+        { name: "pStr", type: "String", defaultValue: "" },
+      ]);
+
+      const [, opts] = fetchSpy.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.Parameters[0].Prompt).toBe("Year");
+      expect(body.Parameters[1]).not.toHaveProperty("Prompt");
+    });
+  });
 });

@@ -50,8 +50,15 @@ describe("Property 8: Prozessparameter-Roundtrip", () => {
         expect(writeBody.Parameters).toHaveLength(params.length);
         for (let i = 0; i < params.length; i++) {
           expect(writeBody.Parameters[i].Name).toBe(params[i].name);
-          expect(writeBody.Parameters[i].Type).toBe(params[i].type === "Numeric" ? 1 : 2);
-          expect(writeBody.Parameters[i].Value).toBe(params[i].defaultValue);
+          // OData enum tm1.ProcessVariableType: String=1, Numeric=2.
+          const expectNumeric = params[i].type === "Numeric";
+          expect(writeBody.Parameters[i].Type).toBe(expectNumeric ? 2 : 1);
+          // Value is coerced to the declared type (TM1 v11 classifies from Value).
+          const dv = params[i].defaultValue;
+          const expectedValue = expectNumeric
+            ? (Number.isFinite(Number(dv)) ? Number(dv) : 0)
+            : String(dv);
+          expect(writeBody.Parameters[i].Value).toBe(expectedValue);
         }
       }
 
