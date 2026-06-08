@@ -5,9 +5,10 @@
 // Synced from commit cf73b93 ("fix(webview): robust Ctrl+V paste path + ...")
 // on 2026-05-12. Each entry there carries a `deprecatedInV12: true` flag.
 //
-// Sync procedure: re-run the extraction node-snippet documented in
-// docs/V12_COMPAT_SYNC.md (TODO) whenever IBM publishes a new PA Cloud
-// release notes or the upstream signatures file changes.
+// Sync procedure: when IBM publishes new PA Cloud release notes or the
+// upstream signatures file changes, re-extract from vscode-tm1-ti's
+// tiSignatures.ts (entries flagged `deprecatedInV12: true`) and update the
+// list below, bumping the source commit reference above.
 
 export interface DeprecatedTiEntry {
   /** Canonical name, original casing (e.g. "SaveDataAll"). */
