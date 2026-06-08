@@ -22,6 +22,21 @@ import type { TM1HttpClient } from "../http.js";
 // is at most one entry — bounded by a short timeout to fail fast.
 const TXLOG_PROBE_TIMEOUT_MS = 8000;
 
+/**
+ * Normalize a user timestamp into an OData v4 DateTimeOffset literal for a
+ * TM1 $filter. TM1 rejects a bare `2026-06-08T00:00:00` ("Syntax error … near
+ * -06") — the value MUST carry a timezone. Verified against TM1 11.8: only the
+ * `Z`-suffixed (or ±hh:mm-offset) form parses. Date-only input expands to
+ * start-of-day UTC; a zoneless datetime gets a `Z`; an already-zoned value is
+ * left untouched.
+ */
+export function toOdataDateTime(input: string): string {
+  let t = input.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) t = `${t}T00:00:00`;
+  if (!/[zZ]$/.test(t) && !/[+-]\d{2}:\d{2}$/.test(t)) t = `${t}Z`;
+  return t;
+}
+
 const enc = encodeURIComponent;
 
 export class ServerService {
@@ -142,7 +157,7 @@ export class ServerService {
     const filters: string[] = [];
     if (opts.cubeName) filters.push(`Cube eq '${opts.cubeName.replace(/'/g, "''")}'`);
     if (opts.user) filters.push(`User eq '${opts.user.replace(/'/g, "''")}'`);
-    if (opts.since) filters.push(`TimeStamp ge ${opts.since}`);
+    if (opts.since) filters.push(`TimeStamp ge ${toOdataDateTime(opts.since)}`);
     // Preflight: bare $top=1 (no orderby/filter) with a short timeout. Fails
     // fast with actionable guidance instead of hanging the heavy query for
     // minutes when the log is unresponsive or the caller lacks read rights.

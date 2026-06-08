@@ -2,7 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import { TM1Error, TM1ErrorCode } from "../../src/types.js";
+import { toOdataDateTime } from "../../src/tm1-client/services/server-service.js";
 import type { TM1Config } from "../../src/config.js";
+
+describe("toOdataDateTime", () => {
+  it("appends Z to a zoneless datetime (TM1 rejects bare datetimes)", () => {
+    expect(toOdataDateTime("2026-06-08T00:00:00")).toBe("2026-06-08T00:00:00Z");
+  });
+  it("expands a date-only value to start-of-day UTC", () => {
+    expect(toOdataDateTime("2026-06-08")).toBe("2026-06-08T00:00:00Z");
+  });
+  it("leaves an already-zoned value untouched", () => {
+    expect(toOdataDateTime("2026-06-08T00:00:00Z")).toBe("2026-06-08T00:00:00Z");
+    expect(toOdataDateTime("2026-06-08T00:00:00+02:00")).toBe("2026-06-08T00:00:00+02:00");
+  });
+});
 
 const mockLogger = {
   info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn(),
@@ -72,6 +86,17 @@ describe("TM1Client – getTransactionLog() preflight probe", () => {
     expect(realUrl).toContain("$orderby=TimeStamp desc");
     expect(realUrl).toContain("$top=50");
     expect(entries).toHaveLength(1);
+  });
+
+  it("normalizes a zoneless `since` into a Z-suffixed $filter (TM1 needs a zone)", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
+      .mockResolvedValueOnce(mockResponse({ value: [] })); // real
+
+    await client.server.getTransactionLog({ since: "2026-06-08T00:00:00" });
+
+    const realUrl = decodeURIComponent(fetchSpy.mock.calls[1][0] as string);
+    expect(realUrl).toContain("TimeStamp ge 2026-06-08T00:00:00Z");
   });
 
   it("rethrows PERMISSION_DENIED from the probe and skips the heavy query", async () => {

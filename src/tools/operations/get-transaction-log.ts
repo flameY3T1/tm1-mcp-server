@@ -6,14 +6,14 @@ import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../for
 export function registerGetTransactionLog(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
     "tm1_get_transaction_log",
-    "Fetch recent TM1 transaction log entries (cell writes), newest first. Optional filters: cube, user, since (ISO timestamp).",
+    "Fetch recent TM1 transaction log entries (cell writes), newest first. Optional filters: cube, user, since. NOTE: this endpoint scans the whole log server-side and is slow — a cheap preflight probe runs first to fail fast if it is unreachable or you lack rights; pass `since` to bound the scan.",
     {
       top: z.number().int().min(1).max(1000).optional().default(100)
         .describe("Max entries to return (default: 100, max: 1000)"),
       cubeName: z.string().optional().describe("Filter to one cube"),
       user: z.string().optional().describe("Filter to one user"),
       since: z.string().optional()
-        .describe("Only entries on or after this ISO timestamp, e.g. '2026-04-17T00:00:00'"),
+        .describe("Only entries on or after this timestamp, interpreted as UTC. Accepts a date '2026-04-17' or datetime '2026-04-17T00:00:00' (a 'Z'/offset is added if missing). Strongly recommended to bound the otherwise-slow full-log scan."),
       ...FORMAT_SCHEMA,
     },
     async ({ top, cubeName, user, since, format }) => {
