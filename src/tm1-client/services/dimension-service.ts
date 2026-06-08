@@ -26,6 +26,40 @@ export interface DefaultMemberResolution {
 
 const enc = encodeURIComponent;
 
+/**
+ * Decode a TM1 `}DimensionProperties.LAST_TIME_UPDATED` cell — a 14-digit
+ * `YYYYMMDDHHMMSS` stamp in server-local time — to a naive-local ISO string
+ * (no trailing `Z`, because the value carries no timezone). Returns null for
+ * blank or non-conforming values.
+ */
+export function decodeTm1Timestamp(raw: string | number | null | undefined): string | null {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).trim();
+  if (!/^\d{14}$/.test(s)) return null;
+  return (
+    `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` +
+    `T${s.slice(8, 10)}:${s.slice(10, 12)}:${s.slice(12, 14)}`
+  );
+}
+
+/**
+ * Normalize a user `changedSince` filter (a date or datetime, interpreted as
+ * server-local — same basis as LAST_TIME_UPDATED) into the 14-digit form so
+ * the two compare by plain string ordering. Date-only pads to start-of-day;
+ * partial times pad missing fields with zero. Throws on fewer than 8 date
+ * digits (need at least a full YYYY-MM-DD).
+ */
+export function normalizeChangedSince(input: string): string {
+  const digits = input.replace(/\D/g, "");
+  if (digits.length < 8) {
+    throw new TM1Error({
+      code: TM1ErrorCode.VALIDATION_ERROR,
+      message: `Invalid changedSince '${input}': need at least a full date (e.g. 2026-04-01).`,
+    });
+  }
+  return digits.padEnd(14, "0").slice(0, 14);
+}
+
 export class DimensionService {
   constructor(private readonly http: TM1HttpClient) {}
 
@@ -128,6 +162,38 @@ export class DimensionService {
    */
   async delete(name: string): Promise<void> {
     await this.http.request<void>("DELETE", `/api/v1/Dimensions('${enc(name)}')`);
+  }
+
+  /**
+   * Read per-dimension last-modified timestamps from the `}DimensionProperties`
+   * control cube (`LAST_TIME_UPDATED` measure) in a single MDX round-trip.
+   * Returns a Map of dimension name → raw `YYYYMMDDHHMMSS` string (server-local);
+   * decode with decodeTm1Timestamp(). Dimensions with a blank stamp are absent
+   * from the map. This is a schema-change stamp (structure), bumped on element /
+   * hierarchy / attribute edits — not a data-write stamp.
+   */
+  async getLastUpdatedMap(): Promise<Map<string, string>> {
+    const mdx =
+      "SELECT {[}DimensionProperties].[LAST_TIME_UPDATED]} ON 0, " +
+      "NON EMPTY [}Dimensions].MEMBERS ON 1 FROM [}DimensionProperties]";
+    const res = await this.http.request<{
+      Cells: Array<{ Value: string | number | null }>;
+      Axes: Array<{ Tuples: Array<{ Members: Array<{ Name: string }> }> }>;
+    }>(
+      "POST",
+      "/api/v1/ExecuteMDX?$expand=Cells($select=Value),Axes($expand=Tuples($expand=Members($select=Name)))",
+      { MDX: mdx },
+    );
+    const map = new Map<string, string>();
+    const rows = res.Axes?.[1]?.Tuples ?? [];
+    rows.forEach((tuple, i) => {
+      const name = tuple.Members[0]?.Name;
+      const value = res.Cells[i]?.Value;
+      if (name && value != null && String(value).trim() !== "") {
+        map.set(name, String(value));
+      }
+    });
+    return map;
   }
 
   /**

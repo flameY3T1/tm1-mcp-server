@@ -334,4 +334,45 @@ describe("TM1Client – Dimension Management Methods", () => {
       expect(body.Weight).toBe(0);
     });
   });
+
+  // ── getLastUpdatedMap() ──────────────────────────────────────────────────
+  describe("getLastUpdatedMap()", () => {
+    // Cellset shape from ExecuteMDX over }DimensionProperties: Axes[1] = rows
+    // (dimensions), Cells row-major (one measure column).
+    const cellset = {
+      Cells: [{ Value: "20260401082819" }, { Value: "20250808141356" }, { Value: "" }],
+      Axes: [
+        { Tuples: [{ Members: [{ Name: "LAST_TIME_UPDATED" }] }] },
+        {
+          Tuples: [
+            { Members: [{ Name: "Region" }] },
+            { Members: [{ Name: "Product" }] },
+            { Members: [{ Name: "Blank" }] },
+          ],
+        },
+      ],
+    };
+
+    it("maps dimension name to its raw stamp via a single ExecuteMDX call", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(200, cellset));
+
+      const map = await client.dimensions.getLastUpdatedMap();
+
+      const [url, opts] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/ExecuteMDX");
+      expect(opts.method).toBe("POST");
+      expect(JSON.parse(opts.body).MDX).toContain("}DimensionProperties");
+      expect(map.get("Region")).toBe("20260401082819");
+      expect(map.get("Product")).toBe("20250808141356");
+    });
+
+    it("omits dimensions with a blank stamp", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse(200, cellset));
+
+      const map = await client.dimensions.getLastUpdatedMap();
+
+      expect(map.has("Blank")).toBe(false);
+      expect(map.size).toBe(2);
+    });
+  });
 });

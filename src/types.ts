@@ -116,6 +116,10 @@ export interface Dimension {
   // Per-hierarchy Type breakdown (N/C/S) + maxLevel. Drives orphan & double-hierarchy detection
   // without cube/MDX dependency.
   elementStats?: Record<string, ElementStats>;
+  // Populated only when tm1_list_dimensions({includeLastUpdated: true}) is called.
+  // Naive-local ISO (no Z) decoded from }DimensionProperties.LAST_TIME_UPDATED — a
+  // schema-change stamp. null when the dimension has no stamp.
+  lastUpdated?: string | null;
 }
 
 export interface Hierarchy {
