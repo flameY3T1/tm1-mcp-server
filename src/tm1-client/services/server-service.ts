@@ -3,6 +3,7 @@
 // here mutates server state.
 //
 // See docs/ARCHITECTURE.md for the layering.
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import type {
   AuditLogDetail,
   AuditLogEntry,
@@ -13,6 +14,13 @@ import type {
   TransactionLogEntry,
 } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
+
+// The TransactionLogEntries endpoint scans the whole log server-side and is
+// slow; without log-read rights it can hang until the global request timeout.
+// Before the real (orderby + filtered) query we fire a bare `$top=1` probe —
+// NO $orderby, NO $filter, so TM1 can stop after the first row and the result
+// is at most one entry — bounded by a short timeout to fail fast.
+const TXLOG_PROBE_TIMEOUT_MS = 8000;
 
 const enc = encodeURIComponent;
 
@@ -135,6 +143,11 @@ export class ServerService {
     if (opts.cubeName) filters.push(`Cube eq '${opts.cubeName.replace(/'/g, "''")}'`);
     if (opts.user) filters.push(`User eq '${opts.user.replace(/'/g, "''")}'`);
     if (opts.since) filters.push(`TimeStamp ge ${opts.since}`);
+    // Preflight: bare $top=1 (no orderby/filter) with a short timeout. Fails
+    // fast with actionable guidance instead of hanging the heavy query for
+    // minutes when the log is unresponsive or the caller lacks read rights.
+    await this.probeTransactionLog();
+
     const top = opts.top ?? 100;
     const qs: string[] = [`$top=${top}`, `$orderby=TimeStamp desc`];
     if (filters.length > 0) qs.push(`$filter=${enc(filters.join(" and "))}`);
@@ -157,6 +170,42 @@ export class ServerService {
       oldValue: e.OldValue ?? null,
       newValue: e.NewValue ?? null,
     }));
+  }
+
+  /**
+   * Cheap reachability/permission probe for the transaction log. A bare
+   * `$top=1` (no $orderby/$filter) returns at most one row so TM1 can short-
+   * circuit; a dedicated short-timeout AbortController caps the wait. Passes
+   * through PERMISSION_DENIED/AUTH_FAILED as-is; anything else (timeout,
+   * connection failure) becomes an actionable TM1_ERROR.
+   */
+  private async probeTransactionLog(): Promise<void> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TXLOG_PROBE_TIMEOUT_MS);
+    try {
+      await this.http.request<{ value: unknown[] }>(
+        "GET",
+        "/api/v1/TransactionLogEntries?$top=1",
+        undefined,
+        { signal: controller.signal },
+      );
+    } catch (err) {
+      if (
+        err instanceof TM1Error &&
+        (err.code === TM1ErrorCode.PERMISSION_DENIED || err.code === TM1ErrorCode.AUTH_FAILED)
+      ) {
+        throw err;
+      }
+      throw new TM1Error({
+        code: TM1ErrorCode.TM1_ERROR,
+        message: `Transaction log preflight failed (timeout ${TXLOG_PROBE_TIMEOUT_MS / 1000}s): the endpoint scans the whole log and may hang or be denied without log-read rights.`,
+        endpoint: "/api/v1/TransactionLogEntries",
+        details: err instanceof Error ? err.message : String(err),
+        hint: "Narrow the query with `since`, `cubeName`, or `user`, or verify the account has transaction-log read rights.",
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**
