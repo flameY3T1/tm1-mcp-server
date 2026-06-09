@@ -4,6 +4,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import {
   computeProcessMetrics,
   type ProcessMetrics,
+  type ScoreWeightsInput,
 } from "../../lib/complexity/process-metrics.js";
 import {
   computeRulesMetrics,
@@ -66,16 +67,49 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
         .default(0)
         .describe(
           "Filter: only include entries whose score is >= this value (applied " +
-            "alongside topN). Default 0 (no filter). When > 0, surviving " +
+            "alongside topN, against the rankBy score). Default 0 (no filter). " +
+            "When > 0, surviving " +
             "process/rules entries also drive status='fail'; at 0, status is " +
             "informational and only consistency issues (variable clusters, " +
             "type conflicts) trigger 'fail'.",
         ),
+      rankBy: z
+        .enum(["scoreV1", "scoreV2"])
+        .optional()
+        .default("scoreV1")
+        .describe(
+          "Which process score drives sort, scoreThreshold, and status. " +
+            "'scoreV1' (default) = loc + 2*branches + 3*maxNesting (size/nesting). " +
+            "'scoreV2' = loc + ifCost + loopCost + hotInLoop: loop nesting " +
+            "multiplies geometrically (nestMult^depth), if cost scales with " +
+            "condition complexity and depth, and hot ops (CellPutN/ASCIIOutput/" +
+            "ExecuteProcess/…) inside loops are penalised. Rules always sort by " +
+            "their own score regardless.",
+        ),
+      weights: z
+        .object({
+          loopBase: z.number().optional(),
+          nestMult: z.number().optional(),
+          ifBase: z.number().optional(),
+          hotPenalty: z.number().optional(),
+          commentDiscountMax: z.number().min(0).max(1).optional(),
+        })
+        .optional()
+        .describe(
+          "Override v2 score weights (only affects scoreV2). Defaults: " +
+            "loopBase=2, nestMult=3, ifBase=1, hotPenalty=2, commentDiscountMax=0. " +
+            "Set commentDiscountMax (0..1) to discount scoreV2 by comment ratio " +
+            "(capped); 0 = off. Use to recalibrate without code changes.",
+        ),
     },
-    async ({ scope, includeControl, topN, scoreThreshold }) => {
+    async ({ scope, includeControl, topN, scoreThreshold, rankBy, weights }) => {
       const activeScope: ReadonlyArray<Scope> =
         scope && scope.length > 0 ? scope : SCOPE_DEFAULT;
       const want = (s: Scope) => activeScope.includes(s);
+
+      const scoreWeights: ScoreWeightsInput | undefined = weights;
+      const procScore = (m: ProcessMetrics): number =>
+        rankBy === "scoreV2" ? m.totals.scoreV2 : m.totals.score;
 
       const serverInfo = await tm1Client.server.getInfo();
 
@@ -90,12 +124,16 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
         const all = await tm1Client.processes.getAllCode(includeControl);
         for (const p of all) {
           processMetrics.push(
-            computeProcessMetrics(p.name, {
-              prolog: p.prolog,
-              metadata: p.metadata,
-              data: p.data,
-              epilog: p.epilog,
-            }),
+            computeProcessMetrics(
+              p.name,
+              {
+                prolog: p.prolog,
+                metadata: p.metadata,
+                data: p.data,
+                epilog: p.epilog,
+              },
+              scoreWeights,
+            ),
           );
         }
         if (want("consistency")) {
@@ -131,11 +169,11 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
       // ── Sort + filter + cap ────────────────────────────────────────────
       const processesScanned = processMetrics.length;
       const rulesScanned = rulesMetrics.length;
-      processMetrics.sort((a, b) => b.totals.score - a.totals.score);
+      processMetrics.sort((a, b) => procScore(b) - procScore(a));
       rulesMetrics.sort((a, b) => b.score - a.score);
 
       const topProcesses = processMetrics
-        .filter((m) => m.totals.score >= scoreThreshold)
+        .filter((m) => procScore(m) >= scoreThreshold)
         .slice(0, topN);
       const topRules = rulesMetrics
         .filter((m) => m.score >= scoreThreshold)
@@ -166,6 +204,7 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
                 productVersion: serverInfo.productVersion,
                 scope: activeScope,
                 includeControl,
+                rankBy,
                 scanned: {
                   processes: processesScanned,
                   rules: rulesScanned,

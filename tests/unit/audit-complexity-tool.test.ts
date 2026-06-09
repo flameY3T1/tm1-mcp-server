@@ -222,6 +222,66 @@ describe("tm1_audit_complexity tool", () => {
     expect(out.status).toBe("fail");
   });
 
+  // FlatBig: 10 sibling IFs (branch-heavy, no loops) -> high v1, modest v2.
+  // DeepLoop: 4 nested whiles -> modest v1, high v2 (loop nesting multiplies).
+  const FLAT_BIG = Array.from({ length: 10 }, () => "IF(x=1);\na=1;\nENDIF;").join("\n");
+  const DEEP_LOOP =
+    "WHILE(a<1);\nWHILE(b<1);\nWHILE(c<1);\nWHILE(d<1);\nx=1;\nEND;\nEND;\nEND;\nEND;";
+
+  it("ranks by v1 score by default (branch-heavy process first)", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      processes: [
+        { name: "DeepLoop", prolog: DEEP_LOOP, metadata: "", data: "", epilog: "" },
+        { name: "FlatBig", prolog: FLAT_BIG, metadata: "", data: "", epilog: "" },
+      ],
+    });
+    registerAuditComplexity(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ scope: ["processes"] }));
+    expect(out.topProcesses[0].name).toBe("FlatBig");
+  });
+
+  it("ranks by v2 score when rankBy=scoreV2 (loop-nesting process first)", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      processes: [
+        { name: "FlatBig", prolog: FLAT_BIG, metadata: "", data: "", epilog: "" },
+        { name: "DeepLoop", prolog: DEEP_LOOP, metadata: "", data: "", epilog: "" },
+      ],
+    });
+    registerAuditComplexity(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ scope: ["processes"], rankBy: "scoreV2" }),
+    );
+    expect(out.topProcesses[0].name).toBe("DeepLoop");
+    expect(out.topProcesses[0].totals.scoreV2).toBeGreaterThan(
+      out.topProcesses[1].totals.scoreV2,
+    );
+  });
+
+  it("passes custom weights through to scoreV2", async () => {
+    const tm1Args = {
+      productVersion: "11.8",
+      processes: [
+        { name: "DeepLoop", prolog: DEEP_LOOP, metadata: "", data: "", epilog: "" },
+      ],
+    };
+    const base = makeFakeServer();
+    registerAuditComplexity(base.server, makeFakeTM1Client(tm1Args));
+    const def = parseResult(await base.getHandler()({ scope: ["processes"] }));
+
+    const tuned = makeFakeServer();
+    registerAuditComplexity(tuned.server, makeFakeTM1Client(tm1Args));
+    const out = parseResult(
+      await tuned.getHandler()({ scope: ["processes"], weights: { nestMult: 5 } }),
+    );
+    expect(out.topProcesses[0].totals.scoreV2).toBeGreaterThan(
+      def.topProcesses[0].totals.scoreV2,
+    );
+  });
+
   it("scoreThreshold filters low-score entries", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
