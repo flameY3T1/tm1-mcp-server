@@ -305,4 +305,43 @@ describe("tm1_audit_complexity tool", () => {
       out.topProcesses.every((p: { totals: { score: number } }) => p.totals.score >= 10),
     ).toBe(true);
   });
+
+  it("scope=antipatterns reports findings and fails on an error-severity rule", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      processes: [
+        {
+          name: "Daily_Load",
+          prolog: "CubeClearData('Sales');",
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
+      ],
+    });
+    registerAuditComplexity(fake.server, tm1);
+    const out = parseResult(
+      await fake.getHandler()({ scope: ["antipatterns"] }),
+    );
+    expect(out.antipatterns.findings.map((f: { rule: string }) => f.rule)).toContain(
+      "destructive-unguarded",
+    );
+    expect(out.antipatterns.summary.error).toBe(1);
+    expect(out.status).toBe("fail");
+  });
+
+  it("antipatterns is not scanned by default", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      processes: [
+        { name: "Daily_Load", prolog: "CubeClearData('Sales');", metadata: "", data: "", epilog: "" },
+      ],
+    });
+    registerAuditComplexity(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+    expect(out.antipatterns).toBeNull();
+    expect(out.status).toBe("pass");
+  });
 });

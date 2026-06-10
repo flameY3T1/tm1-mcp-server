@@ -17,9 +17,20 @@ import {
   groupByCohort,
   type ProcessVarInput,
 } from "../../lib/complexity/cross-process.js";
-const SCOPE_VALUES = ["processes", "rules", "consistency"] as const;
+import {
+  lintProcess,
+  type Finding,
+} from "../../lib/complexity/antipatterns.js";
+const SCOPE_VALUES = [
+  "processes",
+  "rules",
+  "consistency",
+  "antipatterns",
+] as const;
 type Scope = (typeof SCOPE_VALUES)[number];
 
+// antipatterns is opt-in (different output shape: a findings list, not a
+// ranked score) and excluded from the default scope.
 const SCOPE_DEFAULT: ReadonlyArray<Scope> = ["processes", "rules", "consistency"];
 
 export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client) {
@@ -41,7 +52,10 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
         .optional()
         .describe(
           "Sections to scan: 'processes' (TI metrics), 'rules' (cube rules), " +
-            "'consistency' (cross-process naming/type/cohort checks). Default: all three.",
+            "'consistency' (cross-process naming/type/cohort checks), " +
+            "'antipatterns' (TI lint findings: destructive-unguarded, " +
+            "exec-in-loop, cellget-perf, hardcoded-path). " +
+            "Default: processes+rules+consistency. 'antipatterns' is opt-in.",
         ),
       includeControl: z
         .boolean()
@@ -101,8 +115,27 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
             "Set commentDiscountMax (0..1) to discount scoreV2 by comment ratio " +
             "(capped); 0 = off. Use to recalibrate without code changes.",
         ),
+      cellGetDimThreshold: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .default(12)
+        .describe(
+          "Only affects scope='antipatterns'. Element-arg count at/above which " +
+            "a CellGetN/CellGetS is flagged as a perf risk (cellget-perf). " +
+            "Default 12. Lower it to surface mid-dimensional cubes too.",
+        ),
     },
-    async ({ scope, includeControl, topN, scoreThreshold, rankBy, weights }) => {
+    async ({
+      scope,
+      includeControl,
+      topN,
+      scoreThreshold,
+      rankBy,
+      weights,
+      cellGetDimThreshold,
+    }) => {
       const activeScope: ReadonlyArray<Scope> =
         scope && scope.length > 0 ? scope : SCOPE_DEFAULT;
       const want = (s: Scope) => activeScope.includes(s);
@@ -115,26 +148,29 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
 
       const processMetrics: ProcessMetrics[] = [];
       const processVarInputs: ProcessVarInput[] = [];
+      const findings: Finding[] = [];
 
       // ── Processes ──────────────────────────────────────────────────────
       // getAllCode / getAllRules apply the control-prefix filter server-side
       // via OData ($filter=not startswith(Name,'}')), so we trust the service
       // and don't double-filter here.
-      if (want("processes") || want("consistency")) {
+      if (want("processes") || want("consistency") || want("antipatterns")) {
         const all = await tm1Client.processes.getAllCode(includeControl);
         for (const p of all) {
+          const code = {
+            prolog: p.prolog,
+            metadata: p.metadata,
+            data: p.data,
+            epilog: p.epilog,
+          };
           processMetrics.push(
-            computeProcessMetrics(
-              p.name,
-              {
-                prolog: p.prolog,
-                metadata: p.metadata,
-                data: p.data,
-                epilog: p.epilog,
-              },
-              scoreWeights,
-            ),
+            computeProcessMetrics(p.name, code, scoreWeights),
           );
+          if (want("antipatterns")) {
+            findings.push(
+              ...lintProcess(p.name, code, { cellGetDimThreshold }),
+            );
+          }
         }
         if (want("consistency")) {
           for (const p of all) {
@@ -188,8 +224,32 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
         consistency !== null &&
         (consistency.variableClusters.length > 0 ||
           consistency.typeConflicts.length > 0);
+
+      // ── Anti-patterns ──────────────────────────────────────────────────
+      const SEV_ORDER = { error: 0, warn: 1, info: 2 } as const;
+      const antipatterns = want("antipatterns")
+        ? (() => {
+            const summary = { error: 0, warn: 0, info: 0 };
+            for (const f of findings) summary[f.severity]++;
+            const sorted = [...findings].sort(
+              (a, b) =>
+                SEV_ORDER[a.severity] - SEV_ORDER[b.severity] ||
+                a.process.localeCompare(b.process) ||
+                a.line - b.line,
+            );
+            const top = sorted.slice(0, topN);
+            return {
+              summary: { ...summary, total: findings.length },
+              findings: top,
+              truncated: findings.length > top.length,
+            };
+          })()
+        : null;
+      const antipatternErrors = antipatterns !== null && antipatterns.summary.error > 0;
+
       const status =
         consistencyIssues ||
+        antipatternErrors ||
         (thresholdActive && (topProcesses.length > 0 || topRules.length > 0))
           ? "fail"
           : "pass";
@@ -249,6 +309,7 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
                 topProcesses,
                 topRules,
                 consistency,
+                antipatterns,
                 truncated: {
                   processes: processMetrics.length > topProcesses.length,
                   rules: rulesMetrics.length > topRules.length,
