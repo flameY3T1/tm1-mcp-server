@@ -34,15 +34,23 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
         .optional()
         .default(false)
         .describe("Index control processes/cubes when building the index. Default: false."),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Cap the number of returned usages. Omit for full bulk load (audit use-case)."),
     },
-    async ({ kind, name, accessMode, includeSystem, includeControl }) => {
+    async ({ kind, name, accessMode, includeSystem, includeControl, limit }) => {
       const index = await buildIndexFromTM1(tm1Client, { includeControl });
-      const usages = buildCubeOrDimUsages(index, kind, name, { includeSystem, accessMode });
+      const all = buildCubeOrDimUsages(index, kind, name, { includeSystem, accessMode });
+      const truncated = limit !== undefined && all.length > limit;
+      const usages = truncated ? all.slice(0, limit) : all;
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ kind, name, accessMode, count: usages.length, usages }, null, 2),
+            text: JSON.stringify({ kind, name, accessMode, count: all.length, returned: usages.length, truncated, usages }),
           },
         ],
       };

@@ -70,19 +70,27 @@ export function registerGetAllCubeRules(server: McpServer, tm1Client: TM1Client)
         .optional()
         .default(false)
         .describe("Drop rulesText, return aggregate metrics per cube instead (default: false)"),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Cap the number of returned cubes. Omit for full bulk load (audit use-case)."),
     },
-    async ({ includeControl, onlyWithRules, summary }) => {
+    async ({ includeControl, onlyWithRules, summary, limit }) => {
       let all = await tm1Client.cubes.getAllRules(includeControl);
       if (onlyWithRules) all = all.filter((c) => c.rulesText.trim().length > 0);
+      const truncated = limit !== undefined && all.length > limit;
+      const sliced = truncated ? all.slice(0, limit) : all;
       const cubes = summary
-        ? all.map((c) => ({
+        ? sliced.map((c) => ({
             cubeName: c.cubeName,
             skipCheck: c.skipCheck,
             ...summarize(c.rulesText),
           }))
-        : all;
+        : sliced;
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ count: cubes.length, cubes }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ count: all.length, returned: cubes.length, truncated, cubes }) }],
       };
     },
   );

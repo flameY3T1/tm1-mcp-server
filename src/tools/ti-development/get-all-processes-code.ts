@@ -11,11 +11,19 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
         .optional()
         .default(false)
         .describe("Include TM1 control processes whose names start with '}' (default: false)"),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Cap the number of returned processes. Omit for full bulk load (audit use-case)."),
     },
-    async ({ includeControl }) => {
+    async ({ includeControl, limit }) => {
       const all = await tm1Client.processes.getAllCode(includeControl);
+      const truncated = limit !== undefined && all.length > limit;
+      const processes = truncated ? all.slice(0, limit) : all;
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ count: all.length, processes: all }) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ count: all.length, returned: processes.length, truncated, processes }) }],
       };
     },
   );
