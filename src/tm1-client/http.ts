@@ -156,6 +156,10 @@ export class TM1HttpClient {
           });
         }
 
+        if (opts?.signal?.aborted) {
+          throw error;
+        }
+
         if (this.isNetworkError(error)) {
           lastError = error;
           this.logger.error(
@@ -347,6 +351,7 @@ export class TM1HttpClient {
     const headers: Record<string, string> = {
       Cookie: `TM1SessionId=${cookie}`,
       Accept: "application/json",
+      "Accept-Encoding": "gzip, deflate",
       "User-Agent": USER_AGENT,
       "TM1-SessionContext": USER_AGENT,
       "TM1-Session-Context": USER_AGENT,

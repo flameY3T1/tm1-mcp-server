@@ -49,7 +49,7 @@ export function formatTm1ErrorResult(err: unknown): McpToolResult {
   const payload = payloadFromUnknown(err);
   return {
     isError: true,
-    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+    content: [{ type: "text", text: JSON.stringify(payload) }],
   };
 }
 
@@ -87,7 +87,7 @@ export function normalizeErrorResult(result: McpToolResult): McpToolResult {
     };
     return {
       isError: true,
-      content: [{ type: "text", text: JSON.stringify(enriched, null, 2) }],
+      content: [{ type: "text", text: JSON.stringify(enriched) }],
     };
   }
 
@@ -100,7 +100,7 @@ export function normalizeErrorResult(result: McpToolResult): McpToolResult {
   };
   return {
     isError: true,
-    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+    content: [{ type: "text", text: JSON.stringify(payload) }],
   };
 }
 

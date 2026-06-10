@@ -118,7 +118,7 @@ export function pageResponse<T>(
     };
   }
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(page, null, 2) }],
+    content: [{ type: "text" as const, text: JSON.stringify(page) }],
   };
 }
 
@@ -139,7 +139,7 @@ export function wrappedPageResponse<T>(
     };
   }
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(wrapper, null, 2) }],
+    content: [{ type: "text" as const, text: JSON.stringify(wrapper) }],
   };
 }
 
