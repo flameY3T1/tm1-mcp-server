@@ -236,6 +236,36 @@ export function buildCallGraph(
 
 // ─── Cube / Dimension usage ─────────────────────────────────────────────────
 
+// Functions that write cell/attribute data into a cube.
+const WRITE_FUNCS = new Set([
+  'cellputn', 'cellputs', 'cellincrement', 'cellincrementn',
+  'batchcellincrement', 'cellputproportionalspread',
+  'viewzeroout', 'viewzero', 'cubecleardata',
+  'cubeputn', 'cubeputs', 'viewputn', 'viewputs',
+  'cubeattrputn', 'cubeattrputs', 'viewattrputn', 'viewattrputs',
+  'cubeprocessfeeders',
+]);
+
+// Functions that read cell/attribute data from a cube.
+const READ_FUNCS = new Set([
+  'cellgetn', 'cellgets', 'cellexists', 'cellisrule', 'cellisundefined', 'cellisupdateable',
+  'cubegetn', 'cubegets',
+  'viewgetn', 'viewgets',
+  'cubeattrn', 'cubeattrnl', 'cubeattrs', 'cubeattrs1', 'cubeattrs1l',
+  'viewattrn', 'viewattrnl', 'viewattrs', 'viewattrsl',
+  'db', // cube rule DB() reference
+]);
+
+function classifyAccess(funcName: string | undefined, sourceKind: 'process' | 'rule'): 'read' | 'write' | 'other' {
+  // Rule bracket-refs and DB() are always reads.
+  if (sourceKind === 'rule') return 'read';
+  if (!funcName) return 'other';
+  const lc = funcName.toLowerCase();
+  if (WRITE_FUNCS.has(lc)) return 'write';
+  if (READ_FUNCS.has(lc)) return 'read';
+  return 'other';
+}
+
 /** Flat usage reference — one occurrence where a cube/dimension is referenced. */
 export interface UsageRef {
   sourceKind: 'process' | 'rule';
@@ -244,6 +274,8 @@ export interface UsageRef {
   line: number;
   funcName?: string | undefined;
   snippet: string;
+  /** Classified access type: 'read' (CellGetN/S, DB), 'write' (CellPutN/S, ViewZeroOut, …), 'other' (structural). */
+  accessType: 'read' | 'write' | 'other';
 }
 
 /**
@@ -256,9 +288,10 @@ export function buildCubeOrDimUsages(
   index: ReferenceIndex,
   kind: 'cube' | 'dimension',
   name: string,
-  opts: { includeSystem?: boolean } = {},
+  opts: { includeSystem?: boolean; accessMode?: 'read' | 'write' | 'all' } = {},
 ): UsageRef[] {
   const includeSystem = opts.includeSystem ?? true;
+  const accessMode = opts.accessMode ?? 'all';
   const refs = lookupReferences(index, kind, name);
   const result: UsageRef[] = [];
   const nameLc = name.toLowerCase();
@@ -268,6 +301,8 @@ export function buildCubeOrDimUsages(
       continue;
     }
     if (!includeSystem && r.sourceName.startsWith('}')) { continue; }
+    const accessType = classifyAccess(r.funcName, r.sourceKind);
+    if (accessMode !== 'all' && accessType !== accessMode) { continue; }
     result.push({
       sourceKind: r.sourceKind,
       sourceName: r.sourceName,
@@ -275,6 +310,7 @@ export function buildCubeOrDimUsages(
       line: r.line,
       funcName: r.funcName,
       snippet: r.snippet,
+      accessType,
     });
   }
   result.sort((a, b) => a.sourceName.localeCompare(b.sourceName) || a.line - b.line);
