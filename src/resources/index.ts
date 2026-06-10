@@ -131,6 +131,16 @@ export function registerAllResources(
             })),
         };
       },
+      complete: {
+        name: async (value: string) => {
+          const procs = await tm1.processes.list();
+          const lower = value.toLowerCase();
+          return procs
+            .filter((p) => !p.name.startsWith("}") && p.name.toLowerCase().includes(lower))
+            .map((p) => p.name)
+            .slice(0, 100);
+        },
+      },
     }),
     {
       title: "TI Process Source Code",
@@ -188,6 +198,16 @@ export function registerAllResources(
               mimeType: "text/plain",
             })),
         };
+      },
+      complete: {
+        name: async (value: string) => {
+          const cubes = await tm1.cubes.list();
+          const lower = value.toLowerCase();
+          return cubes
+            .filter((c) => !c.name.startsWith("}") && c.name.toLowerCase().includes(lower))
+            .map((c) => c.name)
+            .slice(0, 100);
+        },
       },
     }),
     {
