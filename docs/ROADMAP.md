@@ -4,8 +4,8 @@
 > (`improvements_consolidated.md`, `improvements_consolidated2.md`,
 > `improvements_mcp.md`, `improvements_mcp2.md`).
 > ~85% der ursprünglichen Items sind erledigt; diese Datei führt nur den
-> aktuellen Stand. Persistente Status-Notizen für Claude liegen unter
-> `~/.claude/projects/-home-user-tm1-mcp-server/memory/`.
+> aktuellen Stand. Persistente Status-Notizen für Claude liegen im lokalen
+> Claude-Projekt-Memory (`~/.claude/projects/<project>/memory/`).
 
 ## Architektur-Backlog (Source: MCP-Builder-Review 2026-05-07)
 

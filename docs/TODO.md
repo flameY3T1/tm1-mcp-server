@@ -1,6 +1,6 @@
 # TM1 MCP Server — Backlog
 
-Source: `~/.claude/projects/-home-user-tm1-ai-dev/memory/` (project_mcp_tool_gaps.md, project_lifecycle_gaps.md, reference_mcp_callgraph_tools.md). Captured 2026-05-01.
+Source: local Claude project memory (project_mcp_tool_gaps.md, project_lifecycle_gaps.md, reference_mcp_callgraph_tools.md). Captured 2026-05-01.
 
 ## High-Impact Tools (Token-burn / Workflow-Reibung)
 
