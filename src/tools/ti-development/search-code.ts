@@ -16,6 +16,7 @@ interface Match {
   tab: Tab;
   line: number;
   text: string;
+  alsoFoundIn?: string[];
 }
 
 export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
@@ -65,6 +66,15 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(false)
         .describe("Skip lines beginning with '#' or '//' (TI comment markers). Default: false."),
+      deduplicateByLine: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Collapse matches with identical (tab, line-text) across processes into one result. " +
+          "The first-seen process is kept; others go into alsoFoundIn[]. " +
+          "Drastically reduces output on servers with many process variants. Default: false.",
+        ),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
     },
@@ -77,6 +87,7 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
       maxTotalMatches,
       maskSecrets,
       excludeCommented,
+      deduplicateByLine,
       limit,
       offset,
       fetchAll,
@@ -126,6 +137,25 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         }
       }
 
+      let deduplicated = false;
+      let rawMatchCount: number | undefined;
+      if (deduplicateByLine && matches.length > 0) {
+        rawMatchCount = matches.length;
+        const seen = new Map<string, Match>();
+        for (const m of matches) {
+          const key = `${m.tab}\x00${m.text}`;
+          const existing = seen.get(key);
+          if (existing) {
+            (existing.alsoFoundIn ??= []).push(m.process);
+          } else {
+            seen.set(key, { ...m });
+          }
+        }
+        matches.length = 0;
+        for (const m of seen.values()) matches.push(m);
+        deduplicated = true;
+      }
+
       const page = paginate(matches, limit, offset, fetchAll);
       const wrapper = {
         pattern,
@@ -133,6 +163,7 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         tabsSearched: searchTabs,
         processesScanned: all.length,
         matchCount: matches.length,
+        ...(deduplicated && { rawMatchCount, deduplicated }),
         truncated,
         maskSecrets,
         excludeCommented,
