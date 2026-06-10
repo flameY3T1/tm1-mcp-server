@@ -55,19 +55,9 @@ interface RuntimeStats {
 export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_feeders",
-    [
-      "Bulk-scan cube rules for likely overfeeding patterns (P4). Static",
-      "heuristics S1–S6 detect wildcard brackets, feeders into consolidated",
-      "elements, feeders broader than the cube's dim count, unguarded",
-      "feeders over STET/IF()-conditional rules, DB() feeders into cubes",
-      "lacking `skipcheck;`, and orphan feeders. Mode `runtime` returns",
-      "only `}StatsByCube` cube-level findings (sparsity + memory) with no",
-      "static scan. Mode `both` runs static scan AND fetches runtime stats;",
-      "static findings on cubes carrying runtime evidence are escalated from",
-      "severity `hint` to `evidence`.",
-      "Graceful degrade when `}StatsByCube` is absent. Control objects",
-      "('}'-prefix) excluded by default.",
-    ].join(" "),
+    "Static heuristics (S1–S6) scan cube rules for overfeeding: wildcard brackets, feeders into consolidated " +
+    "elements, over-broad feeders, unguarded STET/IF feeders, DB() without skipcheck, orphan feeders. " +
+    "mode='runtime' returns StatsByCube sparsity/memory stats; mode='both' runs both and escalates static findings with runtime evidence.",
     {
       cubes: z
         .array(z.string())

@@ -52,22 +52,10 @@ interface TruncatedElementGroup {
 export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_naming",
-    [
-      "Bulk-scan all TM1 objects against IBM Planning Analytics naming conventions",
-      "(PA 2.0 + 3.1 naming-conventions doc). Pass/fail per object — only HARD violations",
-      "are reported (reserved characters, control prefix, 256-char length on cube/dim/view/",
-      "subset/process/chore names, element leading +/-, TAB in v12 element names, invalid",
-      "process-variable identifiers). Element/attribute names have NO length check — IBM",
-      "docs define no hard server limit for elements, and TM1 v11 accepts long element",
-      "names via REST.",
-      "Auto-detects the TM1 major version via /api/v1/Configuration/ProductVersion to apply",
-      "v12-only rules (TAB in element names). Default scope covers cubes, dimensions,",
-      "hierarchies, elements, processes, and chores — elements are checked across all",
-      "dimensions but capped at maxElementsPerDim per (dim, hier) (default 100k, paged in",
-      "25k blocks); larger dims are truncated transparently via `elementsTruncated`. Opt in",
-      "to 'processVariables', 'views', or 'subsets' explicitly since they drive extra REST",
-      "calls or large payloads. Control objects ('}'-prefixed) are excluded by default.",
-    ].join(" "),
+    "Bulk-scan TM1 objects against IBM PA 2.0/3.1 naming conventions; reports hard violations only " +
+    "(reserved chars, control-prefix misuse, 256-char limit, element leading +/-, TAB in v12 names, " +
+    "invalid process-variable identifiers). Auto-detects TM1 version; element scan paginated per hierarchy " +
+    "(default cap 100k, oversized hierarchies reported in elementsTruncated).",
     {
       scope: z
         .array(z.enum(SCOPE_VALUES))
@@ -403,7 +391,7 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(payload, null, 2),
+            text: JSON.stringify(payload),
           },
         ],
       };

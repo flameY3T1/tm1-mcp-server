@@ -36,16 +36,9 @@ const SCOPE_DEFAULT: ReadonlyArray<Scope> = ["processes", "rules", "consistency"
 export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_complexity",
-    [
-      "Bulk-scan TI processes and cube rules for complexity + cross-process",
-      "consistency. Per process: LOC per tab, branches, max nesting, comment",
-      "ratio, score (loc + 2*branches + 3*nesting). Per cube rules: LOC, rule",
-      "and feeder counts, DB() coupling and target cubes, skipcheck/feedstrings",
-      "flags, comment ratio. Consistency: variable-name variant clusters",
-      "(pYear/vYear/Year), type conflicts (same name different type across",
-      "processes), prefix-convention adherence (p/v/n/s), and cohorts grouped",
-      "by trailing name token. Control objects ('}'-prefix) excluded by default.",
-    ].join(" "),
+    "Bulk-scan TI processes and cube rules for complexity metrics (LOC, branches, max nesting, score) " +
+    "and cross-process naming consistency (variant clusters, type conflicts, prefix adherence p/v/n/s, cohorts). " +
+    "Cube rules: LOC, rule/feeder counts, DB() coupling, skipcheck/feedstrings flags.",
     {
       scope: z
         .array(z.enum(SCOPE_VALUES))
