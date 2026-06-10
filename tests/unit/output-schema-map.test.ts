@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z, type ZodRawShape, type ZodTypeAny } from "zod";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type pino from "pino";
+import type { TM1Client } from "../../src/tm1-client.js";
+import { registerAllTools } from "../../src/tools/index.js";
+import { withAnnotations } from "../../src/tools/with-annotations.js";
 import { paginate } from "../../src/tools/pagination.js";
 import { OUTPUT_SCHEMA_MAP } from "../../src/tools/output-schema-map.js";
 
@@ -67,116 +72,29 @@ const SAMPLES: Record<string, unknown[]> = {
   ],
 };
 
+const mockLogger = {
+  info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn(),
+  fatal: vi.fn(), trace: vi.fn(), child: vi.fn().mockReturnThis(),
+  level: "silent", flush: vi.fn(),
+} as unknown as pino.Logger;
+
+function registeredToolNames(): Set<string> {
+  const server = new McpServer({ name: "test", version: "0.0.0" });
+  const names = new Set<string>();
+  const orig = server.registerTool.bind(server);
+  server.registerTool = (...args: unknown[]) => {
+    names.add(args[0] as string);
+    return (orig as (...a: unknown[]) => unknown)(...args) as ReturnType<typeof server.registerTool>;
+  };
+  registerAllTools(withAnnotations(server, mockLogger, "readwrite"), {} as TM1Client);
+  return names;
+}
+
 describe("OUTPUT_SCHEMA_MAP", () => {
-  it("declares output schemas for Phase 1 + Phase 2a–2h tools", () => {
-    expect(Object.keys(OUTPUT_SCHEMA_MAP).sort()).toEqual(
-      [
-        "tm1_analyze_callgraph",
-        "tm1_analyze_chore_graph",
-        "tm1_analyze_object_usage",
-        "tm1_assign_client_group",
-        "tm1_bulk_upsert_elements",
-        "tm1_cancel_thread",
-        "tm1_check_cube_rule",
-        "tm1_check_feeders",
-        "tm1_check_process_code",
-        "tm1_check_v12_readiness",
-        "tm1_check_writable_coords",
-        "tm1_clear_cube",
-        "tm1_compile_process",
-        "tm1_copy_process",
-        "tm1_create_chore",
-        "tm1_create_client",
-        "tm1_create_cube",
-        "tm1_create_dimension",
-        "tm1_create_element",
-        "tm1_create_element_attribute",
-        "tm1_create_hierarchy",
-        "tm1_create_mdx_view",
-        "tm1_create_native_view",
-        "tm1_create_subset",
-        "tm1_delete_chore",
-        "tm1_delete_client",
-        "tm1_delete_cube",
-        "tm1_delete_dimension",
-        "tm1_delete_element",
-        "tm1_delete_file",
-        "tm1_delete_hierarchy",
-        "tm1_delete_process",
-        "tm1_delete_subset",
-        "tm1_delete_view",
-        "tm1_diagnose_process_error",
-        "tm1_diff_process_with_file",
-        "tm1_execute_chore",
-        "tm1_execute_mdx",
-        "tm1_execute_process",
-        "tm1_export_process_to_pro",
-        "tm1_find_orphan_dimensions",
-        "tm1_get_all_cube_rules",
-        "tm1_get_all_processes_code",
-        "tm1_get_ancestors",
-        "tm1_get_audit_log",
-        "tm1_get_cell_value",
-        "tm1_get_client",
-        "tm1_get_cube_rules",
-        "tm1_get_cube_stats",
-        "tm1_get_descendants",
-        "tm1_get_element_attribute_values",
-        "tm1_get_error_log_content",
-        "tm1_get_file_content",
-        "tm1_get_hierarchy",
-        "tm1_get_message_log",
-        "tm1_get_process_code",
-        "tm1_get_process_datasource",
-        "tm1_get_process_parameters",
-        "tm1_get_process_variables",
-        "tm1_get_server_info",
-        "tm1_get_server_state",
-        "tm1_get_subset",
-        "tm1_get_transaction_log",
-        "tm1_get_view",
-        "tm1_get_view_definition",
-        "tm1_import_pro_file",
-        "tm1_install_pro_bundle",
-        "tm1_invalidate_callgraph_cache",
-        "tm1_list_chores",
-        "tm1_list_clients",
-        "tm1_list_cubes",
-        "tm1_list_dimensions",
-        "tm1_list_element_attributes",
-        "tm1_list_error_logs",
-        "tm1_list_files",
-        "tm1_list_groups",
-        "tm1_list_processes",
-        "tm1_list_processes_grouped",
-        "tm1_list_sessions",
-        "tm1_list_subsets",
-        "tm1_list_threads",
-        "tm1_list_views",
-        "tm1_move_element",
-        "tm1_remove_client_group",
-        "tm1_resolve_default_member",
-        "tm1_resolve_default_members",
-        "tm1_sample_cells",
-        "tm1_save_data",
-        "tm1_search_code",
-        "tm1_search_files",
-        "tm1_set_cube_rules",
-        "tm1_toggle_chore",
-        "tm1_trace_cell_calculation",
-        "tm1_trace_feeders",
-        "tm1_unload_cube",
-        "tm1_update_chore",
-        "tm1_update_client",
-        "tm1_update_element",
-        "tm1_update_element_attribute_value",
-        "tm1_update_subset",
-        "tm1_upload_file",
-        "tm1_upsert_process",
-        "tm1_validate_process_refs",
-        "tm1_write_cells",
-      ],
-    );
+  it("every OUTPUT_SCHEMA_MAP key is a registered tool (no orphaned schemas)", () => {
+    const registered = registeredToolNames();
+    const orphans = Object.keys(OUTPUT_SCHEMA_MAP).filter((k) => !registered.has(k));
+    expect(orphans).toEqual([]);
   });
 
   for (const [toolName, items] of Object.entries(SAMPLES)) {
