@@ -40,6 +40,37 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
       const info = infoRes.status === "fulfilled" ? infoRes.value : null;
       const x = (info?.extra ?? {}) as Record<string, unknown>;
 
+      const counts = {
+        cubes: settleCount(cubesRes),
+        dimensions: settleCount(dimsRes),
+        processes: settleCount(procsRes),
+        chores: settleCount(choresRes),
+        clients: settleCount(clientsRes),
+      };
+
+      // OData silently returns empty arrays for objects the user cannot read.
+      // Detect implausible count combinations that signal security filtering.
+      const securityWarnings: string[] = [];
+      const dimCount = counts.dimensions.count;
+      if (dimCount !== null && dimCount > 0) {
+        if (counts.cubes.count === 0) {
+          securityWarnings.push(
+            `0 cubes visible despite ${dimCount} dimensions — TM1 security is likely filtering cubes (user lacks READ rights). ` +
+            `Use tm1_list_cubes(includeControl: true) to verify, or check group membership with tm1_list_groups.`,
+          );
+        }
+        if (counts.processes.count === 0) {
+          securityWarnings.push(
+            `0 processes visible despite ${dimCount} dimensions — TM1 security may be filtering processes.`,
+          );
+        }
+      }
+      if (counts.clients.count === null && counts.clients.error) {
+        securityWarnings.push(
+          `Client list failed (${counts.clients.error}) — likely a non-admin session; some object counts may be filtered.`,
+        );
+      }
+
       const state = {
         connected: tm1Client.isConnected(),
         server: info
@@ -62,13 +93,8 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
               loggingDirectory: pick(x, ["Administration", "DebugLog", "LoggingDirectory"]),
             }
           : null,
-        counts: {
-          cubes: settleCount(cubesRes),
-          dimensions: settleCount(dimsRes),
-          processes: settleCount(procsRes),
-          chores: settleCount(choresRes),
-          clients: settleCount(clientsRes),
-        },
+        counts,
+        ...(securityWarnings.length > 0 && { securityWarnings }),
       };
 
       return payloadResponse(state, format, (s) =>
