@@ -75,6 +75,7 @@ import { registerClearCube } from "./model-building/clear-cube.js";
 import { registerUnloadCube } from "./model-building/unload-cube.js";
 import { registerGetAllCubeRules } from "./model-building/get-all-cube-rules.js";
 import { registerCheckCubeRule } from "./model-building/check-cube-rule.js";
+import { registerSearchRules } from "./model-building/search-rules.js";
 
 // View tools
 import { registerListViews } from "./views/list-views.js";
@@ -209,6 +210,7 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerUnloadCube(server, tm1Client);
   registerGetAllCubeRules(server, tm1Client);
   registerCheckCubeRule(server, tm1Client);
+  registerSearchRules(server, tm1Client);
 
   // Views
   registerListViews(server, tm1Client);

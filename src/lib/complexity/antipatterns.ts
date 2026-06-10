@@ -128,12 +128,12 @@ const EXPAND_VAR_RE = /%([A-Za-z_]\w*)%/g;
 function collectReads(text: string, out: Set<string>): void {
   // %varName% inside Expand calls
   for (const m of text.matchAll(EXPAND_VAR_RE)) {
-    out.add(m[1].toLowerCase());
+    if (m[1]) out.add(m[1].toLowerCase());
   }
   // Strip string literals so identifiers inside them don't pollute the read-set
   const stripped = text.replace(/'(?:[^']|'')*'/g, "''");
   for (const m of stripped.matchAll(IDENTIFIER_RE)) {
-    out.add(m[1].toLowerCase());
+    if (m[1]) out.add(m[1].toLowerCase());
   }
 }
 
