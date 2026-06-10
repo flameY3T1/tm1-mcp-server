@@ -88,6 +88,7 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_get_all_cube_rules: READ_ONLY,
   tm1_get_cube_rules: READ_ONLY,
   tm1_get_cube_stats: READ_ONLY,
+  tm1_search_rules: READ_ONLY,
   tm1_unload_cube: DESTRUCTIVE,
   tm1_set_cube_rules: IDEMPOTENT_WRITE,
 
@@ -146,6 +147,7 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   // Native) deploys via different tooling (TM1Web / git-of-records); .pro
   // round-trip is meaningful only against v11 instances.
   tm1_diff_process_with_file: withVersion(READ_ONLY, "v11"),
+  tm1_diff_processes: READ_ONLY,
   tm1_export_process_to_pro: withVersion(READ_ONLY, "v11"),
   tm1_get_all_processes_code: READ_ONLY,
   tm1_get_process_code: READ_ONLY,
