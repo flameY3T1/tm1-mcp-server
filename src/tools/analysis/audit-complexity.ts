@@ -251,8 +251,7 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(
-              {
+            text: JSON.stringify({
                 status,
                 productVersion: serverInfo.productVersion,
                 scope: activeScope,
@@ -307,10 +306,7 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
                   processes: processMetrics.length > topProcesses.length,
                   rules: rulesMetrics.length > topRules.length,
                 },
-              },
-              null,
-              2,
-            ),
+              }),
           },
         ],
       };
