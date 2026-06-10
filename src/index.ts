@@ -37,7 +37,11 @@ import { NAME, VERSION } from "./version.js";
 // SDK's modern `registerTool({ description, inputSchema, outputSchema?,
 // annotations })` API; outputSchema is attached only when present in
 // OUTPUT_SCHEMA_MAP.
-function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
+function withAnnotations(
+  server: McpServer,
+  logger: pino.Logger,
+  mode: "readwrite" | "readonly",
+): McpServer {
   const originalRegisterTool = server.registerTool.bind(server) as (
     ...args: unknown[]
   ) => unknown;
@@ -128,6 +132,9 @@ function withAnnotations(server: McpServer, logger: pino.Logger): McpServer {
           throw new Error(
             `Tool "${name}" registered without annotation — add it to ANNOTATION_MAP in src/tools/annotation-map.ts`,
           );
+        }
+        if (mode === "readonly" && !annot.readOnlyHint) {
+          return; // silently skip write/destructive tools in readonly mode
         }
         const outputSchema = OUTPUT_SCHEMA_MAP[name];
         const wrappedCb = wrapCb(
@@ -293,8 +300,13 @@ async function main(): Promise<void> {
 
   // Register all tools — wrap server so each registration receives the
   // annotation hint from ANNOTATION_MAP without editing call sites.
-  registerAllTools(withAnnotations(server, logger), tm1Client);
-  logger.info("All MCP tools registered");
+  // In readonly mode the proxy silently drops write/destructive tools so they
+  // never appear in the tool listing — no autoApprove lists needed.
+  if (config.mode === "readonly") {
+    logger.info("TM1_MODE=readonly — write and destructive tools will not be registered");
+  }
+  registerAllTools(withAnnotations(server, logger, config.mode), tm1Client);
+  logger.info(`All MCP tools registered (mode: ${config.mode})`);
 
   // Register MCP Resources (URI-addressable read-only views over TM1
   // objects). Mirrors a subset of the get_* tool surface so IDE clients

@@ -17,10 +17,15 @@ export interface TM1Config {
   // protection is enabled. Defaults to loopback origins; extend via env when
   // serving from an explicit hostname.
   httpAllowedOrigins: string[];
+  // When "readonly", only READ_ONLY-annotated tools are registered. Write and
+  // destructive tools are excluded entirely — they don't appear in the tool
+  // listing. Default: "readwrite".
+  mode: "readwrite" | "readonly";
 }
 
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 const VALID_TRANSPORTS = ["stdio", "http"] as const;
+const VALID_MODES = ["readwrite", "readonly"] as const;
 
 export function loadConfig(): TM1Config {
   const baseUrl = process.env.TM1_BASE_URL;
@@ -97,6 +102,11 @@ export function loadConfig(): TM1Config {
     : [];
   const httpAllowedOrigins = Array.from(new Set([...defaultOrigins, ...extraOrigins]));
 
+  const modeRaw = process.env.TM1_MODE ?? "readwrite";
+  const mode = VALID_MODES.includes(modeRaw as (typeof VALID_MODES)[number])
+    ? (modeRaw as TM1Config["mode"])
+    : "readwrite";
+
   return {
     baseUrl: baseUrl!,
     user: user!,
@@ -111,5 +121,6 @@ export function loadConfig(): TM1Config {
     httpHost,
     httpPort,
     httpAllowedOrigins,
+    mode,
   };
 }
