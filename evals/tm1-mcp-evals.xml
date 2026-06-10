@@ -10,8 +10,7 @@
     - stable (based on closed/persisted model state)
     - verifiable by exact string match
 
-  Answers verified 2026-05-10 against the local HRPlan demo instance:
-    - server: HRPlan, version 11.8.02900.8
+  Answers verified 2026-05-10 against a TM1 v11.8 HRPlan demo instance:
     - 12 user cubes (7 with rules) / 28 user dimensions / 83 user processes
     - 1 chore (Chore_Daily_HRPlan, inactive)
 
