@@ -143,7 +143,9 @@ export class CellService {
           message: `Cell tuple length (${c.elements.length}) does not match dimension count (${dimensions.length}) for cube '${cubeName}'.`,
         });
       }
+    }
 
+    const writeOne = async (c: { elements: string[]; value: number | string }) => {
       const memberRefs = c.elements.map(
         (e, idx) => `[${dimensions[idx]}].[${dimensions[idx]}].[${e}]`,
       );
@@ -177,6 +179,11 @@ export class CellService {
           // cleanup best-effort
         }
       }
+    };
+
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < cells.length; i += BATCH_SIZE) {
+      await Promise.all(cells.slice(i, i + BATCH_SIZE).map(writeOne));
     }
   }
 

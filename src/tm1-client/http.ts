@@ -6,7 +6,8 @@ import type { SessionManager } from "../session-manager.js";
 import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
 import { getTm1Dispatcher, tm1Fetch } from "./dispatcher.js";
-import { invalidateCallgraphCache } from "../lib/callgraph/tm1-adapter.js";
+// Side-effect import: registers tm1Events mutation listener in tm1-adapter.
+import "../lib/callgraph/tm1-adapter.js";
 import { tm1Events } from "../lib/tm1-events.js";
 
 const MAX_NETWORK_RETRIES = 3;
@@ -130,7 +131,6 @@ export class TM1HttpClient {
 
           const retryResult = await this.handleResponse<T>(retryResponse, path);
           if (!isSafeMethod) {
-            invalidateCallgraphCache();
             tm1Events.emit("mutation", { method, path });
           }
           return retryResult;
@@ -138,7 +138,6 @@ export class TM1HttpClient {
 
         const result = await this.handleResponse<T>(response, path);
         if (!isSafeMethod) {
-          invalidateCallgraphCache();
           tm1Events.emit("mutation", { method, path });
         }
         return result;
@@ -153,6 +152,9 @@ export class TM1HttpClient {
             code: TM1ErrorCode.LOCK_TIMEOUT,
             message: `Request to ${path} timed out after ${ms}ms`,
             endpoint: path,
+            hint: isSafeMethod
+              ? "Query timed out — result set may be too large. Add filters or reduce scope. If a lock is suspected, use tm1_list_threads to diagnose."
+              : "Request timed out — TM1 server may be waiting on a lock held by another session. Use tm1_list_threads to diagnose and cancel the blocking thread.",
           });
         }
 
@@ -250,7 +252,6 @@ export class TM1HttpClient {
     }
     const text = await response.text();
     if (!isSafeHttpMethod(method)) {
-      invalidateCallgraphCache();
       tm1Events.emit("mutation", { method, path });
     }
     return text;
@@ -328,7 +329,6 @@ export class TM1HttpClient {
       throw this.classifyHttpError(response.status, path, errBody || undefined);
     }
     if (!isSafeHttpMethod(method)) {
-      invalidateCallgraphCache();
       tm1Events.emit("mutation", { method, path });
     }
   }

@@ -1,5 +1,10 @@
 import type { TM1Client } from "../../tm1-client.js";
 import { buildReferenceIndex, type ReferenceIndex, type ProcessFetchResult, type CubeRulesFetchResult, type ChoreFetchResult, type ChoreTaskRef } from "./referenceIndex.js";
+import { tm1Events } from "../tm1-events.js";
+
+// Self-register: invalidate cache on any mutation so the HTTP layer
+// does not need a direct import of callgraph internals.
+tm1Events.on("mutation", () => { invalidateCallgraphCache(); });
 
 export interface BuildIndexOpts {
   includeControl?: boolean;
