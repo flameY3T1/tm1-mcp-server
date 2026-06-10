@@ -148,6 +148,127 @@ describe("cellget-perf", () => {
   });
 });
 
+describe("dead-assignment", () => {
+  it("flags a variable assigned in data tab but never read", () => {
+    const findings = lintProcess(
+      "p",
+      code({ data: `vTemp = 42;\nNVALUE = 1;` }),
+    );
+    const hit = findings.find((f) => f.rule === "dead-assignment");
+    expect(hit).toBeDefined();
+    expect(hit?.severity).toBe("info");
+    expect(hit?.snippet).toContain("vTemp");
+    expect(hit?.tab).toBe("data");
+  });
+
+  it("does not flag a variable that is read in the same tab", () => {
+    const findings = lintProcess(
+      "p",
+      code({ data: `vX = 5;\nNVALUE = vX * 2;` }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("does not flag a variable assigned in data tab but read in epilog", () => {
+    const findings = lintProcess(
+      "p",
+      code({
+        data: `vSum = vSum + 1;`,
+        epilog: `ASCIIOutput('out.txt', NumberToString(vSum));`,
+      }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("does not flag a variable assigned in prolog (only data/metadata flagged)", () => {
+    const findings = lintProcess(
+      "p",
+      code({ prolog: `vUnused = 99;` }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("does not flag a variable assigned in metadata tab that is read in data tab", () => {
+    const findings = lintProcess(
+      "p",
+      code({
+        metadata: `vElem = 'Total';`,
+        data: `IF(vElem @= 'Total');\n  NVALUE = 0;\nENDIF;`,
+      }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("flags a variable assigned in metadata tab but never read", () => {
+    const findings = lintProcess(
+      "p",
+      code({ metadata: `vDead = 'unused';` }),
+    );
+    const hit = findings.find((f) => f.rule === "dead-assignment");
+    expect(hit?.tab).toBe("metadata");
+  });
+
+  it("does not flag NVALUE / SVALUE / VALUE_IS_STRING (implicit TI vars)", () => {
+    const findings = lintProcess(
+      "p",
+      code({ data: `NVALUE = 0;\nSVALUE = '';\nVALUE_IS_STRING = 0;` }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("does not flag V1..Vn datasource column vars", () => {
+    const findings = lintProcess(
+      "p",
+      code({ data: `V1 = V1;\nV12 = V12;` }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("does not flag rc = ExecuteProcess (side-effecting RHS)", () => {
+    const findings = lintProcess(
+      "p",
+      code({ data: `rc = ExecuteProcess('Child', 'p', 1);` }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("treats Expand('%vPath%') as a read of vPath", () => {
+    const findings = lintProcess(
+      "p",
+      code({
+        data: `vPath = 'data';\nASCIIOutput(Expand('%vPath%\\out.txt'), SValue);`,
+      }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("respects excludeVarsFromDeadCheck option", () => {
+    const findings = lintProcess(
+      "p",
+      code({ data: `pExcluded = 7;` }),
+      { excludeVarsFromDeadCheck: ["pExcluded"] },
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+
+  it("reports dead variable only once even if assigned multiple times", () => {
+    const findings = lintProcess(
+      "p",
+      code({ data: `vX = 1;\nvX = 2;` }),
+    );
+    const hits = findings.filter((f) => f.rule === "dead-assignment");
+    expect(hits.length).toBe(1);
+  });
+
+  it("does not flag a loop counter that appears in the WHILE condition", () => {
+    const findings = lintProcess(
+      "p",
+      code({ data: `i = 1;\nWHILE(i <= 10);\n  i = i + 1;\nEND;` }),
+    );
+    expect(rules(findings)).not.toContain("dead-assignment");
+  });
+});
+
 describe("hardcoded-path", () => {
   it("flags a hardcoded UNC path literal as a warning", () => {
     const findings = lintProcess(
