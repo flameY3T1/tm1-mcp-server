@@ -2,6 +2,7 @@
 
 export const TM1ErrorCode = {
   CONNECTION_FAILED: "CONNECTION_FAILED",
+  LOCK_TIMEOUT: "LOCK_TIMEOUT",
   AUTH_FAILED: "AUTH_FAILED",
   PERMISSION_DENIED: "PERMISSION_DENIED",
   NOT_FOUND: "NOT_FOUND",
@@ -83,6 +84,8 @@ export function hintForCode(code: TM1ErrorCode | string): string {
       return "TM1 server version may not support this. Call tm1_get_server_info to check the version.";
     case TM1ErrorCode.CONNECTION_FAILED:
       return "TM1 server unreachable. Verify TM1_BASE_URL/TM1_HOST/TM1_PORT and that the service is running.";
+    case TM1ErrorCode.LOCK_TIMEOUT:
+      return "Request timed out — TM1 server may be waiting on an exclusive lock held by another session. Use tm1_list_threads to diagnose. Retry after the blocking operation completes.";
     case TM1ErrorCode.TM1_ERROR:
       return "Generic TM1 error. Inspect `details` for the raw server message.";
     default:

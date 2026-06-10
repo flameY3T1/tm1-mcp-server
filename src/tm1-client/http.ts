@@ -147,6 +147,15 @@ export class TM1HttpClient {
           throw error;
         }
 
+        if (isTimeoutError(error)) {
+          const ms = opts?.timeoutMs ?? this.config.requestTimeoutMs;
+          throw new TM1Error({
+            code: TM1ErrorCode.LOCK_TIMEOUT,
+            message: `Request to ${path} timed out after ${ms}ms`,
+            endpoint: path,
+          });
+        }
+
         if (this.isNetworkError(error)) {
           lastError = error;
           this.logger.error(
@@ -186,7 +195,10 @@ export class TM1HttpClient {
 
     const doFetch = async (c: string): Promise<Response> => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
+      const timeout = setTimeout(
+        () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
+        effectiveTimeout,
+      );
       const unlink = linkAbortSignals(controller, opts?.signal);
       try {
         return await tm1Fetch(url, {
@@ -207,10 +219,25 @@ export class TM1HttpClient {
       }
     };
 
-    let response = await doFetch(cookie);
+    let response: Response;
+    try {
+      response = await doFetch(cookie);
+    } catch (err) {
+      if (isTimeoutError(err)) {
+        throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
+      }
+      throw err;
+    }
     if (response.status === 401) {
       const newCookie = await this.sessionManager.authenticate();
-      response = await doFetch(newCookie);
+      try {
+        response = await doFetch(newCookie);
+      } catch (err) {
+        if (isTimeoutError(err)) {
+          throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
+        }
+        throw err;
+      }
     }
     if (!response.ok) {
       let body = "";
@@ -245,7 +272,10 @@ export class TM1HttpClient {
 
     const doFetch = async (c: string): Promise<Response> => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
+      const timeout = setTimeout(
+        () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
+        effectiveTimeout,
+      );
       const unlink = linkAbortSignals(controller, opts?.signal);
       try {
         return await tm1Fetch(url, {
@@ -268,10 +298,25 @@ export class TM1HttpClient {
       }
     };
 
-    let response = await doFetch(cookie);
+    let response: Response;
+    try {
+      response = await doFetch(cookie);
+    } catch (err) {
+      if (isTimeoutError(err)) {
+        throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
+      }
+      throw err;
+    }
     if (response.status === 401) {
       const newCookie = await this.sessionManager.authenticate();
-      response = await doFetch(newCookie);
+      try {
+        response = await doFetch(newCookie);
+      } catch (err) {
+        if (isTimeoutError(err)) {
+          throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
+        }
+        throw err;
+      }
     }
     if (!response.ok) {
       let errBody = "";
@@ -294,7 +339,7 @@ export class TM1HttpClient {
   ): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(
-      () => controller.abort(),
+      () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
       timeoutMs ?? this.config.requestTimeoutMs,
     );
     const unlink = linkAbortSignals(controller, externalSignal);
@@ -426,6 +471,11 @@ export class TM1HttpClient {
   }
 
   private isNetworkError(error: unknown): boolean {
+    // TimeoutError is our own request timeout — handled separately as LOCK_TIMEOUT,
+    // never treated as a retryable network blip.
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      return false;
+    }
     if (error instanceof DOMException && error.name === "AbortError") {
       return true;
     }
@@ -444,6 +494,10 @@ export class TM1HttpClient {
     }
     return false;
   }
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "TimeoutError";
 }
 
 function sleep(ms: number): Promise<void> {
