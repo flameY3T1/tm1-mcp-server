@@ -534,6 +534,7 @@ export const CopyProcessResultSchema = z.object({
 //   - warning shape {warning, indexedProcessCount}
 //   - tree shape    {start, direction, mode, tree}
 //   - summary shape {start, direction, mode, summary}
+//   - global rank   {mode:'globalRanking', rankBy, ranking[], ...}  (start omitted)
 // Modeled as one passthrough schema with all fields optional except none.
 // ── Feeder / calculation tracing (v11 cell diagnostics) ─────────────────────
 
@@ -579,6 +580,13 @@ export const CallgraphResultSchema = z
     mode: z.string().optional(),
     summary: z.unknown().optional(),
     tree: z.unknown().optional(),
+    // global-ranking shape (start omitted)
+    rankBy: z.string().optional(),
+    totalProcessesIndexed: z.number().int().optional(),
+    processesWithEdges: z.number().int().optional(),
+    totalCallEdges: z.number().int().optional(),
+    truncated: z.boolean().optional(),
+    ranking: z.array(z.unknown()).optional(),
   })
   .passthrough();
 
