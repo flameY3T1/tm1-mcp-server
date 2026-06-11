@@ -176,8 +176,8 @@ findings on the same cube remain at severity `hint`.
 Live test 2026-05-19 (7 cubes, mode `both`): 7/7 stats fetched, 1 cube
 flagged on both runtime gates (fed/populated ≈ 213× — reported as
 `cube_low_sparsity` 0.47 % under the pre-2026-06-11 metric — plus
-`cube_high_memory` 1.3 GiB) — the production cube `Cube_FP_alt`
-we already suspected from the S1/S2 static findings.
+`cube_high_memory` 1.3 GiB) — a large production cube we already suspected
+from the S1/S2 static findings.
 
 ## Prerequisites (must build before tool ships)
 

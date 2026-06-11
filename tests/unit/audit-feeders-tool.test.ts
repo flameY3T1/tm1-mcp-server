@@ -635,7 +635,7 @@ describe("tm1_audit_feeders tool", () => {
   });
 
   it("does not flag fed/populated below 50x (community threshold)", async () => {
-    // overfed-cube-style case: 167M fed vs 15M populated = 11.1x.
+    // Real-world overfed-cube case: 167M fed vs 15M populated = 11.1x.
     // Community calibration (tm1forum/Cubewise): only ≥ 50x is suspicious,
     // ≥ 100x definite — 11x is normal feeder fan-out, not overfeeding.
     const fake = makeFakeServer();
