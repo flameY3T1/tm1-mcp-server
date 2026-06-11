@@ -25,7 +25,7 @@ Tested against TM1 11.8 via REST API (Basic Auth).
 | Scheduling | chore CRUD, execute, toggle |
 | Security | client + group CRUD, group assignment |
 | Operations | server info, message log, transaction log, threads, sessions, file ops |
-| Analysis | callgraph (full + summary mode), object usage, chore graph, cache invalidation |
+| Analysis | callgraph (full + summary mode + global ranking), object usage, chore graph, cache invalidation |
 
 ## Install
 
@@ -143,7 +143,7 @@ Bulk-load + callgraph tools for code review and dependency tracking:
 - `tm1_get_all_processes_code` — all TI processes + 4 tabs in one roundtrip
 - `tm1_get_all_cube_rules` — all cube rules in one roundtrip
 - `tm1_search_code` — regex over all TI tabs with per-process / total caps; returns hit lines instead of full bulk
-- `tm1_analyze_callgraph` — ExecuteProcess/RunProcess tree (downstream/upstream) with parameter env propagation. `mode='summary'` returns flat per-process aggregates (occurrences, depthMin/Max) for triage before pulling a heavy tree.
+- `tm1_analyze_callgraph` — ExecuteProcess/RunProcess tree (downstream/upstream) with parameter env propagation. `mode='summary'` returns flat per-process aggregates (occurrences, depthMin/Max) for triage before pulling a heavy tree. Omit `start` for a global ranking: every process ranked by `rankBy='outgoing'` (fan-out) or `'incoming'` (fan-in) call counts — answers "which process triggers / is triggered by the most others" without a per-process traversal.
 - `tm1_analyze_object_usage` — find cube/dim references across TI + rules
 - `tm1_analyze_chore_graph` — per-task downstream tree for a chore
 - `tm1_invalidate_callgraph_cache` — reset 60s TTL cache after deploy
