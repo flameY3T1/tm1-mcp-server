@@ -628,7 +628,7 @@ describe("tm1_audit_feeders tool", () => {
     expect(out.runtimeStats.Wild.available).toBe(true);
   });
 
-  it("runtime mode flags cube_low_sparsity when populated/fed under threshold", async () => {
+  it("runtime mode flags cube_high_fed_ratio as evidence at ≥100x fed/populated", async () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
@@ -643,22 +643,48 @@ describe("tm1_audit_feeders tool", () => {
         Sparse: {
           "Total Memory Used": 1_000_000,
           "Number of Populated Numeric Cells": 5,
-          "Number of Fed Cells": 100_000,
+          "Number of Fed Cells": 100_000, // 20,000x — definite overfeeding
         },
       },
     });
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
-    expect(out.summary.byRule.cube_low_sparsity).toBe(1);
-    const ev = out.findings.find((f: { rule: string }) => f.rule === "cube_low_sparsity");
+    expect(out.summary.byRule.cube_high_fed_ratio).toBe(1);
+    const ev = out.findings.find((f: { rule: string }) => f.rule === "cube_high_fed_ratio");
     expect(ev.severity).toBe("evidence");
-    expect(out.runtimeStats.Sparse.sparsity).toBeLessThan(0.01);
+    expect(out.runtimeStats.Sparse.fedToPopulatedRatio).toBeGreaterThan(100);
   });
 
-  it("default sparsityThreshold (0.10) flags ~9% sparsity overfeeding cube", async () => {
-    // Real-world case: overfed-cube had 167M fed vs 15M populated
-    // (~9.3% sparsity) — a clear factor-10x overfeeding hotspot that the
-    // old 0.01 default missed entirely.
+  it("flags fed/populated between 50x and 100x as hint (suspicious, not definite)", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "Suspicious",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        Suspicious: {
+          "Total Memory Used": 1_000_000,
+          "Number of Populated Numeric Cells": 1_000_000,
+          "Number of Fed Cells": 60_000_000, // 60x — community "suspicious" band
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.summary.byRule.cube_high_fed_ratio).toBe(1);
+    const f = out.findings.find((x: { rule: string }) => x.rule === "cube_high_fed_ratio");
+    expect(f.severity).toBe("hint");
+  });
+
+  it("does not flag fed/populated below 50x (community threshold)", async () => {
+    // overfed-cube-style case: 167M fed vs 15M populated = 11.1x.
+    // Community calibration (tm1forum/Cubewise): only ≥ 50x is suspicious,
+    // ≥ 100x definite — 11x is normal feeder fan-out, not overfeeding.
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
@@ -679,9 +705,61 @@ describe("tm1_audit_feeders tool", () => {
     });
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
-    expect(out.summary.byRule.cube_low_sparsity).toBe(1);
-    expect(out.runtimeStats.Cube_Personnel.sparsity).toBeGreaterThan(0.05);
-    expect(out.runtimeStats.Cube_Personnel.sparsity).toBeLessThan(0.10);
+    expect(out.summary.byRule.cube_high_fed_ratio).toBe(0);
+    expect(out.runtimeStats.Cube_Personnel.fedToPopulatedRatio).toBeGreaterThan(10);
+    expect(out.runtimeStats.Cube_Personnel.fedToPopulatedRatio).toBeLessThan(12);
+  });
+
+  it("ratio is null when populatedNumeric is zero — cross-cube-fed cube, no false flag", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "CrossFed",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        CrossFed: {
+          "Total Memory Used": 1_000_000,
+          "Number of Populated Numeric Cells": 0,
+          "Number of Fed Cells": 500_000,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.runtimeStats.CrossFed.fedToPopulatedRatio).toBeNull();
+    expect(out.summary.byRule.cube_high_fed_ratio).toBe(0);
+  });
+
+  it("reports feederMemoryRatio as secondary signal without flagging", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeFakeTM1Client({
+      productVersion: "11.8",
+      rules: [
+        {
+          cubeName: "MemRatio",
+          rulesText: "skipcheck;\n['A']=N:1;\nfeeders;\n['A']=>['B'];",
+          skipCheck: true,
+        },
+      ],
+      cubeStats: {
+        MemRatio: {
+          "Total Memory Used": 1_000_000,
+          "Memory Used for Feeders": 800_000,
+          "Memory Used for Input Data": 100_000,
+          "Number of Populated Numeric Cells": 100,
+          "Number of Fed Cells": 100,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.runtimeStats.MemRatio.feederMemoryRatio).toBe(8);
+    expect(out.invalidCount).toBe(0);
   });
 
   it("runtime mode flags cube_high_memory above threshold", async () => {
@@ -730,7 +808,7 @@ describe("tm1_audit_feeders tool", () => {
     });
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ mode: "both" }));
-    // Wildcard finding plus cube_low_sparsity. Both severity = evidence.
+    // Wildcard finding plus cube_high_fed_ratio (1M x). Both severity = evidence.
     const wildcard = out.findings.find((f: { rule: string }) => f.rule === "wildcard_bracket");
     expect(wildcard.severity).toBe("evidence");
     expect(out.summary.bySeverity.evidence).toBeGreaterThanOrEqual(2);
@@ -753,7 +831,7 @@ describe("tm1_audit_feeders tool", () => {
     const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
     expect(out.scanned.runtimeFailures).toBe(1);
     expect(out.runtimeStats.NoStats.available).toBe(false);
-    expect(out.summary.byRule.cube_low_sparsity).toBe(0);
+    expect(out.summary.byRule.cube_high_fed_ratio).toBe(0);
     expect(out.summary.byRule.cube_high_memory).toBe(0);
   });
 

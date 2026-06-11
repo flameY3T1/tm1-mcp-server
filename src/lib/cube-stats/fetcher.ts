@@ -76,14 +76,28 @@ export async function fetchCubeStats(
 }
 
 /**
- * Sparsity ratio: `populatedNumeric / fedCells`. `1.0` = every fed cell is
- * populated (efficient). `< 0.01` = under 1 % of fed cells carry data (heavy
- * overfeeding). Returns `null` when either input is missing or `fedCells` is
- * zero (no feeders, no division).
+ * Fed-to-populated ratio: `fedCells / populatedNumeric` — the community-
+ * standard }StatsByCube overfeeding indicator (tm1forum t=13110, Cubewise).
+ * Rule of thumb: ≥ 50× suspicious, ≥ 100× definite overfeeding. Returns
+ * `null` when either input is missing or `populatedNumeric` is zero — a
+ * cube fed purely cross-cube can legitimately hold no input data, so a
+ * missing denominator is "insufficient signal", not overfeeding.
  */
-export function computeSparsity(stats: CubeStatsItem): number | null {
+export function computeFedToPopulatedRatio(stats: CubeStatsItem): number | null {
   const pop = stats.populatedNumeric;
   const fed = stats.fedCells;
-  if (typeof pop !== "number" || typeof fed !== "number" || fed <= 0) return null;
-  return pop / fed;
+  if (typeof pop !== "number" || typeof fed !== "number" || pop <= 0) return null;
+  return fed / pop;
+}
+
+/**
+ * Feeder-memory ratio: `memoryFeeders / memoryInput` — secondary overfeeding
+ * signal (feeder flags dwarfing the data they feed from). No community
+ * threshold established; reported as context only, never flagged.
+ */
+export function computeFeederMemoryRatio(stats: CubeStatsItem): number | null {
+  const feeders = stats.memoryFeeders;
+  const input = stats.memoryInput;
+  if (typeof feeders !== "number" || typeof input !== "number" || input <= 0) return null;
+  return feeders / input;
 }

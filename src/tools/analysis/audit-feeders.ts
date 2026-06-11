@@ -15,7 +15,8 @@ import {
 } from "../../lib/feeders/static-heuristics.js";
 import { ElementTypeCache } from "../../lib/feeders/element-type-cache.js";
 import {
-  computeSparsity,
+  computeFedToPopulatedRatio,
+  computeFeederMemoryRatio,
   fetchCubeStats,
   type CubeStatsItem,
 } from "../../lib/cube-stats/fetcher.js";
@@ -28,7 +29,7 @@ type FindingRule =
   | "missing_conditional_feeder"
   | "db_feeder_without_skipcheck"
   | "orphan_feeder"
-  | "cube_low_sparsity"
+  | "cube_high_fed_ratio"
   | "cube_high_memory";
 
 type Severity = "hint" | "evidence";
@@ -48,7 +49,8 @@ interface RuntimeStats {
   memoryMb: number | null;
   fedCells: number | null;
   populatedNumeric: number | null;
-  sparsity: number | null;
+  fedToPopulatedRatio: number | null;
+  feederMemoryRatio: number | null;
   error?: string;
 }
 
@@ -57,7 +59,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
     "tm1_audit_feeders",
     "Static heuristics (S1–S6) scan cube rules for overfeeding: wildcard brackets, feeders into consolidated " +
     "elements, over-broad feeders, unguarded STET/IF feeders, DB() without skipcheck, orphan feeders. " +
-    "mode='runtime' returns StatsByCube sparsity/memory stats; mode='both' runs both and escalates static findings with runtime evidence.",
+    "mode='runtime' returns StatsByCube fed/populated ratio + memory stats; mode='both' runs both and escalates static findings with runtime evidence.",
     {
       cubes: z
         .array(z.string())
@@ -96,14 +98,21 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         .describe(
           "static: rule-text heuristics only (default). runtime: }StatsByCube cube-level findings only (no static scan). both: static scan + runtime evidence + severity escalation on overlap.",
         ),
-      sparsityThreshold: z
+      fedRatioThreshold: z
         .number()
-        .min(0)
-        .max(1)
+        .min(1)
         .optional()
-        .default(0.10)
+        .default(50)
         .describe(
-          "Runtime: flag cube when populatedNumeric / fedCells < this value. Default 0.10 (under 10 % of fed cells carry data — typical factor-10x overfeeding threshold). Lower (e.g. 0.01) for stricter audits that only flag extreme cases; raise (e.g. 0.20) to catch milder overfeeding.",
+          "Runtime: flag cube (severity hint) when fedCells / populatedNumeric ≥ this value. Default 50 — community rule of thumb for 'suspicious' (tm1forum/Cubewise; some use 20). Raise to 100 to only flag definite overfeeding.",
+        ),
+      fedRatioEvidenceThreshold: z
+        .number()
+        .min(1)
+        .optional()
+        .default(100)
+        .describe(
+          "Runtime: escalate cube_high_fed_ratio to severity 'evidence' when fedCells / populatedNumeric ≥ this value. Default 100 — community consensus for definite overfeeding. Must be ≥ fedRatioThreshold to take effect.",
         ),
       memoryThresholdMb: z
         .number()
@@ -127,7 +136,8 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       includeControl,
       s1MinPinnedRatio,
       mode,
-      sparsityThreshold,
+      fedRatioThreshold,
+      fedRatioEvidenceThreshold,
       memoryThresholdMb,
       severityThreshold,
     }) => {
@@ -302,7 +312,8 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
               memoryMb: null,
               fedCells: null,
               populatedNumeric: null,
-              sparsity: null,
+              fedToPopulatedRatio: null,
+              feederMemoryRatio: null,
               error: String(r.reason),
             };
             continue;
@@ -315,27 +326,34 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
           const fedCells = typeof stats.fedCells === "number" ? stats.fedCells : null;
           const populatedNumeric =
             typeof stats.populatedNumeric === "number" ? stats.populatedNumeric : null;
-          const sparsity = computeSparsity(stats);
+          const fedToPopulatedRatio = computeFedToPopulatedRatio(stats);
+          const feederMemoryRatio = computeFeederMemoryRatio(stats);
           const stat: RuntimeStats = {
             available: true,
             memoryTotal,
             memoryMb,
             fedCells,
             populatedNumeric,
-            sparsity,
+            fedToPopulatedRatio,
+            feederMemoryRatio,
           };
           runtimeStats[cubeName] = stat;
           runtimeAvailableCount++;
 
-          // Cube-level findings (severity: evidence).
-          if (sparsity !== null && sparsity < sparsityThreshold) {
+          // Cube-level findings. Fed-ratio severity follows community
+          // calibration: ≥ threshold (50) = suspicious hint, ≥ evidence
+          // threshold (100) = definite overfeeding.
+          if (fedToPopulatedRatio !== null && fedToPopulatedRatio >= fedRatioThreshold) {
+            const definite =
+              fedRatioEvidenceThreshold >= fedRatioThreshold &&
+              fedToPopulatedRatio >= fedRatioEvidenceThreshold;
             findings.push({
               cube: cubeName,
               line: 0,
-              severity: "evidence",
-              rule: "cube_low_sparsity",
+              severity: definite ? "evidence" : "hint",
+              rule: "cube_high_fed_ratio",
               feeder: "",
-              detail: `sparsity=${sparsity.toFixed(4)} (populated ${populatedNumeric ?? "?"} / fed ${fedCells ?? "?"})`,
+              detail: `fed/populated=${fedToPopulatedRatio.toFixed(1)}x (fed ${fedCells ?? "?"} / populated ${populatedNumeric ?? "?"})`,
             });
           }
           if (memoryMb !== null && memoryMb >= memoryThresholdMb) {
@@ -355,7 +373,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         for (const f of findings) {
           if (
             f.severity === "evidence" &&
-            (f.rule === "cube_low_sparsity" || f.rule === "cube_high_memory")
+            (f.rule === "cube_high_fed_ratio" || f.rule === "cube_high_memory")
           ) {
             evidenceCubes.add(f.cube);
           }
@@ -374,7 +392,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         missing_conditional_feeder: 0,
         db_feeder_without_skipcheck: 0,
         orphan_feeder: 0,
-        cube_low_sparsity: 0,
+        cube_high_fed_ratio: 0,
         cube_high_memory: 0,
       };
       const bySeverity: Record<Severity, number> = { hint: 0, evidence: 0 };
@@ -414,7 +432,8 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 mode,
                 includeControl,
                 s1MinPinnedRatio,
-                sparsityThreshold,
+                fedRatioThreshold,
+                fedRatioEvidenceThreshold,
                 memoryThresholdMb,
                 severityThreshold,
                 scanned: {
@@ -433,7 +452,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                   "Static heuristics S1 (feeder_broader_than_rule), S2 (feeder_to_consolidated), " +
                   "S3 (missing_conditional_feeder), S4 (wildcard_bracket), " +
                   "S5 (db_feeder_without_skipcheck), S6 (orphan_feeder). " +
-                  "Runtime evidence: cube_low_sparsity + cube_high_memory via }StatsByCube. " +
+                  "Runtime evidence: cube_high_fed_ratio + cube_high_memory via }StatsByCube. " +
                   "See docs/feeders-audit-spec.md.",
               },
               null,

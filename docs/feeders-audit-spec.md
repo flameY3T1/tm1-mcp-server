@@ -67,7 +67,7 @@ Output schema (sketch):
     "byCube": { "Sales": { "hint": 12, "evidence": 1 } },
     "runtimeStats": {            // only present when mode includes "runtime"
       "topByMemory":   [ { "cube": "Sales", "memoryBytes": 1234567 } ],
-      "topBySparsity": [ { "cube": "X", "fed": 1e6, "populated": 1.2e4, "sparsity": 0.012 } ]
+      "topByFedRatio": [ { "cube": "X", "fed": 1e6, "populated": 1.2e4, "fedToPopulatedRatio": 83.3 } ]
     }
   },
   "truncated": { "findings": false }
@@ -160,13 +160,28 @@ shared with `tm1_get_cube_stats`.
 | Measure                     | Reading                                                            | Default gate                           |
 |-----------------------------|--------------------------------------------------------------------|----------------------------------------|
 | `memoryTotal` / `memoryMb`  | RAM footprint per cube                                             | `cube_high_memory` when ≥ 1024 MB      |
-| `populatedNumeric`          | actual non-empty cells                                             | feeds sparsity                         |
-| `fedCells`                  | cells the feeder graph has marked                                  | feeds sparsity                         |
-| `sparsity = populated / fed`| share of fed cells that carry data                                 | `cube_low_sparsity` when `< 0.10` (default; tune via `sparsityThreshold`) |
+| `populatedNumeric`          | stored input cells                                                 | denominator of fed ratio               |
+| `fedCells`                  | cells the feeder graph has marked                                  | numerator of fed ratio                 |
+| `fedToPopulatedRatio = fed / populated` | community-standard overfeeding indicator               | `cube_high_fed_ratio`: hint when ≥ 50 (`fedRatioThreshold`), evidence when ≥ 100 (`fedRatioEvidenceThreshold`) |
+| `feederMemoryRatio = memoryFeeders / memoryInput` | secondary signal, context only                | never flagged (no established threshold) |
 
-Findings: `cube_low_sparsity` and `cube_high_memory` carry severity
-`evidence`. Every existing static finding on the same cube is then
-escalated from `hint` to `evidence` in the response.
+Threshold calibration follows TM1-community consensus (tm1forum t=13110:
+lotsaram names fed/populated and feeder-memory/input-memory as the two
+meaningful `}StatsByCube` overfeeding ratios, investigation-worthy from
+~100×; Cubewise: 50× suspicious, 100× definite; some practitioners use
+20×). The ratio compares two *different* populations — `populatedNumeric`
+counts stored input cells, `fedCells` counts feeder flags — so values
+below the threshold (including < 1 on dense input cubes) are normal
+feeder fan-out, and a zero denominator (cube fed purely cross-cube, input
+lives elsewhere) yields `null` = insufficient signal, never a flag. The
+ratio is a presumptive indicator, not proof — hence hint/evidence
+tiering, with the Cubewise shadow-cube/helper-measure technique as the
+definitive (dev-only, out-of-scope) confirmation method.
+
+Findings: `cube_high_fed_ratio` at ≥ `fedRatioEvidenceThreshold` and
+`cube_high_memory` carry severity `evidence`. Every existing static
+finding on the same cube is then escalated from `hint` to `evidence` in
+the response.
 
 `}StatsByCube` is not always present (depends on perf-monitor setup). The
 tool degrades per-cube: a failed fetch records `available: false` and an
@@ -174,9 +189,10 @@ tool degrades per-cube: a failed fetch records `available: false` and an
 findings on the same cube remain at severity `hint`.
 
 Live test 2026-05-19 (7 cubes, mode `both`): 7/7 stats fetched, 1 cube
-flagged both `cube_low_sparsity` (0.47 %) and `cube_high_memory` (1.3 GiB)
-— the production cube `Cube_FP_alt` we already suspected from
-the S1/S2 static findings.
+flagged on both runtime gates (fed/populated ≈ 213× — reported as
+`cube_low_sparsity` 0.47 % under the pre-2026-06-11 metric — plus
+`cube_high_memory` 1.3 GiB) — the production cube `Cube_FP_alt`
+we already suspected from the S1/S2 static findings.
 
 ## Prerequisites (must build before tool ships)
 
