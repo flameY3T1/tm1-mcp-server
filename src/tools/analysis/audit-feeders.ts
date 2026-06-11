@@ -8,7 +8,6 @@ import {
   detectBroaderThanRule,
   detectDbFeederWithoutSkipcheck,
   detectFeederToConsolidated,
-  detectMissingConditionalFeeder,
   detectOrphanFeeder,
   detectWildcardBracket,
   findMatchingRule,
@@ -26,7 +25,6 @@ type FindingRule =
   | "wildcard_bracket"
   | "feeder_to_consolidated"
   | "feeder_broader_than_rule"
-  | "missing_conditional_feeder"
   | "db_feeder_without_skipcheck"
   | "orphan_feeder"
   | "cube_high_fed_ratio"
@@ -57,8 +55,8 @@ interface RuntimeStats {
 export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_feeders",
-    "Static heuristics (S1–S6) scan cube rules for overfeeding: wildcard brackets, feeders into consolidated " +
-    "elements, over-broad feeders, unguarded STET/IF feeders, DB() without skipcheck, orphan feeders. " +
+    "Static heuristics (S1–S5) scan cube rules for overfeeding: wildcard brackets, feeders into consolidated " +
+    "elements, over-broad feeders, DB() without skipcheck, orphan feeders. " +
     "mode='runtime' returns StatsByCube fed/populated ratio + memory stats; mode='both' runs both and escalates static findings with runtime evidence.",
     {
       cubes: z
@@ -183,16 +181,12 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         const cubeDimCount = cubeDimNames.length;
 
         const ruleLhs = [];
-        const conditionalRuleLhs = [];
         for (const line of ast.lines) {
           if (line.section !== "rules") continue;
           if (line.isBlank || line.isComment) continue;
           const lists = extractBracketLists(line.trimmed);
           if (lists.length === 0) continue;
           ruleLhs.push(lists[0]!);
-          if (line.hasStet || line.hasIfGuard) {
-            conditionalRuleLhs.push(lists[0]!);
-          }
         }
 
         for (const line of ast.lines) {
@@ -223,7 +217,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
               lhsRuleHit = "feeder_to_consolidated";
               lhsDetail = `${cons.dim}:${cons.elem}`;
             } else if (!isCrossCubeDbFeeder(line.trimmed)) {
-              // Cross-cube DB-feeders: rule lives in target cube; S5 covers
+              // Cross-cube DB-feeders: rule lives in target cube; S4 covers
               // their DB-feeder risk so skip S1 here.
               // Pair by feeder.RHS ⇄ rule.LHS — the feeder marks cells the
               // rule writes, so the target bracket is the right signal.
@@ -242,18 +236,10 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
               }
             }
             if (!lhsRuleHit) {
-              if (
-                detectMissingConditionalFeeder(
-                  feederLhs,
-                  line.hasIfGuard,
-                  conditionalRuleLhs,
-                )
-              ) {
-                lhsRuleHit = "missing_conditional_feeder";
-              } else if (!isCrossCubeDbFeeder(line.trimmed)) {
+              if (!isCrossCubeDbFeeder(line.trimmed)) {
                 // Cross-cube DB-feeders: target rules live in another cube,
-                // so a local orphan check can't see them. S5 covers the
-                // DB-skipcheck risk; skip S6 here to avoid false orphans.
+                // so a local orphan check can't see them. S4 covers the
+                // DB-skipcheck risk; skip S5 here to avoid false orphans.
                 // Orphan check uses feeder.RHS (target cells) so it pairs
                 // with rule.LHS (cells the rule writes) — feeder.LHS uses
                 // different elements in the idiomatic 1:1 pattern.
@@ -389,7 +375,6 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
         wildcard_bracket: 0,
         feeder_to_consolidated: 0,
         feeder_broader_than_rule: 0,
-        missing_conditional_feeder: 0,
         db_feeder_without_skipcheck: 0,
         orphan_feeder: 0,
         cube_high_fed_ratio: 0,
@@ -450,8 +435,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 runtimeStats: wantsRuntime ? runtimeStats : undefined,
                 rulesetSource:
                   "Static heuristics S1 (feeder_broader_than_rule), S2 (feeder_to_consolidated), " +
-                  "S3 (missing_conditional_feeder), S4 (wildcard_bracket), " +
-                  "S5 (db_feeder_without_skipcheck), S6 (orphan_feeder). " +
+                  "S3 (wildcard_bracket), S4 (db_feeder_without_skipcheck), S5 (orphan_feeder). " +
                   "Runtime evidence: cube_high_fed_ratio + cube_high_memory via }StatsByCube. " +
                   "See docs/feeders-audit-spec.md.",
               },

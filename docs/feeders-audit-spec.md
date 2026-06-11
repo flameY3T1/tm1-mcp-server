@@ -22,11 +22,12 @@ References:
 
 1. **Feeder broader than rule** — rule LHS specifies 5 dims, feeder LHS only specifies 2 → feeder fires on all combos of the unspecified 3.
 2. **Feeder to a Consolidated (C-level) member** — feeds every descendant N-level cell, even those without a real rule pendant.
-3. **Unconditional feeder for conditional rule** — rule uses `IF(value=0, STET, …)` but feeder fires unconditionally → all candidates fed. (TM1 has no `IFEED` keyword; the fix is wrapping the feeder LHS in plain `IF(…)`.)
-4. **Wildcard / unscoped bracket** — `['Dim']` (no element) or `[]` — fires per dimension element.
-5. **`DB()` feeder without `skipcheck;` on target** — cross-cube feed cascades through unscoped consolidations.
-6. **Alternate-hierarchy double feed** — element belongs to two hierarchies; unqualified feeder feeds via both.
-7. **Feeder line whose target dims don't intersect any rule LHS** — orphan feeder, pure overhead.
+3. **Wildcard / unscoped bracket** — `['Dim']` (no element) or `[]` — fires per dimension element.
+4. **`DB()` feeder without `skipcheck;` on target** — cross-cube feed cascades through unscoped consolidations.
+5. **Alternate-hierarchy double feed** — element belongs to two hierarchies; unqualified feeder feeds via both.
+6. **Feeder line whose target dims don't intersect any rule LHS** — orphan feeder, pure overhead.
+
+Note: Conditional feeders (`IF(…)`) were considered as a detection target (prior S3) but dropped — TM1 feeders only fire when the source cell is non-zero (sparse algorithm), and conditional feeders are evaluated only at cube-load / explicit recalc rather than dynamically, making them more error-prone than unconditional feeders.
 
 The negative complement (under-feeding) is also detectable but out of scope for v1 — different fix path, different severity.
 
@@ -119,34 +120,18 @@ Requires element-type lookup (one REST call per distinct element in feeders). Ca
 - For each LHS element referenced in any feeder, batch-fetch `Elements?$select=Name,Type&$filter=Name in (…)` per hierarchy.
 - If `Type == "Consolidated"`, flag the feeder line. Severity = `hint`.
 
-### S3 · Conditional rule without conditional feeder
-
-Terminology note (corrected 2026-05-18): TM1 has **STET** (rules-side keyword
-meaning "leave this cell untouched") and plain **`IF()`** (works in both rules
-and feeders). There is no `IFEED` keyword — earlier drafts of this spec called
-it that erroneously.
-
-- Scan rules section: a line is *conditional* if it contains `STET` or wraps
-  its RHS in `IF(…)`.
-- For each such rule, locate the matching feeder. If the feeder LHS isn't
-  itself guarded by an `IF(…)` (Cubewise-style conditional feeder), flag it
-  — unconditional feeder + conditional rule = feed-everything overshoot.
-- AST help: we already detect `isSkipcheck`/`isFeedstrings`; we don't yet
-  detect `STET` or LHS-`IF` per line — add `hasStet: boolean` and
-  `hasIfGuard: boolean` line flags in `parseRules`.
-
-### S4 · Wildcard / unscoped bracket
+### S3 · Wildcard / unscoped bracket
 
 - Detect bracket lists that contain only dim names without element refs.
 - Already partly visible via `parseBracketDimRefs` (returns empty `elems[]`).
 - **Gap (from probe):** positional syntax `['Elem1','Elem2']` without `Dim:` prefix doesn't go through `parseBracketDimRefs`. New parser needed (see §Prerequisites).
 
-### S5 · DB() feeder without skipcheck on target
+### S4 · DB() feeder without skipcheck on target
 
 - Walk `extractDbCalls` over feeder lines only.
 - For each target cube, look up its rules AST; if `ast.hasSkipcheck === false`, flag.
 
-### S6 · Orphan feeder
+### S5 · Orphan feeder
 
 - Feeder LHS shares no `(dim, elem)` overlap with any rule LHS in the cube.
 - Edge: feeders for view-driven reads (no rule) — accept on a denylist?
@@ -207,7 +192,7 @@ we already suspected from the S1/S2 static findings.
    - Batch `Elements?$select=Name,Type` per `(dim, hierarchy)`
    - LRU keyed by `(dim, hier, elem) → "Numeric" | "Consolidated" | "String"`
    - One scan = at most N cache misses per (dim, hier) regardless of how many feeders reference elements
-4. **`hasStet` + `hasIfGuard` line flags in `parseRules`** — minor extension to existing AST (additive, same pattern as `hasFeedstrings` from MED-3 fix). `hasIfGuard` = the line begins with `IF(` regardless of section.
+4. ~~**`hasStet` + `hasIfGuard` line flags in `parseRules`**~~ — built but no longer used (S3 dropped).
 
 ## Risks / open questions
 
@@ -223,7 +208,7 @@ we already suspected from the S1/S2 static findings.
 | P0 | Positional bracket parser + tests | parser handles ≥95 % of feeder lines from probe rerun ✓ (95.08 %) |
 | P1 | Static heuristics S4 + S6 (no REST lookups) | tool registers, returns findings on test server ✓ |
 | P2 | S1 (cube dim-order) + S2 (element-type cache) + S5 (cross-cube skipcheck) ✓ | C-level + DB-target-skipcheck + properly-gated breadth findings live |
-| P3 | S3 (`hasStet` + `hasIfGuard` AST extension) ✓ | conditional-rule findings live |
+| P3 | S3 (conditional-feeder heuristic) — **dropped** (TM1 sparse algorithm + conditional-feeder recalc semantics make this a false-positive factory) | — |
 | P4 | Runtime mode (`}StatsByCube` MDX + sparsity scoring) ✓ | runtime-evidence severity escalates findings |
 | P5 | `severityThreshold` param + operator docs ✓ (calibration deferred — needs bigger model) | tool documented, CI gate available; threshold tuning awaits a larger production cube |
 

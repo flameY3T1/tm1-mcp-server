@@ -8,10 +8,9 @@
  * Heuristic IDs match docs/feeders-audit-spec.md:
  *   S1 — feeder_broader_than_rule       (needs cubeTotalDims)
  *   S2 — feeder_to_consolidated         (needs element-type cache)
- *   S3 — missing_conditional_feeder     (needs hasStet/hasIfGuard from parseRules)
- *   S4 — wildcard_bracket
- *   S5 — db_feeder_without_skipcheck
- *   S6 — orphan_feeder
+ *   S3 — wildcard_bracket
+ *   S4 — db_feeder_without_skipcheck
+ *   S5 — orphan_feeder
  */
 import type { BracketEntry, BracketList } from "./brackets.js";
 import type { ElementTypeCache } from "./element-type-cache.js";
@@ -38,7 +37,7 @@ function pushElems(e: BracketEntry, out: Set<string>): void {
 }
 
 /**
- * S4 · Wildcard / unscoped bracket — bracket has no concrete element
+ * S3 · Wildcard / unscoped bracket — bracket has no concrete element
  * constraints. Either an empty bracket or every entry lacks both `elem` and
  * `elems`. Such feeders fire across every dim member.
  */
@@ -183,7 +182,7 @@ function entryElems(e: BracketEntry): string[] {
 }
 
 /**
- * S5 · `DB()` feeder without skipcheck on target. Cross-cube feeders fan out
+ * S4 · `DB()` feeder without skipcheck on target. Cross-cube feeders fan out
  * through the target cube's consolidations; without `skipcheck;` on the
  * target's rules the engine evaluates every cell. Walk every `DB(...)` call
  * on the feeder line, ask the lookup whether the target cube has skipcheck.
@@ -208,39 +207,7 @@ export function detectDbFeederWithoutSkipcheck(
 }
 
 /**
- * S3 · Conditional rule without conditional feeder.
- *
- * A rule with `STET` or an `IF()` guard fires only for a subset of cells, but
- * a non-guarded feeder still primes every cell the LHS covers — the engine
- * walks the whole space evaluating the rule body. Cubewise-style fix:
- * wrap the feeder LHS in `IF(...)` so the feeder skips the same cells.
- *
- * Flag when the feeder LHS overlaps any conditional rule (bag-equality on
- * element names, dim qualifier ignored) AND the feeder line itself carries
- * no `IF(` guard. Returns false on empty feeder bracket (S4 territory),
- * empty conditional-rule list, or feeder already guarded.
- */
-export function detectMissingConditionalFeeder(
-  feeder: BracketList,
-  feederHasIfGuard: boolean,
-  conditionalRuleLhsList: ReadonlyArray<BracketList>,
-): boolean {
-  if (feederHasIfGuard) return false;
-  if (feeder.entries.length === 0) return false;
-  if (conditionalRuleLhsList.length === 0) return false;
-  const feederElems = collectElementBag(feeder);
-  if (feederElems.size === 0) return false;
-  for (const rule of conditionalRuleLhsList) {
-    const ruleElems = collectElementBag(rule);
-    for (const e of feederElems) {
-      if (ruleElems.has(e)) return true;
-    }
-  }
-  return false;
-}
-
-/**
- * S6 · Orphan feeder — the feeder LHS shares no element name with any rule
+ * S5 · Orphan feeder — the feeder LHS shares no element name with any rule
  * LHS in the cube. Pure overhead: it flags cells that no rule populates.
  * Element comparison is bag-equality on the element-side only (dim
  * qualifiers ignored), so positional and qualified syntax intermix.
