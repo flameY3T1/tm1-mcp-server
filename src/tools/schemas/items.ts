@@ -599,7 +599,10 @@ export const ChoreGraphResultSchema = z.object({
 export const ObjectUsageResultSchema = z.object({
   kind: z.string(),
   name: z.string(),
+  accessMode: z.string(),
   count: z.number().int(),
+  returned: z.number().int(),
+  truncated: z.boolean(),
   usages: z.array(z.unknown()),
 });
 
@@ -647,6 +650,9 @@ export const SearchCodeMatchSchema = z.object({
   tab: z.string(),
   line: z.number().int(),
   text: z.string(),
+  // Present only when deduplicateByLine=true and ≥1 other process shared this
+  // (tab, line-text): the first-seen process is kept, the rest land here.
+  alsoFoundIn: z.array(z.string()).optional(),
 });
 
 // Wrapper around the paginated `items` array — keeps summary fields the agent
@@ -666,6 +672,10 @@ export const SearchCodeResultSchema = z.object({
   has_more: z.boolean(),
   next_offset: z.number().int().nullable(),
   items: z.array(SearchCodeMatchSchema),
+  // Present only when deduplicateByLine=true: rawMatchCount is the pre-collapse
+  // total, deduplicated flags that the collapse ran.
+  rawMatchCount: z.number().int().optional(),
+  deduplicated: z.boolean().optional(),
 });
 
 // ── Phase 2i: hierarchy navigation, server snapshots, diagnostics ────────────

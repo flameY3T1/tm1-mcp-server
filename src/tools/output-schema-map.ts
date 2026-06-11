@@ -133,7 +133,9 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_get_process_datasource: asOutputSchema(DataSourceSchema),
   tm1_get_cell_value: { value: CellValueSchema.describe("Cell value (string, number, or null)") },
   tm1_get_all_cube_rules: {
-    count: z.number().int().describe("Number of cubes returned"),
+    count: z.number().int().describe("Total cubes matched before limit"),
+    returned: z.number().int().describe("Cubes in this response after limit"),
+    truncated: z.boolean().describe("True when limit dropped cubes"),
     cubes: z.array(CubeRulesSchema).describe("Per-cube rule bundles"),
   },
   tm1_get_all_processes_code: {

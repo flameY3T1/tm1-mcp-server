@@ -194,6 +194,8 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_get_cell_value: { value: 42 },
     tm1_get_all_cube_rules: {
       count: 1,
+      returned: 1,
+      truncated: false,
       cubes: [{ cubeName: "Sales", rulesText: "[]=N:1;", skipCheck: false }],
     },
     tm1_get_all_processes_code: { count: 0, processes: [] },
@@ -292,7 +294,10 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_analyze_object_usage: {
       kind: "cube",
       name: "Sales",
+      accessMode: "all",
       count: 2,
+      returned: 2,
+      truncated: false,
       usages: [{ process: "Load.Sales" }, { process: "Clear.Sales" }],
     },
     tm1_search_code: {
