@@ -693,24 +693,76 @@ export const KNOWN_SIGNATURES: Map<string, TiKnownSignature> = new Map([
   ['attrputs', {
     name: 'AttrPutS',
     minParams: 4,
-    maxParams: 4,
+    maxParams: 6,
     params: [
       { name: 'Value', type: 'string' },
       { name: 'DimensionName', type: 'string' },
       { name: 'ElementName', type: 'string' },
       { name: 'AttributeName', type: 'string' },
+      // 5./6. Arg überladen: LocaleCode (string) ODER PassSecurity (numeric).
+      { name: 'LocaleOrPassSecurity', type: 'any' },
+      { name: 'PassSecurity', type: 'any' },
     ],
     returnType: 'void',
   }],
   ['attrputn', {
     name: 'AttrPutN',
     minParams: 4,
-    maxParams: 4,
+    maxParams: 6,
     params: [
       { name: 'Value', type: 'numeric' },
       { name: 'DimensionName', type: 'string' },
       { name: 'ElementName', type: 'string' },
       { name: 'AttributeName', type: 'string' },
+      // 5./6. Arg überladen: LocaleCode (string) ODER PassSecurity (numeric).
+      { name: 'LocaleOrPassSecurity', type: 'any' },
+      { name: 'PassSecurity', type: 'any' },
+    ],
+    returnType: 'void',
+  }],
+  ['elementsecurityput', {
+    name: 'ElementSecurityPut',
+    minParams: 4,
+    maxParams: 4,
+    params: [
+      // Level ist String-Code ('None' | 'Read' | 'Write' | 'Reserve' | 'Lock' | 'Admin').
+      { name: 'Level', type: 'string' },
+      { name: 'DimensionName', type: 'string' },
+      { name: 'ElementName', type: 'string' },
+      { name: 'GroupName', type: 'string' },
+    ],
+    returnType: 'void',
+  }],
+  ['serversandboxexists', {
+    name: 'ServerSandboxExists',
+    minParams: 1,
+    maxParams: 2,
+    params: [
+      { name: 'SandboxName', type: 'string' },
+      // Optional: prüft Sandbox-Existenz für anderen User. Default = aufrufender User.
+      { name: 'UserName', type: 'string' },
+    ],
+    returnType: 'numeric',
+  }],
+  ['stringtonumberex', {
+    name: 'StringToNumberEx',
+    minParams: 3,
+    maxParams: 3,
+    params: [
+      { name: 'String', type: 'string' },
+      { name: 'DecimalSeparator', type: 'string' },
+      { name: 'ThousandSeparator', type: 'string' },
+    ],
+    returnType: 'numeric',
+  }],
+  ['setinputcharacterset', {
+    name: 'SetInputCharacterSet',
+    minParams: 1,
+    maxParams: 2,
+    params: [
+      // 1-arg: nur CharacterSet (aktuelle Datasource). 2-arg: (FileName, CharacterSet).
+      { name: 'FileNameOrCharacterSet', type: 'string' },
+      { name: 'CharacterSet', type: 'string' },
     ],
     returnType: 'void',
   }],
@@ -2938,7 +2990,8 @@ export const KNOWN_SIGNATURES: Map<string, TiKnownSignature> = new Map([
   // ── Security/Client management ────────────────────────────────────────────────
   ['addclient', {
     name: 'AddClient',
-    minParams: 2,
+    // 1-arg: nur User (Passwort separat via AssignClientPassword). 2-arg: (User, Password).
+    minParams: 1,
     maxParams: 2,
     params: [
       { name: 'User', type: 'string' },
