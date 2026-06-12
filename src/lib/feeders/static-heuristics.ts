@@ -5,7 +5,7 @@
  * rule line) and returns a verdict. The tool layer composes these into
  * findings with severity = "hint" since no runtime evidence is observed.
  *
- * Heuristic IDs match docs/feeders-audit-spec.md:
+ * Heuristic IDs match docs/internal/feeders-audit-spec.md:
  *   S1 — feeder_broader_than_rule       (needs cubeTotalDims)
  *   S2 — feeder_to_consolidated         (needs element-type cache)
  *   S3 — wildcard_bracket

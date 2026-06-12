@@ -436,8 +436,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 rulesetSource:
                   "Static heuristics S1 (feeder_broader_than_rule), S2 (feeder_to_consolidated), " +
                   "S3 (wildcard_bracket), S4 (db_feeder_without_skipcheck), S5 (orphan_feeder). " +
-                  "Runtime evidence: cube_high_fed_ratio + cube_high_memory via }StatsByCube. " +
-                  "See docs/feeders-audit-spec.md.",
+                  "Runtime evidence: cube_high_fed_ratio + cube_high_memory via }StatsByCube.",
               },
               null,
               2,

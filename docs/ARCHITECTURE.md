@@ -113,7 +113,7 @@ async getCubes(opts) {
 
 ## Migration roadmap
 
-Tracked as backlog item #5 (see `docs/ROADMAP.md`).
+Tracked as a backlog item.
 
 | Phase | Scope                                                              | Status            |
 |-------|--------------------------------------------------------------------|-------------------|

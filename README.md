@@ -149,7 +149,7 @@ Bulk-load + callgraph tools for code review and dependency tracking:
 - `tm1_invalidate_callgraph_cache` — reset 60s TTL cache after deploy
 - `tm1_audit_naming` — bulk-scan all TM1 objects against IBM Planning Analytics naming conventions (PA 2.0 + 3.1)
 - `tm1_audit_complexity` — bulk-scan TI processes + cube rules for complexity metrics (LOC, branches, max nesting, comment ratio) and cross-process consistency (variable-name clusters, type conflicts, prefix-convention adherence). Tolerates Bedrock-style condensed multi-statement lines.
-- `tm1_audit_feeders` — bulk-scan cube rules for overfeeding patterns. Static heuristics S1–S5 (feeder broader than rule, feeder-into-consolidated, wildcard/unscoped brackets, DB() into cubes without `skipcheck;`, orphan feeders) plus `mode: "runtime" | "both"` for `}StatsByCube` evidence (cube_high_fed_ratio — fed/populated ≥ 50× hint, ≥ 100× evidence per TM1-community calibration — and cube_high_memory). Runtime evidence escalates static findings on the same cube from severity `hint` → `evidence`. CI gate via `severityThreshold: "evidence"`. See `docs/feeders-audit-spec.md`.
+- `tm1_audit_feeders` — bulk-scan cube rules for overfeeding patterns. Static heuristics S1–S5 (feeder broader than rule, feeder-into-consolidated, wildcard/unscoped brackets, DB() into cubes without `skipcheck;`, orphan feeders) plus `mode: "runtime" | "both"` for `}StatsByCube` evidence (cube_high_fed_ratio — fed/populated ≥ 50× hint, ≥ 100× evidence per TM1-community calibration — and cube_high_memory). Runtime evidence escalates static findings on the same cube from severity `hint` → `evidence`. CI gate via `severityThreshold: "evidence"`.
 
 ## MCP Resources
 

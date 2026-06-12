@@ -9,3 +9,6 @@ coverage/
 .idea/
 .claude/
 *:Zone.Identifier
+
+# internal planning/review docs — not for public release
+docs/internal/
