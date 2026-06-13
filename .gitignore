@@ -8,6 +8,7 @@ coverage/
 .vscode/
 .idea/
 .claude/
+.serena/
 *:Zone.Identifier
 
 # internal planning/review docs — not for public release
