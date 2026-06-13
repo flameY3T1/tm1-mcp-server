@@ -24,7 +24,9 @@ export interface TM1Config {
   httpToken?: string | undefined;
   // When "readonly", only READ_ONLY-annotated tools are registered. Write and
   // destructive tools are excluded entirely — they don't appear in the tool
-  // listing. Default: "readwrite".
+  // listing. Default: "readonly" — write/destructive tools are opt-in via
+  // TM1_MODE=readwrite, so an unconfigured server cannot mutate or delete TM1
+  // objects by accident.
   mode: "readwrite" | "readonly";
 }
 
@@ -126,10 +128,10 @@ export function loadConfig(): TM1Config {
 
   const httpToken = process.env.TM1_MCP_HTTP_TOKEN || undefined;
 
-  const modeRaw = process.env.TM1_MODE ?? "readwrite";
+  const modeRaw = process.env.TM1_MODE ?? "readonly";
   const mode = VALID_MODES.includes(modeRaw as (typeof VALID_MODES)[number])
     ? (modeRaw as TM1Config["mode"])
-    : "readwrite";
+    : "readonly";
 
   return {
     baseUrl: baseUrl!,
