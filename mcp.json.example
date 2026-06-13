@@ -8,8 +8,7 @@
         "TM1_BASE_URL": "https://your-tm1-host:port",
         "TM1_USER": "admin",
         "TM1_PASSWORD": "",
-        "TM1_SSL_REJECT_UNAUTHORIZED": "false",
-        "TM1_KNOWLEDGE_DIR": "/absolute/path/to/tm1-ai-dev/knowledge"
+        "TM1_SSL_REJECT_UNAUTHORIZED": "false"
       },
       "autoApprove": [
         "tm1_analyze_callgraph",
@@ -28,7 +27,6 @@
         "tm1_get_client",
         "tm1_get_cube_rules",
         "tm1_get_cube_stats",
-        "tm1_get_knowledge",
         "tm1_get_element_attribute_values",
         "tm1_get_error_log_content",
         "tm1_get_file_content",
@@ -38,7 +36,6 @@
         "tm1_get_process_datasource",
         "tm1_get_process_parameters",
         "tm1_get_process_variables",
-        "tm1_get_server_capabilities",
         "tm1_get_server_info",
         "tm1_get_server_state",
         "tm1_get_subset",
