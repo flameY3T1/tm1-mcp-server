@@ -1,55 +1,85 @@
 # Architecture
 
-This document describes the layering of `tm1-mcp-server` and the active
-god-class refactor (review item #5). It is the source of truth for any
-contributor adding TM1 calls or new tools.
+This document describes the layering of `tm1-mcp-server`. It is the source of
+truth for any contributor adding TM1 calls or new tools.
 
 ## Layers
 
 ```
 ┌──────────────────────────────────────────────┐
-│  src/tools/**            MCP tool surface    │  107 tools, one file each
-│  (Zod schemas, MCP envelopes, validation)    │
+│  src/index.ts            MCP server + wiring │  stdio + Streamable HTTP
+│  - registers tools, prompts, resources        │  TM1_MODE gate (see below)
+└──────────────────────┬───────────────────────┘
+                       │ tools call
+                       ▼
+┌──────────────────────────────────────────────┐
+│  src/tools/**            MCP tool surface     │  109 tools, one file each
+│  (Zod schemas, MCP envelopes, validation)     │  (+ prompts, resources)
 └──────────────────────┬───────────────────────┘
                        │ uses
                        ▼
 ┌──────────────────────────────────────────────┐
-│  src/tm1-client.ts       TM1Client facade    │  thin pass-through
-│  - readonly cubes:     CubeService           │
-│  - readonly dimensions:DimensionService …    │  (added incrementally)
-│  - getCubes() etc.     @deprecated wrappers  │  removed in 2.0
+│  src/tm1-client.ts       TM1Client facade     │  connection lifecycle only
+│  - readonly cubes:     CubeService            │  (connect / disconnect)
+│  - readonly dimensions:DimensionService …     │  everything else delegated
+│  - 13 domain services (see below)             │  to a service
 └──────────────────────┬───────────────────────┘
                        │ delegates to
                        ▼
 ┌──────────────────────────────────────────────┐
-│  src/tm1-client/services/                    │  domain-scoped REST wrappers
-│  - cube-service.ts                           │  (TM1py-style — see below)
-│  - dimension-service.ts                      │
-│  - process-service.ts                        │
-│  - cell-service.ts                           │
-│  - …                                         │
+│  src/tm1-client/services/                     │  domain-scoped REST wrappers
+│  - cube-service.ts                            │  (TM1py-style — see below)
+│  - dimension-service.ts                       │
+│  - process-service.ts                         │
+│  - cell-service.ts                            │
+│  - …                                          │
 └──────────────────────┬───────────────────────┘
                        │ uses
                        ▼
 ┌──────────────────────────────────────────────┐
-│  src/tm1-client/http.ts     TM1HttpClient    │  transport
-│  - request<T>() / requestRaw()               │  auth, retry, error mapping
-│  - executeRequest() (private)                │
+│  src/tm1-client/http.ts     TM1HttpClient     │  transport
+│  - request<T>() / requestRaw()                │  auth, retry, error mapping
+│  - executeRequest() (private)                 │
 └──────────────────────┬───────────────────────┘
                        │ uses
                        ▼
 ┌──────────────────────────────────────────────┐
-│  src/session-manager.ts                      │  cookie auth + keepalive
-│  src/tm1-client/dispatcher.ts                │  undici TLS dispatcher
+│  src/session-manager.ts                       │  cookie auth + keepalive
+│  src/tm1-client/dispatcher.ts                 │  undici TLS dispatcher
 └──────────────────────────────────────────────┘
 ```
+
+## Transports and the readonly/readwrite gate
+
+`src/index.ts` is the entry point. It builds one `McpServer`, registers the
+tools/prompts/resources, and connects it to a transport:
+
+| Transport            | When                                  | Notes                                              |
+|----------------------|---------------------------------------|----------------------------------------------------|
+| **stdio** (default)  | local Claude Code / Claude Desktop    | `StdioServerTransport`                              |
+| **Streamable HTTP**  | `TM1_MCP_TRANSPORT=http`             | stateless JSON, single `POST /mcp`, optional bearer token |
+
+Tool registration is gated by `config.mode` (env `TM1_MODE`):
+
+- **`readonly` (default)** — write and destructive tools are never registered,
+  so the server cannot mutate or delete anything.
+- **`readwrite`** — the full lifecycle (cell writes, cube/dimension/process
+  deletion, TI execution) is registered. Opt in explicitly.
+
+Each tool declares its mutating nature via `src/tools/with-annotations.ts`
+(`readOnlyHint` / `destructiveHint`); the gate in `index.ts` uses that to decide
+what to register.
 
 ## Service-class pattern (TM1py-style)
 
 Each domain owns one service class under `src/tm1-client/services/`. The
 class holds a single `TM1HttpClient` reference and exposes domain methods
-as plain async functions. Pattern is patterned on TM1py's `RestService` +
+as plain async functions. The pattern follows TM1py's `RestService` +
 domain services (`CubeService`, `DimensionService`, `ProcessService`, …).
+
+The 13 services wired into `TM1Client`: `cubes`, `dimensions`, `hierarchies`,
+`cells`, `views`, `subsets`, `elements`, `processes`, `chores`, `security`,
+`server`, `monitoring`, `files`.
 
 ### Authoring a new service
 
@@ -97,25 +127,10 @@ export class TM1Client extends TM1HttpClient {
 TypeScript accepts the upcast since `TM1Client extends TM1HttpClient`.
 The service does not see `TM1Client`-specific surface, only HTTP transport.
 
-### Deprecated flat methods during migration
-
-Until Phase 2–8 of the refactor are complete, the legacy flat methods on
-`TM1Client` (`getCubes`, `executeProcess`, …) remain for backwards
-compatibility with the 98 tool files. They are JSDoc-marked
-`@deprecated`, with a one-line wrapper delegating to the service:
-
-```ts
-/** @deprecated Use `client.cubes.list(opts)` instead. Removed in 2.0. */
-async getCubes(opts) {
-  return this.cubes.list(opts);
-}
-```
-
-## Migration status
-
-The service-composition migration is complete. All TM1 REST calls go
-through a service under `src/tm1-client/services/`, and the `lint:no-flat-api`
-CI gate prevents regression to flat-client calls.
+`TM1Client` holds **no** flat pass-through methods. Tools always reach TM1
+through a service (`client.cubes.list()`, `client.processes.execute()`, …).
+The `lint:no-flat-api` CI gate fails the build if a flat-client TM1 call is
+reintroduced.
 
 ## Why service-composition instead of mixins or inheritance
 
@@ -127,7 +142,7 @@ CI gate prevents regression to flat-client calls.
 
 The service-composition path was chosen because:
 
-1. The MCP server is targeted as an enterprise standard (multi-team,
+1. The MCP server is targeted as a long-lived standard (multi-team,
    multi-year). Long-term DX wins beat short-term migration cost.
 2. TM1py's API (`tm1.cubes.get()`, `tm1.processes.execute()`) is well
    known to TM1 developers — same mental model = lower onboarding cost.

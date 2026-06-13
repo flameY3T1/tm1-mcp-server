@@ -144,6 +144,19 @@ npm test         # vitest
 npm run lint     # tsc --noEmit
 ```
 
+## Documentation
+
+- [docs/EXAMPLES.md](docs/EXAMPLES.md) — working JSON tool-call payloads for every major feature
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layering, service-class pattern, transports, the readonly/readwrite gate
+- [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, lint gates, how to add a tool or service
+- [CHANGELOG.md](CHANGELOG.md) · [SECURITY.md](SECURITY.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first — run
+`npm run verify` (typecheck + lint gates + tests) before opening a PR. This is a
+best-effort project with no support guarantee (see [Provenance](#provenance)).
+
 ## Analysis Tools
 
 Bulk-load + callgraph tools for code review and dependency tracking:
@@ -196,7 +209,7 @@ Catch the gap between "compile passes" and "runtime crashes":
 
 ## Compatibility
 
-- Node.js >= 18
+- Node.js >= 20
 - TM1 11.8 (most tools); some metadata-write paths assume 11.x semantics
 - v12-only features (e.g. `DataSource.usesUnicode`) gated behind `TM1_VERSION`
 

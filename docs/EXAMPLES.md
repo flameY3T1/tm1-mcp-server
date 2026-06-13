@@ -2,7 +2,7 @@
 
 Working examples for every major feature. Snippets are JSON tool-call payloads — paste into any MCP-aware client (Claude Code, Claude Desktop, etc.). Defaults assume server name `tm1`.
 
-> Tip: every list_*/get_* tool now accepts `format: "json"|"markdown"`. Default is `json` (parsed into `structuredContent` by the Proxy); use `"markdown"` when you want a readable table dropped straight into chat.
+> Tip: every list_*/get_* tool now accepts `format: "json"|"markdown"`. Default is `json` (parsed into `structuredContent` by the server); use `"markdown"` when you want a readable table dropped straight into chat.
 
 ---
 
@@ -67,7 +67,6 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
   "tool": "tm1_get_cell_value",
   "args": {
     "cubeName": "Sales",
-    "dimensions": ["Year", "Region", "Product", "Versions", "Measures"],
     "elements": ["2024", "DE", "P001", "Actual", "Amount"]
   }
 }
@@ -78,7 +77,7 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
 ```json
 {
   "tool": "tm1_sample_cells",
-  "args": { "cubeName": "Sales", "sampleSize": 20, "skipZeros": true }
+  "args": { "cubeName": "Sales", "maxCells": 20 }
 }
 ```
 
@@ -493,7 +492,7 @@ Add `format: "markdown"` to any list_* tool or to these get_* tools for human-re
 
 `tm1_get_server_info`, `tm1_get_server_state`, `tm1_get_cube_stats`, `tm1_get_message_log`, `tm1_get_transaction_log`, `tm1_get_process_parameters`, `tm1_get_process_variables`, `tm1_get_process_datasource`, `tm1_get_ancestors`, `tm1_get_descendants`, `tm1_get_element_attribute_values`, `tm1_get_client`.
 
-Default `json` is preferred for agent consumption — the Proxy parses it into `structuredContent` so typed clients can consume the payload directly.
+Default `json` is preferred for agent consumption — the server parses it into `structuredContent` so typed clients can consume the payload directly.
 
 ## MCP Resources
 
@@ -544,6 +543,7 @@ Slash-command workflow templates surfaced by IDE clients. Each prompt briefs the
 
 | Name | Args | Use case |
 |---|---|---|
+| `tm1_orientation` | — | First-call primer: how to navigate the model and which tool/prompt to reach for |
 | `tm1_diagnose_process` | `processName` | Root-cause failed TI: error logs → cascade → params → code → refs → callgraph |
 | `tm1_audit_cube` | `cubeName` | Read-only health audit: shape → rules → stats → object-usage → tx log |
 | `tm1_health_check` | — | Server snapshot: state, sessions, threads, error logs, message log |
@@ -573,4 +573,4 @@ Failures return uniform JSON:
 }
 ```
 
-A subset of high-signal tools (`tm1_set_cube_rules`, `tm1_create_process`, `tm1_execute_process`, `tm1_write_cells`, `tm1_execute_mdx`) attach a tool-context hint that names the right pre-flight or diagnose tool.
+A subset of high-signal tools (`tm1_set_cube_rules`, `tm1_upsert_process`, `tm1_execute_process`, `tm1_write_cells`, `tm1_execute_mdx`) attach a tool-context hint that names the right pre-flight or diagnose tool.

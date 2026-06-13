@@ -414,7 +414,7 @@ interface FindingGroup {
 function buildFindingsByGroup(findings: Finding[]): FindingGroup[] {
   const groups = new Map<string, FindingGroup>();
   for (const f of findings) {
-    const key = `${f.objectKind} ${f.parent ?? ""}`;
+    const key = `${f.objectKind}\0${f.parent ?? ""}`;
     let g = groups.get(key);
     if (!g) {
       g = {

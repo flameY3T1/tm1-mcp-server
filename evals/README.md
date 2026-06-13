@@ -15,8 +15,10 @@ instance (TM1 v11.8, HR-planning demo model) on 2026-06-07.
 
 ## Running
 
-Uses the evaluation harness from the Anthropic `mcp-builder` skill
-(`scripts/evaluation.py`):
+Uses the evaluation harness (`evaluation.py`) from the Anthropic `mcp-builder`
+skill. That script is **not vendored in this repo** — copy it from the skill
+into `scripts/` (or run it from wherever the skill installed it) before running
+the command below:
 
 ```bash
 pip install anthropic mcp

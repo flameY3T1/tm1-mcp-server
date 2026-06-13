@@ -4,12 +4,6 @@
     "tm1": {
       "command": "node",
       "args": ["/absolute/path/to/tm1-mcp-server/dist/index.js"],
-      "env": {
-        "TM1_BASE_URL": "https://your-tm1-host:port",
-        "TM1_USER": "admin",
-        "TM1_PASSWORD": "",
-        "TM1_SSL_REJECT_UNAUTHORIZED": "false"
-      },
       "autoApprove": [
         "tm1_analyze_callgraph",
         "tm1_analyze_chore_graph",
