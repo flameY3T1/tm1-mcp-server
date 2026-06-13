@@ -9,7 +9,7 @@ export function registerSaveData(server: McpServer, tm1Client: TM1Client): void 
     [
       "Persist in-memory cube data to disk: SaveDataAll (all cubes) or CubeSaveData when `cube` is given.",
       "Run after write sessions (tm1_write_cells, TI loads) — unsaved changes are lost on server crash.",
-      "Side effect: truncates the transaction log for saved cubes (entries are flushed to the log archive).",
+      "Persists in-memory data to disk only; it does not clear or truncate the transaction log.",
       "v11 only — v12 removed SaveDataAll/CubeSaveData (cloud engine persists automatically).",
       "Executes as an unbound TI process via ExecuteProcessWithReturn; no process object is created on the server.",
     ].join(" "),

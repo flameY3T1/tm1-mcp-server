@@ -431,8 +431,9 @@ result means no broken feeders detected.
 { "tool": "tm1_save_data", "args": { "cube": "Sales" } }
 ```
 
-Omit `cube` for SaveDataAll. Run after write sessions; truncates the
-transaction log for saved cubes.
+Omit `cube` for SaveDataAll. Run after write sessions to persist in-memory
+changes to disk — otherwise unsaved data is lost if the server crashes. It does
+not clear or truncate the transaction log.
 
 ### 9.7 Who changed what? (audit log, v11)
 
