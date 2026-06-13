@@ -389,7 +389,18 @@ export class TM1HttpClient {
         { endpoint, status: response.status },
         "Request successful",
       );
-      return JSON.parse(text) as T;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        throw new TM1Error({
+          code: TM1ErrorCode.TM1_ERROR,
+          message:
+            `TM1 returned a non-JSON response body (status ${response.status}) for ${endpoint}. ` +
+            `This usually means a proxy or gateway returned HTML/text instead of the TM1 REST API.`,
+          httpStatus: response.status,
+          endpoint,
+        });
+      }
     }
 
     let details: string | undefined;

@@ -17,6 +17,11 @@ export interface TM1Config {
   // protection is enabled. Defaults to loopback origins; extend via env when
   // serving from an explicit hostname.
   httpAllowedOrigins: string[];
+  // Optional bearer token for the Streamable HTTP transport. When set, every
+  // incoming /mcp request must carry `Authorization: Bearer <token>`. Unset
+  // (default) means no transport-level auth — only safe behind loopback or a
+  // trusted reverse proxy.
+  httpToken?: string | undefined;
   // When "readonly", only READ_ONLY-annotated tools are registered. Write and
   // destructive tools are excluded entirely — they don't appear in the tool
   // listing. Default: "readwrite".
@@ -26,6 +31,18 @@ export interface TM1Config {
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 const VALID_TRANSPORTS = ["stdio", "http"] as const;
 const VALID_MODES = ["readwrite", "readonly"] as const;
+
+// Parse a positive-integer env var. Empty/unset → default. A non-numeric or
+// non-positive value throws at startup instead of silently becoming NaN — NaN
+// makes setInterval/setTimeout fire continuously and ports resolve to ":NaN".
+function parseIntEnv(name: string, raw: string | undefined, def: number): number {
+  if (raw === undefined || raw === "") return def;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new Error(`Invalid ${name}: "${raw}". Expected a positive integer.`);
+  }
+  return n;
+}
 
 export function loadConfig(): TM1Config {
   const baseUrl = process.env.TM1_BASE_URL;
@@ -58,11 +75,17 @@ export function loadConfig(): TM1Config {
   const sslRaw = process.env.TM1_SSL_REJECT_UNAUTHORIZED;
   const rejectUnauthorized = sslRaw === undefined ? true : sslRaw !== "false";
 
-  const keepAliveRaw = process.env.TM1_KEEP_ALIVE_INTERVAL;
-  const keepAliveIntervalMs = keepAliveRaw ? parseInt(keepAliveRaw, 10) : 60000;
+  const keepAliveIntervalMs = parseIntEnv(
+    "TM1_KEEP_ALIVE_INTERVAL",
+    process.env.TM1_KEEP_ALIVE_INTERVAL,
+    60000,
+  );
 
-  const timeoutRaw = process.env.TM1_REQUEST_TIMEOUT;
-  const requestTimeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : 30000;
+  const requestTimeoutMs = parseIntEnv(
+    "TM1_REQUEST_TIMEOUT",
+    process.env.TM1_REQUEST_TIMEOUT,
+    30000,
+  );
 
   const logLevelRaw = process.env.TM1_LOG_LEVEL ?? "info";
   const logLevel = VALID_LOG_LEVELS.includes(logLevelRaw as typeof VALID_LOG_LEVELS[number])
@@ -81,8 +104,7 @@ export function loadConfig(): TM1Config {
   // Default to loopback. Binding to 0.0.0.0 must be opt-in to avoid exposing
   // a TM1-credentialed MCP server to the LAN by accident.
   const httpHost = process.env.TM1_MCP_HTTP_HOST || "127.0.0.1";
-  const httpPortRaw = process.env.TM1_MCP_HTTP_PORT;
-  const httpPort = httpPortRaw ? parseInt(httpPortRaw, 10) : 3000;
+  const httpPort = parseIntEnv("TM1_MCP_HTTP_PORT", process.env.TM1_MCP_HTTP_PORT, 3000);
 
   // Origin allow-list for DNS-rebinding protection. Loopback origins are
   // always included so localhost dev clients work out of the box; if the
@@ -101,6 +123,8 @@ export function loadConfig(): TM1Config {
     ? extraOriginsRaw.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
   const httpAllowedOrigins = Array.from(new Set([...defaultOrigins, ...extraOrigins]));
+
+  const httpToken = process.env.TM1_MCP_HTTP_TOKEN || undefined;
 
   const modeRaw = process.env.TM1_MODE ?? "readwrite";
   const mode = VALID_MODES.includes(modeRaw as (typeof VALID_MODES)[number])
@@ -121,6 +145,7 @@ export function loadConfig(): TM1Config {
     httpHost,
     httpPort,
     httpAllowedOrigins,
+    httpToken,
     mode,
   };
 }

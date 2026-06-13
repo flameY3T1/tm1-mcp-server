@@ -17,8 +17,10 @@ import type {
 } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 import { transformCellsetResponse } from "./cellset-transform.js";
+import { rethrowIfSystemic } from "./fallback.js";
 
-const enc = encodeURIComponent;
+// OData key encoder: double ' per OData literal rules, then percent-encode.
+const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export class ViewService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -36,7 +38,8 @@ export class ViewService {
         `/api/v1/Cubes('${enc(cubeName)}')/Views?$select=Name,MDX`,
       );
       result.push(...pub.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: false })));
-    } catch {
+    } catch (e) {
+      rethrowIfSystemic(e);
       // no public views
     }
     try {
@@ -45,7 +48,8 @@ export class ViewService {
         `/api/v1/Cubes('${enc(cubeName)}')/PrivateViews?$select=Name,MDX`,
       );
       result.push(...priv.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: true })));
-    } catch {
+    } catch (e) {
+      rethrowIfSystemic(e);
       // no private views
     }
     return result;

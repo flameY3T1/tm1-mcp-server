@@ -59,7 +59,11 @@ export function toOdataDateTime(input: string): string {
   return t;
 }
 
+// enc stays plain — it also wraps whole $filter/$orderby clauses below, where
+// the inner string literals are already single-quote-escaped via esc().
 const enc = encodeURIComponent;
+// OData entity-key encoder: double ' per OData literal rules, then percent-encode.
+const encKey = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export class ServerService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -127,8 +131,8 @@ export class ServerService {
     if (opts.user) filters.push(`UserName eq '${esc(opts.user)}'`);
     if (opts.objectType) filters.push(`ObjectType eq '${esc(opts.objectType)}'`);
     if (opts.objectName) filters.push(`ObjectName eq '${esc(opts.objectName)}'`);
-    if (opts.since) filters.push(`TimeStamp ge ${opts.since}`);
-    if (opts.until) filters.push(`TimeStamp le ${opts.until}`);
+    if (opts.since) filters.push(`TimeStamp ge ${toOdataDateTime(opts.since)}`);
+    if (opts.until) filters.push(`TimeStamp le ${toOdataDateTime(opts.until)}`);
 
     const top = opts.top ?? 100;
     const qs: string[] = [`$top=${top}`, `$orderby=${enc("TimeStamp desc")}`];
@@ -377,7 +381,7 @@ export class ServerService {
    * GET /api/v1/ErrorLogFiles('<filename>')/Content
    */
   async getErrorLogContent(filename: string): Promise<string> {
-    const path = `/api/v1/ErrorLogFiles('${enc(filename)}')/Content`;
+    const path = `/api/v1/ErrorLogFiles('${encKey(filename)}')/Content`;
     return await this.http.requestRaw("GET", path);
   }
 }

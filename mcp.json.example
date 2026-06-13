@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to .mcp.json (project-local) or merge into ~/.claude/settings.json. Credentials live in .env, not here. autoApprove lists READ-ONLY tools only — destructive tools (delete/clear/unload/cancel/execute/remove/invalidate) MUST stay out of this list and require manual approval.",
+  "_comment": "Copy to .mcp.json (project-local) or merge into ~/.claude/settings.json. Credentials live in .env, not here. autoApprove lists READ-ONLY tools only — destructive tools (delete/clear/unload/cancel/execute/remove/invalidate) MUST stay out of this list and require manual approval. TM1_SSL_REJECT_UNAUTHORIZED=false disables TLS certificate verification — use only for self-signed dev certs, never in production.",
   "mcpServers": {
     "tm1": {
       "command": "node",

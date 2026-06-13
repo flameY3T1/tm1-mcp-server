@@ -15,7 +15,8 @@ import type {
 import type { RequestOptions, TM1HttpClient } from "../http.js";
 import { transformCellsetResponse } from "./cellset-transform.js";
 
-const enc = encodeURIComponent;
+// OData key encoder: double ' per OData literal rules, then percent-encode.
+const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export class CellService {
   constructor(private readonly http: TM1HttpClient) {}

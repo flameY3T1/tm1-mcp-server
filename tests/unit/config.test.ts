@@ -128,4 +128,33 @@ describe("loadConfig", () => {
     const config = loadConfig();
     expect(config.logFile).toBeUndefined();
   });
+
+  it("should throw on non-numeric TM1_KEEP_ALIVE_INTERVAL", () => {
+    setRequiredEnv();
+    process.env.TM1_KEEP_ALIVE_INTERVAL = "abc";
+    expect(() => loadConfig()).toThrow("Invalid TM1_KEEP_ALIVE_INTERVAL");
+  });
+
+  it("should throw on non-positive TM1_REQUEST_TIMEOUT", () => {
+    setRequiredEnv();
+    process.env.TM1_REQUEST_TIMEOUT = "0";
+    expect(() => loadConfig()).toThrow("Invalid TM1_REQUEST_TIMEOUT");
+  });
+
+  it("should throw on non-numeric TM1_MCP_HTTP_PORT", () => {
+    setRequiredEnv();
+    process.env.TM1_MCP_HTTP_PORT = "NaN";
+    expect(() => loadConfig()).toThrow("Invalid TM1_MCP_HTTP_PORT");
+  });
+
+  it("should set httpToken from TM1_MCP_HTTP_TOKEN", () => {
+    setRequiredEnv();
+    process.env.TM1_MCP_HTTP_TOKEN = "s3cret";
+    expect(loadConfig().httpToken).toBe("s3cret");
+  });
+
+  it("should leave httpToken undefined when unset", () => {
+    setRequiredEnv();
+    expect(loadConfig().httpToken).toBeUndefined();
+  });
 });

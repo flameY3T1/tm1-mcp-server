@@ -60,6 +60,11 @@ import {
   ProcessVariableSchema,
   ProcessesGroupedResultSchema,
   SearchCodeResultSchema,
+  SearchRulesResultSchema,
+  AuditComplexityResultSchema,
+  AuditFeedersResultSchema,
+  AuditNamingResultSchema,
+  DiffProcessesResultSchema,
   TraceFeedersResultSchema,
   ServerInfoSchema,
   ServerStateResultSchema,
@@ -154,6 +159,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
 
   // ── Phase 2d: diff/bundle/upsert ──────────────────────────────────────────
   tm1_diff_process_with_file: asOutputSchema(DiffProcessResultSchema),
+  tm1_diff_processes: asOutputSchema(DiffProcessesResultSchema),
   tm1_upsert_process: asOutputSchema(UpsertProcessResultSchema),
   tm1_install_pro_bundle: asOutputSchema(InstallProBundleResultSchema),
   tm1_import_pro_file: asOutputSchema(ImportProFileResultSchema),
@@ -164,6 +170,10 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_analyze_chore_graph: asOutputSchema(ChoreGraphResultSchema),
   tm1_analyze_object_usage: asOutputSchema(ObjectUsageResultSchema),
   tm1_search_code: asOutputSchema(SearchCodeResultSchema),
+  tm1_search_rules: asOutputSchema(SearchRulesResultSchema),
+  tm1_audit_complexity: asOutputSchema(AuditComplexityResultSchema),
+  tm1_audit_feeders: asOutputSchema(AuditFeedersResultSchema),
+  tm1_audit_naming: asOutputSchema(AuditNamingResultSchema),
 
   // ── Phase 2f: validators (refactored from prose) and array-root wraps ─────
   tm1_check_cube_rule: {

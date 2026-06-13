@@ -7,7 +7,8 @@
 import type { Client, ClientCreate, ClientUpdate, Group } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 
-const enc = encodeURIComponent;
+// OData key encoder: double ' per OData literal rules, then percent-encode.
+const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export class SecurityService {
   constructor(private readonly http: TM1HttpClient) {}

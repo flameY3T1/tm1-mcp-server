@@ -1,9 +1,10 @@
 import type { TM1Config } from "./config.js";
 import { createLogger } from "./logger.js";
 import { getTm1Dispatcher, tm1Fetch } from "./tm1-client/dispatcher.js";
+import { NAME, VERSION } from "./version.js";
 import type pino from "pino";
 
-const USER_AGENT = "tm1-mcp-server/1.0.0";
+const USER_AGENT = `${NAME}/${VERSION}`;
 
 export class TimeoutError extends Error {
   readonly timeoutMs: number;
@@ -35,6 +36,7 @@ async function withTimeout<T>(
 
 export class SessionManager {
   private sessionCookie: string | null = null;
+  private authInFlight: Promise<string> | null = null;
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
   private readonly config: TM1Config;
   private readonly logger: pino.Logger;
@@ -182,7 +184,13 @@ export class SessionManager {
     if (this.sessionCookie) {
       return this.sessionCookie;
     }
-    return this.authenticate();
+    // Dedupe concurrent first-auth (HTTP transport): callers arriving before
+    // the initial authenticate() resolves share one in-flight promise instead
+    // of each opening a separate TM1 session and clobbering the cookie.
+    this.authInFlight ??= this.authenticate().finally(() => {
+      this.authInFlight = null;
+    });
+    return this.authInFlight;
   }
 
   /**

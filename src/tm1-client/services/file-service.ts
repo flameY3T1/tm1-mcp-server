@@ -5,8 +5,27 @@
 //
 // See docs/ARCHITECTURE.md for the layering.
 import type { TM1HttpClient } from "../http.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { rethrowIfSystemic } from "./fallback.js";
 
-const enc = encodeURIComponent;
+// OData entity-key encoder: double single quotes per OData literal rules, then
+// percent-encode. Without the doubling a name containing ' breaks the key and
+// makes the object unreachable.
+const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+
+// Split a user-supplied file path into segments, rejecting "." / ".." so a
+// crafted name cannot traverse outside the Contents root.
+function splitPath(raw: string): string[] {
+  const parts = raw.split("/").filter(Boolean);
+  if (parts.some((p) => p === "." || p === "..")) {
+    throw new TM1Error({
+      code: TM1ErrorCode.VALIDATION_ERROR,
+      message: `Invalid path "${raw}": "." and ".." segments are not allowed`,
+      endpoint: raw,
+    });
+  }
+  return parts;
+}
 
 export class FileService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -18,7 +37,7 @@ export class FileService {
    * Tries v12 'Files' first, falls back to v11 'Blobs'.
    */
   async list(path?: string): Promise<string[]> {
-    const segments = path ? path.split("/").filter(Boolean) : [];
+    const segments = path ? splitPath(path) : [];
     const buildUrl = (root: string): string => {
       let url = `/api/v1/Contents('${enc(root)}')`;
       for (const seg of segments) {
@@ -30,7 +49,8 @@ export class FileService {
     try {
       const r = await this.http.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Files"));
       return r.value.map((f) => f.Name);
-    } catch {
+    } catch (e) {
+      rethrowIfSystemic(e);
       const r = await this.http.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Blobs"));
       return r.value.map((f) => f.Name);
     }
@@ -42,7 +62,7 @@ export class FileService {
    * Tries v12 'Files' first, falls back to v11 'Blobs'.
    */
   async getContent(fileName: string): Promise<string> {
-    const parts = fileName.split("/").filter(Boolean);
+    const parts = splitPath(fileName);
     const buildUrl = (root: string): string => {
       let url = `/api/v1/Contents('${enc(root)}')`;
       for (const p of parts) {
@@ -53,7 +73,8 @@ export class FileService {
     };
     try {
       return await this.http.requestRaw("GET", buildUrl("Files"));
-    } catch {
+    } catch (e) {
+      rethrowIfSystemic(e);
       return await this.http.requestRaw("GET", buildUrl("Blobs"));
     }
   }
@@ -64,7 +85,7 @@ export class FileService {
    * not expose HEAD on these. 404 → false; other errors propagate.
    */
   async exists(fileName: string): Promise<boolean> {
-    const parts = fileName.split("/").filter(Boolean);
+    const parts = splitPath(fileName);
     if (parts.length === 0) return false;
     const buildUrl = (root: string): string => {
       const segs = parts.slice(0, -1).map((s) => `/Contents('${enc(s)}')`).join("");
@@ -96,7 +117,7 @@ export class FileService {
    * exist (folder-create not yet exposed).
    */
   async upload(fileName: string, content: Uint8Array): Promise<{ created: boolean; root: "Files" | "Blobs" }> {
-    const parts = fileName.split("/").filter(Boolean);
+    const parts = splitPath(fileName);
     if (parts.length === 0) {
       throw new Error("upload: empty file name");
     }
@@ -133,7 +154,7 @@ export class FileService {
    * Delete a file from blob/file storage. Tries 'Files' first, then 'Blobs'.
    */
   async delete(fileName: string): Promise<void> {
-    const parts = fileName.split("/").filter(Boolean);
+    const parts = splitPath(fileName);
     if (parts.length === 0) {
       throw new Error("delete: empty file name");
     }
@@ -162,7 +183,7 @@ export class FileService {
     path?: string | undefined;
   }): Promise<string[]> {
     const operator = opts.operator ?? "and";
-    const segments = opts.path ? opts.path.split("/").filter(Boolean) : [];
+    const segments = opts.path ? splitPath(opts.path) : [];
     const escape = (s: string): string => s.replace(/'/g, "''");
     const filters: string[] = [];
     if (opts.startswith) {
@@ -182,7 +203,8 @@ export class FileService {
     try {
       const r = await this.http.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Files"));
       return r.value.map((f) => f.Name);
-    } catch {
+    } catch (e) {
+      rethrowIfSystemic(e);
       const r = await this.http.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Blobs"));
       return r.value.map((f) => f.Name);
     }

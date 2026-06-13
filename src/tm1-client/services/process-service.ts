@@ -15,8 +15,10 @@ import type {
   ProcessVariable,
 } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
+import { rethrowIfSystemic } from "./fallback.js";
 
-const enc = encodeURIComponent;
+// OData key encoder: double ' per OData literal rules, then percent-encode.
+const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
 
 // Encode a TI parameter for the OData write body.
 //
@@ -77,7 +79,8 @@ export class ProcessService {
           ...(param.Prompt ? { prompt: param.Prompt } : {}),
         })),
       }));
-    } catch {
+    } catch (e) {
+      rethrowIfSystemic(e);
       const response = await this.http.request<{
         value: Array<{ Name: string }>;
       }>("GET", "/api/v1/Processes?$select=Name");

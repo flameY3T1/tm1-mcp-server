@@ -111,25 +111,11 @@ async getCubes(opts) {
 }
 ```
 
-## Migration roadmap
+## Migration status
 
-Tracked as a backlog item.
-
-| Phase | Scope                                                              | Status            |
-|-------|--------------------------------------------------------------------|-------------------|
-| 1     | Introduce `services/` directory + `CubeService` (exemplar pattern) | DONE 2026-05-08   |
-| 1.1   | `DimensionService`, `HierarchyService`, `ElementService`           | DONE 2026-05-08   |
-| 1.2   | `CellService`, `ViewService`, `SubsetService`                      | DONE 2026-05-08   |
-| 1.3   | `ProcessService`, `ChoreService`                                   | DONE 2026-05-08   |
-| 1.4   | `SecurityService`, `ServerService`, `MonitoringService`            | DONE 2026-05-08   |
-| 1.5   | `FileService` (callgraph stays as `processes.fetchForCallgraph`)   | DONE 2026-05-08   |
-| 2–8   | Migrate tool-files domain by domain to call services directly      | TODO (one PR each) |
-| 9     | Mark flat methods `@deprecated`, add `lint:no-flat-api` CI gate    | DONE 2026-05-08   |
-| 10    | Remove flat methods, release 2.0                                   | DONE 2026-05-08   |
-
-Each Phase 1.x adds new service files; flat methods on `TM1Client` are
-added/converted to wrappers in the same PR. Tool files do not change
-during Phase 1 — that happens in Phase 2–8.
+The service-composition migration is complete. All TM1 REST calls go
+through a service under `src/tm1-client/services/`, and the `lint:no-flat-api`
+CI gate prevents regression to flat-client calls.
 
 ## Why service-composition instead of mixins or inheritance
 

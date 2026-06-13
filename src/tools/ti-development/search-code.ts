@@ -1,4 +1,5 @@
 import { z } from "zod";
+import safeRegex from "safe-regex";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
@@ -29,7 +30,11 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
       "Use tm1_get_process_code on a hit to inspect the surrounding context.",
     ].join(" "),
     {
-      pattern: z.string().describe("Regex pattern (JavaScript flavor). Anchors and groups supported."),
+      pattern: z
+        .string()
+        .min(1)
+        .max(2000)
+        .describe("Regex pattern (JavaScript flavor). Anchors and groups supported."),
       tabs: z
         .array(z.enum(["prolog", "metadata", "data", "epilog"]))
         .optional()
@@ -94,6 +99,14 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
       format,
     }) => {
       const flags = caseSensitive ? "g" : "gi";
+      if (!safeRegex(pattern)) {
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message: "Regex rejected: pattern risks catastrophic backtracking (ReDoS).",
+          details: pattern,
+          hint: "Avoid nested unbounded quantifiers like (a+)+ or (.*)* — simplify or anchor the pattern.",
+        });
+      }
       let regex: RegExp;
       try {
         regex = new RegExp(pattern, flags);

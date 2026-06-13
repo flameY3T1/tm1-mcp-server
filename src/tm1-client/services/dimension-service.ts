@@ -24,7 +24,8 @@ export interface DefaultMemberResolution {
   warning?: string;
 }
 
-const enc = encodeURIComponent;
+// OData key encoder: double ' per OData literal rules, then percent-encode.
+const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
 
 /**
  * Decode a TM1 `}DimensionProperties.LAST_TIME_UPDATED` cell — a 14-digit

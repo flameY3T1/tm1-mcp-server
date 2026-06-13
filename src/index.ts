@@ -50,11 +50,25 @@ async function startHttpTransport(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await server.connect(transport as any);
 
+  if (!config.httpToken) {
+    logger.warn(
+      "HTTP transport has no TM1_MCP_HTTP_TOKEN set — /mcp requests are unauthenticated. " +
+        "Bind to loopback only, or front the server with an authenticating reverse proxy.",
+    );
+  }
+
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (!req.url || !req.url.startsWith("/mcp")) {
       res.statusCode = 404;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ error: "Not found. Use POST /mcp." }));
+      return;
+    }
+    if (config.httpToken && req.headers.authorization !== `Bearer ${config.httpToken}`) {
+      res.statusCode = 401;
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("WWW-Authenticate", "Bearer");
+      res.end(JSON.stringify({ error: "Unauthorized" }));
       return;
     }
     let body: unknown;

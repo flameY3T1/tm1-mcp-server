@@ -686,6 +686,72 @@ export const SearchCodeResultSchema = z.object({
   deduplicated: z.boolean().optional(),
 });
 
+// ── Audit / analysis + diff tool results ─────────────────────────────────────
+// Passthrough: these payloads are deep and evolve (nested summary objects,
+// conditional findings vs findingsByGroup). We pin the stable discriminator
+// fields and let the rest through so structuredContent is emitted without the
+// strict additionalProperties:false footgun rejecting valid responses.
+
+export const AuditComplexityResultSchema = z
+  .object({
+    status: z.string(),
+    productVersion: z.string().optional(),
+    scope: z.unknown().optional(),
+    scanned: z.unknown().optional(),
+    summary: z.unknown().optional(),
+  })
+  .passthrough();
+
+export const AuditFeedersResultSchema = z
+  .object({
+    status: z.string(),
+    productVersion: z.string().optional(),
+    mode: z.string().optional(),
+    scanned: z.unknown().optional(),
+  })
+  .passthrough();
+
+export const AuditNamingResultSchema = z
+  .object({
+    status: z.string(),
+    productVersion: z.string().optional(),
+    scope: z.unknown().optional(),
+    scanned: z.unknown().optional(),
+    summary: z.unknown().optional(),
+  })
+  .passthrough();
+
+export const DiffProcessesResultSchema = z
+  .object({
+    processA: z.string(),
+    processB: z.string(),
+    identical: z.boolean(),
+    tabs: z.unknown(),
+    parameters: z.unknown(),
+    variables: z.unknown(),
+    dataSource: z.unknown(),
+  })
+  .passthrough();
+
+export const SearchRulesResultSchema = z
+  .object({
+    pattern: z.string(),
+    caseSensitive: z.boolean(),
+    cubesScanned: z.number().int(),
+    matchCount: z.number().int(),
+    truncated: z.boolean(),
+    includeFeeders: z.boolean(),
+    total: z.number().int(),
+    count: z.number().int(),
+    offset: z.number().int(),
+    has_more: z.boolean(),
+    next_offset: z.number().int().nullable(),
+    items: z.array(
+      z.object({ cube: z.string(), line: z.number().int(), text: z.string() }).passthrough(),
+    ),
+  })
+  .passthrough();
+
 // ── Phase 2i: hierarchy navigation, server snapshots, diagnostics ────────────
 
 export const AncestorsResultSchema = z.object({
