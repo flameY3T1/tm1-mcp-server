@@ -7,7 +7,7 @@
 // Each resource maps to an existing TM1 service call — same backend logic
 // as the get_* tools, different MCP entry point.
 import {
-  McpServer,
+  type McpServer,
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../tm1-client.js";

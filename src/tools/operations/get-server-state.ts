@@ -38,7 +38,7 @@ export function registerGetServerState(server: McpServer, tm1Client: TM1Client):
       ]);
 
       const info = infoRes.status === "fulfilled" ? infoRes.value : null;
-      const x = (info?.extra ?? {}) as Record<string, unknown>;
+      const x = (info?.extra ?? {});
 
       const counts = {
         cubes: settleCount(cubesRes),

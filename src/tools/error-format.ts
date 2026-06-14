@@ -11,6 +11,7 @@
 import { TM1Error, TM1ErrorCode, hintForCode } from "../types.js";
 
 interface UniformErrorPayload {
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- TM1ErrorCode | string is intentional: documents known codes while accepting arbitrary strings for forward-compat
   code: TM1ErrorCode | string;
   message: string;
   httpStatus?: number | undefined;

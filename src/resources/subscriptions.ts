@@ -40,14 +40,14 @@ export class SubscriptionRegistry {
   install(): void {
     const lowLevel = this.server.server;
 
-    lowLevel.setRequestHandler(SubscribeRequestSchema, async (req) => {
+    lowLevel.setRequestHandler(SubscribeRequestSchema, (req) => {
       const uri = req.params.uri;
       this.subscribed.add(uri);
       this.logger.debug({ uri, count: this.subscribed.size }, "Resource subscribed");
       return {};
     });
 
-    lowLevel.setRequestHandler(UnsubscribeRequestSchema, async (req) => {
+    lowLevel.setRequestHandler(UnsubscribeRequestSchema, (req) => {
       const uri = req.params.uri;
       this.subscribed.delete(uri);
       this.logger.debug({ uri, count: this.subscribed.size }, "Resource unsubscribed");

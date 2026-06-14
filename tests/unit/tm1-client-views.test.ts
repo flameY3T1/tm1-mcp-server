@@ -82,10 +82,10 @@ describe("TM1Client – createNative()", () => {
     expect(body["@odata.type"]).toBe("#ibm.tm1.api.v1.NativeView");
     expect(body.Name).toBe("MyView");
     expect(body.Columns[0]["Subset@odata.bind"]).toBe(
-      "Dimensions('Time')/Hierarchies('Time')/Subsets('All Months')",
+      "Dimensions('Time')/Hierarchies('Time')/Subsets('All%20Months')",
     );
     expect(body.Rows[0]["Subset@odata.bind"]).toBe(
-      "Dimensions('Region')/Hierarchies('Region')/Subsets('All Regions')",
+      "Dimensions('Region')/Hierarchies('Region')/Subsets('All%20Regions')",
     );
     // Defaults: no suppression, no FormatString unless requested.
     expect(body.SuppressEmptyColumns).toBe(false);
@@ -232,5 +232,35 @@ describe("TM1Client – createNative()", () => {
     ).rejects.toThrow(/exactly one of/i);
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("OData-encodes single quotes in dimension, element, subset, and selected names", async () => {
+    fetchSpy.mockResolvedValueOnce(mockResponse({}));
+
+    await client.views.createNative("Sales", "MyView", {
+      columns: [{ dimension: "Dim'One", elements: ["Elem'A", "Elem'B"] }],
+      rows: [{ dimension: "Dim'Two", subset: "Sub'Set" }],
+      titles: [{ dimension: "Dim'Three", elements: ["Val'X"], selected: "Val'X" }],
+    });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+
+    // hierPath: single quotes doubled in dimension and hierarchy names
+    expect(body.Columns[0].Subset["Hierarchy@odata.bind"]).toBe(
+      "Dimensions('Dim''One')/Hierarchies('Dim''One')",
+    );
+    // elements: single quotes doubled in element name
+    expect(body.Columns[0].Subset["Elements@odata.bind"]).toEqual([
+      "Dimensions('Dim''One')/Hierarchies('Dim''One')/Elements('Elem''A')",
+      "Dimensions('Dim''One')/Hierarchies('Dim''One')/Elements('Elem''B')",
+    ]);
+    // subset name: single quotes doubled
+    expect(body.Rows[0]["Subset@odata.bind"]).toBe(
+      "Dimensions('Dim''Two')/Hierarchies('Dim''Two')/Subsets('Sub''Set')",
+    );
+    // title selected: single quotes doubled
+    expect(body.Titles[0]["Selected@odata.bind"]).toBe(
+      "Dimensions('Dim''Three')/Hierarchies('Dim''Three')/Elements('Val''X')",
+    );
   });
 });

@@ -1,7 +1,7 @@
 import { KNOWN_SIGNATURES } from './tiSignatures.js';
 import { extractDbCalls, extractBracketRefs, parseBracketDimRefs, validateBracketRefSyntax } from './rulesLinter.js';
 import { joinContinuationLines } from './tiParser.js';
-import { buildProcessEnv, resolveExpression, ProcessEnv, VarBinding } from './variableEnv.js';
+import { buildProcessEnv, resolveExpression, type ProcessEnv, type VarBinding } from './variableEnv.js';
 
 // ─── Argument-Index Auto-Derivation ──────────────────────────────────────────
 

@@ -43,10 +43,10 @@ function maskEnv(env: Map<string, EffectiveValue>): Record<string, EffectiveValu
 }
 
 function maskChoreParams<T extends Record<string, unknown>>(params: readonly T[] | undefined): T[] | undefined {
-  if (!params) return params as T[] | undefined;
+  if (!params) return params;
   return params.map((p) => {
     const name = (p.Name ?? p.name) as string | undefined;
-    return name && isSecretName(name) ? ({ ...p, Value: MASK, value: MASK } as T) : p;
+    return name && isSecretName(name) ? ({ ...p, Value: MASK, value: MASK }) : p;
   });
 }
 

@@ -267,7 +267,7 @@ export class ProcessService {
         lastErr = e;
       }
     }
-    if (!body) throw lastErr ?? new Error("Processes fetch failed");
+    if (!body) throw (lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "Processes fetch failed")));
     return (body.value ?? []).map((p) => {
       const parameters = (p.Parameters ?? [])
         .map((x) => String(x.Name ?? ""))

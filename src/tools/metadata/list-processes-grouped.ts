@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error } from "../../types.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
 
 export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Client) {
@@ -27,66 +27,55 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
         .describe("JS-compatible regex (case-insensitive) — drop processes whose name matches before grouping. E.g. '^Bedrock\\.' to hide Bedrock utility processes."),
     },
     async ({ format, includeControl, prefixSegments, includeNames, minCount, excludePattern }) => {
-      try {
-        let processes = await tm1Client.processes.list();
-        if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
-        if (excludePattern) {
-          let re: RegExp;
-          try {
-            re = new RegExp(excludePattern, "i");
-          } catch (e) {
-            return {
-              content: [{ type: "text" as const, text: JSON.stringify({ error: `invalid excludePattern: ${(e as Error).message}` }) }],
-              isError: true,
-            };
-          }
-          processes = processes.filter((p) => !re.test(p.name));
+      let processes = await tm1Client.processes.list();
+      if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
+      if (excludePattern) {
+        let re: RegExp;
+        try {
+          re = new RegExp(excludePattern, "i");
+        } catch (e) {
+          throw new TM1Error({
+            code: TM1ErrorCode.VALIDATION_ERROR,
+            message: `invalid excludePattern: ${(e as Error).message}`,
+          });
         }
-
-        const groupMap = new Map<string, string[]>();
-        for (const p of processes) {
-          const segments = p.name.split("_");
-          const prefix = segments.slice(0, prefixSegments).join("_");
-          const group = groupMap.get(prefix);
-          if (group) group.push(p.name);
-          else groupMap.set(prefix, [p.name]);
-        }
-
-        let groups = Array.from(groupMap.entries())
-          .map(([prefix, names]) => ({
-            prefix,
-            count: names.length,
-            ...(includeNames ? { processes: names.sort() } : {}),
-          }))
-          .sort((a, b) => b.count - a.count);
-
-        if (minCount !== undefined) groups = groups.filter((g) => g.count >= minCount);
-
-        const payload = {
-          totalProcesses: processes.length,
-          groupCount: groups.length,
-          prefixSegments,
-          groups,
-        };
-        type GroupRow = (typeof groups)[number];
-        const columns: Column<GroupRow>[] = [
-          { header: "prefix", get: (g) => g.prefix },
-          { header: "count", get: (g) => g.count },
-          ...(includeNames ? [{ header: "processes", get: (g: GroupRow) => ("processes" in g ? g.processes : []) } as Column<GroupRow>] : []),
-        ];
-        return payloadResponse(payload, format, (p) =>
-          `## Processes grouped by prefix\n\n${p.totalProcesses} processes · ${p.groupCount} groups · prefixSegments=${p.prefixSegments}\n\n${renderTable(p.groups, columns)}`,
-        );
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
+        processes = processes.filter((p) => !re.test(p.name));
       }
+
+      const groupMap = new Map<string, string[]>();
+      for (const p of processes) {
+        const segments = p.name.split("_");
+        const prefix = segments.slice(0, prefixSegments).join("_");
+        const group = groupMap.get(prefix);
+        if (group) group.push(p.name);
+        else groupMap.set(prefix, [p.name]);
+      }
+
+      let groups = Array.from(groupMap.entries())
+        .map(([prefix, names]) => ({
+          prefix,
+          count: names.length,
+          ...(includeNames ? { processes: names.sort() } : {}),
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      if (minCount !== undefined) groups = groups.filter((g) => g.count >= minCount);
+
+      const payload = {
+        totalProcesses: processes.length,
+        groupCount: groups.length,
+        prefixSegments,
+        groups,
+      };
+      type GroupRow = (typeof groups)[number];
+      const columns: Column<GroupRow>[] = [
+        { header: "prefix", get: (g) => g.prefix },
+        { header: "count", get: (g) => g.count },
+        ...(includeNames ? [{ header: "processes", get: (g: GroupRow) => ("processes" in g ? g.processes : []) } as Column<GroupRow>] : []),
+      ];
+      return payloadResponse(payload, format, (p) =>
+        `## Processes grouped by prefix\n\n${p.totalProcesses} processes · ${p.groupCount} groups · prefixSegments=${p.prefixSegments}\n\n${renderTable(p.groups, columns)}`,
+      );
     },
   );
 }

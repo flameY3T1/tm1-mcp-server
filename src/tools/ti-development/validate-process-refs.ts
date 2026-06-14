@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
 
 interface RefIssue {
@@ -57,10 +58,10 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
     },
     async ({ processName, filePath, content, includeControl }) => {
       if (!processName && !filePath && !content) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: "Provide processName, filePath, or content" }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message: "Provide processName, filePath, or content",
+        });
       }
 
       let code: { prolog: string; metadata: string; data: string; epilog: string };
@@ -71,10 +72,10 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         let body = content ?? "";
         if (!body && filePath) {
           if (!path.isAbsolute(filePath)) {
-            return {
-              content: [{ type: "text" as const, text: JSON.stringify({ error: `filePath must be absolute: ${filePath}` }) }],
-              isError: true,
-            };
+            throw new TM1Error({
+              code: TM1ErrorCode.VALIDATION_ERROR,
+              message: `filePath must be absolute: ${filePath}`,
+            });
           }
           body = await fs.readFile(filePath, "utf8");
         }

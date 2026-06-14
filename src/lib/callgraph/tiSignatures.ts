@@ -13,11 +13,11 @@ export interface TiKnownSignature {
   maxParams: number; // Infinity for variadic functions
   params: TiParamInfo[];
   returnType: 'string' | 'numeric' | 'void';
-  /** true wenn die Funktion in TM1 / Planning Analytics v12 (Cloud Native) nicht mehr verfügbar ist */
+  /** true if the function is no longer available in TM1 / Planning Analytics v12 (Cloud Native) */
   deprecatedInV12?: boolean;
   /**
-   * Performance-Hinweis: Empfehlung in welchem Abschnitt die Funktion idealerweise stehen sollte.
-   * Wird als `performance-hint` ausgegeben wenn die Funktion außerhalb des empfohlenen Abschnitts steht.
+   * Performance note: recommendation for which section the function should ideally appear in.
+   * Emitted as a `performance-hint` when the function is used outside the recommended section.
    */
   performanceNote?: { recommended: TiSection; reason: string };
 }
@@ -3358,7 +3358,7 @@ export const KNOWN_SIGNATURES: Map<string, TiKnownSignature> = new Map([
   }],
 
   // ── Datasource Getter/Setter (Task 5) — alle als Assignment `Datasource* = X`
-  // oder Funktionsaufruf-Syntax; einheitlich als 1-arg-Funktionen modelliert ──
+  // or function-call syntax; uniformly modelled as 1-arg functions ──
   ['datasourceasciidecimalseparator', {
     name: 'DatasourceASCIIDecimalSeparator',
     minParams: 1, maxParams: 1,
@@ -3505,7 +3505,7 @@ export const KNOWN_SIGNATURES: Map<string, TiKnownSignature> = new Map([
     returnType: 'string',
   }],
 
-  // ── Funktionen die in TM1 / Planning Analytics v12 nicht mehr verfügbar sind ─
+  // ── Functions no longer available in TM1 / Planning Analytics v12 ─────
   ['addinfocuberestriction', {
     name: 'AddInfoCubeRestriction',
     minParams: 3,

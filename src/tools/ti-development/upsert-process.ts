@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 
 const dataSourceSchema = z
@@ -63,16 +64,16 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
       const procs = await tm1Client.processes.list();
       const exists = procs.some((p: { name: string }) => p.name === name);
       if (mode === "create" && exists) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: `Process '${name}' already exists; mode=create` }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.CONFLICT,
+          message: `Process '${name}' already exists; mode=create`,
+        });
       }
       if (mode === "update" && !exists) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: `Process '${name}' does not exist; mode=update` }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.NOT_FOUND,
+          message: `Process '${name}' does not exist; mode=update`,
+        });
       }
 
       if (!exists) {

@@ -25,7 +25,7 @@ export function registerGetServerInfo(server: McpServer, tm1Client: TM1Client): 
     { ...FORMAT_SCHEMA },
     async ({ format }) => {
       const info = await tm1Client.server.getInfo();
-      const x = (info.extra ?? {}) as Record<string, unknown>;
+      const x = (info.extra ?? {});
 
       const payload = {
         serverName: info.serverName,

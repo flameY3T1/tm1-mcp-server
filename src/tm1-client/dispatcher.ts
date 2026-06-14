@@ -33,5 +33,5 @@ export function tm1Fetch(url: string, init: RequestInit): Promise<Response> {
   return undiciFetch(
     url,
     init as unknown as Parameters<typeof undiciFetch>[1],
-  ) as unknown as Promise<Response>;
+  );
 }

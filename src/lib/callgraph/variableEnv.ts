@@ -1,14 +1,14 @@
 /**
- * Pro-Prozess Variable-Environment.
+ * Per-process variable environment.
  *
- * Klassifiziert jede Zuweisung `var = expression;` als
- *   - literal    (String-Literal oder numerisches Literal)
- *   - param      (Referenz auf einen Prozess-Parameter, direkt oder über einen anderen lokalen Var der ein Param ist)
- *   - datasource (Referenz auf eine DataSource-Variable, ihr Wert kommt zur Laufzeit aus den Quelldaten)
- *   - dynamic    (alles andere — CellGet, Konkat, Funktionsaufrufe, IF, Schleifen)
+ * Classifies each assignment `var = expression;` as
+ *   - literal    (string literal or numeric literal)
+ *   - param      (reference to a process parameter, directly or via another local variable that is a param)
+ *   - datasource (reference to a DataSource variable whose value comes from the source data at runtime)
+ *   - dynamic    (everything else — CellGet, concatenation, function calls, IF, loops)
  *
- * Multi-Assignment (eine Var wird mit unterschiedlichen Werten belegt) → dynamic,
- * weil der Wert an einer beliebigen Aufruf-Stelle nicht mehr eindeutig ist.
+ * Multi-assignment (a variable is assigned different values) → dynamic,
+ * because the value is no longer unambiguous at any given call site.
  */
 
 export type TiVarType = 'Numeric' | 'String';

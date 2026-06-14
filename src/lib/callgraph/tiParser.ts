@@ -1,11 +1,10 @@
 import {
-  TiParseResult,
-  TiAst,
-  TiStatement,
-  TiAssignment,
-  TiIfBlock,
-  TiWhileBlock,
-  TiFunctionCall,
+  type TiParseResult,
+  type TiStatement,
+  type TiAssignment,
+  type TiIfBlock,
+  type TiWhileBlock,
+  type TiFunctionCall,
 } from './types.js';
 
 /**

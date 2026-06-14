@@ -249,7 +249,7 @@ export class ViewService {
     spec: NativeViewCreate,
   ): Promise<void> {
     const hierPath = (a: NativeViewAxisSpec): string =>
-      `Dimensions('${a.dimension}')/Hierarchies('${a.hierarchy ?? a.dimension}')`;
+      `Dimensions('${enc(a.dimension)}')/Hierarchies('${enc(a.hierarchy ?? a.dimension)}')`;
 
     const mapAxis = (a: NativeViewAxisSpec): Record<string, unknown> => {
       const sources = [a.subset, a.expression, a.elements].filter((s) => s !== undefined);
@@ -263,7 +263,7 @@ export class ViewService {
         });
       }
       if (a.subset !== undefined) {
-        return { "Subset@odata.bind": `${hierPath(a)}/Subsets('${a.subset}')` };
+        return { "Subset@odata.bind": `${hierPath(a)}/Subsets('${enc(a.subset)}')` };
       }
       if (a.expression !== undefined) {
         return { Subset: { "Hierarchy@odata.bind": hierPath(a), Expression: a.expression } };
@@ -271,7 +271,7 @@ export class ViewService {
       return {
         Subset: {
           "Hierarchy@odata.bind": hierPath(a),
-          "Elements@odata.bind": (a.elements ?? []).map((e) => `${hierPath(a)}/Elements('${e}')`),
+          "Elements@odata.bind": (a.elements ?? []).map((e) => `${hierPath(a)}/Elements('${enc(e)}')`),
         },
       };
     };
@@ -289,7 +289,7 @@ export class ViewService {
         });
       }
       const axis = mapAxis(t);
-      axis["Selected@odata.bind"] = `${hierPath(t)}/Elements('${t.selected}')`;
+      axis["Selected@odata.bind"] = `${hierPath(t)}/Elements('${enc(t.selected)}')`;
       return axis;
     };
 

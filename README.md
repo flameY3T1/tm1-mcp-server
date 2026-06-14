@@ -29,11 +29,24 @@ Tested against TM1 11.8 via REST API (Basic Auth).
 
 ## Install
 
+**Option A — clone and build** (source install):
+
 ```bash
 git clone https://github.com/flameY3T1/tm1-mcp-server.git
 cd tm1-mcp-server
 npm install
 npm run build
+# run directly
+node dist/index.js
+```
+
+**Option B — global install from local clone** (gives you the `tm1-mcp-server` CLI):
+
+```bash
+# after cloning + building (Option A):
+npm install -g .
+# then from any directory:
+tm1-mcp-server
 ```
 
 ## Configure
@@ -69,6 +82,18 @@ Copy `mcp.json.example` to `.mcp.json` (project-local) or merge into
     "tm1": {
       "command": "node",
       "args": ["/absolute/path/to/tm1-mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+If you installed globally (`npm install -g .`), use the CLI name instead:
+
+```json
+{
+  "mcpServers": {
+    "tm1": {
+      "command": "tm1-mcp-server"
     }
   }
 }

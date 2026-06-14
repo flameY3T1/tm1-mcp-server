@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import "dotenv/config";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -57,6 +58,7 @@ async function startHttpTransport(
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- async request handler is intentional; errors are caught internally
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     if (!req.url || !req.url.startsWith("/mcp")) {
       res.statusCode = 404;
@@ -238,9 +240,9 @@ async function main(): Promise<void> {
     process.exit(0);
   };
 
-  process.on("SIGINT", () => shutdown("SIGINT"));
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGHUP", () => shutdown("SIGHUP"));
+  process.on("SIGINT", () => { void shutdown("SIGINT"); });
+  process.on("SIGTERM", () => { void shutdown("SIGTERM"); });
+  process.on("SIGHUP", () => { void shutdown("SIGHUP"); });
 
   // Parent process death — only meaningful on stdio (Claude spawns us as a
   // child). For http we ignore stdin events since the process lifecycle is
@@ -267,7 +269,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
+   
   console.error("Fatal error starting TM1 MCP Server:", err);
   process.exit(1);
 });

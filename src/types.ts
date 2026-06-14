@@ -68,6 +68,7 @@ export class TM1Error extends Error {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- accepts known codes + arbitrary strings for extensibility
 export function hintForCode(code: TM1ErrorCode | string): string {
   switch (code) {
     case TM1ErrorCode.AUTH_FAILED:

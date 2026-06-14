@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import type { ProcessParameter, ProcessVariable, DataSource } from "../../types.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
 
 interface TabDiff {
@@ -100,18 +101,18 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
     },
     async ({ filePath, content, processName }) => {
       if (!filePath && !content) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: "Provide filePath or content" }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message: "Provide filePath or content",
+        });
       }
       let body = content ?? "";
       if (!body && filePath) {
         if (!path.isAbsolute(filePath)) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: `filePath must be absolute: ${filePath}` }) }],
-            isError: true,
-          };
+          throw new TM1Error({
+            code: TM1ErrorCode.VALIDATION_ERROR,
+            message: `filePath must be absolute: ${filePath}`,
+          });
         }
         body = await fs.readFile(filePath, "utf8");
       }
@@ -119,10 +120,10 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
       const parsed = parseProFile(body);
       const name = processName ?? parsed.name;
       if (!name) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: "Process name not found in .pro and no override provided" }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message: "Process name not found in .pro and no override provided",
+        });
       }
 
       const [installedCode, installedParams, installedVars, installedDs] = await Promise.all([

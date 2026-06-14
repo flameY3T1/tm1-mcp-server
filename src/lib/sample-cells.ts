@@ -98,7 +98,7 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
   if (typeof colFilter === "string") {
     columnSet = `{${memberRef(columnDim, colFilter)}}`;
   } else if (Array.isArray(colFilter) && colFilter.length > 0) {
-    columnSet = `{${(colFilter as string[]).map((e) => memberRef(columnDim, e)).join(",")}}`;
+    columnSet = `{${(colFilter).map((e) => memberRef(columnDim, e)).join(",")}}`;
   } else {
     columnSet = `{[${columnDim}].DefaultMember}`;
   }

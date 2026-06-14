@@ -64,8 +64,8 @@ export class ElementTypeCache {
         const h = await this.hierarchy.get(dim, hier);
         const m = new Map<string, ElementType>();
         for (const e of h.elements) {
-          if (VALID_TYPES.has(e.type as ElementType)) {
-            m.set(normalize(e.name), e.type as ElementType);
+          if (VALID_TYPES.has(e.type)) {
+            m.set(normalize(e.name), e.type);
           }
         }
         this.slots.set(slotKey, m);

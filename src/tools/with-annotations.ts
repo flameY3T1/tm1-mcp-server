@@ -1,5 +1,5 @@
 import type pino from "pino";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ANNOTATION_MAP } from "./annotation-map.js";
 import { OUTPUT_SCHEMA_MAP } from "./output-schema-map.js";
 import {
@@ -23,7 +23,7 @@ export function withAnnotations(
     ...args: unknown[]
   ) => unknown;
 
-  type ToolCallback = (...cbArgs: unknown[]) => Promise<unknown> | unknown;
+  type ToolCallback = (...cbArgs: unknown[]) => unknown;
 
   const attachStructured = (result: McpToolResult): McpToolResult => {
     const first = result.content?.[0];
@@ -121,5 +121,5 @@ export function withAnnotations(
         return originalRegisterTool(name, config, wrappedCb);
       };
     },
-  }) as McpServer;
+  });
 }

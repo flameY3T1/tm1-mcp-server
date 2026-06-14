@@ -24,7 +24,7 @@ function neutralize(line: string): string {
 export interface RulesAst {
   lines: ParsedRulesLine[];
   hasSkipcheck: boolean;
-  skipchecLine: number;
+  skipcheckLine: number;
   hasFeedstrings: boolean;
   feedstringsLine: number;
   feedersLineIndex: number;
@@ -36,7 +36,7 @@ export function parseRules(text: string): RulesAst {
   let feedersCount = 0;
   let feedersLineIndex = -1;
   let hasSkipcheck = false;
-  let skipchecLine = -1;
+  let skipcheckLine = -1;
   let hasFeedstrings = false;
   let feedstringsLine = -1;
   let inFeeders = false;
@@ -54,7 +54,7 @@ export function parseRules(text: string): RulesAst {
 
     if (isSkipcheck && !hasSkipcheck) {
       hasSkipcheck = true;
-      skipchecLine = lineIndex;
+      skipcheckLine = lineIndex;
     }
     if (isFeedstrings && !hasFeedstrings) {
       hasFeedstrings = true;
@@ -90,7 +90,7 @@ export function parseRules(text: string): RulesAst {
   return {
     lines,
     hasSkipcheck,
-    skipchecLine,
+    skipcheckLine,
     hasFeedstrings,
     feedstringsLine,
     feedersLineIndex,

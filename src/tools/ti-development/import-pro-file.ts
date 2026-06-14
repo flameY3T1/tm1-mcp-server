@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
 import { withToolHint } from "../error-format.js";
 
@@ -36,19 +37,19 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ filePath, content, name, mode, preflight }) => {
       if (!filePath && !content) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: "Provide filePath or content" }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message: "Provide filePath or content",
+        });
       }
 
       let body = content ?? "";
       if (!body && filePath) {
         if (!path.isAbsolute(filePath)) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: `filePath must be absolute: ${filePath}` }) }],
-            isError: true,
-          };
+          throw new TM1Error({
+            code: TM1ErrorCode.VALIDATION_ERROR,
+            message: `filePath must be absolute: ${filePath}`,
+          });
         }
         body = await fs.readFile(filePath, "utf8");
       }
@@ -56,10 +57,10 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       const parsed = parseProFile(body);
       const processName = name ?? parsed.name;
       if (!processName) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: "Process name not found in .pro (602,'Name') and no name override provided" }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message: "Process name not found in .pro (602,'Name') and no name override provided",
+        });
       }
 
       if (preflight) {
@@ -85,16 +86,16 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       const exists = allProcs.some((p: { name: string }) => p.name === processName);
 
       if (mode === "create" && exists) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: `Process '${processName}' already exists; mode=create` }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.CONFLICT,
+          message: `Process '${processName}' already exists; mode=create`,
+        });
       }
       if (mode === "update" && !exists) {
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: `Process '${processName}' does not exist; mode=update` }) }],
-          isError: true,
-        };
+        throw new TM1Error({
+          code: TM1ErrorCode.NOT_FOUND,
+          message: `Process '${processName}' does not exist; mode=update`,
+        });
       }
 
       const action = exists ? "updated" : "created";

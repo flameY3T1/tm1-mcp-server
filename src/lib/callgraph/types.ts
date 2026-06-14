@@ -21,7 +21,7 @@ export interface TiAssignment {
   type: 'assignment';
   variable: string;
   expression: string;
-  /** true wenn der Ausdruck CellGetN/CellGetS enthält */
+  /** true if the expression contains CellGetN/CellGetS */
   isExternal: boolean;
   /** Falls isExternal: Funktionsname und Parameter */
   cellGetInfo?: { fn: 'CellGetN' | 'CellGetS'; params: string[] } | undefined;

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
-import type { DataSource, ProcessParameter, ProcessVariable } from "../../types.js";
+import type { ProcessParameter, ProcessVariable } from "../../types.js";
 
 const parameterSchema = z.object({
   name: z.string(),
@@ -72,7 +72,7 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
         ...(epilog !== undefined ? { epilog } : {}),
         ...(resolvedParams !== undefined ? { parameters: resolvedParams } : {}),
         ...(resolvedVars !== undefined ? { variables: resolvedVars } : {}),
-        ...(dataSource !== undefined ? { dataSource: dataSource as DataSource } : {}),
+        ...(dataSource !== undefined ? { dataSource: dataSource } : {}),
       });
       const payload = {
         ok: result.success,

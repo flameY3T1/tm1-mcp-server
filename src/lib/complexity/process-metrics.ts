@@ -8,9 +8,6 @@
 import { parseTiCode } from "../callgraph/tiParser.js";
 import type {
   TiStatement,
-  TiIfBlock,
-  TiWhileBlock,
-  TiFunctionCall,
 } from "../callgraph/types.js";
 
 export type TiTab = "prolog" | "metadata" | "data" | "epilog";
@@ -229,7 +226,7 @@ function walk(
 ) {
   for (const s of stmts) {
     if (s.type === "if") {
-      const ifBlk = s as TiIfBlock;
+      const ifBlk = s;
       acc.branches += 1 + ifBlk.elseIfClauses.length;
       const nextDepth = depth + 1;
       if (nextDepth > acc.maxNesting) acc.maxNesting = nextDepth;
@@ -237,7 +234,7 @@ function walk(
       for (const c of ifBlk.elseIfClauses) walk(c.body, nextDepth, acc);
       walk(ifBlk.elseBody, nextDepth, acc);
     } else if (s.type === "while") {
-      const whBlk = s as TiWhileBlock;
+      const whBlk = s;
       acc.branches += 1;
       const nextDepth = depth + 1;
       if (nextDepth > acc.maxNesting) acc.maxNesting = nextDepth;
@@ -260,7 +257,7 @@ function walkCost(
 ): void {
   for (const s of stmts) {
     if (s.type === "if") {
-      const ifBlk = s as TiIfBlock;
+      const ifBlk = s;
       acc.ifCost +=
         w.ifBase * conditionComplexity(ifBlk.condition) * (1 + ifDepth);
       for (const c of ifBlk.elseIfClauses) {
@@ -272,11 +269,11 @@ function walkCost(
         walkCost(c.body, loopDepth, ifDepth + 1, w, acc);
       walkCost(ifBlk.elseBody, loopDepth, ifDepth + 1, w, acc);
     } else if (s.type === "while") {
-      const whBlk = s as TiWhileBlock;
+      const whBlk = s;
       acc.loopCost += w.loopBase * Math.pow(w.nestMult, loopDepth);
       walkCost(whBlk.body, loopDepth + 1, ifDepth, w, acc);
     } else if (s.type === "functionCall") {
-      const fn = s as TiFunctionCall;
+      const fn = s;
       if (loopDepth > 0 && HOT_OPS.has(fn.name.toLowerCase())) {
         acc.hotInLoop += w.hotPenalty * loopDepth;
       }

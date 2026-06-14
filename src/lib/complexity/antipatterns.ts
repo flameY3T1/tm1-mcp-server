@@ -9,8 +9,6 @@
 import { parseTiCode } from "../callgraph/tiParser.js";
 import type {
   TiStatement,
-  TiIfBlock,
-  TiWhileBlock,
 } from "../callgraph/types.js";
 import type { ProcessCodeInput, TiTab } from "./process-metrics.js";
 
@@ -142,7 +140,7 @@ function collectReadsFromStmts(stmts: TiStatement[], out: Set<string>): void {
     if (s.type === "assignment") {
       collectReads(s.expression, out);
     } else if (s.type === "if") {
-      const blk = s as TiIfBlock;
+      const blk = s;
       collectReads(blk.condition, out);
       collectReadsFromStmts(blk.thenBody, out);
       for (const c of blk.elseIfClauses) {
@@ -151,7 +149,7 @@ function collectReadsFromStmts(stmts: TiStatement[], out: Set<string>): void {
       }
       collectReadsFromStmts(blk.elseBody, out);
     } else if (s.type === "while") {
-      const blk = s as TiWhileBlock;
+      const blk = s;
       collectReads(blk.condition, out);
       collectReadsFromStmts(blk.body, out);
     } else if (s.type === "functionCall") {
@@ -185,14 +183,14 @@ function collectDeadCandidates(
         });
       }
     } else if (s.type === "if") {
-      const blk = s as TiIfBlock;
+      const blk = s;
       collectDeadCandidates(blk.thenBody, tab, out);
       for (const c of blk.elseIfClauses) {
         collectDeadCandidates(c.body, tab, out);
       }
       collectDeadCandidates(blk.elseBody, tab, out);
     } else if (s.type === "while") {
-      const blk = s as TiWhileBlock;
+      const blk = s;
       collectDeadCandidates(blk.body, tab, out);
     }
   }
@@ -250,13 +248,13 @@ function walk(
         }
       }
     } else if (s.type === "if") {
-      const blk = s as TiIfBlock;
+      const blk = s;
       walk(blk.thenBody, loopDepth, ifDepth + 1, ctx);
       for (const c of blk.elseIfClauses)
         walk(c.body, loopDepth, ifDepth + 1, ctx);
       walk(blk.elseBody, loopDepth, ifDepth + 1, ctx);
     } else if (s.type === "while") {
-      const blk = s as TiWhileBlock;
+      const blk = s;
       walk(blk.body, loopDepth + 1, ifDepth, ctx);
     } else if (s.type === "functionCall") {
       const name = s.name.toLowerCase();

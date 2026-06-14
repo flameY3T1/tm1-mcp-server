@@ -74,8 +74,8 @@ export class HierarchyService {
     }>("GET", path);
 
     let filteredElements = rawResponse.Elements;
-    if (filterByType) filteredElements = filteredElements.filter((e) => e.Type === opts!.elementType);
-    if (regex !== undefined) filteredElements = filteredElements.filter((e) => regex!.test(e.Name));
+    if (filterByType) filteredElements = filteredElements.filter((e) => e.Type === opts.elementType);
+    if (regex !== undefined) filteredElements = filteredElements.filter((e) => regex.test(e.Name));
     if (needsClientPostFilter && opts?.topN !== undefined) {
       filteredElements = filteredElements.slice(0, opts.topN);
     }

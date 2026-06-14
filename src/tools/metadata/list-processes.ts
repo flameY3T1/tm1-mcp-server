@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import type { Process } from "../../types.js";
-import { TM1Error } from "../../types.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
@@ -33,66 +33,55 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
         .describe("Projection. Default: all fields. Use ['name'] to skip parameters[] and shrink payload ~10x."),
     },
     async ({ limit, offset, fetchAll, format, includeControl, nameContains, nameRegex, nameNotContains, excludePattern, fields }) => {
-      try {
-        let processes: Process[] = await tm1Client.processes.list();
+      let processes: Process[] = await tm1Client.processes.list();
 
-        if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
+      if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
 
-        if (nameContains) {
-          const needle = nameContains.toLowerCase();
-          processes = processes.filter((p) => p.name.toLowerCase().includes(needle));
-        }
-        if (nameRegex) {
-          let re: RegExp;
-          try {
-            re = new RegExp(nameRegex, "i");
-          } catch (e) {
-            return {
-              content: [{ type: "text" as const, text: JSON.stringify({ error: `invalid nameRegex: ${(e as Error).message}` }) }],
-              isError: true,
-            };
-          }
-          processes = processes.filter((p) => re.test(p.name));
-        }
-        if (nameNotContains) {
-          const needle = nameNotContains.toLowerCase();
-          processes = processes.filter((p) => !p.name.toLowerCase().includes(needle));
-        }
-        if (excludePattern) {
-          let re: RegExp;
-          try {
-            re = new RegExp(excludePattern, "i");
-          } catch (e) {
-            return {
-              content: [{ type: "text" as const, text: JSON.stringify({ error: `invalid excludePattern: ${(e as Error).message}` }) }],
-              isError: true,
-            };
-          }
-          processes = processes.filter((p) => !re.test(p.name));
-        }
-
-        const projected: Array<Process | { name: string }> =
-          fields && !fields.includes("parameters")
-            ? processes.map((p) => ({ name: p.name }))
-            : processes;
-
-        const page = paginate(projected, limit, offset, fetchAll);
-        type Row = (typeof projected)[number];
-        const columns: Column<Row>[] = [
-          { header: "name", get: (p) => p.name },
-          { header: "parameters", get: (p) => ("parameters" in p ? (p.parameters?.map((x) => x.name).join(", ") ?? "") : "—") },
-        ];
-        return pageResponse(page, format, { title: "Processes", columns });
-      } catch (error) {
-        const msg =
-          error instanceof TM1Error
-            ? { code: error.code, message: error.message, httpStatus: error.httpStatus, endpoint: error.endpoint }
-            : { error: String(error) };
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(msg) }],
-          isError: true,
-        };
+      if (nameContains) {
+        const needle = nameContains.toLowerCase();
+        processes = processes.filter((p) => p.name.toLowerCase().includes(needle));
       }
+      if (nameRegex) {
+        let re: RegExp;
+        try {
+          re = new RegExp(nameRegex, "i");
+        } catch (e) {
+          throw new TM1Error({
+            code: TM1ErrorCode.VALIDATION_ERROR,
+            message: `invalid nameRegex: ${(e as Error).message}`,
+          });
+        }
+        processes = processes.filter((p) => re.test(p.name));
+      }
+      if (nameNotContains) {
+        const needle = nameNotContains.toLowerCase();
+        processes = processes.filter((p) => !p.name.toLowerCase().includes(needle));
+      }
+      if (excludePattern) {
+        let re: RegExp;
+        try {
+          re = new RegExp(excludePattern, "i");
+        } catch (e) {
+          throw new TM1Error({
+            code: TM1ErrorCode.VALIDATION_ERROR,
+            message: `invalid excludePattern: ${(e as Error).message}`,
+          });
+        }
+        processes = processes.filter((p) => !re.test(p.name));
+      }
+
+      const projected: Array<Process | { name: string }> =
+        fields && !fields.includes("parameters")
+          ? processes.map((p) => ({ name: p.name }))
+          : processes;
+
+      const page = paginate(projected, limit, offset, fetchAll);
+      type Row = (typeof projected)[number];
+      const columns: Column<Row>[] = [
+        { header: "name", get: (p) => p.name },
+        { header: "parameters", get: (p) => ("parameters" in p ? (p.parameters?.map((x) => x.name).join(", ") ?? "") : "—") },
+      ];
+      return pageResponse(page, format, { title: "Processes", columns });
     },
   );
 }

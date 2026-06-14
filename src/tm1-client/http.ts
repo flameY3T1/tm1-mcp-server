@@ -196,55 +196,27 @@ export class TM1HttpClient {
   /** @internal — for Service-layer use; not part of the public consumer API. */
   public async requestRaw(method: string, path: string, opts?: RequestOptions): Promise<string> {
     const url = `${this.config.baseUrl}${path}`;
-    const cookie = await this.sessionManager.ensureSession();
     const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
+    const cookie = await this.sessionManager.ensureSession();
 
-    const doFetch = async (c: string): Promise<Response> => {
-      const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
-        effectiveTimeout,
-      );
-      const unlink = linkAbortSignals(controller, opts?.signal);
-      try {
-        return await tm1Fetch(url, {
-          method,
-          headers: {
-            Cookie: `TM1SessionId=${c}`,
-            Accept: "*/*",
-            "User-Agent": USER_AGENT,
-            "TM1-SessionContext": USER_AGENT,
-            "TM1-Session-Context": USER_AGENT,
-          },
-          signal: controller.signal,
-          dispatcher: getTm1Dispatcher(this.config),
-        } as unknown as RequestInit);
-      } finally {
-        clearTimeout(timeout);
-        unlink();
-      }
+    const headers: Record<string, string> = {
+      Cookie: `TM1SessionId=${cookie}`,
+      Accept: "*/*",
+      "User-Agent": USER_AGENT,
+      "TM1-SessionContext": USER_AGENT,
+      "TM1-Session-Context": USER_AGENT,
     };
 
-    let response: Response;
-    try {
-      response = await doFetch(cookie);
-    } catch (err) {
-      if (isTimeoutError(err)) {
-        throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
-      }
-      throw err;
-    }
-    if (response.status === 401) {
-      const newCookie = await this.sessionManager.authenticate();
-      try {
-        response = await doFetch(newCookie);
-      } catch (err) {
-        if (isTimeoutError(err)) {
-          throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
-        }
-        throw err;
-      }
-    }
+    const response = await this.withReauth(
+      (c) => {
+        const hdrs = { ...headers, Cookie: `TM1SessionId=${c}` };
+        return this.sendOnce(url, method, hdrs, undefined, effectiveTimeout, opts?.signal);
+      },
+      cookie,
+      path,
+      effectiveTimeout,
+    );
+
     if (!response.ok) {
       let body = "";
       try { body = await response.text(); } catch { /* ignore */ }
@@ -272,57 +244,30 @@ export class TM1HttpClient {
     opts?: RequestOptions,
   ): Promise<void> {
     const url = `${this.config.baseUrl}${path}`;
-    const cookie = await this.sessionManager.ensureSession();
     const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
+    const cookie = await this.sessionManager.ensureSession();
 
-    const doFetch = async (c: string): Promise<Response> => {
-      const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
+    const response = await this.withReauth(
+      (c) => this.sendOnce(
+        url,
+        method,
+        {
+          Cookie: `TM1SessionId=${c}`,
+          Accept: "application/json,*/*",
+          "Content-Type": contentType,
+          "User-Agent": USER_AGENT,
+          "TM1-SessionContext": USER_AGENT,
+          "TM1-Session-Context": USER_AGENT,
+        },
+        body,
         effectiveTimeout,
-      );
-      const unlink = linkAbortSignals(controller, opts?.signal);
-      try {
-        return await tm1Fetch(url, {
-          method,
-          headers: {
-            Cookie: `TM1SessionId=${c}`,
-            Accept: "application/json,*/*",
-            "Content-Type": contentType,
-            "User-Agent": USER_AGENT,
-            "TM1-SessionContext": USER_AGENT,
-            "TM1-Session-Context": USER_AGENT,
-          },
-          body,
-          signal: controller.signal,
-          dispatcher: getTm1Dispatcher(this.config),
-        } as unknown as RequestInit);
-      } finally {
-        clearTimeout(timeout);
-        unlink();
-      }
-    };
+        opts?.signal,
+      ),
+      cookie,
+      path,
+      effectiveTimeout,
+    );
 
-    let response: Response;
-    try {
-      response = await doFetch(cookie);
-    } catch (err) {
-      if (isTimeoutError(err)) {
-        throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
-      }
-      throw err;
-    }
-    if (response.status === 401) {
-      const newCookie = await this.sessionManager.authenticate();
-      try {
-        response = await doFetch(newCookie);
-      } catch (err) {
-        if (isTimeoutError(err)) {
-          throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
-        }
-        throw err;
-      }
-    }
     if (!response.ok) {
       let errBody = "";
       try { errBody = await response.text(); } catch { /* ignore */ }
@@ -333,6 +278,73 @@ export class TM1HttpClient {
     }
   }
 
+  /**
+   * Low-level single fetch with timeout + AbortSignal wiring.
+   * Does NOT handle 401, retries, or error classification — callers own that.
+   */
+  private async sendOnce(
+    url: string,
+    method: string,
+    headers: Record<string, string>,
+    body: string | Uint8Array | undefined,
+    timeoutMs: number,
+    externalSignal?: AbortSignal,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
+      timeoutMs,
+    );
+    const unlink = linkAbortSignals(controller, externalSignal);
+    try {
+      return await tm1Fetch(url, {
+        method,
+        headers,
+        body,
+        signal: controller.signal,
+        dispatcher: getTm1Dispatcher(this.config),
+      } as unknown as RequestInit);
+    } finally {
+      clearTimeout(timeout);
+      unlink();
+    }
+  }
+
+  /**
+   * Wraps a send function with cookie-refresh-on-401 and timeout→LOCK_TIMEOUT mapping.
+   * Used by requestRaw and requestBinary (which have no network-retry loop).
+   * On 401: calls sessionManager.authenticate() and retries once with the new cookie.
+   * The caller is responsible for obtaining the initial cookie via ensureSession().
+   */
+  private async withReauth(
+    send: (cookie: string) => Promise<Response>,
+    initialCookie: string,
+    path: string,
+    effectiveTimeout: number,
+  ): Promise<Response> {
+    let response: Response;
+    try {
+      response = await send(initialCookie);
+    } catch (err) {
+      if (isTimeoutError(err)) {
+        throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
+      }
+      throw err;
+    }
+    if (response.status === 401) {
+      const newCookie = await this.sessionManager.authenticate();
+      try {
+        response = await send(newCookie);
+      } catch (err) {
+        if (isTimeoutError(err)) {
+          throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
+        }
+        throw err;
+      }
+    }
+    return response;
+  }
+
   private async executeRequest(
     url: string,
     method: string,
@@ -341,13 +353,6 @@ export class TM1HttpClient {
     timeoutMs?: number,
     externalSignal?: AbortSignal,
   ): Promise<Response> {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
-      timeoutMs ?? this.config.requestTimeoutMs,
-    );
-    const unlink = linkAbortSignals(controller, externalSignal);
-
     const headers: Record<string, string> = {
       Cookie: `TM1SessionId=${cookie}`,
       Accept: "application/json",
@@ -362,19 +367,12 @@ export class TM1HttpClient {
       headers["Content-Type"] = "application/json";
     }
 
-    try {
-      return await tm1Fetch(url, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : isWriteMethod ? "" : undefined,
-        signal: controller.signal,
-        dispatcher: getTm1Dispatcher(this.config),
-      } as unknown as RequestInit);
-    } finally {
-      clearTimeout(timeout);
-      unlink();
-    }
+    const serializedBody: string | undefined =
+      body !== undefined ? JSON.stringify(body) : isWriteMethod ? "" : undefined;
+
+    return this.sendOnce(url, method, headers, serializedBody, timeoutMs ?? this.config.requestTimeoutMs, externalSignal);
   }
+
 
   private async handleResponse<T>(
     response: Response,
@@ -404,7 +402,7 @@ export class TM1HttpClient {
     }
 
     let details: string | undefined;
-    let errorBody = "";
+    let errorBody: string;
     try {
       errorBody = await response.text();
       if (errorBody) {

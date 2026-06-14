@@ -33,7 +33,7 @@ export function registerAllPrompts(server: McpServer): void {
       description:
         "Use at the start of a TM1 session to brief yourself on server topology, naming conventions ('}'-prefix control objects), pagination envelope shape, and the recommended tool sequence per workflow (audit, build, debug, deploy). Read before making tool calls in an unfamiliar TM1 environment.",
     },
-    async () =>
+    () =>
       userMessage(
         [
           "# TM1 MCP Server Orientation",
@@ -98,7 +98,7 @@ export function registerAllPrompts(server: McpServer): void {
           .describe("Name of the failed TI process to diagnose"),
       },
     },
-    async ({ processName }) =>
+    ({ processName }) =>
       userMessage(
         [
           `Diagnose why TI process **${processName}** failed. Follow this sequence:`,
@@ -126,7 +126,7 @@ export function registerAllPrompts(server: McpServer): void {
         cubeName: z.string().describe("Name of the TM1 cube to audit"),
       },
     },
-    async ({ cubeName }) =>
+    ({ cubeName }) =>
       userMessage(
         [
           `Run a read-only audit of cube **${cubeName}**. Report findings.`,
@@ -150,7 +150,7 @@ export function registerAllPrompts(server: McpServer): void {
       description:
         "Snapshot of TM1 server state: connection, version, capability flags, object counts, active sessions, recent errors.",
     },
-    async () =>
+    () =>
       userMessage(
         [
           "Run a TM1 server health check and report a 1-paragraph summary plus a punch-list of concerns.",
@@ -177,7 +177,7 @@ export function registerAllPrompts(server: McpServer): void {
         cubeName: z.string().describe("Name of the cube whose rules to review"),
       },
     },
-    async ({ cubeName }) =>
+    ({ cubeName }) =>
       userMessage(
         [
           `Review the rules of cube **${cubeName}**. Code-review style.`,

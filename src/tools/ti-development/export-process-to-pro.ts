@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { serializeToPro } from "../../lib/pro-serializer.js";
 
 export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Client) {
@@ -43,10 +44,10 @@ export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Clie
       let writtenTo: string | null = null;
       if (writeToFile) {
         if (!path.isAbsolute(writeToFile)) {
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify({ error: `writeToFile must be absolute: ${writeToFile}` }) }],
-            isError: true,
-          };
+          throw new TM1Error({
+            code: TM1ErrorCode.VALIDATION_ERROR,
+            message: `writeToFile must be absolute: ${writeToFile}`,
+          });
         }
         await fs.writeFile(writeToFile, proContent, "utf8");
         writtenTo = writeToFile;
