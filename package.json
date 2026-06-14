@@ -23,6 +23,7 @@
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:property": "vitest run tests/property",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit && eslint .",

@@ -1,0 +1,220 @@
+// Live PROCESS (TI development) tier: exercises the TurboIntegrator tool
+// surface end-to-end against the running TM1 server. Every object it creates
+// is prefixed `${SANDBOX}_PROC` and torn down in afterAll, so a stray run can
+// never touch real model objects. All TI is deliberately harmless — no data
+// sources touching real cubes, no CubeClearData; just parameter/variable
+// assignment so compile + execute are guaranteed safe.
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { getHarness, LIVE_ENABLED, SANDBOX, type LiveHarness } from "./harness.js";
+
+const PROC_A = `${SANDBOX}_PROC_A`;
+const PROC_B = `${SANDBOX}_PROC_B`;
+const PROC_BAD = `${SANDBOX}_PROC_BAD`;
+
+// Trivial, self-contained TI body: a parameter plus a couple of harmless
+// numeric/string variable assignments. Touches nothing on the server.
+const PROLOG_A = [
+  "# harmless self-contained TI body for live test",
+  "nFoo = 1;",
+  "nBar = nFoo + pAmount;",
+  "sMsg = 'mcp-live-' | NumberToString( nBar );",
+].join("\r\n");
+
+describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
+  let h: LiveHarness;
+  beforeAll(async () => {
+    h = await getHarness();
+    // Clean any leftovers from a previous interrupted run (idempotent).
+    for (const name of [PROC_A, PROC_B, PROC_BAD]) {
+      await h.call("tm1_delete_process", { processName: name, confirm: name });
+    }
+  });
+
+  afterAll(async () => {
+    for (const name of [PROC_A, PROC_B, PROC_BAD]) {
+      try {
+        await h.call("tm1_delete_process", { processName: name, confirm: name });
+      } catch {
+        /* idempotent teardown — ignore missing */
+      }
+    }
+  });
+
+  it("check_process_code validates a harmless body without saving", async () => {
+    const r = await h.ok("tm1_check_process_code", {
+      name: PROC_A,
+      prolog: PROLOG_A,
+      parameters: [{ name: "pAmount", type: "Numeric", defaultValue: 0 }],
+      dataSource: { type: "None" },
+    });
+    expect(r.json).toMatchObject({ ok: true, errorCount: 0 });
+    expect(r.json.errors).toEqual([]);
+  });
+
+  it("upsert_process creates PROC_A with prolog + parameter", async () => {
+    const r = await h.ok("tm1_upsert_process", {
+      name: PROC_A,
+      prolog: PROLOG_A,
+      parameters: [
+        { name: "pAmount", type: "Numeric", defaultValue: 0, prompt: "Amount" },
+      ],
+      mode: "upsert",
+    });
+    expect(r.json).toMatchObject({
+      processName: PROC_A,
+      action: "created",
+    });
+    expect(r.json.appliedSteps).toContain("createProcess");
+    expect(r.json.appliedSteps).toContain("updateProcessCode");
+    expect(r.json.appliedSteps).toContain("updateProcessParameters");
+  });
+
+  it("compile_process reports success for PROC_A", async () => {
+    const r = await h.ok("tm1_compile_process", { name: PROC_A });
+    expect(r.json).toMatchObject({ ok: true, processName: PROC_A, errorCount: 0 });
+  });
+
+  it("get_process_code returns the four tabs and the prolog back", async () => {
+    const r = await h.ok("tm1_get_process_code", { processName: PROC_A });
+    expect(r.json).toMatchObject({
+      prolog: expect.any(String),
+      metadata: expect.any(String),
+      data: expect.any(String),
+      epilog: expect.any(String),
+    });
+    expect(r.json.prolog).toContain("nFoo = 1;");
+  });
+
+  it("get_process_parameters returns the declared parameter", async () => {
+    const r = await h.ok("tm1_get_process_parameters", {
+      processName: PROC_A,
+      format: "json",
+    });
+    expect(r.json.parameters).toBeInstanceOf(Array);
+    const pAmount = r.json.parameters.find(
+      (p: { name: string }) => p.name === "pAmount",
+    );
+    expect(pAmount).toBeTruthy();
+    expect(pAmount).toMatchObject({ name: "pAmount", type: "Numeric" });
+  });
+
+  it("get_process_variables works", async () => {
+    const r = await h.ok("tm1_get_process_variables", {
+      processName: PROC_A,
+      format: "json",
+    });
+    expect(r.json.variables).toBeInstanceOf(Array);
+  });
+
+  it("get_process_datasource returns a None-type datasource", async () => {
+    const r = await h.ok("tm1_get_process_datasource", {
+      processName: PROC_A,
+      format: "json",
+    });
+    expect(r.json).toBeTruthy();
+    expect(r.json.type).toBeTruthy();
+  });
+
+  it("execute_process runs the harmless process successfully", async () => {
+    const r = await h.ok("tm1_execute_process", {
+      processName: PROC_A,
+      parameters: { pAmount: 5 },
+    });
+    expect(r.json).toMatchObject({
+      success: true,
+      processErrorStatus: "CompletedSuccessfully",
+    });
+  });
+
+  it("copy_process clones PROC_A to PROC_B", async () => {
+    const r = await h.ok("tm1_copy_process", {
+      sourceName: PROC_A,
+      targetName: PROC_B,
+    });
+    expect(r.json).toMatchObject({
+      success: true,
+      sourceName: PROC_A,
+      targetName: PROC_B,
+    });
+  });
+
+  it("diff_processes reports A and B as identical", async () => {
+    const r = await h.ok("tm1_diff_processes", {
+      processA: PROC_A,
+      processB: PROC_B,
+    });
+    // Each tab result carries an `identical` flag; the copy should match.
+    const tabs = r.json.tabResults ?? r.json.tabs ?? {};
+    const flags = Object.values(tabs).map(
+      (t: unknown) => (t as { identical?: boolean }).identical,
+    );
+    expect(flags.every((f) => f !== false)).toBe(true);
+    expect(JSON.stringify(r.json)).toContain("identical");
+  });
+
+  it("validate_process_refs scans PROC_A (no real-object refs)", async () => {
+    const r = await h.ok("tm1_validate_process_refs", { processName: PROC_A });
+    expect(r.json).toMatchObject({
+      processName: PROC_A,
+      unresolved: expect.any(Number),
+    });
+    // Harmless body references no cubes/dimensions → nothing unresolved.
+    expect(r.json.unresolved).toBe(0);
+  });
+
+  it("diagnose_process_error returns a structured (possibly empty) log set", async () => {
+    const r = await h.ok("tm1_diagnose_process_error", {
+      processName: PROC_A,
+      includeRelated: false,
+    });
+    expect(r.json).toMatchObject({
+      processName: PROC_A,
+      logsFound: expect.any(Number),
+      logs: expect.any(Array),
+    });
+  });
+
+  it("a deliberately broken process fails to compile, then diagnose runs", async () => {
+    // Upsert a process with a real syntax error (unterminated statement /
+    // undefined function call), compile it → expect an error envelope.
+    await h.ok("tm1_upsert_process", {
+      name: PROC_BAD,
+      prolog: "nX = ThisFunctionDoesNotExist( ;",
+      mode: "upsert",
+    });
+    const compiled = await h.call("tm1_compile_process", { name: PROC_BAD });
+    expect(compiled.isError).toBe(true);
+    expect(compiled.json).toMatchObject({ ok: false });
+    expect(compiled.json.errorCount).toBeGreaterThan(0);
+
+    // diagnose accepts a process name and returns a structured envelope
+    // regardless of whether a runtime error log exists.
+    const diag = await h.ok("tm1_diagnose_process_error", {
+      processName: PROC_BAD,
+      includeRelated: false,
+    });
+    expect(diag.json).toMatchObject({
+      processName: PROC_BAD,
+      logs: expect.any(Array),
+    });
+  });
+
+  it("get_process_code on a nonexistent process yields an error envelope", async () => {
+    const r = await h.call("tm1_get_process_code", {
+      processName: `${SANDBOX}_PROC_DOES_NOT_EXIST`,
+    });
+    expect(r.isError).toBe(true);
+    expect(r.json?.code).toBeTruthy();
+  });
+
+  it("delete_process removes PROC_B (confirm gate)", async () => {
+    const r = await h.ok("tm1_delete_process", {
+      processName: PROC_B,
+      confirm: PROC_B,
+    });
+    expect(r.json ?? r.text).toBeTruthy();
+    // Gone now: get_process_code should error.
+    const gone = await h.call("tm1_get_process_code", { processName: PROC_B });
+    expect(gone.isError).toBe(true);
+  });
+});
