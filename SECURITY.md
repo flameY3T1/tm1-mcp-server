@@ -37,10 +37,10 @@ instance over the TM1 REST API. Keep the following in mind before reporting:
   never be placed in `.mcp.json`, `settings.json`, or any committed config —
   those files are frequently shared and would leak the credential. This is
   documented behaviour, not a vulnerability.
-- **`readwrite` is the default mode** and exposes destructive tools
-  (cube/dimension deletion, cell writes, process execution). Set
-  `TM1_MODE=readonly` on production instances. Running `readwrite` against
-  production by choice is not a vulnerability.
+- **`readonly` is the default mode.** Destructive tools (cube/dimension
+  deletion, cell writes, process execution) are disabled unless you explicitly
+  opt in with `TM1_MODE=readwrite`. Enabling `readwrite` against production by
+  choice is not a vulnerability.
 - **HTTP transport binds loopback (`127.0.0.1`) by default.** Setting
   `TM1_MCP_HTTP_HOST=0.0.0.0` exposes the server and its TM1 credentials to the
   network; only do so behind a reverse proxy with its own auth. A self-inflicted
