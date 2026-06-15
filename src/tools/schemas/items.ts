@@ -116,6 +116,16 @@ export const ErrorLogFileSchema = z.object({
   lastUpdated: z.string().optional(),
 });
 
+// groupBy='process' audit-summary item: per-process failure aggregation.
+export const ErrorLogGroupSchema = z.object({
+  process: z.string(),
+  count: z.number().int(),
+  firstSeen: z.string().nullable(),
+  lastSeen: z.string().nullable(),
+  spanDays: z.number().int(),
+  perDay: z.number(),
+});
+
 const RelatedErrorLogFileSchema = z.object({
   filename: z.string(),
   deltaSec: z.number().int(),
@@ -604,6 +614,8 @@ export const ChoreGraphResultSchema = z.object({
   ),
 });
 
+// `usages` is present in full mode; `sources`/`sourceCount`/`mode` are present
+// in mode='summary'. Both shapes validate against this one schema.
 export const ObjectUsageResultSchema = z.object({
   kind: z.string(),
   name: z.string(),
@@ -611,7 +623,10 @@ export const ObjectUsageResultSchema = z.object({
   count: z.number().int(),
   returned: z.number().int(),
   truncated: z.boolean(),
-  usages: z.array(z.unknown()),
+  usages: z.array(z.unknown()).optional(),
+  mode: z.string().optional(),
+  sourceCount: z.number().int().optional(),
+  sources: z.array(z.unknown()).optional(),
 });
 
 // ── tm1_get_cube_stats result schemas ────────────────────────────────────────
@@ -663,23 +678,35 @@ export const SearchCodeMatchSchema = z.object({
   alsoFoundIn: z.array(z.string()).optional(),
 });
 
+// groupBy mode item: one row per process/tab with its match count.
+export const SearchCodeGroupSchema = z.object({
+  process: z.string().optional(),
+  tab: z.string().optional(),
+  matchCount: z.number().int(),
+});
+
 // Wrapper around the paginated `items` array — keeps summary fields the agent
 // uses to interpret the search (pattern echo, totals, truncation flag).
+// Fields that only apply in the default (non-grouped) mode are optional so the
+// groupBy='process'|'tab' aggregation shape validates against the same schema.
 export const SearchCodeResultSchema = z.object({
   pattern: z.string(),
   caseSensitive: z.boolean(),
   tabsSearched: z.array(z.string()),
   processesScanned: z.number().int(),
   matchCount: z.number().int(),
-  truncated: z.boolean(),
-  maskSecrets: z.boolean(),
-  excludeCommented: z.boolean(),
+  truncated: z.boolean().optional(),
+  maskSecrets: z.boolean().optional(),
+  excludeCommented: z.boolean().optional(),
+  // Present only in groupBy mode.
+  groupBy: z.enum(["process", "tab"]).optional(),
+  groupCount: z.number().int().optional(),
   total: z.number().int(),
   count: z.number().int(),
   offset: z.number().int(),
   has_more: z.boolean(),
   next_offset: z.number().int().nullable(),
-  items: z.array(SearchCodeMatchSchema),
+  items: z.array(z.union([SearchCodeMatchSchema, SearchCodeGroupSchema])),
   // Present only when deduplicateByLine=true: rawMatchCount is the pre-collapse
   // total, deduplicated flags that the collapse ran.
   rawMatchCount: z.number().int().optional(),

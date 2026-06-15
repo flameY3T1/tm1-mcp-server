@@ -40,6 +40,7 @@ import {
   ElementAttributeValueSchema,
   ErrorLogContentResultSchema,
   ErrorLogFileSchema,
+  ErrorLogGroupSchema,
   ExportProcessToProResultSchema,
   FileContentResultSchema,
   FilenameItemSchema,
@@ -226,7 +227,9 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
     count: z.number().int(),
     entries: z.array(AuditLogEntrySchema),
   },
-  tm1_list_error_logs: pageShapeFor(ErrorLogFileSchema),
+  // Items are ErrorLogFileSchema in the default file listing, or
+  // ErrorLogGroupSchema when groupBy='process' returns the audit summary.
+  tm1_list_error_logs: pageShapeFor(z.union([ErrorLogFileSchema, ErrorLogGroupSchema])),
   tm1_get_error_log_content: asOutputSchema(ErrorLogContentResultSchema),
   tm1_get_file_content: asOutputSchema(FileContentResultSchema),
 

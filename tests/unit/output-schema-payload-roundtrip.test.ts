@@ -85,6 +85,87 @@ describe("strict outputSchemas accept real handler payloads", () => {
     expect(() => ObjectUsageResultSchema.parse(payload)).not.toThrow();
   });
 
+  it("tm1_search_code: groupBy='process' payload (group items, no truncated/maskSecrets)", () => {
+    const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_search_code);
+    const payload = {
+      pattern: "ExecuteProcess",
+      caseSensitive: false,
+      tabsSearched: ["prolog", "metadata", "data", "epilog"],
+      processesScanned: 90,
+      groupBy: "process",
+      groupCount: 3,
+      matchCount: 412,
+      total: 3,
+      count: 3,
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [
+        { process: "Master.Run", matchCount: 210 },
+        { process: "Load.All", matchCount: 150 },
+        { process: "Nightly.Batch", matchCount: 52 },
+      ],
+    };
+    expect(() => schema.parse(payload)).not.toThrow();
+  });
+
+  it("tm1_analyze_object_usage: mode='summary' payload (sources, sourceCount, no usages)", () => {
+    const payload = {
+      kind: "cube",
+      name: "Cube_Resource",
+      accessMode: "all",
+      mode: "summary",
+      count: 1191,
+      sourceCount: 20,
+      returned: 20,
+      truncated: false,
+      sources: [
+        {
+          sourceKind: "process",
+          sourceName: "Load.Resource.Plan",
+          accessTypes: ["read", "write"],
+          sections: ["data", "epilog"],
+          funcNames: ["CellGetN", "CellPutN"],
+          count: 340,
+        },
+      ],
+    };
+    expect(() => ObjectUsageResultSchema.parse(payload)).not.toThrow();
+  });
+
+  it("tm1_list_error_logs: groupBy='process' payload (group items + wrapper fields)", () => {
+    const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_list_error_logs);
+    const payload = {
+      groupBy: "process",
+      totalFiles: 500,
+      groupCount: 3,
+      total: 3,
+      count: 3,
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [
+        {
+          process: "Nightly.Load",
+          count: 120,
+          firstSeen: "2026-06-01T02:00:00",
+          lastSeen: "2026-06-15T02:00:00",
+          spanDays: 15,
+          perDay: 8,
+        },
+        {
+          process: "(unparsed)",
+          count: 4,
+          firstSeen: null,
+          lastSeen: null,
+          spanDays: 1,
+          perDay: 4,
+        },
+      ],
+    };
+    expect(() => schema.parse(payload)).not.toThrow();
+  });
+
   it("tm1_get_all_cube_rules: summary payload (count, returned, truncated, summary metrics)", () => {
     const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_get_all_cube_rules);
     const payload = {
