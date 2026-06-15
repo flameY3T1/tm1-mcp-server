@@ -68,7 +68,10 @@ function decodeCursor(cursor: string | undefined): number {
 // Resolve the full sorted resource list. Template list callbacks fire in
 // parallel; static entries pass through. Sorting by URI gives stable paging
 // across requests even if a template adds/removes entries between pages.
-async function resolveAll(catalog: ResourceCatalog): Promise<CatalogResource[]> {
+async function resolveAll(
+  catalog: ResourceCatalog,
+  logger: pino.Logger,
+): Promise<CatalogResource[]> {
   const statics: CatalogResource[] = [];
   const templatePromises: Promise<CatalogResource[]>[] = [];
 
@@ -77,13 +80,24 @@ async function resolveAll(catalog: ResourceCatalog): Promise<CatalogResource[]> 
       statics.push(entry.resource);
     } else {
       templatePromises.push(
-        entry.list().then((r) =>
-          r.resources.map((res) => ({
-            ...entry.templateMetadata,
-            // resource-level metadata overrides template defaults per SDK convention
-            ...res,
-          })),
-        ),
+        entry
+          .list()
+          .then((r) =>
+            r.resources.map((res) => ({
+              ...entry.templateMetadata,
+              // resource-level metadata overrides template defaults per SDK convention
+              ...res,
+            })),
+          )
+          // A single failing template (e.g. TM1 briefly unreachable) must not take
+          // down the entire resources/list response — log it and omit its entries.
+          .catch((err: unknown) => {
+            logger.warn(
+              { err, template: entry.templateMetadata },
+              "resource template list() failed; omitting from listing",
+            );
+            return [] as CatalogResource[];
+          }),
       );
     }
   }
@@ -103,7 +117,7 @@ export function installPaginatedListHandler(
   server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
     const cursorParam = request.params?.cursor;
     const offset = decodeCursor(cursorParam ?? undefined);
-    const all = await resolveAll(catalog);
+    const all = await resolveAll(catalog, logger);
 
     const slice = all.slice(offset, offset + pageSize);
     const next = offset + slice.length;

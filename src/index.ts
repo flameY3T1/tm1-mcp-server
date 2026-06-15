@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import "dotenv/config";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -66,12 +67,19 @@ async function startHttpTransport(
       res.end(JSON.stringify({ error: "Not found. Use POST /mcp." }));
       return;
     }
-    if (config.httpToken && req.headers.authorization !== `Bearer ${config.httpToken}`) {
-      res.statusCode = 401;
-      res.setHeader("Content-Type", "application/json");
-      res.setHeader("WWW-Authenticate", "Bearer");
-      res.end(JSON.stringify({ error: "Unauthorized" }));
-      return;
+    if (config.httpToken) {
+      // Constant-time comparison: hashing both sides to fixed-length digests avoids
+      // both the length-mismatch throw and the per-character timing oracle that `!==`
+      // would leak, so the token can't be brute-forced via response-timing analysis.
+      const expected = createHash("sha256").update(`Bearer ${config.httpToken}`).digest();
+      const provided = createHash("sha256").update(req.headers.authorization ?? "").digest();
+      if (!timingSafeEqual(expected, provided)) {
+        res.statusCode = 401;
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("WWW-Authenticate", "Bearer");
+        res.end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
     }
     let body: unknown;
     if (req.method === "POST") {

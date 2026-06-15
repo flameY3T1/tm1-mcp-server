@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { compileUserRegex } from "../../lib/safe-regex.js";
 import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
 
 export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Client) {
@@ -30,15 +30,7 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
       let processes = await tm1Client.processes.list();
       if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
       if (excludePattern) {
-        let re: RegExp;
-        try {
-          re = new RegExp(excludePattern, "i");
-        } catch (e) {
-          throw new TM1Error({
-            code: TM1ErrorCode.VALIDATION_ERROR,
-            message: `invalid excludePattern: ${(e as Error).message}`,
-          });
-        }
+        const re = compileUserRegex(excludePattern, "i", "excludePattern");
         processes = processes.filter((p) => !re.test(p.name));
       }
 

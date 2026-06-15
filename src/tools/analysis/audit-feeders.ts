@@ -13,6 +13,7 @@ import {
   findMatchingRule,
 } from "../../lib/feeders/static-heuristics.js";
 import { ElementTypeCache } from "../../lib/feeders/element-type-cache.js";
+import { mapSettledWithConcurrency } from "../../lib/concurrency.js";
 import {
   computeFedToPopulatedRatio,
   computeFeederMemoryRatio,
@@ -284,8 +285,12 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       let runtimeFailureCount = 0;
 
       if (wantsRuntime && scannedCubeNames.length > 0) {
-        const settled = await Promise.allSettled(
-          scannedCubeNames.map((name) => fetchCubeStats(tm1Client, name)),
+        // Cap in-flight }StatsByCube MDX calls so a large model can't flood TM1's
+        // worker pool with hundreds of simultaneous requests.
+        const settled = await mapSettledWithConcurrency(
+          scannedCubeNames,
+          10,
+          (name) => fetchCubeStats(tm1Client, name),
         );
         for (let i = 0; i < settled.length; i++) {
           const cubeName = scannedCubeNames[i]!;

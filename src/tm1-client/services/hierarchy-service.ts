@@ -3,6 +3,7 @@
 // derived ancestors/descendants traversals that fetch a hierarchy and walk it
 // client-side. See docs/ARCHITECTURE.md for the layering.
 import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { compileUserRegex } from "../../lib/safe-regex.js";
 import type { Hierarchy, HierarchyElement } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 
@@ -49,14 +50,7 @@ export class HierarchyService {
     const filterByType = opts?.elementType && opts.elementType !== "All";
     let regex: RegExp | undefined;
     if (opts?.nameRegex !== undefined) {
-      try {
-        regex = new RegExp(opts.nameRegex);
-      } catch (e) {
-        throw new TM1Error({
-          code: TM1ErrorCode.VALIDATION_ERROR,
-          message: `Invalid nameRegex: ${(e as Error).message}`,
-        });
-      }
+      regex = compileUserRegex(opts.nameRegex, undefined, "nameRegex");
     }
     const needsClientPostFilter = filterByType || regex !== undefined;
     if (filters.length > 0) elementClauses.push(`$filter=${filters.join(" and ")}`);

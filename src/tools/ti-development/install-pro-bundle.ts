@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { compileUserRegex } from "../../lib/safe-regex.js";
 import { parseProFile } from "../../lib/pro-parser.js";
 
 interface FileResult {
@@ -62,7 +63,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
           message: `directory must be absolute: ${directory}`,
         });
       }
-      const filenameRe = pattern ? new RegExp(pattern) : /\.pro$/i;
+      const filenameRe = pattern ? compileUserRegex(pattern, undefined, "pattern") : /\.pro$/i;
 
       async function collect(dir: string): Promise<string[]> {
         const out: string[] = [];

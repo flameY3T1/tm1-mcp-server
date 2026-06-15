@@ -1,8 +1,7 @@
 import { z } from "zod";
-import safeRegex from "safe-regex";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { compileUserRegex } from "../../lib/safe-regex.js";
 import { maskCodeLine } from "../../lib/mask-secrets.js";
 import { FORMAT_SCHEMA, wrappedPageResponse, type Column } from "../format.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
@@ -99,25 +98,7 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
       format,
     }) => {
       const flags = caseSensitive ? "g" : "gi";
-      if (!safeRegex(pattern)) {
-        throw new TM1Error({
-          code: TM1ErrorCode.VALIDATION_ERROR,
-          message: "Regex rejected: pattern risks catastrophic backtracking (ReDoS).",
-          details: pattern,
-          hint: "Avoid nested unbounded quantifiers like (a+)+ or (.*)* — simplify or anchor the pattern.",
-        });
-      }
-      let regex: RegExp;
-      try {
-        regex = new RegExp(pattern, flags);
-      } catch (e) {
-        throw new TM1Error({
-          code: TM1ErrorCode.VALIDATION_ERROR,
-          message: `Invalid regex: ${(e as Error).message}`,
-          details: pattern,
-          hint: "Pattern must be a valid JavaScript regex. Escape backslashes (e.g. 'c:\\\\\\\\' for 'c:\\\\') and balance brackets/parens.",
-        });
-      }
+      const regex = compileUserRegex(pattern, flags);
 
       const searchTabs = tabs && tabs.length > 0 ? tabs : ALL_TABS;
       const all = await tm1Client.processes.getAllCode(includeControl);

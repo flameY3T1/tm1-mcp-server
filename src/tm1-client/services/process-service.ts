@@ -392,7 +392,9 @@ export class ProcessService {
       ...(ds.asciiThousandSeparator !== undefined ? { asciiThousandSeparator: ds.asciiThousandSeparator } : {}),
       ...(ds.usesUnicode !== undefined ? { usesUnicode: ds.usesUnicode } : {}),
       ...(ds.userName !== undefined ? { userName: ds.userName } : {}),
-      ...(ds.password !== undefined ? { password: ds.password } : {}),
+      // Never surface the ODBC datasource password to the caller/LLM — return a
+      // presence marker so the field stays observable without leaking the credential.
+      ...(ds.password !== undefined ? { password: ds.password ? "[redacted]" : "" } : {}),
       ...(ds.oDBCConnection !== undefined ? { oDBCConnection: ds.oDBCConnection } : {}),
       ...(ds.query !== undefined ? { query: ds.query } : {}),
       ...(ds.view !== undefined ? { view: ds.view } : {}),

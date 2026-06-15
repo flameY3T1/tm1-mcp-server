@@ -31,8 +31,8 @@ First public release.
 
 ### Modes
 
-- `TM1_MODE=readonly` restricts tool registration to non-destructive tools for
-  production instances; `readwrite` (default) exposes the full lifecycle.
+- `TM1_MODE=readonly` (default) restricts tool registration to non-destructive
+  tools for production instances; `readwrite` opts in to the full lifecycle.
 
 ### TI analysis
 

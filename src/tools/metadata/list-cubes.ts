@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import type { Cube } from "../../types.js";
-import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { compileUserRegex } from "../../lib/safe-regex.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
@@ -75,15 +75,7 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
           cubes = cubes.filter((c) => c.name.toLowerCase().includes(needle));
         }
         if (nameRegex !== undefined && nameRegex.length > 0) {
-          let re: RegExp;
-          try {
-            re = new RegExp(nameRegex, "i");
-          } catch (e) {
-            throw new TM1Error({
-              code: TM1ErrorCode.VALIDATION_ERROR,
-              message: `Invalid nameRegex: ${String(e)}`,
-            });
-          }
+          const re = compileUserRegex(nameRegex, "i", "nameRegex");
           cubes = cubes.filter((c) => re.test(c.name));
         }
       }
