@@ -3,9 +3,10 @@ import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { TM1Error } from "../../types.js";
 import { compileUserRegex } from "../../lib/safe-regex.js";
 import { parseProFile } from "../../lib/pro-parser.js";
+import { resolveLocalPath } from "../local-file.js";
 
 interface FileResult {
   file: string;
@@ -20,7 +21,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
     "tm1_install_pro_bundle",
     "Install all .pro files from a directory in one call. Iterates the directory (non-recursive by default), applies tm1_import_pro_file logic per file, and reports per-file outcome. Stops on first failure unless continueOnError=true. Useful for Bedrock or library deployments.",
     {
-      directory: z.string().describe("Absolute path to directory containing .pro files"),
+      directory: z.string().describe("Absolute host path to directory containing .pro files. Disabled unless TM1_LOCAL_FILE_ROOT is set; the directory must resolve within that root."),
       recursive: z.boolean().optional().default(false).describe("Recurse into subdirectories (default false)"),
       pattern: z.string().optional().describe("Regex (JS) on filename. Default: matches *.pro (case-insensitive)."),
       mode: z
@@ -57,12 +58,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
           .catch(() => undefined);
       };
 
-      if (!path.isAbsolute(directory)) {
-        throw new TM1Error({
-          code: TM1ErrorCode.VALIDATION_ERROR,
-          message: `directory must be absolute: ${directory}`,
-        });
-      }
+      const safeDir = resolveLocalPath(directory, "directory");
       const filenameRe = pattern ? compileUserRegex(pattern, undefined, "pattern") : /\.pro$/i;
 
       async function collect(dir: string): Promise<string[]> {
@@ -79,7 +75,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
         return out;
       }
 
-      const files = (await collect(directory)).sort();
+      const files = (await collect(safeDir)).sort();
       if (files.length === 0) {
         return {
           content: [{ type: "text" as const, text: JSON.stringify({ directory, filesFound: 0, results: [] }) }],

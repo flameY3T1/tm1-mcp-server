@@ -1,5 +1,5 @@
 import { promises as fs } from "node:fs";
-import path from "node:path";
+import { resolveLocalPath } from "../local-file.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
@@ -95,7 +95,7 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
     "tm1_diff_process_with_file",
     "Compare an installed TI process on the server against a local .pro file. Returns per-tab identical flags + line counts, parameter diff (added/removed/changed), variable diff, and datasource diff. Use before tm1_import_pro_file to preview what will change.",
     {
-      filePath: z.string().optional().describe("Absolute path to the .pro file"),
+      filePath: z.string().optional().describe("Absolute path to the .pro file on the MCP server host. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline."),
       content: z.string().optional().describe("Raw .pro file content as string"),
       processName: z.string().optional().describe("Override process name. Default: from .pro 602 line."),
     },
@@ -108,13 +108,7 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
       }
       let body = content ?? "";
       if (!body && filePath) {
-        if (!path.isAbsolute(filePath)) {
-          throw new TM1Error({
-            code: TM1ErrorCode.VALIDATION_ERROR,
-            message: `filePath must be absolute: ${filePath}`,
-          });
-        }
-        body = await fs.readFile(filePath, "utf8");
+        body = await fs.readFile(resolveLocalPath(filePath), "utf8");
       }
 
       const parsed = parseProFile(body);

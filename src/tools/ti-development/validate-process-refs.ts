@@ -1,5 +1,5 @@
 import { promises as fs } from "node:fs";
-import path from "node:path";
+import { resolveLocalPath } from "../local-file.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
@@ -52,7 +52,7 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
     "Scan a TI process (live, by name, or from .pro) for cube/dimension references in well-known TI functions (CellGetN/S, CellPutN/S, ViewCreate, DimensionElementInsertDirect, AttrPutS, etc.) and verify each name resolves on the server. TM1 lets syntactically valid code reference non-existent objects — this catches the gap between compile and runtime.",
     {
       processName: z.string().optional().describe("Validate an installed process by name"),
-      filePath: z.string().optional().describe("Validate a .pro file (absolute path)"),
+      filePath: z.string().optional().describe("Validate a .pro file (absolute host path). Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline."),
       content: z.string().optional().describe("Validate raw .pro content"),
       includeControl: z.boolean().optional().default(true).describe("Include control objects ('}'-prefixed) as valid targets. Default true."),
     },
@@ -71,13 +71,7 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
       } else {
         let body = content ?? "";
         if (!body && filePath) {
-          if (!path.isAbsolute(filePath)) {
-            throw new TM1Error({
-              code: TM1ErrorCode.VALIDATION_ERROR,
-              message: `filePath must be absolute: ${filePath}`,
-            });
-          }
-          body = await fs.readFile(filePath, "utf8");
+          body = await fs.readFile(resolveLocalPath(filePath), "utf8");
         }
         const parsed = parseProFile(body);
         code = {

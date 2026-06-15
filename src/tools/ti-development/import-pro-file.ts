@@ -1,5 +1,5 @@
 import { promises as fs } from "node:fs";
-import path from "node:path";
+import { resolveLocalPath } from "../local-file.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
@@ -15,7 +15,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       filePath: z
         .string()
         .optional()
-        .describe("Absolute path to the .pro file on the MCP server host"),
+        .describe("Absolute path to the .pro file on the MCP server host. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline."),
       content: z
         .string()
         .optional()
@@ -45,13 +45,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
 
       let body = content ?? "";
       if (!body && filePath) {
-        if (!path.isAbsolute(filePath)) {
-          throw new TM1Error({
-            code: TM1ErrorCode.VALIDATION_ERROR,
-            message: `filePath must be absolute: ${filePath}`,
-          });
-        }
-        body = await fs.readFile(filePath, "utf8");
+        body = await fs.readFile(resolveLocalPath(filePath), "utf8");
       }
 
       const parsed = parseProFile(body);

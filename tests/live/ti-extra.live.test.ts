@@ -24,9 +24,15 @@ describe.skipIf(!LIVE_ENABLED)("live: ti-extra (.pro roundtrip + ops gap)", () =
   let h: LiveHarness;
   let proContent = "";
   let bundleDir = "";
+  let prevFileRoot: string | undefined;
 
   beforeAll(async () => {
     h = await getHarness();
+    // install_pro_bundle reads a host directory; host-file access is gated
+    // behind TM1_LOCAL_FILE_ROOT (default-off). The bundle dir lives under the
+    // OS temp dir, so allow that root for the duration of this suite.
+    prevFileRoot = process.env.TM1_LOCAL_FILE_ROOT;
+    process.env.TM1_LOCAL_FILE_ROOT = os.tmpdir();
     // Idempotent pre-clean.
     for (const name of [PROC_SRC, PROC_IMPORT]) {
       await h.call("tm1_delete_process", { processName: name, confirm: name });
@@ -56,6 +62,8 @@ describe.skipIf(!LIVE_ENABLED)("live: ti-extra (.pro roundtrip + ops gap)", () =
         /* best-effort */
       }
     }
+    if (prevFileRoot === undefined) delete process.env.TM1_LOCAL_FILE_ROOT;
+    else process.env.TM1_LOCAL_FILE_ROOT = prevFileRoot;
   });
 
   it("export_process_to_pro returns inline .pro content", async () => {
