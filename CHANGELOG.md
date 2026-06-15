@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-06-15
+
 ### Added
 
 - `tm1_search_code` gains a `groupBy` parameter (`'process'` | `'tab'`) that
@@ -26,6 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extracted heuristically from the filename; unparseable names bucket under
   `(unparsed)`. The full-mode `lastUpdated` column is now derived from the
   filename timestamp (v11 OData exposes no LastUpdated field).
+
+### Security
+
+- Host-file access for the `.pro` round-trip tools (`tm1_diff_process_with_file`,
+  `tm1_validate_process_refs`, `tm1_export_process_to_pro`, `tm1_import_pro_file`,
+  `tm1_install_pro_bundle`) is now gated behind the new `TM1_LOCAL_FILE_ROOT`
+  environment variable and **disabled by default**. When unset, the `filePath` /
+  `writeToFile` / `directory` parameters are rejected and the tools accept only
+  inline `content`; when set, supplied paths must resolve within that root (no
+  `..` traversal). Prevents arbitrary host file read/write (e.g.
+  `/proc/self/environ`, which would leak credentials, or `~/.ssh`) from the
+  default tool surface, including in the default readonly mode.
+
 ## [2.0.0] - 2026-06-13
 
 First public release.
@@ -101,5 +116,6 @@ First public release.
 
 - README, ARCHITECTURE, CONTRIBUTING, and SECURITY policy for open-source release.
 
-[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/flameY3T1/tm1-mcp-server/releases/tag/v2.0.0

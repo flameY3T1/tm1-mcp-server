@@ -1,6 +1,6 @@
 {
   "name": "tm1-mcp-server",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "MCP server for IBM Planning Analytics / TM1 \u2014 full model lifecycle via REST API",
   "repository": {
     "type": "git",
@@ -17,6 +17,8 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run verify",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
