@@ -14,7 +14,12 @@ import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 export function parseLogName(filename: string): { process: string | null; ts: string | null } {
   const modern = filename.match(/^TM1ProcessError_(\d{14})_\d+_(.+)\.log$/i);
   if (modern) {
-    const proc = modern[2]!.replace(/_[0-9a-fA-F]{6,}$/, "");
+    // Strip the trailing TM1 session-hash token. Real-world v11 hashes are
+    // lowercase base36 (e.g. "_mp2su7f4sybb"), not just hex, so match any
+    // lowercase-alphanumeric token of length >= 8 that contains at least one
+    // digit (the digit requirement avoids stripping real word suffixes like
+    // "_export"). Collapses TIRecord_<proc>_<hash> variants onto one process.
+    const proc = modern[2]!.replace(/_(?=[a-z0-9]*\d)[a-z0-9]{8,}$/, "");
     return { ts: modern[1]!, process: proc };
   }
   const legacy = filename.match(/^(.+)_(\d{8,14})\.log$/i);
