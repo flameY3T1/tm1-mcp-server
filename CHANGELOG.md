@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Answers "which process has the most X calls" in a tiny payload instead of
   dumping every matching line. Counts are complete (per-process/total caps and
   `maskSecrets` do not apply in this mode).
+- `tm1_analyze_object_usage` gains a `mode` parameter (`'full'` | `'summary'`).
+  `summary` aggregates per source — one row per process/rule with its
+  `accessTypes`, `sections`, `funcNames`, and usage `count`, sorted by count —
+  dropping snippets. Collapses hundreds of usages into a compact data-flow
+  overview for heavily-referenced cubes/dimensions.
 ## [2.0.0] - 2026-06-13
 
 First public release.

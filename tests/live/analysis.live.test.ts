@@ -113,6 +113,24 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
       count: expect.any(Number),
       usages: expect.any(Array),
     });
+
+    const s = await h.ok("tm1_analyze_object_usage", {
+      kind: "cube",
+      name: cubeNames[0],
+      mode: "summary",
+      limit: 50,
+    });
+    expect(s.isError).toBe(false);
+    expect(s.json).toMatchObject({
+      kind: "cube",
+      mode: "summary",
+      sourceCount: expect.any(Number),
+      sources: expect.any(Array),
+    });
+    const sources = s.json.sources as Array<{ count: number }>;
+    for (let i = 1; i < sources.length; i++) {
+      expect(sources[i - 1]!.count).toBeGreaterThanOrEqual(sources[i]!.count);
+    }
   });
 
   // ── analyze_callgraph: per-process traversal ────────────────────────────
