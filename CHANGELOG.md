@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tm1_search_code` gains a `groupBy` parameter (`'process'` | `'tab'`) that
+  returns a sorted match-count aggregation instead of individual match lines.
+  Answers "which process has the most X calls" in a tiny payload instead of
+  dumping every matching line. Counts are complete (per-process/total caps and
+  `maskSecrets` do not apply in this mode).
 ## [2.0.0] - 2026-06-13
 
 First public release.

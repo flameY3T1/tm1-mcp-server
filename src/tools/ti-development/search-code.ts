@@ -27,6 +27,7 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
       "Returns matches paginated (default 50/page) with process name, tab, line number, and trimmed line text.",
       "Wrapper over tm1_get_all_processes_code that avoids dumping ~MB of code through the channel.",
       "Use tm1_get_process_code on a hit to inspect the surrounding context.",
+      "Set groupBy='process' (or 'tab') for a sorted count aggregation instead of individual match lines.",
     ].join(" "),
     {
       pattern: z
@@ -79,6 +80,15 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
           "The first-seen process is kept; others go into alsoFoundIn[]. " +
           "Drastically reduces output on servers with many process variants. Default: false.",
         ),
+      groupBy: z
+        .enum(["process", "tab"])
+        .optional()
+        .describe(
+          "Aggregate mode. Instead of individual match lines, return counts grouped by process or tab, " +
+          "sorted by matchCount desc. Answers 'which process has the most X calls' in a tiny payload " +
+          "instead of dumping every matching line. Counts are complete: maxMatchesPerProcess/maxTotalMatches " +
+          "and maskSecrets do not apply in this mode.",
+        ),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
     },
@@ -92,6 +102,7 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
       maskSecrets,
       excludeCommented,
       deduplicateByLine,
+      groupBy,
       limit,
       offset,
       fetchAll,
@@ -102,6 +113,53 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
 
       const searchTabs = tabs && tabs.length > 0 ? tabs : ALL_TABS;
       const all = await tm1Client.processes.getAllCode(includeControl);
+
+      if (groupBy) {
+        // Aggregate mode: count every matching line, grouped by process or tab.
+        // No per-process / total caps here so the counts are complete — the
+        // payload is bounded by the number of groups, not the match count.
+        const counts = new Map<string, number>();
+        let totalMatches = 0;
+        for (const proc of all) {
+          for (const tab of searchTabs) {
+            const code = (proc as Record<Tab, string>)[tab] ?? "";
+            if (!code) continue;
+            const lines = code.split(/\r?\n/);
+            for (let i = 0; i < lines.length; i++) {
+              regex.lastIndex = 0;
+              const raw = lines[i]!;
+              if (excludeCommented && COMMENT_RE.test(raw)) continue;
+              if (regex.test(raw)) {
+                const key = groupBy === "process" ? proc.name : tab;
+                counts.set(key, (counts.get(key) ?? 0) + 1);
+                totalMatches++;
+              }
+            }
+          }
+        }
+        const groups = [...counts.entries()]
+          .map(([key, matchCount]) => ({ [groupBy]: key, matchCount }))
+          .sort((a, b) => b.matchCount - a.matchCount);
+        const groupPage = paginate(groups, limit, offset, fetchAll);
+        const groupWrapper = {
+          pattern,
+          caseSensitive,
+          tabsSearched: searchTabs,
+          processesScanned: all.length,
+          groupBy,
+          groupCount: groups.length,
+          matchCount: totalMatches,
+          ...groupPage,
+        };
+        const groupColumns: Column<{ [k: string]: string | number }>[] = [
+          { header: groupBy, get: (g) => g[groupBy] },
+          { header: "matchCount", get: (g) => g.matchCount },
+        ];
+        return wrappedPageResponse(groupWrapper, groupPage, format, {
+          title: `Search: ${pattern} (grouped by ${groupBy})`,
+          columns: groupColumns,
+        });
+      }
 
       const matches: Match[] = [];
       let truncated = false;

@@ -75,6 +75,22 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
     });
   });
 
+  it("tm1_search_code: groupBy='process' returns sorted count aggregation", async () => {
+    const r = await h.ok("tm1_search_code", { pattern: "If", groupBy: "process", limit: 5 });
+    expect(r.isError).toBe(false);
+    expect(r.json).toMatchObject({
+      groupBy: "process",
+      groupCount: expect.any(Number),
+      matchCount: expect.any(Number),
+      items: expect.any(Array),
+    });
+    const items = r.json.items as Array<{ process: string; matchCount: number }>;
+    // sorted desc by matchCount
+    for (let i = 1; i < items.length; i++) {
+      expect(items[i - 1]!.matchCount).toBeGreaterThanOrEqual(items[i]!.matchCount);
+    }
+  });
+
   // ── search_rules (model-building) ───────────────────────────────────────
   it("tm1_search_rules: regex over cube rules returns envelope", async () => {
     const r = await h.ok("tm1_search_rules", { pattern: ".", limit: 5 });
