@@ -121,6 +121,21 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
     });
   });
 
+  it("tm1_list_error_logs groupBy='process' returns audit summary", async () => {
+    const r = await h.ok("tm1_list_error_logs", { groupBy: "process", limit: 20 });
+    expect(r.isError).toBe(false);
+    expect(r.json).toMatchObject({
+      groupBy: "process",
+      totalFiles: expect.any(Number),
+      groupCount: expect.any(Number),
+      items: expect.any(Array),
+    });
+    const items = r.json.items as Array<{ process: string; count: number; perDay: number }>;
+    for (let i = 1; i < items.length; i++) {
+      expect(items[i - 1]!.count).toBeGreaterThanOrEqual(items[i]!.count);
+    }
+  });
+
   // ---- SECURITY (read-tier) ----------------------------------------------
 
   it("tm1_list_clients returns clients with Name", async () => {

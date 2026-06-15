@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `accessTypes`, `sections`, `funcNames`, and usage `count`, sorted by count —
   dropping snippets. Collapses hundreds of usages into a compact data-flow
   overview for heavily-referenced cubes/dimensions.
+- `tm1_list_error_logs` gains a `groupBy='process'` parameter that returns an
+  audit summary — per process `{count, firstSeen, lastSeen, spanDays, perDay}`,
+  sorted by count desc — instead of listing every file. Answers "which
+  processes fail regularly" in one call. Process name and timestamp are
+  extracted heuristically from the filename; unparseable names bucket under
+  `(unparsed)`. The full-mode `lastUpdated` column is now derived from the
+  filename timestamp (v11 OData exposes no LastUpdated field).
 ## [2.0.0] - 2026-06-13
 
 First public release.
