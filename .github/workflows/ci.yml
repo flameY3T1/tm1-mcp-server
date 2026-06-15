@@ -42,6 +42,14 @@ jobs:
       - name: Coverage (enforces vitest thresholds)
         run: npm run test:coverage
 
-      - name: Audit (high+)
-        run: npm audit --audit-level=high
+      # Gate on what consumers actually install: the published package ships
+      # only dist/ + runtime deps (files:["dist"]). Dev-only advisories (e.g.
+      # vite via vitest) don't reach users and must not block a release.
+      - name: Audit (production deps, high+)
+        run: npm audit --omit=dev --audit-level=high
         continue-on-error: false
+
+      # Full-tree audit incl. devDependencies — informational, never blocks.
+      - name: Audit (all deps, informational)
+        run: npm audit --audit-level=high
+        continue-on-error: true
