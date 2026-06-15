@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `.env` is now loaded from the package/repo root (the directory containing
+  `dist/`) in addition to the current working directory. MCP clients spawn the
+  server with their own cwd, so a repo `.env` was previously never found unless
+  the client explicitly set the working directory; it now works out of the box.
+  dotenv's v17 startup tips are also suppressed (`quiet`) so they cannot corrupt
+  the JSON-RPC stream on the stdio transport.
+- CI now runs ESLint (`npm run lint:eslint`) alongside the existing typecheck,
+  flat-API, and annotation-coverage gates.
+
+### Security
+
+- `.env.example` no longer ships `TM1_SSL_REJECT_UNAUTHORIZED=false` as an active
+  default. The line is commented out so the secure code default (`true`, full TLS
+  verification) applies unless a user deliberately opts out for self-signed certs.
+
 ## [2.1.0] - 2026-06-15
 
 ### Added

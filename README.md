@@ -69,9 +69,10 @@ TM1_VERSION=11.8
 
 ## Use with Claude Code
 
-Credentials live in `.env` (loaded via `dotenv` at startup). The MCP client
-config only points at the binary — **do not put `TM1_PASSWORD` in `.mcp.json`
-or `settings.json`**.
+Credentials live in `.env` (loaded at startup from the repo root — the directory
+containing `dist/` — so it is found no matter which working directory the MCP
+client launches the server from). The MCP client config only points at the
+binary — **do not put `TM1_PASSWORD` in `.mcp.json` or `settings.json`**.
 
 Copy `mcp.json.example` to `.mcp.json` (project-local) or merge into
 `~/.claude/settings.json`:

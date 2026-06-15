@@ -33,6 +33,9 @@ jobs:
       - name: Lint (annotation coverage)
         run: npm run lint:annotations
 
+      - name: Lint (ESLint)
+        run: npm run lint:eslint
+
       - name: Build
         run: npm run build
 
