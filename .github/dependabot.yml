@@ -10,6 +10,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # undici 8 requires node >=22.19; we still support node 20.
+      # Stay on undici 7.x (maintained) until node 20 is dropped.
+      - dependency-name: "undici"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
