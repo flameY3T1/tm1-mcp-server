@@ -14,6 +14,19 @@ import type { CellService } from "./cell-service.js";
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
 
+// TM1 signals "element already exists" with different HTTP statuses across
+// versions: some return 409 Conflict, but v11.x (REST 11.8) returns 400 with
+// the message "An element with name ... already exists". Detect both so bulk
+// upsert stays idempotent (update existing) rather than throwing on re-upsert.
+function isAlreadyExists(err: TM1Error): boolean {
+  if (err.httpStatus === 409) return true;
+  if (err.httpStatus === 400) {
+    const text = `${err.message} ${err.details ?? ""}`.toLowerCase();
+    return text.includes("already exists");
+  }
+  return false;
+}
+
 // TM1 may report an element's Type as the enum name ("Numeric"|"String"|
 // "Consolidated") or its ordinal (1|2|3). Normalize to the name so callers can
 // compare against ElementCreate.type regardless of representation.
@@ -142,7 +155,7 @@ export class ElementService {
       try {
         await this.http.request<void>("POST", baseUrl, body);
       } catch (err) {
-        if (err instanceof TM1Error && err.httpStatus === 409) {
+        if (err instanceof TM1Error && isAlreadyExists(err)) {
           // Element already exists. Patch the type only when it actually
           // differs (avoids a pointless write), and surface the change: a
           // Numeric->Consolidated / Numeric->String conversion discards the

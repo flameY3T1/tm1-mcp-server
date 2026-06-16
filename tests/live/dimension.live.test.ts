@@ -20,6 +20,7 @@ const SUB = "Region_North"; // intermediate consolidation
 const LEAF1 = "City_A"; // leaf under SUB
 const LEAF2 = "City_B"; // leaf created standalone, then moved under SUB
 const LEAF3 = "City_C"; // leaf for attribute values
+const TC = "TypeChangeLeaf"; // standalone leaf for the upsert idempotency / type-change test
 
 describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle", () => {
   let h: LiveHarness;
@@ -84,6 +85,37 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
       ],
     });
     expect(r.json).toMatchObject({ success: true, total: 3 });
+  });
+
+  it("bulk-upsert is idempotent and surfaces in-place type changes", async () => {
+    // Create a standalone leaf.
+    const a = await h.ok("tm1_bulk_upsert_elements", {
+      dimension: DIM,
+      hierarchy: HIER,
+      elements: [{ name: TC, type: "Numeric" }],
+    });
+    expect(a.json).toMatchObject({ success: true });
+    expect(a.json.typeChanges ?? []).toEqual([]);
+
+    // Re-upsert with the SAME type must be idempotent. Regression: TM1 v11
+    // reports "element already exists" as HTTP 400 (not 409), which used to
+    // escape the conflict handler and throw.
+    const b = await h.ok("tm1_bulk_upsert_elements", {
+      dimension: DIM,
+      hierarchy: HIER,
+      elements: [{ name: TC, type: "Numeric" }],
+    });
+    expect(b.json).toMatchObject({ success: true });
+    expect(b.json.typeChanges ?? []).toEqual([]);
+
+    // Changing the type in place must be reported (it discards leaf data).
+    const c = await h.ok("tm1_bulk_upsert_elements", {
+      dimension: DIM,
+      hierarchy: HIER,
+      elements: [{ name: TC, type: "String" }],
+    });
+    expect(c.json.typeChanges).toEqual([{ name: TC, from: "Numeric", to: "String" }]);
+    expect(typeof c.json.warning).toBe("string");
   });
 
   it("get_hierarchy returns the created elements (incl. quoted name)", async () => {
