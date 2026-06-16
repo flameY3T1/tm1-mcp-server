@@ -13,3 +13,6 @@ coverage/
 
 # internal planning/review docs — not for public release
 docs/internal/
+
+# agent entry point — local only, not for public release
+CLAUDE.md
