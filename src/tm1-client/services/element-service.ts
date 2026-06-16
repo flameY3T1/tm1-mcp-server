@@ -14,6 +14,25 @@ import type { CellService } from "./cell-service.js";
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
 
+// TM1 may report an element's Type as the enum name ("Numeric"|"String"|
+// "Consolidated") or its ordinal (1|2|3). Normalize to the name so callers can
+// compare against ElementCreate.type regardless of representation.
+function normalizeElementType(t: number | string): string {
+  switch (t) {
+    case 1:
+    case "1":
+      return "Numeric";
+    case 2:
+    case "2":
+      return "String";
+    case 3:
+    case "3":
+      return "Consolidated";
+    default:
+      return String(t);
+  }
+}
+
 export class ElementService {
   constructor(
     private readonly http: TM1HttpClient,
@@ -113,8 +132,9 @@ export class ElementService {
     dimensionName: string,
     hierarchyName: string,
     elements: ElementCreate[],
-  ): Promise<void> {
+  ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
     const baseUrl = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements`;
+    const typeChanges: Array<{ name: string; from: string; to: string }> = [];
 
     // Pass 1: Create/upsert all elements without components.
     for (const el of elements) {
@@ -123,8 +143,22 @@ export class ElementService {
         await this.http.request<void>("POST", baseUrl, body);
       } catch (err) {
         if (err instanceof TM1Error && err.httpStatus === 409) {
-          // Already exists – patch type if needed.
-          await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
+          // Element already exists. Patch the type only when it actually
+          // differs (avoids a pointless write), and surface the change: a
+          // Numeric->Consolidated / Numeric->String conversion discards the
+          // element's leaf cell values, so the caller must be told it happened
+          // rather than have it occur silently.
+          const existing = await this.http
+            .request<{ Type: number | string }>("GET", `${baseUrl}('${enc(el.name)}')?$select=Type`)
+            .catch(() => null);
+          const from = existing ? normalizeElementType(existing.Type) : null;
+          if (from && from !== el.type) {
+            await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
+            typeChanges.push({ name: el.name, from, to: el.type });
+          } else if (!from) {
+            // Type unreadable — preserve prior behaviour and patch unconditionally.
+            await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
+          }
         } else {
           throw err;
         }
@@ -145,6 +179,8 @@ export class ElementService {
       };
       await this.http.request<void>("PATCH", path, body);
     }
+
+    return { typeChanges };
   }
 
   /**

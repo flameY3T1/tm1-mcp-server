@@ -27,7 +27,7 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
     },
     async ({ dimension, hierarchy, elements }) => {
       const hier = hierarchy ?? dimension;
-      await withToolHint(
+      const { typeChanges } = await withToolHint(
         tm1Client.elements.bulkUpsert(dimension, hier, elements),
         "Bulk upsert failed. Common causes: Consolidated element references a child that is not in this batch and does not exist yet (list leafs first), dimension/hierarchy name mismatch (tm1_list_dimensions to verify), or attempt to change an element's type (delete + recreate instead).",
       );
@@ -45,6 +45,14 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
             hierarchyName: hier,
             total: elements.length,
             counts,
+            // Existing elements whose Type was changed in place. A
+            // Numeric->Consolidated/String conversion discards the element's
+            // leaf cell values, so surface it instead of letting it happen
+            // silently.
+            typeChanges,
+            ...(typeChanges.length > 0 && {
+              warning: `${typeChanges.length} element(s) had their type changed in place; any existing leaf cell values for those elements were discarded.`,
+            }),
           }, null, 2),
         }],
       };
