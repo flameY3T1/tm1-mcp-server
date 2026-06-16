@@ -279,6 +279,17 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
                             (a, m) => a + m.totals.commentRatio,
                             0,
                           ) / processesScanned,
+                    totalDeadCodeLines: processMetrics.reduce(
+                      (a, m) => a + m.totals.deadCodeLines,
+                      0,
+                    ),
+                    avgDeadCodeRatio:
+                      processesScanned === 0
+                        ? 0
+                        : processMetrics.reduce(
+                            (a, m) => a + m.totals.deadCodeRatio,
+                            0,
+                          ) / processesScanned,
                   },
                   rules: {
                     totalRulesLoc: rulesMetrics.reduce(
@@ -291,6 +302,10 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
                     ),
                     totalDbCalls: rulesMetrics.reduce(
                       (a, m) => a + m.dbCallCount,
+                      0,
+                    ),
+                    totalDeadCodeLines: rulesMetrics.reduce(
+                      (a, m) => a + m.deadCodeLines,
                       0,
                     ),
                     cubesWithoutSkipcheck: rulesMetrics

@@ -7,6 +7,7 @@
  */
 import { parseRules } from "../callgraph/rulesParser.js";
 import { extractDbCalls } from "../callgraph/rulesLinter.js";
+import { isCommentedOutCode } from "./comment-classifier.js";
 
 export interface RulesMetrics {
   cube: string;
@@ -18,10 +19,14 @@ export interface RulesMetrics {
   ruleCount: number;
   /** Rule-area lines (start with `[`) in the feeders section. */
   feederCount: number;
-  /** Lines starting with `#`. */
+  /** `#` lines that are real comments (prose), not disabled code. */
   commentLines: number;
-  /** commentLines / max(rulesLoc + feedersLoc + commentLines, 1). 0..1. */
+  /** `#` lines that look like commented-out TM1 code (disabled statements). */
+  deadCodeLines: number;
+  /** commentLines / max(rulesLoc + feedersLoc + commentLines + deadCodeLines, 1). 0..1. */
   commentRatio: number;
+  /** deadCodeLines / max(rulesLoc + feedersLoc + commentLines + deadCodeLines, 1). 0..1. */
+  deadCodeRatio: number;
   /** `skipcheck;` directive present in the rules section. */
   hasSkipcheck: boolean;
   /** `feedstrings;` directive present in the rules section. */
@@ -51,7 +56,9 @@ export function computeRulesMetrics(cube: string, rulesText: string): RulesMetri
       ruleCount: 0,
       feederCount: 0,
       commentLines: 0,
+      deadCodeLines: 0,
       commentRatio: 0,
+      deadCodeRatio: 0,
       hasSkipcheck: false,
       hasFeedstrings: false,
       dbCallCount: 0,
@@ -66,13 +73,15 @@ export function computeRulesMetrics(cube: string, rulesText: string): RulesMetri
   let ruleCount = 0;
   let feederCount = 0;
   let commentLines = 0;
+  let deadCodeLines = 0;
   let dbCallCount = 0;
   const coupled = new Set<string>();
 
   for (const line of ast.lines) {
     if (line.isBlank) continue;
     if (line.isComment) {
-      commentLines++;
+      if (isCommentedOutCode(line.trimmed)) deadCodeLines++;
+      else commentLines++;
       continue;
     }
     // Section markers (`feeders;`) are dividers, not code — skip from LOC.
@@ -93,8 +102,9 @@ export function computeRulesMetrics(cube: string, rulesText: string): RulesMetri
     }
   }
 
-  const denom = rulesLoc + feedersLoc + commentLines;
+  const denom = rulesLoc + feedersLoc + commentLines + deadCodeLines;
   const commentRatio = denom === 0 ? 0 : commentLines / denom;
+  const deadCodeRatio = denom === 0 ? 0 : deadCodeLines / denom;
   const coupledCubes = [...coupled].sort();
   const score =
     rulesLoc + 2 * ruleCount + 3 * dbCallCount + 5 * coupledCubes.length;
@@ -106,7 +116,9 @@ export function computeRulesMetrics(cube: string, rulesText: string): RulesMetri
     ruleCount,
     feederCount,
     commentLines,
+    deadCodeLines,
     commentRatio,
+    deadCodeRatio,
     hasSkipcheck: ast.hasSkipcheck,
     hasFeedstrings: ast.hasFeedstrings,
     dbCallCount,

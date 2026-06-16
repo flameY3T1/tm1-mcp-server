@@ -9,6 +9,7 @@ import { parseTiCode } from "../callgraph/tiParser.js";
 import type {
   TiStatement,
 } from "../callgraph/types.js";
+import { isCommentedOutCode } from "./comment-classifier.js";
 
 export type TiTab = "prolog" | "metadata" | "data" | "epilog";
 
@@ -101,8 +102,10 @@ function conditionComplexity(condition: string): number {
 export interface TabMetrics {
   /** Non-blank, non-comment source lines. */
   loc: number;
-  /** Lines starting with `#`. */
+  /** `#` lines that are real comments (prose), not disabled code. */
   commentLines: number;
+  /** `#` lines that look like commented-out TI code (disabled statements). */
+  deadCodeLines: number;
   /** Lines that are purely whitespace. */
   blankLines: number;
   /** if + elseIf + while statements (recursive). */
@@ -125,6 +128,7 @@ export interface ProcessMetrics {
   totals: {
     loc: number;
     commentLines: number;
+    deadCodeLines: number;
     branches: number;
     maxNesting: number;
     /** Heuristic (v1): loc + 2*branches + 3*maxNesting. Unchanged for compatibility. */
@@ -137,8 +141,10 @@ export interface ProcessMetrics {
     hotInLoop: number;
     /** v2: loc + ifCost + loopCost + hotInLoop, optionally discounted by comments. */
     scoreV2: number;
-    /** commentLines / max(loc + commentLines, 1). 0..1. */
+    /** commentLines / max(loc + commentLines + deadCodeLines, 1). 0..1. Real comments only. */
     commentRatio: number;
+    /** deadCodeLines / max(loc + commentLines + deadCodeLines, 1). 0..1. */
+    deadCodeRatio: number;
   };
 }
 
@@ -205,18 +211,22 @@ function splitMultiStatementLines(src: string): string {
 function classifyLines(src: string): {
   loc: number;
   commentLines: number;
+  deadCodeLines: number;
   blankLines: number;
 } {
   let loc = 0;
   let commentLines = 0;
+  let deadCodeLines = 0;
   let blankLines = 0;
   for (const raw of src.split(/\r?\n/)) {
     const t = raw.trim();
     if (t === "") blankLines++;
-    else if (t.startsWith("#")) commentLines++;
-    else loc++;
+    else if (t.startsWith("#")) {
+      if (isCommentedOutCode(t)) deadCodeLines++;
+      else commentLines++;
+    } else loc++;
   }
-  return { loc, commentLines, blankLines };
+  return { loc, commentLines, deadCodeLines, blankLines };
 }
 
 function walk(
@@ -300,6 +310,7 @@ export function computeTabMetrics(
   return {
     loc: counts.loc,
     commentLines: counts.commentLines,
+    deadCodeLines: counts.deadCodeLines,
     blankLines: counts.blankLines,
     branches: acc.branches,
     maxNesting: acc.maxNesting,
@@ -321,6 +332,7 @@ export function computeProcessMetrics(
 
   let loc = 0;
   let commentLines = 0;
+  let deadCodeLines = 0;
   let branches = 0;
   let maxNesting = 0;
   let loopCost = 0;
@@ -329,6 +341,7 @@ export function computeProcessMetrics(
   for (const t of TABS) {
     loc += tabs[t].loc;
     commentLines += tabs[t].commentLines;
+    deadCodeLines += tabs[t].deadCodeLines;
     branches += tabs[t].branches;
     if (tabs[t].maxNesting > maxNesting) maxNesting = tabs[t].maxNesting;
     loopCost += tabs[t].loopCost;
@@ -336,8 +349,9 @@ export function computeProcessMetrics(
     hotInLoop += tabs[t].hotInLoop;
   }
   const score = loc + 2 * branches + 3 * maxNesting;
-  const denom = loc + commentLines;
+  const denom = loc + commentLines + deadCodeLines;
   const commentRatio = denom === 0 ? 0 : commentLines / denom;
+  const deadCodeRatio = denom === 0 ? 0 : deadCodeLines / denom;
   const rawV2 = loc + ifCost + loopCost + hotInLoop;
   const discount = Math.min(Math.max(w.commentDiscountMax, 0), 1) * commentRatio;
   const scoreV2 = rawV2 * (1 - discount);
@@ -348,6 +362,7 @@ export function computeProcessMetrics(
     totals: {
       loc,
       commentLines,
+      deadCodeLines,
       branches,
       maxNesting,
       score,
@@ -356,6 +371,7 @@ export function computeProcessMetrics(
       hotInLoop,
       scoreV2,
       commentRatio,
+      deadCodeRatio,
     },
   };
 }
