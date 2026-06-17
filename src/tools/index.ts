@@ -43,6 +43,8 @@ import { registerDiffProcesses } from "./ti-development/diff-processes.js";
 import { registerValidateProcessRefs } from "./ti-development/validate-process-refs.js";
 import { registerUpsertProcess } from "./ti-development/upsert-process.js";
 import { registerInstallProBundle } from "./ti-development/install-pro-bundle.js";
+import { registerExportProcessToGit } from "./ti-development/export-process-to-git.js";
+import { registerImportProcessFromGit } from "./ti-development/import-process-from-git.js";
 import { registerCheckWritableCoords } from "./celldata/check-writable-coords.js";
 
 // Dimension management tools
@@ -176,6 +178,8 @@ export function registerAllTools(server: McpServer, tm1Client: TM1Client): void 
   registerValidateProcessRefs(server, tm1Client);
   registerUpsertProcess(server, tm1Client);
   registerInstallProBundle(server, tm1Client);
+registerExportProcessToGit(server, tm1Client);
+registerImportProcessFromGit(server, tm1Client);
   registerCheckWritableCoords(server, tm1Client);
   registerCheckFeeders(server, tm1Client);
   registerTraceFeeders(server, tm1Client);

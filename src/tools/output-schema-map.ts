@@ -42,6 +42,7 @@ import {
   ErrorLogFileSchema,
   ErrorLogGroupSchema,
   ExportProcessToProResultSchema,
+  ExportProcessToGitResultSchema,
   FileContentResultSchema,
   FilenameItemSchema,
   GroupItemSchema,
@@ -164,6 +165,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_upsert_process: asOutputSchema(UpsertProcessResultSchema),
   tm1_install_pro_bundle: asOutputSchema(InstallProBundleResultSchema),
   tm1_import_pro_file: asOutputSchema(ImportProFileResultSchema),
+  tm1_import_process_from_git: asOutputSchema(ImportProFileResultSchema),
   tm1_copy_process: asOutputSchema(CopyProcessResultSchema),
 
   // ── Phase 2e: analysis tools ──────────────────────────────────────────────
@@ -266,6 +268,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_list_processes_grouped: asOutputSchema(ProcessesGroupedResultSchema),
   tm1_diagnose_process_error: asOutputSchema(DiagnoseProcessErrorResultSchema),
   tm1_export_process_to_pro: asOutputSchema(ExportProcessToProResultSchema),
+  tm1_export_process_to_git: asOutputSchema(ExportProcessToGitResultSchema),
   tm1_find_orphan_dimensions: asOutputSchema(FindOrphanDimensionsResultSchema),
   tm1_check_v12_readiness: asOutputSchema(V12ReadinessResultSchema),
   tm1_resolve_default_member: asOutputSchema(DefaultMemberResolutionSchema),

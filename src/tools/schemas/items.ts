@@ -916,3 +916,19 @@ export const ExportProcessToProResultSchema = z.object({
   dataSourceType: z.string(),
   content: z.string(),
 });
+
+export const ExportProcessToGitResultSchema = z.object({
+  processName: z.string(),
+  jsonFileName: z.string(),
+  tiFileName: z.string(),
+  parameterCount: z.number().int(),
+  variableCount: z.number().int(),
+  dataSourceType: z.string(),
+  credentialsOmitted: z.boolean(),
+  writtenTo: z.object({
+    json: z.string().nullable(),
+    ti: z.string().nullable(),
+  }),
+  json: z.string(),
+  ti: z.string(),
+});

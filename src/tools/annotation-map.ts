@@ -149,6 +149,8 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_diff_process_with_file: withVersion(READ_ONLY, "v11"),
   tm1_diff_processes: READ_ONLY,
   tm1_export_process_to_pro: withVersion(READ_ONLY, "v11"),
+  tm1_export_process_to_git: READ_ONLY,
+  tm1_import_process_from_git: IDEMPOTENT_WRITE,
   tm1_get_all_processes_code: READ_ONLY,
   tm1_get_process_code: READ_ONLY,
   tm1_get_process_datasource: READ_ONLY,
