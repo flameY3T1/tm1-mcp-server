@@ -9,7 +9,7 @@ Tested against TM1 11.8 via REST API (Basic Auth).
 
 ## Features
 
-109 tools across 12 categories:
+111 tools across 12 categories:
 
 | Category | Tools |
 |---|---|
@@ -20,7 +20,7 @@ Tested against TM1 11.8 via REST API (Basic Auth).
 | Views | list / create MDX view / delete view |
 | Cell Data | execute MDX (+ `format=markdown` pivot render), get view, get cell value, write cells, **pre-write coord check** (N-Level + rule-overlap warn) |
 | TI Development | process CRUD, compile, **unbound check** (pre-save validation), get/update code (single + bulk), datasource, variables, parameters, **regex search across all TI**, **upsert (atomic-style bundle)**, **ref validation** (cube/dim resolve) |
-| TI Lifecycle (.pro) | **import .pro file** (parse + 1-call deploy), **diff installed vs .pro**, **install bundle** (directory of .pro files) |
+| TI Lifecycle (.pro + git) | **import .pro file** (parse + 1-call deploy), **diff installed vs .pro**, **install bundle** (directory of .pro files), **git export/import** (diff-friendly `{name}.json` + `{name}.ti` two-file layout, tm1-git/TM1py style) |
 | Process Execution | execute process, get parameters |
 | Scheduling | chore CRUD, execute, toggle |
 | Security | client + group CRUD, group assignment |
