@@ -20,7 +20,7 @@ Tested against TM1 11.8 via REST API (Basic Auth).
 | Views | list / create MDX view / delete view |
 | Cell Data | execute MDX (+ `format=markdown` pivot render), get view, get cell value, write cells, **pre-write coord check** (N-Level + rule-overlap warn) |
 | TI Development | process CRUD, compile, **unbound check** (pre-save validation), get/update code (single + bulk), datasource, variables, parameters, **regex search across all TI**, **upsert (atomic-style bundle)**, **ref validation** (cube/dim resolve) |
-| TI Lifecycle (.pro + git) | **import .pro file** (parse + 1-call deploy), **diff installed vs .pro**, **install bundle** (directory of .pro files), **git export/import** (diff-friendly `{name}.json` + `{name}.ti` two-file layout, tm1-git/TM1py style) |
+| TI Lifecycle (.pro + git) | **import .pro file** (parse + 1-call deploy), **diff installed vs .pro**, **install bundle** (directory of .pro files), **git export/import** (diff-friendly `{name}.json` + `{name}.ti` two-file layout, tm1-git/TM1py style; inline or host-disk paths — see [Local file access](#local-file-access-tm1_local_file_root)) |
 | Process Execution | execute process, get parameters |
 | Scheduling | chore CRUD, execute, toggle |
 | Security | client + group CRUD, group assignment |
@@ -59,13 +59,36 @@ TM1_USER=admin
 TM1_PASSWORD=your-password
 TM1_SSL_REJECT_UNAUTHORIZED=false
 TM1_VERSION=11.8
+TM1_MODE=readonly                   # readonly (default) | readwrite
+# TM1_LOCAL_FILE_ROOT=/srv/tm1-git  # optional; enables host-disk file params (see below)
 ```
+
+See [`.env.example`](.env.example) for the full set (timeouts, logging, HTTP transport).
 
 > **Safe by default:** the server starts in `TM1_MODE=readonly` — only read
 > tools are registered, so it cannot mutate or delete anything. To enable the
 > full lifecycle (cell writes, cube/dimension/process deletion, TI execution),
 > set `TM1_MODE=readwrite` explicitly. Never point a `readwrite` server at a
 > production instance without reviewing the write path first.
+
+### Local file access (`TM1_LOCAL_FILE_ROOT`)
+
+Tools that read or write files on the host running the server — `tm1_import_pro_file`,
+`tm1_install_pro_bundle`, `tm1_diff_process_with_file`, `tm1_validate_process_refs`,
+and the git export/import pair — are **disabled by default**. Set
+`TM1_LOCAL_FILE_ROOT` to an absolute directory to enable host-path parameters;
+every supplied path must resolve inside that root (path traversal is rejected).
+
+```env
+TM1_LOCAL_FILE_ROOT=/srv/tm1-git    # optional; enables host-disk file params
+```
+
+The git tools work without it via inline content:
+
+- `tm1_export_process_to_git` returns `{name}.json` + `{name}.ti` inline by
+  default; pass `writeToDir` (a host path under the root) to also persist them.
+- `tm1_import_process_from_git` accepts `jsonContent`/`tiContent` strings, or
+  `jsonPath`/`tiPath` host paths when the root is set.
 
 ## Use with Claude Code
 
