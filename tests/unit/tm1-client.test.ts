@@ -385,18 +385,20 @@ describe("TM1Client", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(4);
     });
 
-    it("should classify AbortError (timeout) as network error and retry", async () => {
-      // First attempt: timeout
+    it("should NOT retry a bare AbortError (caller cancellation, not a network blip)", async () => {
+      // Our own request timeout aborts with name "TimeoutError" (→ LOCK_TIMEOUT).
+      // A plain "AbortError" can only be caller cancellation and must propagate
+      // immediately — retrying a cancelled request is a bug.
       fetchSpy.mockRejectedValueOnce(
         new DOMException("The operation was aborted.", "AbortError"),
       );
-      // Second attempt: success
+      // Would succeed if (wrongly) retried — proves no retry happens.
       fetchSpy.mockResolvedValueOnce(
         mockResponse({ ok: true, body: { ok: true } }),
       );
 
-      const result = await client.testRequest("GET", "/api/v1/Cubes");
-      expect(result).toEqual({ ok: true });
+      await expect(client.testRequest("GET", "/api/v1/Cubes")).rejects.toThrow();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
     it("should classify ECONNREFUSED as network error and retry", async () => {

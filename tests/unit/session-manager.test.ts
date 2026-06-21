@@ -162,7 +162,51 @@ describe("SessionManager", () => {
     });
   });
 
+  describe("concurrent re-auth dedup (regression)", () => {
+    it("dedupes concurrent authenticate() calls into a single login", async () => {
+      // Two requests whose sessions expire at once both re-auth via the HTTP
+      // 401 handler. They must share one login, not open two sessions and
+      // clobber each other's cookie.
+      fetchSpy.mockResolvedValue(
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" })
+      );
+
+      const sm = new SessionManager(makeConfig(), mockLogger);
+      const [a, b] = await Promise.all([sm.authenticate(), sm.authenticate()]);
+
+      expect(a).toBe(b);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("keepAlive()", () => {
+    it("clears the session cookie on keep-alive timeout to force re-auth", async () => {
+      // Initial auth succeeds.
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=sess1; Path=/" })
+      );
+      // Keep-alive hangs until its timeout aborts the request.
+      fetchSpy.mockImplementationOnce(
+        (_url: string, opts: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            opts.signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation aborted.", "AbortError"));
+            });
+          })
+      );
+
+      const sm = new SessionManager(
+        makeConfig({ requestTimeoutMs: 50 }),
+        mockLogger
+      );
+      await sm.authenticate();
+      expect(sm.isSessionActive()).toBe(true);
+
+      // Timeout is swallowed (returns normally) but the cookie must be cleared.
+      await sm.keepAlive();
+      expect(sm.isSessionActive()).toBe(false);
+    });
+
     it("should GET /api/v1/ActiveSession with session cookie", async () => {
       // First authenticate
       fetchSpy.mockResolvedValueOnce(

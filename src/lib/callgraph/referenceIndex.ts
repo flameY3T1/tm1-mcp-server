@@ -2,6 +2,7 @@ import { KNOWN_SIGNATURES } from './tiSignatures.js';
 import { extractDbCalls, extractBracketRefs, parseBracketDimRefs, validateBracketRefSyntax } from './rulesLinter.js';
 import { joinContinuationLines } from './tiParser.js';
 import { buildProcessEnv, resolveExpression, type ProcessEnv, type VarBinding } from './variableEnv.js';
+import { rethrowIfSystemic } from '../../tm1-client/services/fallback.js';
 
 // ─── Argument-Index Auto-Derivation ──────────────────────────────────────────
 
@@ -361,10 +362,23 @@ export interface BuildIndexDeps {
  * Pure function — dependencies are injected to allow testing without network.
  */
 export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<ReferenceIndex> {
+  // Per-source tolerance: a NOT_FOUND / PERMISSION_DENIED on one domain
+  // degrades to an empty slice. But a systemic failure (auth expired, server
+  // unreachable, lock timeout) must propagate — otherwise an outage builds an
+  // empty index that looks like an empty server and gets cached as truth.
   const [processes, cubes, chores] = await Promise.all([
-    deps.fetchProcesses().catch(() => [] as ProcessFetchResult[]),
-    deps.fetchCubesWithRules().catch(() => [] as CubeRulesFetchResult[]),
-    deps.fetchChores?.().catch(() => [] as ChoreFetchResult[]) ?? Promise.resolve([] as ChoreFetchResult[]),
+    deps.fetchProcesses().catch((e) => {
+      rethrowIfSystemic(e);
+      return [] as ProcessFetchResult[];
+    }),
+    deps.fetchCubesWithRules().catch((e) => {
+      rethrowIfSystemic(e);
+      return [] as CubeRulesFetchResult[];
+    }),
+    deps.fetchChores?.().catch((e) => {
+      rethrowIfSystemic(e);
+      return [] as ChoreFetchResult[];
+    }) ?? Promise.resolve([] as ChoreFetchResult[]),
   ]);
 
   const all: TmReference[] = [];

@@ -1,6 +1,7 @@
 import type { TM1Client } from "../../tm1-client.js";
 import { buildReferenceIndex, type ReferenceIndex, type ProcessFetchResult, type CubeRulesFetchResult, type ChoreFetchResult, type ChoreTaskRef } from "./referenceIndex.js";
 import { tm1Events } from "../tm1-events.js";
+import { rethrowIfSystemic } from "../../tm1-client/services/fallback.js";
 
 // Self-register: invalidate cache on any mutation so the HTTP layer
 // does not need a direct import of callgraph internals.
@@ -105,7 +106,12 @@ async function buildIndexInternal(tm1Client: TM1Client, includeControl: boolean)
           }));
           return { name: c.name, tasks };
         });
-    } catch {
+    } catch (e) {
+      // Don't let an auth/connection/lock failure masquerade as "no chores" —
+      // that silently drops chore→process edges from the callgraph and the
+      // result looks complete. Real outages must propagate so the index is
+      // not built (and cached) from partial data.
+      rethrowIfSystemic(e);
       return [];
     }
   };

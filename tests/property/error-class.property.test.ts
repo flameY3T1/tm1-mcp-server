@@ -93,7 +93,8 @@ describe("Property 16: Netzwerkfehler-Klassifizierung", () => {
       () => new TypeError("fetch failed"),
       () => new TypeError("connect ECONNREFUSED 127.0.0.1:8010"),
       () => new TypeError("getaddrinfo ENOTFOUND tm1server"),
-      () => new DOMException("The operation was aborted.", "AbortError"),
+      // NB: a bare AbortError is intentionally excluded — it signals caller
+      // cancellation, is not retried, and is covered in http-abort-signal.test.ts.
     );
     const endpointArb = fc.constantFrom("/api/v1/Cubes", "/api/v1/Dimensions");
 

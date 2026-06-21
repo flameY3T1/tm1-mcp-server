@@ -48,10 +48,28 @@ export class SessionManager {
 
   /**
    * Authenticate against TM1 using native Basic Auth.
+   *
+   * Concurrent callers share a single in-flight login. The HTTP transport
+   * re-authenticates directly from its 401 handler (http.ts), so two requests
+   * whose sessions expire at the same time both land here; without this dedup
+   * each opens a fresh TM1 session and the second login's cookie clobbers the
+   * first, leaving the first request retrying with a now-stale cookie (the
+   * "thundering herd on session expiry" race). All re-auth paths — ensureSession,
+   * keepAlive, and the transport 401 retry — funnel through this guard.
+   */
+  async authenticate(): Promise<string> {
+    this.authInFlight ??= this.doAuthenticate().finally(() => {
+      this.authInFlight = null;
+    });
+    return this.authInFlight;
+  }
+
+  /**
+   * Perform the actual login round-trip.
    * GET /api/v1/Configuration/ProductVersion with Authorization header.
    * Extracts TM1SessionId cookie from the response.
    */
-  async authenticate(): Promise<string> {
+  private async doAuthenticate(): Promise<string> {
     // Close any existing session before opening a new one — prevents
     // orphaned sessions accumulating on the TM1 server across re-auths.
     if (this.sessionCookie) {
@@ -147,7 +165,12 @@ export class SessionManager {
       );
     } catch (err) {
       if (err instanceof TimeoutError) {
-        this.logger.error("Keep-alive request timed out");
+        // Clear the cookie so the next real request re-authenticates up front
+        // (via ensureSession) instead of serving the possibly-dead session and
+        // eating a 401 round-trip under load. A keep-alive timeout is a strong
+        // signal the session is no longer healthy.
+        this.logger.error("Keep-alive request timed out; clearing session to force re-auth");
+        this.sessionCookie = null;
         return;
       }
       throw err;
@@ -184,13 +207,9 @@ export class SessionManager {
     if (this.sessionCookie) {
       return this.sessionCookie;
     }
-    // Dedupe concurrent first-auth (HTTP transport): callers arriving before
-    // the initial authenticate() resolves share one in-flight promise instead
-    // of each opening a separate TM1 session and clobbering the cookie.
-    this.authInFlight ??= this.authenticate().finally(() => {
-      this.authInFlight = null;
-    });
-    return this.authInFlight;
+    // authenticate() dedupes concurrent logins internally (see its doc), so
+    // first-auth races and 401 re-auth races share the same in-flight promise.
+    return this.authenticate();
   }
 
   /**

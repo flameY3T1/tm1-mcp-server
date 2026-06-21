@@ -43,6 +43,19 @@ describe("R2-03: AbortSignal propagation through HTTP layer", () => {
     vi.unstubAllGlobals();
   });
 
+  it("does not retry on a bare AbortError (cancellation is not a network blip)", async () => {
+    // Regression: isNetworkError used to classify AbortError as retryable, so a
+    // cancelled GET was retried up to 3×. A DOMException AbortError must abort
+    // the request loop immediately — fetch is called exactly once.
+    const fetchSpy = vi.fn().mockImplementation(() =>
+      Promise.reject(new DOMException("The operation was aborted.", "AbortError"))
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(client.request("GET", "/api/v1/Configuration")).rejects.toThrow();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("aborts in-flight fetch when external signal aborts", async () => {
     let capturedSignal: AbortSignal | undefined;
     const fetchSpy = vi.fn().mockImplementation((_url: string, init: RequestInit) => {

@@ -490,8 +490,14 @@ export class TM1HttpClient {
     if (error instanceof DOMException && error.name === "TimeoutError") {
       return false;
     }
+    // AbortError is never a retryable network blip. Our own request timeout
+    // aborts with name "TimeoutError" (handled above → LOCK_TIMEOUT). A plain
+    // "AbortError" can only come from a caller-supplied signal (cancellation),
+    // which must propagate immediately — retrying a cancelled request 3× is a
+    // bug. The request loop also guards opts.signal.aborted before reaching
+    // here; this is the defensive backstop for any other abort source.
     if (error instanceof DOMException && error.name === "AbortError") {
-      return true;
+      return false;
     }
     if (error instanceof TypeError) {
       return true;
