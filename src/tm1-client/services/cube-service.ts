@@ -223,7 +223,10 @@ export class CubeService {
 
   // 11.x fallback: deploy ephemeral TI with CubeClearData(), execute, delete.
   private async clearViaTI(cubeName: string): Promise<void> {
-    const procName = `}TempClear_${cubeName.replace(/[^A-Za-z0-9_]/g, "_")}_${Date.now()}`;
+    // Cap the sanitized cube name so the temp process name stays under TM1's
+    // ~256-char process-name limit (prefix + timestamp suffix add ~25 chars).
+    const safeName = cubeName.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 200);
+    const procName = `}TempClear_${safeName}_${Date.now()}`;
     const safeCube = cubeName.replace(/'/g, "''");
     const prologCode = `CubeClearData('${safeCube}');`;
 

@@ -118,7 +118,7 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_create_chore: WRITE,
   tm1_delete_chore: DESTRUCTIVE,
   tm1_execute_chore: DESTRUCTIVE,
-  tm1_toggle_chore: WRITE,
+  tm1_toggle_chore: IDEMPOTENT_WRITE,
   tm1_update_chore: IDEMPOTENT_WRITE,
 
   // security

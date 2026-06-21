@@ -3,7 +3,7 @@
 // CompileProcess (server-side syntax check, with and without saving).
 //
 // See docs/ARCHITECTURE.md for the layering.
-import { TM1Error } from "../../types.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import type {
   CompileResult,
   DataSource,
@@ -211,6 +211,24 @@ export class ProcessService {
    */
   async create(name: string): Promise<void> {
     await this.http.request<void>("POST", "/api/v1/Processes", { Name: name });
+  }
+
+  /**
+   * Cheap existence probe: a single GET with $select=Name (404 → false)
+   * instead of list(), which pulls every process plus its parameters just to
+   * check one name. Rethrows anything that isn't NOT_FOUND.
+   */
+  async exists(name: string): Promise<boolean> {
+    try {
+      await this.http.request<{ Name: string }>(
+        "GET",
+        `/api/v1/Processes('${enc(name)}')?$select=Name`,
+      );
+      return true;
+    } catch (e) {
+      if (e instanceof TM1Error && e.code === TM1ErrorCode.NOT_FOUND) return false;
+      throw e;
+    }
   }
 
   /**

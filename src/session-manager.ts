@@ -269,16 +269,25 @@ export class SessionManager {
     this.logger.info("Logging out from TM1");
 
     try {
-      const response = await tm1Fetch(url, {
-        method: "DELETE",
-        headers: {
-          Cookie: `TM1SessionId=${this.sessionCookie}`,
-          "User-Agent": USER_AGENT,
-          "TM1-SessionContext": USER_AGENT,
-          "TM1-Session-Context": USER_AGENT,
-        },
-        dispatcher: getTm1Dispatcher(this.config),
-      } as unknown as RequestInit);
+      // Bound the logout request — authenticate() calls logout() first, so a
+      // hung DELETE (slow/unreachable server) would otherwise block re-auth
+      // indefinitely. On timeout we still clear the cookie below.
+      const response = await withTimeout(
+        this.config.requestTimeoutMs,
+        "Logout",
+        (signal) =>
+          tm1Fetch(url, {
+            method: "DELETE",
+            headers: {
+              Cookie: `TM1SessionId=${this.sessionCookie}`,
+              "User-Agent": USER_AGENT,
+              "TM1-SessionContext": USER_AGENT,
+              "TM1-Session-Context": USER_AGENT,
+            },
+            dispatcher: getTm1Dispatcher(this.config),
+            signal,
+          } as unknown as RequestInit),
+      );
 
       // Consume body to release connection
       await response.text();

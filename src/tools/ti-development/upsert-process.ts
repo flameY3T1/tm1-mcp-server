@@ -61,8 +61,7 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, mode, autoCompile }) => {
       const trail: string[] = [];
-      const procs = await tm1Client.processes.list();
-      const exists = procs.some((p: { name: string }) => p.name === name);
+      const exists = await tm1Client.processes.exists(name);
       if (mode === "create" && exists) {
         throw new TM1Error({
           code: TM1ErrorCode.CONFLICT,

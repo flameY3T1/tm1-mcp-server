@@ -186,6 +186,29 @@ describe("TM1Client – Process Execution Methods", () => {
 
   // ── getProcessParameters() ───────────────────────────────────────────────
 
+  describe("exists()", () => {
+    it("returns true on 200 and probes with $select=Name (not a full list)", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "ImportData" }));
+      expect(await client.processes.exists("ImportData")).toBe(true);
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/Processes('ImportData')?$select=Name");
+    });
+
+    it("returns false when the process is not found (404)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ error: { message: "not found" } }, 404),
+      );
+      expect(await client.processes.exists("Nope")).toBe(false);
+    });
+
+    it("rethrows a non-NOT_FOUND error instead of reporting absent", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ error: { message: "forbidden" } }, 403),
+      );
+      await expect(client.processes.exists("Secret")).rejects.toThrow();
+    });
+  });
+
   describe("getProcessParameters()", () => {
     it("should return parameters with correct type mapping", async () => {
       fetchSpy.mockResolvedValueOnce(

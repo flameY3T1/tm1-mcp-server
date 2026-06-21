@@ -97,8 +97,7 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         }
       }
 
-      const allProcs = await tm1Client.processes.list();
-      const exists = allProcs.some((p: { name: string }) => p.name === processName);
+      const exists = await tm1Client.processes.exists(processName);
 
       if (mode === "create" && exists) {
         throw new TM1Error({
