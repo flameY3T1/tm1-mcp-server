@@ -48,6 +48,7 @@ import {
   GroupItemSchema,
   HierarchySchema,
   ImportProFileResultSchema,
+  ImportProcessFromGitResultSchema,
   InstallProBundleResultSchema,
   InvalidateCallgraphCacheResultSchema,
   MdxResultSchema,
@@ -165,7 +166,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_upsert_process: asOutputSchema(UpsertProcessResultSchema),
   tm1_install_pro_bundle: asOutputSchema(InstallProBundleResultSchema),
   tm1_import_pro_file: asOutputSchema(ImportProFileResultSchema),
-  tm1_import_process_from_git: asOutputSchema(ImportProFileResultSchema),
+  tm1_import_process_from_git: asOutputSchema(ImportProcessFromGitResultSchema),
   tm1_copy_process: asOutputSchema(CopyProcessResultSchema),
 
   // ── Phase 2e: analysis tools ──────────────────────────────────────────────

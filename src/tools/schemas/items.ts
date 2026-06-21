@@ -532,6 +532,24 @@ export const ImportProFileResultSchema = z.object({
   }),
 });
 
+// Dedicated schema for tm1_import_process_from_git. Currently identical in
+// shape to ImportProFileResultSchema, but kept separate so the two import
+// paths can diverge (e.g. a .pro-specific field) without one silently
+// rejecting the other's payload. Mirror any git-import handler change here.
+export const ImportProcessFromGitResultSchema = z.object({
+  action: z.string(),
+  processName: z.string(),
+  parsed: z.object({
+    prologLines: z.number().int(),
+    metadataLines: z.number().int(),
+    dataLines: z.number().int(),
+    epilogLines: z.number().int(),
+    parameterCount: z.number().int(),
+    variableCount: z.number().int(),
+    dataSourceType: z.string(),
+  }),
+});
+
 export const CopyProcessResultSchema = z.object({
   success: z.boolean(),
   sourceName: z.string(),

@@ -41,6 +41,10 @@ export function registerSaveData(server: McpServer, tm1Client: TM1Client): void 
             text: JSON.stringify({ ...result, scope: cube ?? "all" }, null, 2),
           },
         ],
+        // A failed SaveData is a data-persistence failure (in-memory data not
+        // written to disk) — surface it as an MCP error, not a success payload
+        // carrying success:false, so the caller can't silently miss data loss.
+        ...(result.success === false ? { isError: true as const } : {}),
       };
     },
   );

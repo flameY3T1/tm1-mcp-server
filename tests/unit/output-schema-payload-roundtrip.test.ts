@@ -166,6 +166,26 @@ describe("strict outputSchemas accept real handler payloads", () => {
     expect(() => schema.parse(payload)).not.toThrow();
   });
 
+  it("tm1_import_process_from_git: success payload (action, processName, parsed counts)", () => {
+    // Guards the dedicated ImportProcessFromGitResultSchema mapping — this used
+    // to point at ImportProFileResultSchema and pass only by coincidence.
+    const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_import_process_from_git);
+    const payload = {
+      action: "created",
+      processName: "Load.Assumptions",
+      parsed: {
+        prologLines: 12,
+        metadataLines: 1,
+        dataLines: 40,
+        epilogLines: 3,
+        parameterCount: 2,
+        variableCount: 5,
+        dataSourceType: "ODBC",
+      },
+    };
+    expect(() => schema.parse(payload)).not.toThrow();
+  });
+
   it("tm1_get_all_cube_rules: summary payload (count, returned, truncated, summary metrics)", () => {
     const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_get_all_cube_rules);
     const payload = {

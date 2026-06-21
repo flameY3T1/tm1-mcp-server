@@ -58,6 +58,12 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
         );
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+          // A TI process that ran but reported failure is a tool failure, not a
+          // successful call carrying success:false. Flag isError so agents that
+          // branch on the MCP error signal don't silently treat it as success;
+          // the full payload (processErrorStatus, errorLogFile) is preserved by
+          // normalizeErrorResult for diagnosis.
+          ...(result.success === false ? { isError: true as const } : {}),
         };
       } finally {
         if (heartbeatTimer !== undefined) clearInterval(heartbeatTimer);
