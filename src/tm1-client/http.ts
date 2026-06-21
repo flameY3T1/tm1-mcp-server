@@ -54,10 +54,12 @@ function linkAbortSignals(local: AbortController, external?: AbortSignal): () =>
 }
 
 export class TM1HttpClient {
-  // Public so domain Service classes (CubeService, ProcessService, ...) can
-  // read tm1Version for version-conditional code paths and emit structured
-  // logs without holding their own logger refs.
-  public readonly config: TM1Config;
+  // config is private: it carries credentials (TM1Config.password), so it must
+  // not be reachable as `client.config` from the service layer or leak into the
+  // compiled .d.ts public surface. Services get only what they need —
+  // `tm1Version` (read-only getter) for version-conditional paths and `logger`
+  // for structured logs.
+  private readonly config: TM1Config;
   public readonly logger: pino.Logger;
   protected readonly sessionManager: SessionManager;
 
@@ -69,6 +71,11 @@ export class TM1HttpClient {
     this.config = config;
     this.sessionManager = sessionManager;
     this.logger = logger;
+  }
+
+  /** TM1 server version (e.g. "11.8.…") for version-conditional service code. */
+  get tm1Version(): string {
+    return this.config.tm1Version;
   }
 
   /**
