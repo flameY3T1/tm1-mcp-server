@@ -135,141 +135,150 @@ import { registerListGroups } from "./security/list-groups.js";
 import { registerAssignClientGroup } from "./security/assign-client-group.js";
 import { registerRemoveClientGroup } from "./security/remove-client-group.js";
 
-export function registerAllTools(server: McpServer, tm1Client: TM1Client): void {
+// Single registry of every tool registrar, grouped by category. Adding a tool
+// = add its import above and one entry here (adjacent edit, one PR hunk). The
+// previous design kept a second hand-ordered call block that drifted from the
+// import order; this array is the only call site. check-tool-registration.mjs
+// fails the build if a `register*` export under src/tools/ is missing here.
+type ToolRegistrar = (server: McpServer, tm1Client: TM1Client) => void;
+
+const REGISTRARS: ToolRegistrar[] = [
   // Metadata
-  registerListCubes(server, tm1Client);
-  registerListDimensions(server, tm1Client);
-  registerGetHierarchy(server, tm1Client);
-  registerGetDescendants(server, tm1Client);
-  registerGetAncestors(server, tm1Client);
-  registerResolveDefaultMember(server, tm1Client);
-  registerResolveDefaultMembers(server, tm1Client);
-  registerListProcesses(server, tm1Client);
-  registerListProcessesGrouped(server, tm1Client);
-  registerListChores(server, tm1Client);
+  registerListCubes,
+  registerListDimensions,
+  registerGetHierarchy,
+  registerGetDescendants,
+  registerGetAncestors,
+  registerResolveDefaultMember,
+  registerResolveDefaultMembers,
+  registerListProcesses,
+  registerListProcessesGrouped,
+  registerListChores,
 
   // Cell data
-  registerGetCellValue(server, tm1Client);
-  registerExecuteMdx(server, tm1Client);
-  registerGetView(server, tm1Client);
-  registerGetViewDefinition(server, tm1Client);
-  registerSampleCells(server, tm1Client);
-  registerWriteCells(server, tm1Client);
-
-  // Process execution
-  registerExecuteProcess(server, tm1Client);
-  registerGetProcessParameters(server, tm1Client);
+  registerGetCellValue,
+  registerExecuteMdx,
+  registerGetView,
+  registerGetViewDefinition,
+  registerSampleCells,
+  registerWriteCells,
+  registerCheckFeeders,
+  registerTraceFeeders,
+  registerTraceCellCalculation,
+  registerCheckWritableCoords,
 
   // TI development — writes go through registerUpsertProcess (bundled),
   // reads remain atomic for inspection without pulling full process code.
-  registerGetProcessCode(server, tm1Client);
-  registerGetProcessDatasource(server, tm1Client);
-  registerGetProcessVariables(server, tm1Client);
-  registerDeleteProcess(server, tm1Client);
-  registerCopyProcess(server, tm1Client);
-  registerCompileProcess(server, tm1Client);
-  registerCheckProcessCode(server, tm1Client);
-  registerGetAllProcessesCode(server, tm1Client);
-  registerSearchCode(server, tm1Client);
-  registerImportProFile(server, tm1Client);
-  registerExportProcessToPro(server, tm1Client);
-  registerDiffProcessWithFile(server, tm1Client);
-  registerDiffProcesses(server, tm1Client);
-  registerValidateProcessRefs(server, tm1Client);
-  registerUpsertProcess(server, tm1Client);
-  registerInstallProBundle(server, tm1Client);
-registerExportProcessToGit(server, tm1Client);
-registerImportProcessFromGit(server, tm1Client);
-  registerCheckWritableCoords(server, tm1Client);
-  registerCheckFeeders(server, tm1Client);
-  registerTraceFeeders(server, tm1Client);
-  registerTraceCellCalculation(server, tm1Client);
+  registerExecuteProcess,
+  registerGetProcessParameters,
+  registerGetProcessCode,
+  registerGetProcessDatasource,
+  registerGetProcessVariables,
+  registerDeleteProcess,
+  registerCopyProcess,
+  registerCompileProcess,
+  registerCheckProcessCode,
+  registerGetAllProcessesCode,
+  registerSearchCode,
+  registerImportProFile,
+  registerExportProcessToPro,
+  registerDiffProcessWithFile,
+  registerDiffProcesses,
+  registerValidateProcessRefs,
+  registerUpsertProcess,
+  registerInstallProBundle,
+  registerExportProcessToGit,
+  registerImportProcessFromGit,
 
   // Dimension management
-  registerCreateDimension(server, tm1Client);
-  registerDeleteDimension(server, tm1Client);
-  registerBulkUpsertElements(server, tm1Client);
-  registerCreateElement(server, tm1Client);
-  registerUpdateElement(server, tm1Client);
-  registerDeleteElement(server, tm1Client);
-  registerMoveElement(server, tm1Client);
-  registerListElementAttributes(server, tm1Client);
-  registerCreateElementAttribute(server, tm1Client);
-  registerGetElementAttributeValues(server, tm1Client);
-  registerUpdateElementAttributeValue(server, tm1Client);
-  registerCreateHierarchy(server, tm1Client);
-  registerDeleteHierarchy(server, tm1Client);
+  registerCreateDimension,
+  registerDeleteDimension,
+  registerBulkUpsertElements,
+  registerCreateElement,
+  registerUpdateElement,
+  registerDeleteElement,
+  registerMoveElement,
+  registerListElementAttributes,
+  registerCreateElementAttribute,
+  registerGetElementAttributeValues,
+  registerUpdateElementAttributeValue,
+  registerCreateHierarchy,
+  registerDeleteHierarchy,
 
   // Subsets
-  registerListSubsets(server, tm1Client);
-  registerGetSubset(server, tm1Client);
-  registerCreateSubset(server, tm1Client);
-  registerUpdateSubset(server, tm1Client);
-  registerDeleteSubset(server, tm1Client);
+  registerListSubsets,
+  registerGetSubset,
+  registerCreateSubset,
+  registerUpdateSubset,
+  registerDeleteSubset,
 
   // Model building
-  registerCreateCube(server, tm1Client);
-  registerDeleteCube(server, tm1Client);
-  registerGetCubeRules(server, tm1Client);
-  registerSetCubeRules(server, tm1Client);
-  registerClearCube(server, tm1Client);
-  registerUnloadCube(server, tm1Client);
-  registerGetAllCubeRules(server, tm1Client);
-  registerCheckCubeRule(server, tm1Client);
-  registerSearchRules(server, tm1Client);
+  registerCreateCube,
+  registerDeleteCube,
+  registerGetCubeRules,
+  registerSetCubeRules,
+  registerClearCube,
+  registerUnloadCube,
+  registerGetAllCubeRules,
+  registerCheckCubeRule,
+  registerSearchRules,
 
   // Views
-  registerListViews(server, tm1Client);
-  registerCreateMdxView(server, tm1Client);
-  registerCreateNativeView(server, tm1Client);
-  registerDeleteView(server, tm1Client);
+  registerListViews,
+  registerCreateMdxView,
+  registerCreateNativeView,
+  registerDeleteView,
 
   // Scheduling
-  registerToggleChore(server, tm1Client);
-  registerExecuteChore(server, tm1Client);
-  registerCreateChore(server, tm1Client);
-  registerUpdateChore(server, tm1Client);
-  registerDeleteChore(server, tm1Client);
+  registerToggleChore,
+  registerExecuteChore,
+  registerCreateChore,
+  registerUpdateChore,
+  registerDeleteChore,
 
   // Operations
-  registerGetMessageLog(server, tm1Client);
-  registerGetThreads(server, tm1Client);
-  registerGetServerInfo(server, tm1Client);
-  registerGetServerState(server, tm1Client);
-  registerGetTransactionLog(server, tm1Client);
-  registerGetAuditLog(server, tm1Client);
-  registerGetSessions(server, tm1Client);
-  registerListErrorLogs(server, tm1Client);
-  registerGetErrorLogContent(server, tm1Client);
-  registerDiagnoseProcessError(server, tm1Client);
-  registerGetCubeStats(server, tm1Client);
-  registerSaveData(server, tm1Client);
+  registerGetMessageLog,
+  registerGetThreads,
+  registerGetServerInfo,
+  registerGetServerState,
+  registerGetTransactionLog,
+  registerGetAuditLog,
+  registerGetSessions,
+  registerListErrorLogs,
+  registerGetErrorLogContent,
+  registerDiagnoseProcessError,
+  registerGetCubeStats,
+  registerSaveData,
 
   // File operations
-  registerListFiles(server, tm1Client);
-  registerGetFileContent(server, tm1Client);
-  registerUploadFile(server, tm1Client);
-  registerDeleteFile(server, tm1Client);
-  registerSearchFiles(server, tm1Client);
+  registerListFiles,
+  registerGetFileContent,
+  registerUploadFile,
+  registerDeleteFile,
+  registerSearchFiles,
 
   // Analysis
-  registerAnalyzeCallgraph(server, tm1Client);
-  registerAnalyzeObjectUsage(server, tm1Client);
-  registerAnalyzeChoreGraph(server, tm1Client);
-  registerInvalidateCallgraphCache(server, tm1Client);
-  registerFindOrphanDimensions(server, tm1Client);
-  registerCheckV12Readiness(server, tm1Client);
-  registerAuditNaming(server, tm1Client);
-  registerAuditComplexity(server, tm1Client);
-  registerAuditFeeders(server, tm1Client);
+  registerAnalyzeCallgraph,
+  registerAnalyzeObjectUsage,
+  registerAnalyzeChoreGraph,
+  registerInvalidateCallgraphCache,
+  registerFindOrphanDimensions,
+  registerCheckV12Readiness,
+  registerAuditNaming,
+  registerAuditComplexity,
+  registerAuditFeeders,
 
   // Security
-  registerListClients(server, tm1Client);
-  registerGetClient(server, tm1Client);
-  registerCreateClient(server, tm1Client);
-  registerUpdateClient(server, tm1Client);
-  registerDeleteClient(server, tm1Client);
-  registerListGroups(server, tm1Client);
-  registerAssignClientGroup(server, tm1Client);
-  registerRemoveClientGroup(server, tm1Client);
+  registerListClients,
+  registerGetClient,
+  registerCreateClient,
+  registerUpdateClient,
+  registerDeleteClient,
+  registerListGroups,
+  registerAssignClientGroup,
+  registerRemoveClientGroup,
+];
+
+export function registerAllTools(server: McpServer, tm1Client: TM1Client): void {
+  for (const register of REGISTRARS) register(server, tm1Client);
 }
