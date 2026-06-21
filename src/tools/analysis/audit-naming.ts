@@ -40,8 +40,6 @@ const SCOPE_DEFAULT: ReadonlyArray<Scope> = [
   "chores",
 ];
 
-const enc = encodeURIComponent;
-
 interface TruncatedElementGroup {
   dimension: string;
   hierarchy: string;
@@ -208,61 +206,28 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       }
 
       // ── Elements (per-dim/per-hierarchy, server-side paginated) ────────
-      // Single-bulk OData call previously crashed Node on large models
-      // ("Cannot create a string longer than 0x1fffffe8 characters") because
-      // response.text() buffers the full response body into one V8 string.
-      // Probe + page strategy: first page asks for $count=true so we learn the
-      // total in one round-trip without hitting the /$count endpoint (TM1 v11
-      // returns text/plain there and rejects the Accept: application/json sent
-      // by the shared HTTP client). If total > maxElementsPerDim we still scan
-      // the first N elements (paginated by elementsPageSize) and report the
-      // truncation in `elementsTruncated` — never a silent skip. No single
-      // response approaches the V8 string limit thanks to $top.
+      // Delegated to ElementService.scanElementNames, which owns the
+      // probe-then-page strategy and the V8-string-limit workaround (a single
+      // bulk OData fetch used to crash Node on large models). If a hierarchy
+      // exceeds maxElementsPerDim we still scan the first N names and report
+      // the truncation in `elementsTruncated` — never a silent skip.
       const elementsTruncated: TruncatedElementGroup[] = [];
       let totalElementsInScope = 0;
       if (want("elements") && dimensionsForChildren) {
         let elemCount = 0;
         for (const d of dimensionsForChildren) {
           for (const h of d.hierarchies) {
-            const basePath =
-              `/api/v1/Dimensions('${enc(d.name)}')/Hierarchies('${enc(h)}')` +
-              `/Elements?$select=Name&$top=${elementsPageSize}`;
-            const firstPage = await tm1Client.request<{
-              "@odata.count"?: number;
-              value: Array<{ Name: string }>;
-            }>("GET", `${basePath}&$skip=0&$count=true`);
-            const total = firstPage["@odata.count"] ?? firstPage.value.length;
+            const { names, total, scanned: scannedHere, truncated } =
+              await tm1Client.elements.scanElementNames(d.name, h, {
+                pageSize: elementsPageSize,
+                maxScan: maxElementsPerDim,
+              });
             totalElementsInScope += total;
-            const scanLimit = Math.min(total, maxElementsPerDim);
-
-            let scannedHere = 0;
-            const firstSliceEnd = Math.min(firstPage.value.length, scanLimit);
-            for (let i = 0; i < firstSliceEnd; i++) {
-              const e = firstPage.value[i]!;
+            for (const name of names) {
               elemCount++;
-              scannedHere++;
-              addIfInvalid(e.Name, "element", `${d.name} / ${h}`);
+              addIfInvalid(name, "element", `${d.name} / ${h}`);
             }
-            let skip = firstPage.value.length;
-            let lastPageSize = firstPage.value.length;
-            while (lastPageSize === elementsPageSize && scannedHere < scanLimit) {
-              const page = await tm1Client.request<{ value: Array<{ Name: string }> }>(
-                "GET",
-                `${basePath}&$skip=${skip}`,
-              );
-              const remaining = scanLimit - scannedHere;
-              const sliceEnd = Math.min(page.value.length, remaining);
-              for (let i = 0; i < sliceEnd; i++) {
-                const e = page.value[i]!;
-                elemCount++;
-                scannedHere++;
-                addIfInvalid(e.Name, "element", `${d.name} / ${h}`);
-              }
-              lastPageSize = page.value.length;
-              skip += page.value.length;
-            }
-
-            if (total > maxElementsPerDim) {
+            if (truncated) {
               elementsTruncated.push({
                 dimension: d.name,
                 hierarchy: h,

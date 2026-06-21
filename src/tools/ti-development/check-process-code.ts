@@ -2,40 +2,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import type { ProcessParameter, ProcessVariable } from "../../types.js";
-
-const parameterSchema = z.object({
-  name: z.string(),
-  type: z.enum(["String", "Numeric"]),
-  defaultValue: z.union([z.string(), z.number()]),
-  prompt: z.string().optional(),
-});
-
-const variableSchema = z.object({
-  name: z.string(),
-  type: z.enum(["String", "Numeric"]),
-  position: z.number(),
-  startByte: z.number().optional(),
-  endByte: z.number().optional(),
-});
-
-const dataSourceSchema = z.object({
-  type: z.enum(["None", "TM1CubeView", "TM1DimensionSubset", "ASCII", "ODBC", "TM1Process"]),
-  dataSourceNameForServer: z.string().optional(),
-  dataSourceNameForClient: z.string().optional(),
-  asciiDelimiterType: z.string().optional(),
-  asciiDelimiterChar: z.string().optional(),
-  asciiQuoteCharacter: z.string().optional(),
-  asciiHeaderRecords: z.number().optional(),
-  asciiDecimalSeparator: z.string().optional(),
-  asciiThousandSeparator: z.string().optional(),
-  usesUnicode: z.boolean().optional(),
-  userName: z.string().optional(),
-  password: z.string().optional(),
-  oDBCConnection: z.string().optional(),
-  query: z.string().optional(),
-  view: z.string().optional(),
-  subset: z.string().optional(),
-});
+import {
+  parameterSchema,
+  variableSchema,
+  dataSourceSchema,
+} from "../../lib/process-parts-schema.js";
 
 export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client): void {
   server.tool(

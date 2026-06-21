@@ -66,6 +66,14 @@ const PATTERN = new RegExp(
   "g",
 );
 
+// Tools must reach TM1 through a domain service, never the raw transport.
+// A tool that calls .request()/.requestRaw()/.requestBinary() directly (e.g.
+// hand-rolling OData) bypasses the service layer and reimplements paging,
+// escaping and version branches that belong in a service. Enforced only under
+// src/tools/** — services and the facade legitimately use the transport.
+const TOOLS_DIR = ["src", "tools", ""].join(sep);
+const TRANSPORT_RE = /\.(request|requestRaw|requestBinary)\s*\(/g;
+
 function* walkTs(dir) {
   for (const entry of readdirSync(dir)) {
     if (entry === "node_modules" || entry === "dist" || entry.startsWith(".")) continue;
@@ -89,6 +97,7 @@ function stripComments(src) {
 }
 
 const violations = [];
+const transportViolations = [];
 for (const root of ["src", "tests"]) {
   for (const file of walkTs(root)) {
     if (file === FACADE_FILE) continue;
@@ -99,17 +108,36 @@ for (const root of ["src", "tests"]) {
       const lineNum = content.slice(0, m.index).split("\n").length;
       violations.push({ file, lineNum, receiver: m[1], method: m[2] });
     }
+    if (file.includes(TOOLS_DIR)) {
+      TRANSPORT_RE.lastIndex = 0;
+      let t;
+      while ((t = TRANSPORT_RE.exec(content)) !== null) {
+        const lineNum = content.slice(0, t.index).split("\n").length;
+        transportViolations.push({ file, lineNum, method: t[1] });
+      }
+    }
   }
 }
 
-if (violations.length > 0) {
-  console.error(`\n✖ Found ${violations.length} use(s) of deprecated flat TM1Client methods.`);
-  console.error(`  Migrate to the service API (see docs/ARCHITECTURE.md).\n`);
-  for (const v of violations) {
-    console.error(`  ${v.file}:${v.lineNum}  ${v.receiver}.${v.method}(...)`);
+if (violations.length > 0 || transportViolations.length > 0) {
+  if (violations.length > 0) {
+    console.error(`\n✖ Found ${violations.length} use(s) of deprecated flat TM1Client methods.`);
+    console.error(`  Migrate to the service API (see docs/ARCHITECTURE.md).\n`);
+    for (const v of violations) {
+      console.error(`  ${v.file}:${v.lineNum}  ${v.receiver}.${v.method}(...)`);
+    }
+  }
+  if (transportViolations.length > 0) {
+    console.error(`\n✖ Found ${transportViolations.length} raw transport call(s) under src/tools/.`);
+    console.error(`  Tools must go through a domain service, not .request()/.requestRaw()/.requestBinary().`);
+    console.error(`  Add or extend a service under src/tm1-client/services/ (see docs/ARCHITECTURE.md).\n`);
+    for (const v of transportViolations) {
+      console.error(`  ${v.file}:${v.lineNum}  .${v.method}(...)`);
+    }
   }
   console.error("");
   process.exit(1);
 }
 
 console.log("✓ no deprecated flat TM1Client method calls outside src/tm1-client.ts");
+console.log("✓ no raw transport calls under src/tools/");

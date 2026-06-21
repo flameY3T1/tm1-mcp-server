@@ -136,4 +136,18 @@ describe("git-process round-trip", () => {
     expect(json.endsWith("\n")).toBe(true);
     expect(ti.endsWith("\n")).toBe(true);
   });
+
+  it("rejects a parameter with an invalid type instead of blind-casting it", () => {
+    const { json, ti } = serializeProcessToGit(fixture());
+    const meta = JSON.parse(json) as Record<string, unknown>;
+    meta.parameters = [{ name: "pMonth", type: "bad", defaultValue: "1" }];
+    expect(() => parseProcessFromGit(JSON.stringify(meta), ti)).toThrow(/invalid 'parameters'/);
+  });
+
+  it("rejects a non-array variables field", () => {
+    const { json, ti } = serializeProcessToGit(fixture());
+    const meta = JSON.parse(json) as Record<string, unknown>;
+    meta.variables = { not: "an array" };
+    expect(() => parseProcessFromGit(JSON.stringify(meta), ti)).toThrow(/invalid 'variables'/);
+  });
 });

@@ -380,6 +380,20 @@ export class ProcessService {
     }>("GET", path);
 
     const ds = response.DataSource;
+    // ds.Type is a raw string from the OData response. Surface (don't silently
+    // swallow) a type this client version doesn't know — a future TM1 API
+    // value would otherwise be cast to DataSource["type"] and could break a
+    // downstream switch (e.g. the .pro serializer's type map). Pass it through
+    // for forward-compat reads, but log so the gap is observable.
+    const KNOWN_DATASOURCE_TYPES: ReadonlyArray<DataSource["type"]> = [
+      "None", "TM1CubeView", "TM1DimensionSubset", "ASCII", "ODBC", "TM1Process",
+    ];
+    if (!KNOWN_DATASOURCE_TYPES.includes(ds.Type as DataSource["type"])) {
+      this.http.logger.warn(
+        { processName, dataSourceType: ds.Type },
+        "Unknown TI datasource type from TM1; passing through unchanged",
+      );
+    }
     return {
       type: ds.Type as DataSource["type"],
       ...(ds.dataSourceNameForServer !== undefined ? { dataSourceNameForServer: ds.dataSourceNameForServer } : {}),

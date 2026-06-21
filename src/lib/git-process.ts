@@ -1,8 +1,14 @@
+import { z } from "zod";
 import type {
   DataSource,
   ProcessParameter,
   ProcessVariable,
 } from "../types.js";
+import {
+  parameterSchema,
+  variableSchema,
+  dataSourceSchema,
+} from "./process-parts-schema.js";
 
 /**
  * tm1-git-style two-file representation of a TI process.
@@ -113,16 +119,34 @@ export function parseProcessFromGit(
   }
 
   const name = typeof meta.name === "string" ? meta.name : "";
-  const parameters = Array.isArray(meta.parameters)
-    ? (meta.parameters as ProcessParameter[])
-    : [];
-  const variables = Array.isArray(meta.variables)
-    ? (meta.variables as ProcessVariable[])
-    : [];
-  const dataSource =
-    meta.dataSource && typeof meta.dataSource === "object"
-      ? (meta.dataSource as DataSource)
-      : ({ type: "None" } as DataSource);
+
+  // Validate the deployable parts instead of blind-casting user JSON: a
+  // malformed entry (e.g. type:"bad" or a numeric name) would otherwise flow
+  // straight into encodeParameter / the REST payload and surface as a confusing
+  // TM1 400. Missing/absent parts still default to empty / {type:"None"}.
+  const paramsResult = z.array(parameterSchema).safeParse(meta.parameters ?? []);
+  if (!paramsResult.success) {
+    throw new Error(
+      `Process JSON has invalid 'parameters': ${paramsResult.error.issues[0]?.message ?? "shape mismatch"}`,
+    );
+  }
+  const parameters: ProcessParameter[] = paramsResult.data;
+
+  const varsResult = z.array(variableSchema).safeParse(meta.variables ?? []);
+  if (!varsResult.success) {
+    throw new Error(
+      `Process JSON has invalid 'variables': ${varsResult.error.issues[0]?.message ?? "shape mismatch"}`,
+    );
+  }
+  const variables: ProcessVariable[] = varsResult.data;
+
+  const dsResult = dataSourceSchema.safeParse(meta.dataSource ?? { type: "None" });
+  if (!dsResult.success) {
+    throw new Error(
+      `Process JSON has invalid 'dataSource': ${dsResult.error.issues[0]?.message ?? "shape mismatch"}`,
+    );
+  }
+  const dataSource: DataSource = dsResult.data;
 
   // --- split .ti by tab markers ---
   const buckets: Record<Tab, string[]> = {

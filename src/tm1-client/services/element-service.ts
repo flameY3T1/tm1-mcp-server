@@ -117,6 +117,63 @@ export class ElementService {
   }
 
   /**
+   * Scan element names in a hierarchy with a hard cap, paginating server-side.
+   *
+   * A single bulk Elements fetch can exceed V8's max string length on large
+   * dimensions (response.text() buffers the whole body into one string), so
+   * this probes the total via $count on the first page, then pages by
+   * `pageSize` until either `maxScan` names are collected or the hierarchy is
+   * exhausted. Callers learn the true `total` and whether the scan was
+   * `truncated` — never a silent skip. Owns the V8-string-limit workaround so
+   * tools don't reimplement raw OData paging.
+   * GET /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Elements?$select=Name
+   */
+  async scanElementNames(
+    dimensionName: string,
+    hierarchyName: string,
+    opts: { pageSize: number; maxScan: number },
+  ): Promise<{ names: string[]; total: number; scanned: number; truncated: boolean }> {
+    const { pageSize, maxScan } = opts;
+    const basePath =
+      `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')` +
+      `/Elements?$select=Name&$top=${pageSize}`;
+
+    // First page carries $count=true so we learn the total in one round-trip
+    // without the /$count endpoint (TM1 v11 returns text/plain there and
+    // rejects the Accept: application/json the shared HTTP client sends).
+    const firstPage = await this.http.request<{
+      "@odata.count"?: number;
+      value: Array<{ Name: string }>;
+    }>("GET", `${basePath}&$skip=0&$count=true`);
+
+    const total = firstPage["@odata.count"] ?? firstPage.value.length;
+    const scanLimit = Math.min(total, maxScan);
+    const names: string[] = [];
+
+    const firstSliceEnd = Math.min(firstPage.value.length, scanLimit);
+    for (let i = 0; i < firstSliceEnd; i++) {
+      names.push(firstPage.value[i]!.Name);
+    }
+    let skip = firstPage.value.length;
+    let lastPageSize = firstPage.value.length;
+    while (lastPageSize === pageSize && names.length < scanLimit) {
+      const page = await this.http.request<{ value: Array<{ Name: string }> }>(
+        "GET",
+        `${basePath}&$skip=${skip}`,
+      );
+      const remaining = scanLimit - names.length;
+      const sliceEnd = Math.min(page.value.length, remaining);
+      for (let i = 0; i < sliceEnd; i++) {
+        names.push(page.value[i]!.Name);
+      }
+      lastPageSize = page.value.length;
+      skip += page.value.length;
+    }
+
+    return { names, total, scanned: names.length, truncated: total > maxScan };
+  }
+
+  /**
    * Add an element as a component of a new parent.
    * POST /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Elements('{newParent}')/Components
    */

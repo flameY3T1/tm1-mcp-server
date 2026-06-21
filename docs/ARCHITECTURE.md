@@ -132,6 +132,13 @@ through a service (`client.cubes.list()`, `client.processes.execute()`, …).
 The `lint:no-flat-api` CI gate fails the build if a flat-client TM1 call is
 reintroduced.
 
+The same gate also forbids tools under `src/tools/**` from calling the raw
+transport (`.request()` / `.requestRaw()` / `.requestBinary()`) directly.
+Hand-rolling OData in a tool bypasses the service layer and reimplements
+paging, OData-quote escaping, and version branches that belong in a service.
+If a tool needs a call no service exposes yet, add the method to the relevant
+service (e.g. `ElementService.scanElementNames`) and call that.
+
 ## Why service-composition instead of mixins or inheritance
 
 | Pattern                  | Pro                              | Con                                      |

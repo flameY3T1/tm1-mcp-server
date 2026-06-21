@@ -1,6 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { z, type ZodRawShape } from "zod";
 import { registerAuditNaming } from "../../src/tools/analysis/audit-naming.js";
+import { ElementService } from "../../src/tm1-client/services/element-service.js";
+
+// audit-naming now scans element names via ElementService.scanElementNames.
+// Wrapping the mock's request() in a REAL ElementService keeps the paging /
+// $count-probe / truncation logic genuinely exercised by these tests rather
+// than reimplemented in the mock.
+function elementServiceFrom(
+  request: (method: string, path: string) => Promise<unknown>,
+): ElementService {
+  return new ElementService({ request } as unknown as ConstructorParameters<
+    typeof ElementService
+  >[0]);
+}
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
 
@@ -54,6 +67,19 @@ const ELEMENTS_RE =
   /\/api\/v1\/Dimensions\('([^']+)'\)\/Hierarchies\('([^']+)'\)\/Elements\?(.*)$/;
 
 function makeFakeTM1Client(args: FakeTM1Args) {
+  const request = async (_method: string, path: string) => {
+    const m = ELEMENTS_RE.exec(path);
+    if (!m) throw new Error(`unexpected path: ${path}`);
+    const dim = decodeURIComponent(m[1]!);
+    const hier = decodeURIComponent(m[2]!);
+    const names = args.elementsByHier?.[`${dim}/${hier}`] ?? [];
+    const qs = new URLSearchParams(m[3]!);
+    const top = Number(qs.get("$top") ?? names.length);
+    const skip = Number(qs.get("$skip") ?? 0);
+    const wantCount = qs.get("$count") === "true";
+    const value = names.slice(skip, skip + top).map((Name) => ({ Name }));
+    return wantCount ? { "@odata.count": names.length, value } : { value };
+  };
   return {
     server: { getInfo: async () => ({ productVersion: args.productVersion }) },
     cubes: { list: async () => args.cubes ?? [] },
@@ -68,19 +94,8 @@ function makeFakeTM1Client(args: FakeTM1Args) {
       list: async (dim: string, hier: string) =>
         args.subsets?.[`${dim}/${hier}`] ?? [],
     },
-    request: async (_method: string, path: string) => {
-      const m = ELEMENTS_RE.exec(path);
-      if (!m) throw new Error(`unexpected path: ${path}`);
-      const dim = decodeURIComponent(m[1]!);
-      const hier = decodeURIComponent(m[2]!);
-      const names = args.elementsByHier?.[`${dim}/${hier}`] ?? [];
-      const qs = new URLSearchParams(m[3]!);
-      const top = Number(qs.get("$top") ?? names.length);
-      const skip = Number(qs.get("$skip") ?? 0);
-      const wantCount = qs.get("$count") === "true";
-      const value = names.slice(skip, skip + top).map((Name) => ({ Name }));
-      return wantCount ? { "@odata.count": names.length, value } : { value };
-    },
+    request,
+    elements: elementServiceFrom(request),
   } as unknown as Parameters<typeof registerAuditNaming>[1];
 }
 
@@ -243,6 +258,17 @@ describe("tm1_audit_naming tool", () => {
     const names = Array.from({ length: total }, (_, i) => `e${i}`);
     const fake = makeFakeServer();
     let requestCount = 0;
+    const request = async (_method: string, path: string) => {
+      requestCount++;
+      const m = ELEMENTS_RE.exec(path);
+      if (!m) throw new Error(`unexpected path: ${path}`);
+      const qs = new URLSearchParams(m[3]!);
+      const top = Number(qs.get("$top") ?? names.length);
+      const skip = Number(qs.get("$skip") ?? 0);
+      const wantCount = qs.get("$count") === "true";
+      const value = names.slice(skip, skip + top).map((Name) => ({ Name }));
+      return wantCount ? { "@odata.count": names.length, value } : { value };
+    };
     const tm1 = {
       server: { getInfo: async () => ({ productVersion: "11.8.01100" }) },
       cubes: { list: async () => [] },
@@ -253,17 +279,8 @@ describe("tm1_audit_naming tool", () => {
       chores: { list: async () => [] },
       views: { list: async () => [] },
       subsets: { list: async () => [] },
-      request: async (_method: string, path: string) => {
-        requestCount++;
-        const m = ELEMENTS_RE.exec(path);
-        if (!m) throw new Error(`unexpected path: ${path}`);
-        const qs = new URLSearchParams(m[3]!);
-        const top = Number(qs.get("$top") ?? names.length);
-        const skip = Number(qs.get("$skip") ?? 0);
-        const wantCount = qs.get("$count") === "true";
-        const value = names.slice(skip, skip + top).map((Name) => ({ Name }));
-        return wantCount ? { "@odata.count": names.length, value } : { value };
-      },
+      request,
+      elements: elementServiceFrom(request),
     } as unknown as Parameters<typeof registerAuditNaming>[1];
     registerAuditNaming(fake.server, tm1);
     const out = parseResult(
