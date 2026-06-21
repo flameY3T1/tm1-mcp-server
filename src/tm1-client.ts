@@ -48,6 +48,12 @@ export class TM1Client extends TM1HttpClient {
     this.cells = new CellService(this);
     this.views = new ViewService(this);
     this.subsets = new SubsetService(this);
+    // ElementService depends on CellService — `cells` MUST be constructed above.
+    // Enforced at runtime so a future reorder fails loudly instead of injecting
+    // `undefined` (TS types it as defined, so the compiler won't catch a move).
+    if (!this.cells) {
+      throw new Error("TM1Client init order: CellService must be constructed before ElementService");
+    }
     this.elements = new ElementService(this, this.cells);
     this.processes = new ProcessService(this);
     this.chores = new ChoreService(this);

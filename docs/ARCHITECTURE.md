@@ -127,6 +127,13 @@ export class TM1Client extends TM1HttpClient {
 TypeScript accepts the upcast since `TM1Client extends TM1HttpClient`.
 The service does not see `TM1Client`-specific surface, only HTTP transport.
 
+**Init order is load-bearing where one service depends on another.**
+`ElementService` takes `CellService` (`new ElementService(this, this.cells)`),
+so `this.cells` must be assigned first. TypeScript types the field as defined
+and will *not* catch a reorder that leaves it `undefined` at construction time,
+so the constructor asserts `this.cells` before wiring `elements`. Keep
+dependency-bearing services after the ones they consume, or the assert throws.
+
 `TM1Client` holds **no** flat pass-through methods. Tools always reach TM1
 through a service (`client.cubes.list()`, `client.processes.execute()`, …).
 The `lint:no-flat-api` CI gate fails the build if a flat-client TM1 call is
