@@ -11,15 +11,15 @@ export function registerCheckCubeRule(server: McpServer, tm1Client: TM1Client): 
       "Use this as a pre-flight check before tm1_set_cube_rules to avoid committing broken rules.",
     ].join(" "),
     {
-      cube: z.string().describe("Cube name (case-sensitive)"),
+      cubeName: z.string().describe("Cube name (case-sensitive)"),
       rules: z.string().describe("Full rules text to validate (must include SKIPCHECK; / FEEDERS; structure if used)"),
     },
-    async ({ cube, rules }) => {
-      const errors = await tm1Client.cubes.checkRule(cube, rules);
+    async ({ cubeName, rules }) => {
+      const errors = await tm1Client.cubes.checkRule(cubeName, rules);
       const ok = errors.length === 0;
       const payload = {
         ok,
-        cube,
+        cube: cubeName,
         lineCount: rules.split("\n").length,
         errorCount: errors.length,
         errors: errors.map((e) => ({

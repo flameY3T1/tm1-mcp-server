@@ -21,14 +21,14 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
       "IMPORTANT: List all Numeric/String leaf elements BEFORE Consolidated elements to avoid reference errors.",
     ].join(" "),
     {
-      dimension: z.string().describe("Dimension name"),
+      dimensionName: z.string().describe("Dimension name"),
       hierarchy: z.string().optional().describe("Hierarchy name (defaults to dimension name)"),
       elements: z.array(ElementSchema).min(1).describe("Elements to create or update"),
     },
-    async ({ dimension, hierarchy, elements }) => {
-      const hier = hierarchy ?? dimension;
+    async ({ dimensionName, hierarchy, elements }) => {
+      const hier = hierarchy ?? dimensionName;
       const { typeChanges } = await withToolHint(
-        tm1Client.elements.bulkUpsert(dimension, hier, elements),
+        tm1Client.elements.bulkUpsert(dimensionName, hier, elements),
         "Bulk upsert failed. Common causes: Consolidated element references a child that is not in this batch and does not exist yet (list leafs first), dimension/hierarchy name mismatch (tm1_list_dimensions to verify), or attempt to change an element's type (delete + recreate instead).",
       );
       const counts = {
@@ -41,7 +41,7 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
           type: "text" as const,
           text: JSON.stringify({
             success: true,
-            dimensionName: dimension,
+            dimensionName,
             hierarchyName: hier,
             total: elements.length,
             counts,

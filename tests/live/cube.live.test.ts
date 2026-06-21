@@ -105,7 +105,7 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
 
   it("check_writable_coords reports leaf coords as writable", async () => {
     const r = await h.ok("tm1_check_writable_coords", {
-      cube: C1,
+      cubeName: C1,
       coords: [D1_PLAIN, D2_A],
     });
     expect(r.json.writable).toBe(true);
@@ -139,15 +139,15 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
 
   it("check_cube_rule validates a trivial rule without applying it", async () => {
     const rules = `SKIPCHECK;\n['${D1_PLAIN}'] = N: 1;\nFEEDERS;`;
-    const r = await h.ok("tm1_check_cube_rule", { cube: C1, rules });
+    const r = await h.ok("tm1_check_cube_rule", { cubeName: C1, rules });
     expect(r.json.ok).toBe(true);
     expect(r.json.errorCount).toBe(0);
   });
 
   it("set_cube_rules then get_cube_rules reads the rule back", async () => {
     const rules = `SKIPCHECK;\n['${D1_PLAIN}'] = N: 1;\nFEEDERS;`;
-    await h.ok("tm1_set_cube_rules", { cube: C1, rules });
-    const r = await h.ok("tm1_get_cube_rules", { cube: C1 });
+    await h.ok("tm1_set_cube_rules", { cubeName: C1, rules });
+    const r = await h.ok("tm1_get_cube_rules", { cubeName: C1 });
     const text = typeof r.json === "string" ? r.json : (r.json.rules ?? r.text);
     expect(String(text)).toContain("SKIPCHECK");
     expect(String(text)).toContain(D1_PLAIN);

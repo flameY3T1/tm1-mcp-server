@@ -16,27 +16,27 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
     "tm1_check_writable_coords",
     "Pre-flight check before CellPutN/CellPutS. Verifies (1) every coord element exists, (2) every element is N-Level (writes to Consolidated elements silent-fail), and (3) whether the target cube has rules that may overlap the coord. Returns per-coord status + a rule-overlap warning. Use before writing cells in a TI process or via tm1_write_cells.",
     {
-      cube: z.string().describe("Target cube name"),
+      cubeName: z.string().describe("Target cube name"),
       coords: z
         .array(z.string())
         .describe(
           "Element name per dimension, in cube dimension order. Length must match cube.dimensions.length.",
         ),
     },
-    async ({ cube, coords }) => {
+    async ({ cubeName, coords }) => {
       const cubes = await tm1Client.cubes.list();
-      const cubeMeta = cubes.find((c) => c.name.toLowerCase() === cube.toLowerCase());
+      const cubeMeta = cubes.find((c) => c.name.toLowerCase() === cubeName.toLowerCase());
       if (!cubeMeta) {
         throw new TM1Error({
           code: TM1ErrorCode.NOT_FOUND,
-          message: `Cube '${cube}' not found`,
+          message: `Cube '${cubeName}' not found`,
         });
       }
       const dims = cubeMeta.dimensions;
       if (coords.length !== dims.length) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
-          message: `coords length ${coords.length} does not match cube '${cube}' dimensions (${dims.length}: ${dims.join(", ")})`,
+          message: `coords length ${coords.length} does not match cube '${cubeName}' dimensions (${dims.length}: ${dims.join(", ")})`,
         });
       }
 
@@ -83,7 +83,7 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
         note: "",
       };
       try {
-        const rules = await tm1Client.cubes.getRules(cube);
+        const rules = await tm1Client.cubes.getRules(cubeName);
         const ruleText = (rules.rulesText ?? "").trim();
         if (ruleText) {
           ruleOverlapWarn = {
@@ -107,7 +107,7 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
             type: "text" as const,
             text: JSON.stringify(
               {
-                cube,
+                cube: cubeName,
                 writable,
                 allElementsExist: allExist,
                 allElementsNLevel: allNLevel,

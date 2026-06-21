@@ -72,7 +72,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
 
   it("bulk-upserts more elements (leafs before consolidation)", async () => {
     const r = await h.ok("tm1_bulk_upsert_elements", {
-      dimension: DIM,
+      dimensionName: DIM,
       hierarchy: HIER,
       elements: [
         { name: LEAF2, type: "Numeric" },
@@ -90,7 +90,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
   it("bulk-upsert is idempotent and surfaces in-place type changes", async () => {
     // Create a standalone leaf.
     const a = await h.ok("tm1_bulk_upsert_elements", {
-      dimension: DIM,
+      dimensionName: DIM,
       hierarchy: HIER,
       elements: [{ name: TC, type: "Numeric" }],
     });
@@ -101,7 +101,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     // reports "element already exists" as HTTP 400 (not 409), which used to
     // escape the conflict handler and throw.
     const b = await h.ok("tm1_bulk_upsert_elements", {
-      dimension: DIM,
+      dimensionName: DIM,
       hierarchy: HIER,
       elements: [{ name: TC, type: "Numeric" }],
     });
@@ -110,7 +110,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
 
     // Changing the type in place must be reported (it discards leaf data).
     const c = await h.ok("tm1_bulk_upsert_elements", {
-      dimension: DIM,
+      dimensionName: DIM,
       hierarchy: HIER,
       elements: [{ name: TC, type: "String" }],
     });
@@ -143,7 +143,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     const r = await h.ok("tm1_get_descendants", {
       dimensionName: DIM,
       hierarchyName: HIER,
-      element: SUB,
+      elementName: SUB,
     });
     const names: string[] = r.json.descendants.map((d: { name: string }) => d.name);
     expect(names).toContain(LEAF1);
@@ -154,7 +154,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     const r = await h.ok("tm1_get_descendants", {
       dimensionName: DIM,
       hierarchyName: HIER,
-      element: TOP,
+      elementName: TOP,
       leavesOnly: true,
     });
     const types: string[] = r.json.descendants.map((d: { type: string }) => d.type);
@@ -166,7 +166,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     const r = await h.ok("tm1_get_ancestors", {
       dimensionName: DIM,
       hierarchyName: HIER,
-      element: LEAF1,
+      elementName: LEAF1,
     });
     const names: string[] = r.json.ancestors.map((a: { name: string }) => a.name);
     expect(names).toContain(SUB);
@@ -193,7 +193,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     const r = await h.ok("tm1_get_descendants", {
       dimensionName: DIM,
       hierarchyName: HIER,
-      element: SUB,
+      elementName: SUB,
     });
     const names: string[] = r.json.descendants.map((d: { name: string }) => d.name);
     expect(names).toContain(LEAF3);

@@ -14,15 +14,15 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
       "Before: tm1_check_cube_rule to validate syntax. After: tm1_get_cube_rules to read back, tm1_invalidate_callgraph_cache is called automatically (rule changes shift DB() / feeder edges).",
     ].join(" "),
     {
-      cube: z.string().describe("Cube name (case-sensitive)"),
+      cubeName: z.string().describe("Cube name (case-sensitive)"),
       rules: z.string().describe("Full rules text (must start with SKIPCHECK; and include FEEDERS; section)"),
       skipCheck: z.boolean().optional().default(true)
         .describe("Enable SKIPCHECK for performance (default: true, recommended)"),
     },
-    async ({ cube, rules, skipCheck }) => {
+    async ({ cubeName, rules, skipCheck }) => {
       await withToolHint(
-        tm1Client.cubes.updateRules(cube, rules, skipCheck),
-        `Pre-flight syntax with tm1_check_cube_rule(cube='${cube}', rules=...) before set_cube_rules. Inspect details for the offending line.`,
+        tm1Client.cubes.updateRules(cubeName, rules, skipCheck),
+        `Pre-flight syntax with tm1_check_cube_rule(cubeName='${cubeName}', rules=...) before set_cube_rules. Inspect details for the offending line.`,
       );
       const lineCount = rules.split("\n").length;
       // Rule changes shift call edges (DB(), feeders) — drop callgraph TTL early.
@@ -32,7 +32,7 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
           type: "text" as const,
           text: JSON.stringify({
             success: true,
-            cubeName: cube,
+            cubeName,
             lineCount,
             skipCheck,
             callgraphEntriesCleared,

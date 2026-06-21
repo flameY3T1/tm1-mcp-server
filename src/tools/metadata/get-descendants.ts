@@ -15,15 +15,15 @@ export function registerGetDescendants(server: McpServer, tm1Client: TM1Client) 
     {
       dimensionName: z.string().describe("Name of the TM1 dimension"),
       hierarchyName: z.string().describe("Hierarchy within the dimension"),
-      element: z.string().describe("Start element (typically a consolidation). Numeric/leaf elements return empty descendants."),
+      elementName: z.string().describe("Start element (typically a consolidation). Numeric/leaf elements return empty descendants."),
       depth: z.number().int().positive().optional()
         .describe("Max depth below the start element. Omit for unlimited."),
       leavesOnly: z.boolean().optional().default(false)
         .describe("Return only leaf elements (no consolidations)."),
       ...FORMAT_SCHEMA,
     },
-    async ({ dimensionName, hierarchyName, element, depth, leavesOnly, format }) => {
-      const result = await tm1Client.hierarchies.getDescendants(dimensionName, hierarchyName, element, {
+    async ({ dimensionName, hierarchyName, elementName, depth, leavesOnly, format }) => {
+      const result = await tm1Client.hierarchies.getDescendants(dimensionName, hierarchyName, elementName, {
         ...(depth !== undefined ? { depth } : {}),
         ...(leavesOnly !== undefined ? { leavesOnly } : {}),
       });

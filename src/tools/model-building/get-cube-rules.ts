@@ -7,10 +7,10 @@ export function registerGetCubeRules(server: McpServer, tm1Client: TM1Client): v
     "tm1_get_cube_rules",
     "Get the current rules text for a TM1 cube. Returns empty string if no rules are defined.",
     {
-      cube: z.string().describe("Cube name (case-sensitive)"),
+      cubeName: z.string().describe("Cube name (case-sensitive)"),
     },
-    async ({ cube }) => {
-      const rules = await tm1Client.cubes.getRules(cube);
+    async ({ cubeName }) => {
+      const rules = await tm1Client.cubes.getRules(cubeName);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(rules, null, 2) }],
       };

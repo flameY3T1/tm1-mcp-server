@@ -14,11 +14,11 @@ export function registerGetAncestors(server: McpServer, tm1Client: TM1Client) {
     {
       dimensionName: z.string().describe("Name of the TM1 dimension"),
       hierarchyName: z.string().describe("Hierarchy within the dimension"),
-      element: z.string().describe("Element whose ancestors are requested. Root elements return empty ancestors and a single self-only path."),
+      elementName: z.string().describe("Element whose ancestors are requested. Root elements return empty ancestors and a single self-only path."),
       ...FORMAT_SCHEMA,
     },
-    async ({ dimensionName, hierarchyName, element, format }) => {
-      const result = await tm1Client.hierarchies.getAncestors(dimensionName, hierarchyName, element);
+    async ({ dimensionName, hierarchyName, elementName, format }) => {
+      const result = await tm1Client.hierarchies.getAncestors(dimensionName, hierarchyName, elementName);
       type Row = (typeof result.ancestors)[number];
       const columns: Column<Row>[] = [
         { header: "name", get: (a) => a.name },
