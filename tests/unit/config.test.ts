@@ -63,6 +63,44 @@ describe("loadConfig", () => {
     );
   });
 
+  it("should default namespace and camPassport to undefined", () => {
+    setRequiredEnv();
+    const config = loadConfig();
+    expect(config.namespace).toBeUndefined();
+    expect(config.camPassport).toBeUndefined();
+  });
+
+  it("should parse TM1_NAMESPACE for CAM auth", () => {
+    setRequiredEnv();
+    process.env.TM1_NAMESPACE = "LDAP";
+    const config = loadConfig();
+    expect(config.namespace).toBe("LDAP");
+  });
+
+  it("should treat empty TM1_NAMESPACE as unset", () => {
+    setRequiredEnv();
+    process.env.TM1_NAMESPACE = "";
+    const config = loadConfig();
+    expect(config.namespace).toBeUndefined();
+  });
+
+  it("should still require TM1_USER/TM1_PASSWORD in CAMNamespace mode", () => {
+    process.env.TM1_BASE_URL = "https://tm1server:8010";
+    process.env.TM1_NAMESPACE = "LDAP";
+    expect(() => loadConfig()).toThrow(
+      "Missing or empty required environment variables: TM1_USER, TM1_PASSWORD"
+    );
+  });
+
+  it("should parse TM1_CAM_PASSPORT and not require user/password", () => {
+    process.env.TM1_BASE_URL = "https://tm1server:8010";
+    process.env.TM1_CAM_PASSPORT = "MTszMDk6...";
+    const config = loadConfig();
+    expect(config.camPassport).toBe("MTszMDk6...");
+    expect(config.user).toBe("");
+    expect(config.password).toBe("");
+  });
+
   it("should parse TM1_SSL_REJECT_UNAUTHORIZED=false", () => {
     setRequiredEnv();
     process.env.TM1_SSL_REJECT_UNAUTHORIZED = "false";

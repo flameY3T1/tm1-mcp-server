@@ -2,6 +2,15 @@ export interface TM1Config {
   baseUrl: string;
   user: string;
   password: string;
+  // Optional CAM (Cognos Access Manager) namespace. When set, the client
+  // authenticates with `Authorization: CAMNamespace base64(user:password:namespace)`
+  // instead of native Basic auth. Mirrors TM1py's namespace-based CAM login.
+  namespace?: string | undefined;
+  // Optional pre-obtained CAM passport token. When set, takes precedence over
+  // namespace/Basic and authenticates with `Authorization: CAMPassport <token>`.
+  // Use when an external SSO/gateway step already produced the passport — the
+  // server does no user/password round-trip in this mode.
+  camPassport?: string | undefined;
   ssl: {
     rejectUnauthorized: boolean;
   };
@@ -51,14 +60,27 @@ export function loadConfig(): TM1Config {
   const user = process.env.TM1_USER;
   const password = process.env.TM1_PASSWORD;
 
-  // Required: baseUrl, user. Empty strings are rejected (treated as unset).
-  // Password may be empty — some TM1 setups allow blank password for the admin
-  // account or anonymous-style auth. We warn but don't block, so that the real
-  // 401 from TM1 (if any) surfaces with context instead of an opaque error.
+  // CAM auth (mirrors TM1py's RestService._build_authorization_token):
+  //   TM1_CAM_PASSPORT set → "CAMPassport <token>"      (no user/password round-trip)
+  //   TM1_NAMESPACE set     → "CAMNamespace b64(u:p:ns)" (needs user + password + namespace)
+  //   neither               → "Basic b64(u:p)"           (native TM1)
+  // SSO/gateway (Windows SSPI) is intentionally unsupported here: TM1py only does
+  // it via the Windows-only requests_negotiate_sspi package. Supply a passport
+  // obtained out-of-band via TM1_CAM_PASSPORT instead.
+  const namespace = process.env.TM1_NAMESPACE || undefined;
+  const camPassport = process.env.TM1_CAM_PASSPORT || undefined;
+
+  // Required: baseUrl always. user/password only when NOT using a passport — a
+  // passport carries the authenticated identity, so TM1 needs no credentials.
+  // Empty strings are rejected (treated as unset). Password may be empty — some
+  // TM1 setups allow a blank password for the admin account — so we warn but
+  // don't block, letting the real 401 (if any) surface with context.
   const missing: string[] = [];
   if (!baseUrl) missing.push("TM1_BASE_URL");
-  if (!user) missing.push("TM1_USER");
-  if (password === undefined) missing.push("TM1_PASSWORD");
+  if (!camPassport) {
+    if (!user) missing.push("TM1_USER");
+    if (password === undefined) missing.push("TM1_PASSWORD");
+  }
 
   if (missing.length > 0) {
     throw new Error(
@@ -67,7 +89,7 @@ export function loadConfig(): TM1Config {
     );
   }
 
-  if (password === "") {
+  if (!camPassport && password === "") {
     process.stderr.write(
       "[tm1-mcp-server] WARNING: TM1_PASSWORD is empty. " +
         "If TM1 rejects with 401, check whether the account actually allows blank passwords.\n",
@@ -135,8 +157,12 @@ export function loadConfig(): TM1Config {
 
   return {
     baseUrl: baseUrl!,
-    user: user!,
-    password: password!,
+    // In passport mode user/password are unused; default to "" so the type stays
+    // a plain string and the Authorization header is built from the passport.
+    user: user ?? "",
+    password: password ?? "",
+    namespace,
+    camPassport,
     ssl: { rejectUnauthorized },
     keepAliveIntervalMs,
     requestTimeoutMs,

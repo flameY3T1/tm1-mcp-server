@@ -63,7 +63,13 @@ TM1_MODE=readonly                   # readonly (default) | readwrite
 # TM1_LOCAL_FILE_ROOT=/srv/tm1-git  # optional; enables host-disk file params (see below)
 ```
 
-See [`.env.example`](.env.example) for the full set (timeouts, logging, HTTP transport).
+For **CAM (Cognos Access Manager) / LDAP** servers, set `TM1_NAMESPACE` to your
+CAM namespace (the client then logs in with `Authorization: CAMNamespace`); or
+supply a pre-obtained passport via `TM1_CAM_PASSPORT` (`Authorization:
+CAMPassport`, no user/password needed). Native TM1 auth stays the default when
+neither is set.
+
+See [`.env.example`](.env.example) for the full set (CAM auth, timeouts, logging, HTTP transport).
 
 > **Safe by default:** the server starts in `TM1_MODE=readonly` — only read
 > tools are registered, so it cannot mutate or delete anything. To enable the
@@ -429,7 +435,10 @@ never against production.
 `TM1_BASE_URL` points at the REST API port (e.g. `https://host:8010`). Some test
 servers allow a blank admin password — an empty `TM1_PASSWORD` is accepted and
 the server logs a warning rather than blocking, so the real TM1 `401` surfaces
-with context.
+with context. For CAM/LDAP servers a `401` usually means the wrong
+`TM1_NAMESPACE` (or an interactive account on PA Cloud — use a non-interactive
+service account); confirm the server's `IntegratedSecurityMode` via
+`tm1_get_server_info`.
 
 **v11 vs v12 feature errors** (`DataSource.usesUnicode`, hierarchy/`Files`
 endpoints): set `TM1_VERSION=11.8` (or your `11.x`) so v12-only paths are

@@ -160,6 +160,54 @@ describe("SessionManager", () => {
       const expected = `Basic ${Buffer.from("user@domain:p@ss:word!").toString("base64")}`;
       expect(opts.headers.Authorization).toBe(expected);
     });
+
+    it("should send CAMNamespace auth when namespace is configured", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" })
+      );
+
+      const sm = new SessionManager(
+        makeConfig({ user: "alice", password: "pw", namespace: "LDAP" }),
+        mockLogger
+      );
+      await sm.authenticate();
+
+      const [, opts] = fetchSpy.mock.calls[0];
+      // Mirrors TM1py: base64("user:password:namespace") with the CAMNamespace scheme.
+      const expected = `CAMNamespace ${Buffer.from("alice:pw:LDAP").toString("base64")}`;
+      expect(opts.headers.Authorization).toBe(expected);
+    });
+
+    it("should send CAMPassport auth when a passport is configured", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" })
+      );
+
+      const sm = new SessionManager(
+        // Passport mode ignores user/password and namespace.
+        makeConfig({ user: "", password: "", camPassport: "PASSPORT_TOKEN" }),
+        mockLogger
+      );
+      await sm.authenticate();
+
+      const [, opts] = fetchSpy.mock.calls[0];
+      expect(opts.headers.Authorization).toBe("CAMPassport PASSPORT_TOKEN");
+    });
+
+    it("should prefer passport over namespace when both are set", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" })
+      );
+
+      const sm = new SessionManager(
+        makeConfig({ namespace: "LDAP", camPassport: "PT" }),
+        mockLogger
+      );
+      await sm.authenticate();
+
+      const [, opts] = fetchSpy.mock.calls[0];
+      expect(opts.headers.Authorization).toBe("CAMPassport PT");
+    });
   });
 
   describe("concurrent re-auth dedup (regression)", () => {

@@ -47,7 +47,8 @@ export class SessionManager {
   }
 
   /**
-   * Authenticate against TM1 using native Basic Auth.
+   * Authenticate against TM1. The auth scheme (Basic / CAMNamespace /
+   * CAMPassport) is selected by config — see buildAuthorizationHeader.
    *
    * Concurrent callers share a single in-flight login. The HTTP transport
    * re-authenticates directly from its 401 handler (http.ts), so two requests
@@ -81,11 +82,9 @@ export class SessionManager {
     }
 
     const url = `${this.config.baseUrl}/api/v1/Configuration/ProductVersion`;
-    const credentials = Buffer.from(
-      `${this.config.user}:${this.config.password}`
-    ).toString("base64");
+    const authorization = this.buildAuthorizationHeader();
 
-    this.logger.info({ endpoint: url }, "Authenticating with TM1");
+    this.logger.info({ endpoint: url, authMode: this.authMode() }, "Authenticating with TM1");
 
     const response = await withTimeout(
       this.config.requestTimeoutMs,
@@ -94,7 +93,7 @@ export class SessionManager {
         tm1Fetch(url, {
           method: "GET",
           headers: {
-            Authorization: `Basic ${credentials}`,
+            Authorization: authorization,
             Accept: "application/json",
             "User-Agent": USER_AGENT,
             "TM1-SessionContext": USER_AGENT,
@@ -302,6 +301,42 @@ export class SessionManager {
 
   /**
    * Extract TM1SessionId from Set-Cookie response headers.
+   */
+  /**
+   * Build the Authorization header value for the configured auth mode.
+   *
+   * Mirrors TM1py's RestService._build_authorization_token:
+   *   - camPassport set → "CAMPassport <token>"
+   *   - namespace set   → "CAMNamespace " + base64("user:password:namespace")
+   *   - otherwise       → "Basic " + base64("user:password")
+   *
+   * The base64 input is UTF-8 encoded (TM1py uses str.encode(), i.e. UTF-8, and
+   * Buffer.from defaults to UTF-8), so non-ASCII users/passwords/namespaces
+   * round-trip identically. The CAMNamespace credential ordering is
+   * user:password:namespace — confirmed against TM1py and IBM PA REST docs.
+   */
+  private buildAuthorizationHeader(): string {
+    const { user, password, namespace, camPassport } = this.config;
+    if (camPassport) {
+      return `CAMPassport ${camPassport}`;
+    }
+    if (namespace) {
+      const token = Buffer.from(`${user}:${password}:${namespace}`).toString("base64");
+      return `CAMNamespace ${token}`;
+    }
+    const token = Buffer.from(`${user}:${password}`).toString("base64");
+    return `Basic ${token}`;
+  }
+
+  /** Human-readable auth mode for logging (never logs the credential itself). */
+  private authMode(): "CAMPassport" | "CAMNamespace" | "Basic" {
+    if (this.config.camPassport) return "CAMPassport";
+    if (this.config.namespace) return "CAMNamespace";
+    return "Basic";
+  }
+
+  /**
+   * Extract TM1SessionId Set-Cookie response headers.
    */
   private extractSessionCookie(response: Response): string | null {
     const setCookie = response.headers.get("set-cookie");
