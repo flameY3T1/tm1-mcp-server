@@ -29,25 +29,42 @@ Tested against TM1 11.8 via REST API (Basic Auth).
 
 ## Install
 
-**Option A — clone and build** (source install):
+**Option A — from npm (recommended).** No clone, no build. Run on demand with
+`npx` (always pulls the latest published version):
+
+```bash
+npx -y tm1-mcp-server
+```
+
+…or install the `tm1-mcp-server` CLI globally:
+
+```bash
+npm install -g tm1-mcp-server
+tm1-mcp-server
+```
+
+**Option B — clone and build** (source / development install):
 
 ```bash
 git clone https://github.com/flameY3T1/tm1-mcp-server.git
 cd tm1-mcp-server
 npm install
 npm run build
-# run directly
 node dist/index.js
 ```
 
-**Option B — global install from local clone** (gives you the `tm1-mcp-server` CLI):
+### Updating
 
-```bash
-# after cloning + building (Option A):
-npm install -g .
-# then from any directory:
-tm1-mcp-server
-```
+- **`npx`:** picks up new versions automatically on the next start. If a stale
+  version is cached, run `npm cache clean --force` (or pin a version with
+  `tm1-mcp-server@1.2.3`), then restart your MCP client.
+- **Global install:** `npm update -g tm1-mcp-server` (or
+  `npm install -g tm1-mcp-server@latest`); check with
+  `npm view tm1-mcp-server version` vs `npm list -g tm1-mcp-server`.
+- **Source install:** `git pull && npm install && npm run build`.
+
+Always **restart the MCP client** (Claude Desktop / Claude Code) after updating —
+the server process is only spawned at client startup.
 
 ## Configure
 
@@ -104,7 +121,34 @@ client launches the server from). The MCP client config only points at the
 binary — **do not put `TM1_PASSWORD` in `.mcp.json` or `settings.json`**.
 
 Copy `mcp.json.example` to `.mcp.json` (project-local) or merge into
-`~/.claude/settings.json`:
+`~/.claude/settings.json`.
+
+**Recommended — `npx` (Option A install, no clone):**
+
+```json
+{
+  "mcpServers": {
+    "tm1": {
+      "command": "npx",
+      "args": ["-y", "tm1-mcp-server"]
+    }
+  }
+}
+```
+
+If you installed globally (`npm install -g tm1-mcp-server`), use the CLI name:
+
+```json
+{
+  "mcpServers": {
+    "tm1": {
+      "command": "tm1-mcp-server"
+    }
+  }
+}
+```
+
+For a source build (Option B), point at the built entrypoint:
 
 ```json
 {
@@ -112,18 +156,6 @@ Copy `mcp.json.example` to `.mcp.json` (project-local) or merge into
     "tm1": {
       "command": "node",
       "args": ["/absolute/path/to/tm1-mcp-server/dist/index.js"]
-    }
-  }
-}
-```
-
-If you installed globally (`npm install -g .`), use the CLI name instead:
-
-```json
-{
-  "mcpServers": {
-    "tm1": {
-      "command": "tm1-mcp-server"
     }
   }
 }
