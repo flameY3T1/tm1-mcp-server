@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CAM (Cognos Access Manager) login. Set `TM1_NAMESPACE` for namespace auth
+  (sends `Authorization: CAMNamespace base64(user:password:namespace)`) or
+  `TM1_CAM_PASSPORT` for a pre-obtained passport (sends
+  `Authorization: CAMPassport <token>`, takes precedence and needs no
+  user/password). Native TM1 auth stays the default when neither is set.
+
 ### Changed
 
 - `.env` is now loaded from the package/repo root (the directory containing
