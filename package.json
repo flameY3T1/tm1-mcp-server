@@ -13,7 +13,8 @@
     "tm1-mcp-server": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.map"
   ],
   "scripts": {
     "build": "tsc",
