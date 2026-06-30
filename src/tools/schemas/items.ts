@@ -319,6 +319,7 @@ export const ProcessCodeSchema = z.object({
   metadata: z.string(),
   data: z.string(),
   epilog: z.string(),
+  hint: z.string().optional(),
 });
 
 export const DataSourceSchema = z
