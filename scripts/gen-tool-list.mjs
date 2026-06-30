@@ -63,7 +63,12 @@ if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
 const before = readme.slice(0, startIdx + START.length);
 const after = readme.slice(endIdx);
 const block = `\n${render("##")}\n`;
-const next = `${before}${block}${after}`;
+// Also keep the prose tool count (outside the sentinels) in sync; the category
+// count is curated, so leave it untouched.
+const next = `${before}${block}${after}`.replace(
+  /\b\d+ tools across (\d+) categories:/,
+  `${total} tools across $1 categories:`,
+);
 
 if (next === readme) {
   console.log("README.md tool list already in sync.");
