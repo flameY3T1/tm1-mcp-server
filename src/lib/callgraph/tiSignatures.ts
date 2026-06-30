@@ -116,17 +116,6 @@ export const KNOWN_SIGNATURES: Map<string, TiKnownSignature> = new Map([
     ],
     returnType: 'numeric',
   }],
-  ['cellincrement', {
-    name: 'CellIncrement',
-    minParams: 4,
-    maxParams: Infinity,
-    params: [
-      { name: 'Value', type: 'numeric' },
-      { name: 'CubeName', type: 'string' },
-      { name: 'ElemN', type: 'string' },
-    ],
-    returnType: 'void',
-  }],
 
   // ── String functions ─────────────────────────────────────────────────────────
   ['str', {

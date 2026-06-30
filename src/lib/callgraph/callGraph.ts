@@ -238,21 +238,24 @@ export function buildCallGraph(
 
 // Functions that write cell/attribute data into a cube.
 const WRITE_FUNCS = new Set([
-  'cellputn', 'cellputs', 'cellincrement', 'cellincrementn',
+  'cellputn', 'cellputs', 'cellincrementn',
   'batchcellincrement', 'cellputproportionalspread',
-  'viewzeroout', 'viewzero', 'cubecleardata',
-  'cubeputn', 'cubeputs', 'viewputn', 'viewputs',
-  'cubeattrputn', 'cubeattrputs', 'viewattrputn', 'viewattrputs',
-  'cubeprocessfeeders',
+  'viewzeroout', 'cubecleardata', 'cubeprocessfeeders',
+  // Cube attribute value writes (target the }CubeAttributes control cube).
+  'cubeattrputn', 'cubeattrputs',
+  // Element/dimension attribute value writes (target the }ElementAttributes_<dim>
+  // control cube; classified as a write on the dimension).
+  'attrputn', 'attrputs', 'elementattrputn', 'elementattrputs',
 ]);
 
 // Functions that read cell/attribute data from a cube.
 const READ_FUNCS = new Set([
   'cellgetn', 'cellgets', 'cellexists', 'cellisrule', 'cellisundefined', 'cellisupdateable',
-  'cubegetn', 'cubegets',
-  'viewgetn', 'viewgets',
-  'cubeattrn', 'cubeattrnl', 'cubeattrs', 'cubeattrs1', 'cubeattrs1l',
-  'viewattrn', 'viewattrnl', 'viewattrs', 'viewattrsl',
+  // Cube attribute value reads (locale form; CubeAttrN/S base form is not a real TI fn).
+  'cubeattrnl', 'cubeattrsl',
+  // Element/dimension attribute value reads (classified as a read on the dimension).
+  'attrn', 'attrs', 'attrnl', 'attrsl',
+  'elementattrn', 'elementattrs', 'elementattrnl', 'elementattrsl',
   'db', // cube rule DB() reference
 ]);
 

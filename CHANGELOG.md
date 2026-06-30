@@ -27,6 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   consecutive comment lines into a `# [... N lines commented out ...]` marker to
   reduce dead-code context. Comment-heavy tabs surface a hint when not stripped.
 
+### Fixed
+
+- Corrected the read/write access taxonomy behind `tm1_analyze_object_usage` and
+  `tm1_trace_data_flow`. Now classified: element/dimension attribute value access
+  (`AttrPutN/S`, `ElementAttrPutN/S` writes; `ATTRN/S`, `AttrNL/SL`,
+  `ElementAttrN/S/NL/SL` reads) and cube attributes (`CubeAttrPutN/S` writes,
+  `CubeATTRNL/SL` reads). Removed classification of functions that do not exist in
+  TM1 TI — `CellIncrement` (only `CellIncrementN`), `CubePutN/S`, `ViewPutN/S`,
+  `CubeGetN/S`, `ViewGetN/S`, `ViewAttr*`, base-form `CubeAttrN/S`, `AttributeGet`,
+  `AttributePut` — so they are no longer mis-counted as reads/writes. The bogus
+  `CellIncrement` TI signature was also dropped.
+
 ### Security
 
 - Ignore `.npmrc` to prevent accidental npm token commits.
