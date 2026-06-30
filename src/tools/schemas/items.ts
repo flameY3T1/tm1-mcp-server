@@ -87,6 +87,7 @@ export const MessageLogEntrySchema = z.object({
   timestamp: z.string(),
   level: z.string(),
   message: z.string(),
+  errorFile: z.string().optional(),
 });
 
 export const TransactionLogEntrySchema = z.object({

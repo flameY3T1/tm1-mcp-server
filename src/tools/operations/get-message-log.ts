@@ -6,7 +6,7 @@ import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../for
 export function registerGetMessageLog(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
     "tm1_get_message_log",
-    "Fetch recent TM1 server message log entries, newest first. Useful for debugging TI process errors.",
+    "Fetch recent TM1 server message log entries, newest first. Useful for debugging TI process errors. When an entry references a TI error file, the parsed filename is surfaced as `errorFile` — pass it straight to tm1_get_error_log_content to read the failure detail.",
     {
       top: z.number().int().min(1).max(500).optional().default(100)
         .describe("Number of entries to fetch (default: 100, max: 500)"),
@@ -25,6 +25,7 @@ export function registerGetMessageLog(server: McpServer, tm1Client: TM1Client): 
         { header: "timestamp", get: (e) => e.timestamp },
         { header: "level", get: (e) => e.level },
         { header: "message", get: (e) => e.message },
+        { header: "errorFile", get: (e) => e.errorFile ?? "" },
       ];
       return payloadResponse(payload, format, (p) =>
         `## Message log\n\n${p.count} entries\n\n${renderTable(p.entries, columns)}`,

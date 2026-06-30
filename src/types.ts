@@ -357,6 +357,8 @@ export interface MessageLogEntry {
   timestamp: string;
   level: string;
   message: string;
+  /** TI error file referenced in `message`, parsed out for direct fetch. Absent when none. */
+  errorFile?: string;
 }
 
 /** One audit detail row (nested under an AuditLogEntry). */

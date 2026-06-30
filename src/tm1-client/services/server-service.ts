@@ -15,6 +15,25 @@ import type {
 } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 
+// TM1 references the per-run TI error file inside the free-text message, either
+// wrapped in angle brackets (e.g. German `Fehlerdatei: <…log>`) or bare
+// (`see TM1ProcessError_…log`). Both regexes are linear (no nested quantifiers,
+// delimiter excluded from the class) — no ReDoS guard needed for these literals.
+const ANGLE_WRAPPED_LOG = /<([^<>\s]+\.log)>/i;
+const BARE_PROCESS_ERROR_LOG = /TM1ProcessError_[^\s<>'"()]+\.log/i;
+
+/**
+ * Pull the TM1 error log filename out of a message-log entry's free text, so it
+ * can be fed straight into `tm1_get_error_log_content(filename=…)`. Returns the
+ * exact filename (no surrounding brackets) or undefined when none is mentioned.
+ */
+export function extractErrorFile(message: string): string | undefined {
+  const angle = message.match(ANGLE_WRAPPED_LOG);
+  if (angle) return angle[1];
+  const bare = message.match(BARE_PROCESS_ERROR_LOG);
+  return bare ? bare[0] : undefined;
+}
+
 // The TransactionLogEntries endpoint scans the whole log server-side and is
 // slow; without log-read rights it can hang until the global request timeout.
 // Before the real (orderby + filtered) query we fire a bare `$top=1` probe —
@@ -104,11 +123,16 @@ export class ServerService {
     const response = await this.http.request<{
       value: Array<{ TimeStamp?: string; Timestamp?: string; Level?: string; Message?: string; Text?: string }>;
     }>("GET", path);
-    return response.value.map((e) => ({
-      timestamp: e.TimeStamp ?? e.Timestamp ?? "",
-      level: (e.Level ?? "").toUpperCase(),
-      message: e.Message ?? e.Text ?? "",
-    }));
+    return response.value.map((e) => {
+      const message = e.Message ?? e.Text ?? "";
+      const errorFile = extractErrorFile(message);
+      return {
+        timestamp: e.TimeStamp ?? e.Timestamp ?? "",
+        level: (e.Level ?? "").toUpperCase(),
+        message,
+        ...(errorFile ? { errorFile } : {}),
+      };
+    });
   }
 
   /**
