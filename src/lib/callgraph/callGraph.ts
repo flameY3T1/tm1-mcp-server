@@ -256,7 +256,7 @@ const READ_FUNCS = new Set([
   'db', // cube rule DB() reference
 ]);
 
-function classifyAccess(funcName: string | undefined, sourceKind: 'process' | 'rule'): 'read' | 'write' | 'other' {
+export function classifyAccess(funcName: string | undefined, sourceKind: 'process' | 'rule'): 'read' | 'write' | 'other' {
   // Rule bracket-refs and DB() are always reads.
   if (sourceKind === 'rule') return 'read';
   if (!funcName) return 'other';

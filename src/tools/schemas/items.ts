@@ -649,6 +649,36 @@ export const ObjectUsageResultSchema = z.object({
   sources: z.array(z.unknown()).optional(),
 });
 
+// ── tm1_trace_data_flow result schema ────────────────────────────────────────
+export const DataFlowResultSchema = z.object({
+  cube: z.string(),
+  direction: z.enum(["upstream", "downstream", "both"]),
+  upstream: z
+    .array(
+      z.object({
+        process: z.string(),
+        sourceCubes: z.array(z.string()),
+        datasourceType: z.string(),
+        externalSource: z.string().optional(),
+      }),
+    )
+    .optional(),
+  downstream: z
+    .array(
+      z.object({
+        process: z.string(),
+        targetCubes: z.array(z.string()),
+        readsVia: z.enum(["code", "datasource", "both"]),
+      }),
+    )
+    .optional(),
+  counts: z.object({
+    upstream: z.number().int().optional(),
+    downstream: z.number().int().optional(),
+  }),
+  hint: z.string().optional(),
+});
+
 // ── tm1_get_cube_stats result schemas ────────────────────────────────────────
 // Stats elements differ between TM1 v11 and v12. We expose well-known names
 // as typed fields (best-effort match) and the entire raw element-name → value

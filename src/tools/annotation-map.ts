@@ -23,6 +23,7 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_analyze_callgraph: READ_ONLY,
   tm1_analyze_chore_graph: READ_ONLY,
   tm1_analyze_object_usage: READ_ONLY,
+  tm1_trace_data_flow: READ_ONLY,
   tm1_audit_complexity: READ_ONLY,
   tm1_audit_feeders: READ_ONLY,
   tm1_audit_naming: READ_ONLY,

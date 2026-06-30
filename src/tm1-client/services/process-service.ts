@@ -435,6 +435,40 @@ export class ProcessService {
   }
 
   /**
+   * Bulk-fetch the datasource of every process in one OData call, projected to
+   * the few fields data-flow analysis needs (type + source object). Credentials
+   * are never selected. Used by tm1_trace_data_flow to detect view-sourced reads
+   * that leave no CellGet in the code and so never reach the reference index.
+   * GET /api/v1/Processes?$select=Name,DataSource
+   */
+  async listDataSources(
+    includeControl = false,
+  ): Promise<Array<{ name: string; type: string; sourceName?: string; view?: string; subset?: string }>> {
+    const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
+    const path = `/api/v1/Processes?$select=Name,DataSource${filter}`;
+    const response = await this.http.request<{
+      value: Array<{
+        Name?: string;
+        DataSource?: { Type?: string; dataSourceNameForServer?: string; view?: string; subset?: string };
+      }>;
+    }>("GET", path);
+    return response.value
+      .filter((p): p is { Name: string; DataSource?: { Type?: string; dataSourceNameForServer?: string; view?: string; subset?: string } } =>
+        typeof p.Name === "string",
+      )
+      .map((p) => {
+        const ds = p.DataSource;
+        return {
+          name: p.Name,
+          type: ds?.Type ?? "None",
+          ...(ds?.dataSourceNameForServer !== undefined ? { sourceName: ds.dataSourceNameForServer } : {}),
+          ...(ds?.view !== undefined ? { view: ds.view } : {}),
+          ...(ds?.subset !== undefined ? { subset: ds.subset } : {}),
+        };
+      });
+  }
+
+  /**
    * Update the data source configuration of a TI process.
    * PATCH /api/v1/Processes('{name}') with DataSource object.
    */

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `tm1_trace_data_flow`: new analysis tool that traces a cube's data flow in one
+  call instead of `analyze_object_usage` + N× `get_process_code`. `downstream`
+  lists processes that read the cube and the cubes they write to; `upstream`
+  lists processes that write the cube and where they source data. Combines
+  code-level CellGet/CellPut/DB access with each process's datasource (one bulk
+  OData fetch), so view-sourced reads with no CellGet are caught too.
+
 - `tm1_get_message_log`: each entry now surfaces an optional `errorFile` field —
   the TI error filename parsed out of the message text — so it can be passed
   straight to `tm1_get_error_log_content` without manual string-copying.

@@ -117,6 +117,7 @@ import { registerSearchFiles } from "./fileops/search-files.js";
 // Analysis tools
 import { registerAnalyzeCallgraph } from "./analysis/analyze-callgraph.js";
 import { registerAnalyzeObjectUsage } from "./analysis/analyze-object-usage.js";
+import { registerTraceDataFlow } from "./analysis/trace-data-flow.js";
 import { registerAnalyzeChoreGraph } from "./analysis/analyze-chore-graph.js";
 import { registerInvalidateCallgraphCache } from "./analysis/invalidate-callgraph-cache.js";
 import { registerFindOrphanDimensions } from "./analysis/find-orphan-dimensions.js";
@@ -260,6 +261,7 @@ const REGISTRARS: ToolRegistrar[] = [
   // Analysis
   registerAnalyzeCallgraph,
   registerAnalyzeObjectUsage,
+  registerTraceDataFlow,
   registerAnalyzeChoreGraph,
   registerInvalidateCallgraphCache,
   registerFindOrphanDimensions,
