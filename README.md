@@ -9,7 +9,7 @@ Tested against TM1 11.8 via REST API (Basic Auth).
 
 ## Features
 
-111 tools across 12 categories:
+112 tools across 12 categories:
 
 | Category | Tools |
 |---|---|

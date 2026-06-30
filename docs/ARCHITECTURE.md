@@ -13,7 +13,7 @@ truth for any contributor adding TM1 calls or new tools.
                        │ tools call
                        ▼
 ┌──────────────────────────────────────────────┐
-│  src/tools/**            MCP tool surface     │  111 tools, one file each
+│  src/tools/**            MCP tool surface     │  112 tools, one file each
 │  (Zod schemas, MCP envelopes, validation)     │  (+ prompts, resources)
 └──────────────────────┬───────────────────────┘
                        │ uses
