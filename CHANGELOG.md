@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `tm1_get_message_log`: each entry now surfaces an optional `errorFile` field —
+  the TI error filename parsed out of the message text — so it can be passed
+  straight to `tm1_get_error_log_content` without manual string-copying.
+- `tm1_sample_cells`: opt-in `includeStrings` flag to sample String value
+  fields. Swaps NON EMPTY for a `<> ""` FILTER and scans all members including
+  consolidations (string values do not roll up and can sit on C elements). A
+  zero-result numeric run now hints at the flag.
+- `tm1_get_process_code`: opt-in `stripComments` flag that collapses runs of 4+
+  consecutive comment lines into a `# [... N lines commented out ...]` marker to
+  reduce dead-code context. Comment-heavy tabs surface a hint when not stripped.
+
+### Security
+
+- Ignore `.npmrc` to prevent accidental npm token commits.
+
 ## [1.0.0] - 2026-06-24
 
 Initial public release.
