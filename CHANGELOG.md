@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-06-30
+
 ### Added
 
 - `tm1_trace_data_flow`: new analysis tool that traces a cube's data flow in one
@@ -38,10 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CubeGetN/S`, `ViewGetN/S`, `ViewAttr*`, base-form `CubeAttrN/S`, `AttributeGet`,
   `AttributePut` — so they are no longer mis-counted as reads/writes. The bogus
   `CellIncrement` TI signature was also dropped.
-
-### Security
-
-- Ignore `.npmrc` to prevent accidental npm token commits.
 
 ## [1.0.0] - 2026-06-24
 
