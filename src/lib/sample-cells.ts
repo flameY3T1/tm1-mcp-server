@@ -17,6 +17,14 @@ export interface SampleCellsBuildArgs {
   axisDimension?: string | undefined;
   /** If true, restrict unfiltered dims to leaf members (level 0). */
   leavesOnly: boolean;
+  /**
+   * If true, sample string-valued cells: drop the NON EMPTY numeric suppression
+   * in favour of a `<> ""` FILTER, and include consolidations on unfiltered dims
+   * (overrides leavesOnly) because string values do not consolidate and may sit
+   * directly on C elements. Requires the column/measure to resolve to a single
+   * element. Default false (numeric NON EMPTY behaviour).
+   */
+  includeStrings?: boolean | undefined;
 }
 
 export interface SampleCellsBuildResult {
@@ -45,7 +53,7 @@ const memberRef = (dim: string, elem: string): string => {
 };
 
 export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuildResult {
-  const { cubeName, dimensions, maxCells, filters = {}, leavesOnly } = args;
+  const { cubeName, dimensions, maxCells, filters = {}, leavesOnly, includeStrings = false } = args;
 
   if (dimensions.length === 0) {
     throw new Error(`Cube '${cubeName}' has no dimensions`);
@@ -86,22 +94,25 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
       continue;
     }
     rowDims.push(dim);
+    // String values can sit on consolidations and do not roll up, so includeStrings
+    // must scan all members (incl. C), overriding the leaf-only restriction.
     rowSets.push(
-      leavesOnly
+      leavesOnly && !includeStrings
         ? `TM1FILTERBYLEVEL({TM1SUBSETALL([${dim}])},0)`
         : `{TM1SUBSETALL([${dim}])}`,
     );
   }
 
   const colFilter = filters[columnDim];
-  let columnSet: string;
+  let columnMembers: string[];
   if (typeof colFilter === "string") {
-    columnSet = `{${memberRef(columnDim, colFilter)}}`;
+    columnMembers = [memberRef(columnDim, colFilter)];
   } else if (Array.isArray(colFilter) && colFilter.length > 0) {
-    columnSet = `{${(colFilter).map((e) => memberRef(columnDim, e)).join(",")}}`;
+    columnMembers = colFilter.map((e) => memberRef(columnDim, e));
   } else {
-    columnSet = `{[${columnDim}].DefaultMember}`;
+    columnMembers = [`[${columnDim}].DefaultMember`];
   }
+  const columnSet = `{${columnMembers.join(",")}}`;
 
   let rowExpr: string;
   if (rowSets.length === 0) {
@@ -112,10 +123,25 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
     rowExpr = rowSets.reduce((acc, s) => `CROSSJOIN(${acc},${s})`);
   }
 
-  // TM1's NONEMPTY(set, filterSet) is a set function. Plain "NON EMPTY <set>"
-  // is an axis modifier and is rejected as a syntax error inside HEAD().
-  const nonEmptyExpr = `NONEMPTY(${rowExpr},${columnSet})`;
-  const rowAxisExpr = maxCells > 0 ? `HEAD(${nonEmptyExpr},${maxCells})` : nonEmptyExpr;
+  let rowAxisExpr: string;
+  if (includeStrings) {
+    // NON EMPTY suppression can hide string cells on some TM1 versions, and never
+    // surfaces strings on consolidations. Filter on a non-blank string value
+    // instead. Needs a single measure cell to reference.
+    if (columnMembers.length !== 1) {
+      throw new Error(
+        `includeStrings requires the column/measure to resolve to a single element; ` +
+          `pin it via filters['${columnDim}']='<element>' or axisDimension (got ${columnMembers.length} members).`,
+      );
+    }
+    const filterExpr = `FILTER(${rowExpr},[${cubeName}].(${columnMembers[0]})<>"")`;
+    rowAxisExpr = maxCells > 0 ? `HEAD(${filterExpr},${maxCells})` : filterExpr;
+  } else {
+    // TM1's NONEMPTY(set, filterSet) is a set function. Plain "NON EMPTY <set>"
+    // is an axis modifier and is rejected as a syntax error inside HEAD().
+    const nonEmptyExpr = `NONEMPTY(${rowExpr},${columnSet})`;
+    rowAxisExpr = maxCells > 0 ? `HEAD(${nonEmptyExpr},${maxCells})` : nonEmptyExpr;
+  }
 
   const whereClause = whereParts.length > 0 ? ` WHERE (${whereParts.join(",")})` : "";
   const mdx = `SELECT ${columnSet} ON COLUMNS, ${rowAxisExpr} ON ROWS FROM [${cubeName}]${whereClause}`;

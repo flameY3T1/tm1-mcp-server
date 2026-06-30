@@ -127,6 +127,47 @@ describe("buildSampleCellsMdx", () => {
       }),
     ).toThrow(/Filter dimension 'Foo'/);
   });
+
+  it("includeStrings: swaps NON EMPTY for a <> \"\" FILTER on the pinned measure", () => {
+    const r = buildSampleCellsMdx({
+      cubeName: "Cube_X",
+      dimensions: baseDims,
+      maxCells: 5,
+      filters: { Measure: "KPI_1" },
+      leavesOnly: true,
+      includeStrings: true,
+    });
+    expect(r.mdx).not.toContain("NONEMPTY");
+    expect(r.mdx).toContain("FILTER(");
+    expect(r.mdx).toContain('[Cube_X].([Measure].[KPI_1])<>""');
+    expect(r.mdx).toContain("HEAD(FILTER(");
+  });
+
+  it("includeStrings: scans all members incl. consolidations (ignores leavesOnly)", () => {
+    const r = buildSampleCellsMdx({
+      cubeName: "Cube_X",
+      dimensions: baseDims,
+      maxCells: 5,
+      filters: { Measure: "KPI_1" },
+      leavesOnly: true,
+      includeStrings: true,
+    });
+    expect(r.mdx).not.toContain("TM1FILTERBYLEVEL");
+    expect(r.mdx).toContain("{TM1SUBSETALL([Version])}");
+  });
+
+  it("includeStrings: rejects a multi-member column (predicate needs a single measure cell)", () => {
+    expect(() =>
+      buildSampleCellsMdx({
+        cubeName: "Cube_X",
+        dimensions: baseDims,
+        maxCells: 5,
+        filters: { Measure: ["KPI_1", "KPI_2"] },
+        leavesOnly: true,
+        includeStrings: true,
+      }),
+    ).toThrow(/single element/);
+  });
 });
 
 describe("transformSampleCells", () => {
