@@ -57,7 +57,7 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
           `Process '${processName}' failed at runtime. Inspect cascade with tm1_diagnose_process_error(processName='${processName}', includeRelated=true). Verify parameter shape via tm1_get_process_parameters; check syntax with tm1_compile_process before re-running.`,
         );
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify(result) }],
           // A TI process that ran but reported failure is a tool failure, not a
           // successful call carrying success:false. Flag isError so agents that
           // branch on the MCP error signal don't silently treat it as success;

@@ -182,7 +182,7 @@ export function registerInstallProBundle(server: McpServer, tm1Client: TM1Client
         },
         results,
       };
-      return { content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify(summary) }] };
     },
   );
 }

@@ -16,13 +16,9 @@ export function registerSampleCells(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_sample_cells",
     [
-      "Return up to maxCells populated cells from a cube without guessing element coordinates.",
-      "Internally builds a NON EMPTY CROSSJOIN MDX over the cube's dimensions and HEAD-limits it.",
-      "Use filters to pin or constrain dimensions: a single string becomes a WHERE pin (cheaper),",
-      "an array becomes an axis member set. Useful for sanity-checking after a clone, finding any",
-      "non-zero cells, or debugging empty views. Default maxCells=5; set maxCells=0 for unlimited",
-      "(WARNING: large cubes may return millions of cells — prefer filters first).",
-      "NON EMPTY targets numeric cells; for String value fields set includeStrings=true.",
+      "Return up to maxCells populated cells from a cube without guessing coordinates — builds a NON EMPTY CROSSJOIN MDX over the cube's dimensions and HEAD-limits it.",
+      "For sanity-checks after a clone, finding non-zero cells, or debugging empty views. maxCells=0 means unlimited (WARNING: large cubes may return millions — filter first).",
+      "NON EMPTY targets numeric cells; set includeStrings=true for String value fields.",
     ].join(" "),
     {
       cubeName: z.string().describe("Cube to sample"),
@@ -90,7 +86,7 @@ export function registerSampleCells(server: McpServer, tm1Client: TM1Client) {
       };
 
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(payload) }],
       };
     },
   );

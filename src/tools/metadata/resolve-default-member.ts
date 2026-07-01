@@ -21,7 +21,7 @@ export function registerResolveDefaultMember(server: McpServer, tm1Client: TM1Cl
         hierarchyName,
       );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(result) }],
       };
     },
   );

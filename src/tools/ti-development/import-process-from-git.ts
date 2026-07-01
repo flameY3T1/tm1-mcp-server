@@ -91,7 +91,7 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         });
         if (!check.success) {
           return {
-            content: [{ type: "text" as const, text: JSON.stringify({ stage: "preflight", processName, errors: check.errors }, null, 2) }],
+            content: [{ type: "text" as const, text: JSON.stringify({ stage: "preflight", processName, errors: check.errors }) }],
             isError: true,
           };
         }

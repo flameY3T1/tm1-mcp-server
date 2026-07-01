@@ -56,7 +56,7 @@ export function registerGetFileContent(server: McpServer, tm1Client: TM1Client):
         content: body,
       };
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(payload) }],
       };
     },
   );

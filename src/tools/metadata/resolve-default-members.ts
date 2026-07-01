@@ -39,7 +39,7 @@ export function registerResolveDefaultMembers(server: McpServer, tm1Client: TM1C
         };
       });
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ results }, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ results }) }],
       };
     },
   );

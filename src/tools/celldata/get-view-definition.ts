@@ -22,7 +22,7 @@ export function registerGetViewDefinition(server: McpServer, tm1Client: TM1Clien
     async ({ cubeName, viewName, isPrivate }) => {
       const result = await tm1Client.views.getDefinition(cubeName, viewName, isPrivate);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(result) }],
       };
     },
   );

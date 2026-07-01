@@ -53,7 +53,7 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
       };
       return {
         isError: !result.success || undefined,
-        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(payload) }],
       };
     },
   );

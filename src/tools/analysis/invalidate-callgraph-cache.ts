@@ -15,7 +15,7 @@ export function registerInvalidateCallgraphCache(server: McpServer, _tm1Client: 
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({ cleared, entriesBefore: before }, null, 2),
+              text: JSON.stringify({ cleared, entriesBefore: before }),
             },
           ],
         };

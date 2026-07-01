@@ -66,7 +66,7 @@ export function registerUploadFile(server: McpServer, tm1Client: TM1Client): voi
         container: result.root,
       };
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(payload) }],
         structuredContent: payload,
       };
     },
