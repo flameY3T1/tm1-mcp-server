@@ -67,11 +67,9 @@ export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): 
   server.tool(
     "tm1_list_error_logs",
     [
-      "List TI process error log files on the TM1 server, newest first.",
-      "Filename patterns: modern v11 'TM1ProcessError_<ts>_<id>_<proc>_<hash>.log' and legacy '<proc>_<ts>.log' (use processName to filter both).",
-      "Paginated (default 50/page). For one-call diagnosis of a failed process prefer tm1_diagnose_process_error which combines list + fetch; use this tool when you need to browse the catalogue.",
-      "Follow up with tm1_get_error_log_content for the raw log text.",
-      "Set groupBy='process' for an audit summary: per-process failure count + first/last timestamp + span + per-day frequency, instead of listing every file.",
+      "List TI process error log files on the TM1 server, newest first. Paginated (default 50/page).",
+      "For one-call diagnosis of a failed process prefer tm1_diagnose_process_error (list + fetch combined); use this to browse the catalogue, then tm1_get_error_log_content for raw text.",
+      "groupBy='process' returns a per-process audit summary instead of individual files.",
     ].join(" "),
     {
       processName: z.string().optional()

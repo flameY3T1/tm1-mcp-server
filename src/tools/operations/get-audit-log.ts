@@ -7,7 +7,6 @@ export function registerGetAuditLog(server: McpServer, tm1Client: TM1Client): vo
   server.tool(
     "tm1_get_audit_log",
     "Fetch recent TM1 audit log entries (metadata/security changes: who changed what, when), newest first. " +
-      "Optional filters: user, objectType (e.g. Cube, Dimension, Process, User, Chore, Server), objectName, since/until (ISO timestamps). " +
       "Requires AuditLogOn=T in tm1s.cfg — an empty result on an active server usually means auditing is disabled " +
       "(check auditLogEnabled in tm1_get_server_info).",
     {

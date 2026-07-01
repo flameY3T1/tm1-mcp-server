@@ -10,11 +10,9 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_list_processes",
     [
-      "List TurboIntegrator processes in the TM1 server with their parameters.",
-      "Control processes (names starting with '}') are excluded by default — set includeControl=true to include them.",
-      "Filters: nameContains (case-insensitive substring), nameRegex (JS RegExp), nameNotContains, excludePattern (JS RegExp).",
-      "Projection: fields=['name'] drops parameters[] for compact output (recommended for >100 procs).",
-      "Paginated (default 50/page). Returns {total, count, offset, has_more, next_offset, items}.",
+      "List TurboIntegrator processes (with parameters) in the TM1 server. Control processes ('}'-prefixed) excluded unless includeControl=true.",
+      "Name filters (nameContains/nameRegex/nameNotContains/excludePattern) and fields=['name'] projection trim payload on large models.",
+      "Paginated (default 50/page).",
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,

@@ -12,11 +12,9 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_list_cubes",
     [
-      "List cubes in the TM1 server.",
-      "Control cubes (names starting with '}') are excluded by default — set includeControl=true to include them.",
-      "Name filters (combinable, applied after includeControl): nameExact (case-sensitive single match, fast-path), nameContains (case-insensitive substring), nameRegex (JS regex, case-insensitive).",
-      "Projection: includeDimensions=false drops dimensions[] (~5x payload shrink for wide cubes). includeRules=true adds hasRules:boolean per cube via a single OData round-trip.",
-      "Paginated (default 50/page). Returns {total, count, offset, has_more, next_offset, items}.",
+      "List cubes in the TM1 server. Control cubes ('}'-prefixed) excluded unless includeControl=true.",
+      "Combinable name filters (nameExact/nameContains/nameRegex) and projection toggles (includeDimensions, includeRules) trim payload on wide models.",
+      "Paginated (default 50/page).",
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,

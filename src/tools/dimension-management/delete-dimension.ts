@@ -9,7 +9,6 @@ export function registerDeleteDimension(server: McpServer, tm1Client: TM1Client)
     "tm1_delete_dimension",
     [
       "Delete a TM1 dimension and all its hierarchies. Warning: fails if the dimension is used in a cube.",
-      "Safety: pass confirm=<dimension name verbatim>. Mismatched confirm rejects the call.",
       "Before: tm1_find_orphan_dimensions to confirm the dimension is unused, or tm1_analyze_object_usage for a targeted check.",
     ].join(" "),
     {

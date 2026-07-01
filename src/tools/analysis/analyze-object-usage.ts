@@ -9,10 +9,7 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
     "tm1_analyze_object_usage",
     [
       "Find every reference to a cube or dimension across all TI processes (CellGet/Put, ViewExtract, ZeroOut, …) and cube rules (DB(), [dim].[el]).",
-      "Returns a flat list of {sourceKind, sourceName, section, line, funcName, accessType, snippet}, sorted by source.",
-      "Excludes a cube's self-references inside its own rules.",
-      "Use accessMode='write' for data-flow analysis (what writes into this cube) or 'read' for consumption analysis.",
-      "Set mode='summary' for a per-source aggregation (drops snippets): one row per process/rule with its accessTypes, sections, and funcNames, sorted by usage count. Collapses hundreds of usages into a compact data-flow overview.",
+      "Returns a flat list sorted by source; excludes a cube's self-references inside its own rules. accessMode picks read vs write (data-flow) analysis; mode='summary' collapses per-source and drops snippets.",
     ].join(" "),
     {
       kind: z.enum(["cube", "dimension"]).describe("Object kind to look up"),

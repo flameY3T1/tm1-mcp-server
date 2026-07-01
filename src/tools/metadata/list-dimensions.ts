@@ -12,13 +12,9 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
   server.tool(
     "tm1_list_dimensions",
     [
-      "List dimensions in the TM1 server with their hierarchy names.",
-      "Control dimensions (names starting with '}') are excluded by default — set includeControl=true to include them.",
-      "Set includeElementCount=true to size each dimension's hierarchies in one round-trip — avoids per-dimension tm1_get_hierarchy calls during audits.",
-      "Set includeElementStats=true to get per-Type breakdown {total, numeric, consolidated, string, maxLevel} per hierarchy — drives double-hierarchy / orphan detection without cube/MDX dependency. Heavier payload (scans all elements server-side). Overrides includeElementCount when both set.",
-      "Set includeLastUpdated=true to attach `lastUpdated` (server-local ISO) per dimension from }DimensionProperties.LAST_TIME_UPDATED — a schema-change stamp (bumped on element/hierarchy/attribute edits, NOT on data writes). One extra MDX round-trip.",
-      "Set changedSince (date or datetime, e.g. '2026-04-01' or '2026-04-01T08:30') to return only dimensions modified at/after it — implies includeLastUpdated. Compared in server-local time.",
-      "Paginated (default 50/page). Returns {total, count, offset, has_more, next_offset, items}.",
+      "List dimensions (with their hierarchy names) in the TM1 server. Control dimensions ('}'-prefixed) excluded unless includeControl=true.",
+      "Optional per-dimension enrichment: includeElementCount/includeElementStats (sizing + per-type breakdown for orphan/double-hierarchy audits), includeLastUpdated/changedSince (schema-change stamp — bumped on metadata edits, NOT on data writes).",
+      "Paginated (default 50/page).",
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,

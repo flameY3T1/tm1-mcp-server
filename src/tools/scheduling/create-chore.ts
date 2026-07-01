@@ -59,7 +59,7 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
             ...(coerced ? {
               warning: `startTime had no timezone offset; auto-appended 'Z' → '${normalizedStartTime}'. Pass an explicit offset to silence this.`,
             } : {}),
-          }, null, 2),
+          }),
         }],
       };
     },

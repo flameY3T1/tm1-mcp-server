@@ -17,10 +17,8 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_list_chores",
     [
-      "List chores in the TM1 server with schedule and assigned processes.",
-      "Use compact=true to replace the full processes[] array with processCount (~5–10x payload shrink for chores with many steps).",
-      "Filter: processNameContains restricts results to chores whose steps reference a process matching the substring (case-insensitive).",
-      "Paginated (default 50/page). Returns {total, count, offset, has_more, next_offset, items}.",
+      "List chores in the TM1 server with schedule and assigned processes. compact=true replaces processes[] with processCount; processNameContains filters by referenced process.",
+      "Paginated (default 50/page).",
     ].join(" "),
     {
       ...PAGINATION_SCHEMA,

@@ -36,7 +36,7 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
             lineCount,
             skipCheck,
             callgraphEntriesCleared,
-          }, null, 2),
+          }),
         }],
       };
     },
