@@ -15,7 +15,7 @@ import type {
   ViewDefinition,
   ViewResult,
 } from "../../types.js";
-import type { TM1HttpClient } from "../http.js";
+import type { RequestOptions, TM1HttpClient } from "../http.js";
 import { transformCellsetResponse } from "./cellset-transform.js";
 import { rethrowIfSystemic } from "./fallback.js";
 
@@ -56,12 +56,26 @@ export class ViewService {
   }
 
   /**
-   * Execute a named view and return its cells + axes.
+   * Execute a named view and return its cells + axes. Cells paginate
+   * server-side via $top/$skip (mirrors CellService.executeMdx) so wide/tall
+   * views don't dump their whole cellset; totalCellCount stays exact (product
+   * of axis tuple counts) regardless of the slice.
    * POST /api/v1/Cubes('{c}')/Views('{v}')/tm1.Execute
    */
-  async getView(cubeName: string, viewName: string): Promise<ViewResult> {
+  async getView(
+    cubeName: string,
+    viewName: string,
+    top?: number,
+    skip?: number,
+    opts?: RequestOptions,
+  ): Promise<ViewResult> {
+    let cellsExpand = "Cells($select=Value,FormattedValue";
+    if (top !== undefined) cellsExpand += `;$top=${top}`;
+    if (skip !== undefined) cellsExpand += `;$skip=${skip}`;
+    cellsExpand += ")";
+
     const axesExpand = "Axes($expand=Tuples($expand=Members($select=Name;$expand=Hierarchy($select=Name))))";
-    const path = `/api/v1/Cubes('${enc(cubeName)}')/Views('${enc(viewName)}')/tm1.Execute?$expand=Cells($select=Value,FormattedValue),${axesExpand}`;
+    const path = `/api/v1/Cubes('${enc(cubeName)}')/Views('${enc(viewName)}')/tm1.Execute?$expand=${cellsExpand},${axesExpand}`;
 
     const response = await this.http.request<{
       ID: string;
@@ -74,7 +88,7 @@ export class ViewService {
           }>;
         }>;
       }>;
-    }>("POST", path);
+    }>("POST", path, undefined, opts);
 
     const mdxResult = transformCellsetResponse(response);
 
@@ -83,6 +97,7 @@ export class ViewService {
       viewName,
       cells: mdxResult.cells,
       axes: mdxResult.axes,
+      totalCellCount: mdxResult.totalCellCount,
     };
   }
 
