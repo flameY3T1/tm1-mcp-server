@@ -5,11 +5,9 @@ export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_get_hierarchy",
     [
-      "Get hierarchy elements with parent-child relationships for a given dimension.",
-      "Filters reduce payload before transit: level (exact), levelMax (≤), elementType (Numeric/String/Consolidated/All), topN (truncate after filter).",
-      "Name filters: nameContains/nameStartsWith pushed server-side via OData (saves bandwidth on large dims). nameRegex applied client-side after fetch.",
+      "Get hierarchy elements with parent-child relationships for a dimension.",
+      "Filters (level/levelMax/elementType, name filters, compact) reduce payload; capped to topN (default 1000) with truncated=true when the cap clips — raise topN for more.",
       "Filtered-out parents/children are pruned from remaining elements to avoid dangling references.",
-      "Use compact=true to drop the parents[] and children[] arrays and shrink large dimensions ~10x (keeps name/type/level only).",
     ].join(" "),
     {
       dimensionName: z.string().describe("Name of the TM1 dimension"),
@@ -26,8 +24,8 @@ export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
         .describe("Server-side OData prefix filter (startswith). Case-sensitive."),
       nameRegex: z.string().optional()
         .describe("Client-side regex filter on element name (JS RegExp). Use for patterns OData cannot express. Invalid regex throws VALIDATION_ERROR."),
-      topN: z.number().int().positive().optional()
-        .describe("Truncate to first N elements after filter. Use to preview large dims."),
+      topN: z.number().int().positive().optional().default(1000)
+        .describe("Max elements returned after filter (default 1000). Caps large dimensions; result sets truncated=true when the cap clipped the set. Raise to fetch more."),
       compact: z.boolean().optional().default(false)
         .describe("Drop parents[] and children[] arrays from each element. Use for hierarchy overviews."),
     },
@@ -39,20 +37,21 @@ export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
         ...(nameContains !== undefined ? { nameContains } : {}),
         ...(nameStartsWith !== undefined ? { nameStartsWith } : {}),
         ...(nameRegex !== undefined ? { nameRegex } : {}),
-        ...(topN !== undefined ? { topN } : {}),
+        topN,
       });
-      const output = compact
-        ? {
-            ...hierarchy,
-            elements: hierarchy.elements.map((e) => ({
-              name: e.name,
-              type: e.type,
-              level: e.level,
-            })),
-          }
-        : hierarchy;
+      // The service caps the element set at topN; a full page means the cap
+      // clipped the (post-filter) result, so more elements may exist.
+      const truncated = hierarchy.elements.length === topN;
+      const elements = compact
+        ? hierarchy.elements.map((e) => ({
+            name: e.name,
+            type: e.type,
+            level: e.level,
+          }))
+        : hierarchy.elements;
+      const output = { ...hierarchy, elements, truncated };
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(output, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(output) }],
       };
     },
   );
