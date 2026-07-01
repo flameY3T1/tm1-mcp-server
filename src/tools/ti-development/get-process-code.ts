@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { commentStats, stripCommentBlocks } from "../../lib/strip-comments.js";
+import { maskCode } from "../../lib/mask-secrets.js";
 
 // A tab counts as comment-heavy (worth flagging for stripComments) only when it
 // is both long enough to matter and mostly comments.
@@ -22,8 +23,12 @@ export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) 
         "If true, collapse blocks of 4+ consecutive comment lines into a single marker (dead-code reduction). " +
           "Inline and short comments are kept. Default false (full verbatim source).",
       ),
+      maskSecrets: z.boolean().optional().default(true).describe(
+        "Redact credential literals in the returned code. Masks the password arg of ODBCOpen() and quoted values " +
+          "assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
+      ),
     },
-    async ({ processName, stripComments }) => {
+    async ({ processName, stripComments, maskSecrets }) => {
       const code = await tm1Client.processes.getCode(processName);
       let hint: string | undefined;
 
@@ -57,9 +62,13 @@ export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) 
         }
       }
 
+      if (maskSecrets) {
+        for (const tab of TABS) code[tab] = maskCode(code[tab]);
+      }
+
       const payload = { ...code, ...(hint ? { hint } : {}) };
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(payload) }],
       };
     },
   );

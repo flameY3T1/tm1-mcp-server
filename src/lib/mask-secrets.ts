@@ -30,5 +30,25 @@ export function maskCodeLine(line: string): string {
     (_m, prefix) => `${prefix}'${MASK}'`,
   );
 
+  // Connection-string credential pairs embedded INSIDE a string literal, e.g.
+  //   'Driver={SQL Server};Server=srv;UID=admin;PWD=hunter2;'
+  // These slip past the arg-position and keyword-before-'=' passes because the
+  // credential lives inside another literal (ODBCOpen 1st arg, or a conn string
+  // assigned to a non-credential-named var). Mask just the VALUE, keep the key.
+  // Value = bare token up to the next ';' or quote (unquoted conn-string syntax);
+  // the [^;'"]+ capture is a single linear quantifier — no nested backtracking.
+  out = out.replace(
+    /\b(pwd|password|uid|user\s*id)(\s*=\s*)([^;'"]+)/gi,
+    (_m, key, eq) => `${key}${eq}${MASK}`,
+  );
+
   return out;
+}
+
+// Mask credential literals across a whole (possibly multi-line) code blob by
+// applying maskCodeLine to each line. Splits on "\n" only so CRLF/CR endings
+// are preserved byte-for-byte (the trailing "\r" rides along on each line and
+// is untouched by maskCodeLine).
+export function maskCode(code: string): string {
+  return code.split("\n").map(maskCodeLine).join("\n");
 }

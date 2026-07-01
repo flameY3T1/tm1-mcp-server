@@ -6,6 +6,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import type { ProcessParameter, ProcessVariable, DataSource } from "../../types.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
+import { maskCode } from "../../lib/mask-secrets.js";
 
 interface TabDiff {
   tab: "prolog" | "metadata" | "data" | "epilog";
@@ -98,8 +99,17 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
       filePath: z.string().optional().describe("Absolute path to the .pro file on the MCP server host. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline."),
       content: z.string().optional().describe("Raw .pro file content as string"),
       processName: z.string().optional().describe("Override process name. Default: from .pro 602 line."),
+      maskSecrets: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Redact credential literals on BOTH sides before diffing (so a cred present on only one side can't leak via the diff). " +
+            "Masks the password arg of ODBCOpen() and quoted values assigned to credential-named identifiers (pPwd, sToken, …). " +
+            "Default: true. Set false only when explicitly auditing credentials.",
+        ),
     },
-    async ({ filePath, content, processName }) => {
+    async ({ filePath, content, processName, maskSecrets }) => {
       if (!filePath && !content) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
@@ -127,11 +137,12 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
         tm1Client.processes.getDataSource(name),
       ]);
 
+      const mask = maskSecrets ? maskCode : (s: string) => s;
       const tabs = [
-        tabDiff("prolog", installedCode.prolog, parsed.prolog),
-        tabDiff("metadata", installedCode.metadata, parsed.metadata),
-        tabDiff("data", installedCode.data, parsed.data),
-        tabDiff("epilog", installedCode.epilog, parsed.epilog),
+        tabDiff("prolog", mask(installedCode.prolog), mask(parsed.prolog)),
+        tabDiff("metadata", mask(installedCode.metadata), mask(parsed.metadata)),
+        tabDiff("data", mask(installedCode.data), mask(parsed.data)),
+        tabDiff("epilog", mask(installedCode.epilog), mask(parsed.epilog)),
       ];
       const params = diffParams(installedParams, parsed.parameters);
       const variables = diffVars(installedVars, parsed.variables);

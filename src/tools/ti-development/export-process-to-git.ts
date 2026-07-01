@@ -6,6 +6,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeProcessToGit } from "../../lib/git-process.js";
+import { maskCode } from "../../lib/mask-secrets.js";
 
 export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -22,8 +23,16 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         .string()
         .optional()
         .describe("Optional absolute host directory to write '{name}.json' and '{name}.ti' into. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. If omitted, content is only returned inline."),
+      maskSecrets: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Redact credential literals in the exported .ti code (inline and written file). Masks the password arg of ODBCOpen() and quoted values " +
+            "assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
+        ),
     },
-    async ({ processName, writeToDir }) => {
+    async ({ processName, writeToDir, maskSecrets }) => {
       const [code, parameters, variables, dataSource] = await Promise.all([
         tm1Client.processes.getCode(processName),
         tm1Client.processes.getParameters(processName),
@@ -31,12 +40,13 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         tm1Client.processes.getDataSource(processName),
       ]);
 
+      const mask = maskSecrets ? maskCode : (s: string) => s;
       const { json, ti, credentialsOmitted } = serializeProcessToGit({
         name: processName,
-        prolog: code.prolog,
-        metadata: code.metadata,
-        data: code.data,
-        epilog: code.epilog,
+        prolog: mask(code.prolog),
+        metadata: mask(code.metadata),
+        data: mask(code.data),
+        epilog: mask(code.epilog),
         parameters,
         variables,
         dataSource,
@@ -78,7 +88,7 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
             writtenTo,
             json,
             ti,
-          }, null, 2),
+          }),
         }],
       };
     },
