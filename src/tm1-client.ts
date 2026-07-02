@@ -20,8 +20,17 @@ import { ServerService } from "./tm1-client/services/server-service.js";
 import { MonitoringService } from "./tm1-client/services/monitoring-service.js";
 import { FileService } from "./tm1-client/services/file-service.js";
 
-export class TM1Client extends TM1HttpClient {
+export class TM1Client {
   private connected = false;
+
+  // Transport is HELD, not inherited. Because TM1Client no longer `extends`
+  // TM1HttpClient, its public type does not expose `request()/requestRaw()/
+  // requestBinary()`, so a tool typed on TM1Client cannot call raw REST — that
+  // is now a compile error (`tsc`), not just a `lint:no-flat-api` failure.
+  // Services that legitimately need transport receive `this.http` explicitly.
+  private readonly http: TM1HttpClient;
+  private readonly sessionManager: SessionManager;
+  private readonly logger: pino.Logger;
 
   // Domain services. Init order matters when services depend on each other —
   // `cells` is created before `elements` because the latter holds a CellService
@@ -41,26 +50,28 @@ export class TM1Client extends TM1HttpClient {
   readonly files: FileService;
 
   constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
-    super(config, sessionManager, logger);
-    this.cubes = new CubeService(this);
-    this.dimensions = new DimensionService(this);
-    this.hierarchies = new HierarchyService(this);
-    this.cells = new CellService(this);
-    this.views = new ViewService(this);
-    this.subsets = new SubsetService(this);
+    this.http = new TM1HttpClient(config, sessionManager, logger);
+    this.sessionManager = sessionManager;
+    this.logger = logger;
+    this.cubes = new CubeService(this.http);
+    this.dimensions = new DimensionService(this.http);
+    this.hierarchies = new HierarchyService(this.http);
+    this.cells = new CellService(this.http);
+    this.views = new ViewService(this.http);
+    this.subsets = new SubsetService(this.http);
     // ElementService depends on CellService — `cells` MUST be constructed above.
     // Enforced at runtime so a future reorder fails loudly instead of injecting
     // `undefined` (TS types it as defined, so the compiler won't catch a move).
     if (!this.cells) {
       throw new Error("TM1Client init order: CellService must be constructed before ElementService");
     }
-    this.elements = new ElementService(this, this.cells);
-    this.processes = new ProcessService(this);
-    this.chores = new ChoreService(this);
-    this.security = new SecurityService(this);
-    this.server = new ServerService(this);
-    this.monitoring = new MonitoringService(this);
-    this.files = new FileService(this);
+    this.elements = new ElementService(this.http, this.cells);
+    this.processes = new ProcessService(this.http);
+    this.chores = new ChoreService(this.http);
+    this.security = new SecurityService(this.http);
+    this.server = new ServerService(this.http);
+    this.monitoring = new MonitoringService(this.http);
+    this.files = new FileService(this.http);
   }
 
   /**

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import * as fc from "fast-check";
-import { TM1Client } from "../../src/tm1-client.js";
+import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
 import { TM1Error, TM1ErrorCode } from "../../src/types.js";
 import type { TM1Config } from "../../src/config.js";
@@ -28,7 +28,7 @@ function makeConfig(): TM1Config {
   };
 }
 
-class TestTM1Client extends TM1Client {
+class TestTM1Client extends TM1HttpClient {
   async testRequest<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
     return this.request<T>(method, path, body);
   }

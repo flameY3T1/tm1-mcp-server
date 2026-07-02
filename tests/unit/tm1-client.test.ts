@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TM1Client } from "../../src/tm1-client.js";
+import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
 import { TM1Error, TM1ErrorCode } from "../../src/types.js";
 import type { TM1Config } from "../../src/config.js";
@@ -50,9 +51,11 @@ function mockResponse(opts: {
 }
 
 /**
- * Expose the protected `request` method for testing via a thin subclass.
+ * Expose the transport `request` method for testing via a thin subclass.
+ * Transport lives on TM1HttpClient (TM1Client no longer inherits it — it holds
+ * a private `http` instead), so the request-behavior suite tests it here.
  */
-class TestTM1Client extends TM1Client {
+class TestTM1Client extends TM1HttpClient {
   async testRequest<T = unknown>(
     method: string,
     path: string,
@@ -68,6 +71,8 @@ describe("TM1Client", () => {
   let fetchSpy: ReturnType<typeof vi.fn>;
   let sessionManager: SessionManager;
   let client: TestTM1Client;
+  // Lifecycle (connect/disconnect/isConnected) lives on the TM1Client facade.
+  let lifecycleClient: TM1Client;
 
   beforeEach(() => {
     fetchSpy = vi.fn();
@@ -76,6 +81,7 @@ describe("TM1Client", () => {
     const config = makeConfig();
     sessionManager = new SessionManager(config, mockLogger);
     client = new TestTM1Client(config, sessionManager, mockLogger);
+    lifecycleClient = new TM1Client(config, sessionManager, mockLogger);
 
     // Default: ensureSession returns a cookie
     vi.spyOn(sessionManager, "ensureSession").mockResolvedValue("session123");
@@ -93,32 +99,32 @@ describe("TM1Client", () => {
 
   describe("connect()", () => {
     it("should authenticate and start keep-alive", async () => {
-      await client.connect();
+      await lifecycleClient.connect();
 
       expect(sessionManager.authenticate).toHaveBeenCalledOnce();
       expect(sessionManager.startKeepAlive).toHaveBeenCalledOnce();
-      expect(client.isConnected()).toBe(true);
+      expect(lifecycleClient.isConnected()).toBe(true);
     });
   });
 
   describe("disconnect()", () => {
     it("should stop keep-alive and mark as disconnected", async () => {
-      await client.connect();
-      await client.disconnect();
+      await lifecycleClient.connect();
+      await lifecycleClient.disconnect();
 
       expect(sessionManager.stopKeepAlive).toHaveBeenCalledOnce();
-      expect(client.isConnected()).toBe(false);
+      expect(lifecycleClient.isConnected()).toBe(false);
     });
   });
 
   describe("isConnected()", () => {
     it("should return false before connect", () => {
-      expect(client.isConnected()).toBe(false);
+      expect(lifecycleClient.isConnected()).toBe(false);
     });
 
     it("should return true after connect", async () => {
-      await client.connect();
-      expect(client.isConnected()).toBe(true);
+      await lifecycleClient.connect();
+      expect(lifecycleClient.isConnected()).toBe(true);
     });
   });
 
