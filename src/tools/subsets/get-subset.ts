@@ -14,7 +14,7 @@ export function registerGetSubset(server: McpServer, tm1Client: TM1Client) {
     async ({ dimensionName, hierarchyName, subsetName, isPrivate }) => {
       const subset = await tm1Client.subsets.get(dimensionName, hierarchyName, subsetName, isPrivate ?? false);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(subset, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(subset) }],
       };
     },
   );

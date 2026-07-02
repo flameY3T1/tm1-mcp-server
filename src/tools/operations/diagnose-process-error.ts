@@ -15,8 +15,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
     [
       "One-call error diagnosis for a failed TI process: lists matching error logs, fetches their content,",
       "and optionally includes cascade-related sibling logs (same timestamp window) in a single response.",
-      "Replaces the manual sequence: tm1_list_error_logs → tm1_get_error_log_content (× N).",
-      "Returns logs newest-first. Use since to narrow to a specific time window.",
+      "Replaces the manual sequence tm1_list_error_logs → tm1_get_error_log_content (× N). Returns logs newest-first.",
     ].join(" "),
     {
       processName: z.string().describe("Process name to diagnose. Matches both TM1 filename conventions: modern 'TM1ProcessError_<ts>_<id>_<processName>.log' and legacy '<processName>_<ts>.log'."),
@@ -46,7 +45,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
         return {
           content: [{
             type: "text" as const,
-            text: JSON.stringify({ processName, since: since ?? null, logsFound: 0, logsReturned: 0, logs: [] }, null, 2),
+            text: JSON.stringify({ processName, since: since ?? null, logsFound: 0, logsReturned: 0, logs: [] }),
           }],
         };
       }
@@ -116,7 +115,7 @@ export function registerDiagnoseProcessError(server: McpServer, tm1Client: TM1Cl
             logsFound: matching.length,
             logsReturned: logs.length,
             logs,
-          }, null, 2),
+          }),
         }],
       };
     },

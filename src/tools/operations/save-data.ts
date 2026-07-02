@@ -38,7 +38,7 @@ export function registerSaveData(server: McpServer, tm1Client: TM1Client): void 
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ ...result, scope: cube ?? "all" }, null, 2),
+            text: JSON.stringify({ ...result, scope: cube ?? "all" }),
           },
         ],
         // A failed SaveData is a data-persistence failure (in-memory data not

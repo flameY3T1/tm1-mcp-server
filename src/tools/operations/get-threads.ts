@@ -35,7 +35,7 @@ export function registerGetThreads(server: McpServer, tm1Client: TM1Client): voi
     },
     async ({ id }) => {
       await tm1Client.monitoring.cancelThread(id);
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, threadId: id }, null, 2) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, threadId: id }) }] };
     },
   );
 }

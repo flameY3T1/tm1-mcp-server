@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-07-02
+
+Hardening release: security, bounded outputs, robustness, and internal
+layering. Two output-shape changes are noted below — they affect how a client
+reads results, though in practice an MCP agent reads the envelope dynamically.
+
+### ⚠️ Output-shape changes
+
+- `tm1_get_view` now returns a paginated envelope
+  (`{ items, total, count, offset, has_more, next_offset, axes }`) instead of a
+  raw cellset, and paginates by default. Pass `fetchAll: true` (or `limit: 0`)
+  for the full cellset. The cell array moved from `cells` to `items`.
+- `tm1_resolve_default_member` was removed; use `tm1_resolve_default_members`
+  with a single-item array (`items: [{ dimensionName }]`). The resolved member
+  is `results[0].resolved.name` (content is identical to the old tool).
+
+### Added
+
+- `tm1_get_view`: `format='markdown'` pivot-grid/flat-table rendering plus
+  `limit`/`offset`/`fetchAll` pagination (`$top`/`$skip` pushed server-side),
+  reusing the `tm1_execute_mdx` envelope.
+- `tm1_get_hierarchy`: default element cap with a `truncated` flag on cut output.
+- Code-reading TI tools (`tm1_get_process_code`, `tm1_export_process_to_pro`,
+  `tm1_export_process_to_git`, `tm1_diff_processes`, `tm1_diff_process_with_file`)
+  gain a `maskSecrets` flag (default `true`) that masks inline ODBC/connection
+  credentials before returning or writing code.
+- outputSchema byte-budget CI gate (`lint:output-schema-budget`) guarding the
+  tools/list payload against schema bloat; wired into `npm run verify` and CI.
+
+### Changed
+
+- Tool responses now emit compact JSON (disk artifacts stay pretty-printed),
+  cutting every large response body.
+- Trimmed verbose top-level tool descriptions that restated per-field docs.
+- `TM1Client` uses composition over inheritance so the raw transport surface is
+  no longer reachable from the tools layer (compiler-enforced, not just lint).
+
+### Removed
+
+- `tm1_resolve_default_member` (merged into `tm1_resolve_default_members`);
+  tool count 112 → 111.
+
+### Fixed
+
+- Inline ODBC/connection-string credentials in TI code are now masked in the
+  five code-reading tools (previously returned — and for git export, written to
+  disk — in plaintext).
+- Transaction-log windowing/probe paths no longer swallow connection outages or
+  permission denials as an empty "no data in range" result.
+- Network-error classification uses `err.cause.code` (undici) instead of brittle
+  message-substring matching that varied by Node version and locale.
+- `asOutputSchema` no longer reads Zod's private `_def`; uses the public
+  accessor and pins Zod to an exact version with a regression test.
+
 ## [1.0.1] - 2026-06-30
 
 ### Added

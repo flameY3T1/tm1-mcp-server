@@ -11,7 +11,7 @@ export function registerAssignClientGroup(server: McpServer, tm1Client: TM1Clien
     },
     async ({ clientName, groupName }) => {
       await tm1Client.security.assignClientGroup(clientName, groupName);
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, clientName, groupName }, null, 2) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, clientName, groupName }) }] };
     },
   );
 }

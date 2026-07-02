@@ -28,3 +28,17 @@ export function rethrowIfSystemic(e: unknown): void {
   if (e instanceof TM1Error && !SYSTEMIC_CODES.has(e.code)) return;
   throw e;
 }
+
+/**
+ * Stricter variant for transaction-log windowing/probe paths: rethrows
+ * everything `rethrowIfSystemic` does AND `PERMISSION_DENIED`. Here a permission
+ * denial (e.g. cube-level security on a filtered query) must surface — swallowing
+ * it would return an empty window that reads as "no transactions in range",
+ * hiding the fact the caller simply cannot see the data. Use this instead of
+ * `rethrowIfSystemic` wherever an empty result is otherwise indistinguishable
+ * from "access denied".
+ */
+export function rethrowIfSystemicOrDenied(e: unknown): void {
+  if (e instanceof TM1Error && e.code === TM1ErrorCode.PERMISSION_DENIED) throw e;
+  rethrowIfSystemic(e);
+}

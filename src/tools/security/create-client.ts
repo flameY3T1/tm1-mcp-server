@@ -13,7 +13,7 @@ export function registerCreateClient(server: McpServer, tm1Client: TM1Client) {
     },
     async (args) => {
       await tm1Client.security.createClient(args);
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, name: args.name }, null, 2) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, name: args.name }) }] };
     },
   );
 }

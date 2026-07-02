@@ -41,7 +41,7 @@ export function registerUpdateChore(server: McpServer, tm1Client: TM1Client): vo
           warning: `startTime had no timezone offset; auto-appended 'Z' → '${updates.startTime}'. Pass an explicit offset to silence this.`,
         } : {}),
       };
-      return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
+      return { content: [{ type: "text" as const, text: JSON.stringify(payload) }] };
     },
   );
 }

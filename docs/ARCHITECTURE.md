@@ -105,7 +105,7 @@ Key conventions:
 | Method names          | Domain-scoped — `list()`, not `listCubes()`. Prefix is implicit |
 | Long-running calls    | Accept `opts?: { timeoutMs?: number }` and pass to `request()`  |
 | Logging               | Use `this.http.logger` for warnings only — keep services quiet  |
-| Version branches      | `if (this.http.config.tm1Version.startsWith("11"))`             |
+| Version branches      | `if (this.http.tm1Version.startsWith("11"))`                    |
 | Helpers               | Private methods on the service (e.g. `clearViaTI`)              |
 | State                 | None. Services are stateless wrappers.                          |
 
@@ -113,19 +113,25 @@ Key conventions:
 
 ```ts
 // src/tm1-client.ts
-export class TM1Client extends TM1HttpClient {
+export class TM1Client {
+  private readonly http: TM1HttpClient;
   readonly cubes: CubeService;
 
   constructor(config, sessionManager, logger) {
-    super(config, sessionManager, logger);
-    this.cubes = new CubeService(this);
+    this.http = new TM1HttpClient(config, sessionManager, logger);
+    this.cubes = new CubeService(this.http);
   }
 }
 ```
 
-`new CubeService(this)` is safe because `this` is a `TM1HttpClient` —
-TypeScript accepts the upcast since `TM1Client extends TM1HttpClient`.
-The service does not see `TM1Client`-specific surface, only HTTP transport.
+`TM1Client` **holds** the transport (`private readonly http`) rather than
+extending it. That is a load-bearing type boundary: because `TM1Client` does
+not `extend TM1HttpClient`, its public type does **not** expose
+`request()/requestRaw()/requestBinary()`, so a tool typed on `TM1Client`
+cannot call raw REST — that is a `tsc` compile error, not merely a
+`lint:no-flat-api` failure. Services that legitimately need transport receive
+`this.http` explicitly (`new CubeService(this.http)`), so they see the HTTP
+surface while tools never do.
 
 **Init order is load-bearing where one service depends on another.**
 `ElementService` takes `CellService` (`new ElementService(this, this.cells)`),

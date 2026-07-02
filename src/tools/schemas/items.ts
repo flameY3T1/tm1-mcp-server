@@ -312,6 +312,8 @@ export const HierarchySchema = z.object({
   name: z.string(),
   dimensionName: z.string(),
   elements: z.array(HierarchyElementSchema),
+  // true when the topN cap clipped the (post-filter) element set — raise topN.
+  truncated: z.boolean(),
 });
 
 export const ProcessCodeSchema = z.object({
@@ -375,13 +377,21 @@ export const MdxAxisSchema = z.object({
   ),
 });
 
+// tm1_get_view returns the same page-envelope shape as tm1_execute_mdx
+// (axes + paginated cell `items`), plus the cube/view it executed. Cells
+// paginate server-side so wide/tall views can't dump their whole cellset.
 export const ViewResultSchema = z.object({
   cubeName: z.string(),
   viewName: z.string(),
-  cells: z.array(
+  axes: z.array(MdxAxisSchema),
+  total: z.number().int().nullable(),
+  count: z.number().int(),
+  offset: z.number().int(),
+  has_more: z.boolean(),
+  next_offset: z.number().int().nullable(),
+  items: z.array(
     z.object({ value: CellValueSchema, formattedValue: z.string() }),
   ),
-  axes: z.array(MdxAxisSchema),
 });
 
 export const SampleCellsResultSchema = z.object({

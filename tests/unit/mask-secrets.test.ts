@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSecretName, maskCodeLine, MASK } from "../../src/lib/mask-secrets.js";
+import { isSecretName, maskCode, maskCodeLine, MASK } from "../../src/lib/mask-secrets.js";
 
 describe("isSecretName", () => {
   it.each([
@@ -48,5 +48,48 @@ describe("maskCodeLine", () => {
     expect(out).toContain("'MyDSN'");
     expect(out).toContain("'svc_user'");
     expect(out).not.toContain("topSecret");
+  });
+
+  it("masks conn-string creds in DSN-less ODBCOpen first arg (bypass #1)", () => {
+    const out = maskCodeLine(
+      "ODBCOpen('Driver={SQL Server};Server=srv;UID=admin;PWD=hunter2;', '', '');",
+    );
+    expect(out).not.toContain("hunter2");
+    expect(out).not.toContain("admin");
+    expect(out).toContain("PWD=***");
+    expect(out).toContain("UID=***");
+  });
+
+  it("masks conn-string creds assigned to non-credential var (bypass #2)", () => {
+    const out = maskCodeLine(
+      "sConn = 'Provider=SQLOLEDB;Server=srv;UID=admin;PWD=hunter2;';",
+    );
+    expect(out).not.toContain("hunter2");
+    expect(out).not.toContain("admin");
+    expect(out).toContain("PWD=***");
+    expect(out).toContain("UID=***");
+  });
+});
+
+describe("maskCode", () => {
+  it("masks credential literals across every line of a multi-line blob", () => {
+    const code = [
+      "sMsg = 'start';",
+      "ODBCOpen('SalesDSN', 'svc_user', 'S3cr3t_Pw!');",
+      "pPwd = 'anotherSecret';",
+    ].join("\n");
+    const out = maskCode(code);
+    expect(out).not.toContain("S3cr3t_Pw!");
+    expect(out).not.toContain("anotherSecret");
+    expect(out).toContain(MASK);
+    // Non-credential line untouched.
+    expect(out).toContain("sMsg = 'start';");
+  });
+
+  it("preserves CRLF line endings byte-for-byte", () => {
+    const code = "a = 1;\r\nODBCOpen('D', 'u', 'pw');\r\nb = 2;";
+    const out = maskCode(code);
+    expect(out).toContain("\r\n");
+    expect(out).not.toContain("'pw'");
   });
 });

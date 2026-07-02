@@ -39,6 +39,17 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Schema gates: coverage + registration parse src; the byte-budget gate
+      # measures the compiled dist payload, so all three run after Build.
+      - name: Lint (output-schema coverage)
+        run: npm run lint:output-schema
+
+      - name: Lint (output-schema byte budget)
+        run: npm run lint:output-schema-budget
+
+      - name: Lint (tool registration)
+        run: npm run lint:tool-registration
+
       - name: Coverage (enforces vitest thresholds)
         run: npm run test:coverage
 

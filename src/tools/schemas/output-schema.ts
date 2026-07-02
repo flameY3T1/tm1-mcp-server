@@ -12,11 +12,17 @@ import type { ZodObject, ZodRawShape, ZodTypeAny } from "zod";
  * Plain object schemas are passed as ZodRawShape (`.shape`) per SDK convention.
  *
  * Detection: zod 4 stores the catchall/passthrough fallback under
- * `_def.catchall`. For plain `z.object({...})` it is undefined.
+ * `def.catchall`. For plain `z.object({...})` it is undefined; for a
+ * `.passthrough()` / `.catchall(...)` schema it is a Zod type.
+ *
+ * `.def` is zod 4's public, typed accessor for the schema definition (the
+ * classic `ZodObject` types `.def` identically to the internal `._def`), so
+ * no `_def` reach-in or `as unknown as` cast is needed. The exact-pinned zod
+ * version (see package.json) plus the co-located regression test guard against
+ * a point release changing this shape. Bump zod manually and re-run tests.
  */
 export function asOutputSchema<T extends ZodObject<ZodRawShape>>(
   schema: T,
 ): ZodTypeAny | ZodRawShape {
-  const def = (schema as unknown as { _def?: { catchall?: unknown } })._def;
-  return def && def.catchall != null ? schema : schema.shape;
+  return schema.def.catchall != null ? schema : schema.shape;
 }

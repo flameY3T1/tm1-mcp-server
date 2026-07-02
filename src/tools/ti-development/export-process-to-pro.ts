@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeToPro } from "../../lib/pro-serializer.js";
+import { maskCode } from "../../lib/mask-secrets.js";
 
 export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -20,8 +21,16 @@ export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Clie
         .string()
         .optional()
         .describe("Optional absolute host path to write the .pro file to. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. If omitted, content is only returned inline."),
+      maskSecrets: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Redact credential literals in the exported code (inline and written file). Masks the password arg of ODBCOpen() and quoted values " +
+            "assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
+        ),
     },
-    async ({ processName, writeToFile }) => {
+    async ({ processName, writeToFile, maskSecrets }) => {
       const [code, parameters, variables, dataSource] = await Promise.all([
         tm1Client.processes.getCode(processName),
         tm1Client.processes.getParameters(processName),
@@ -29,12 +38,13 @@ export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Clie
         tm1Client.processes.getDataSource(processName),
       ]);
 
+      const mask = maskSecrets ? maskCode : (s: string) => s;
       const proContent = serializeToPro({
         name: processName,
-        prolog: code.prolog,
-        metadata: code.metadata,
-        data: code.data,
-        epilog: code.epilog,
+        prolog: mask(code.prolog),
+        metadata: mask(code.metadata),
+        data: mask(code.data),
+        epilog: mask(code.epilog),
         parameters,
         variables,
         dataSource,
@@ -58,7 +68,7 @@ export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Clie
             variableCount: variables.length,
             dataSourceType: dataSource.type,
             content: proContent,
-          }, null, 2),
+          }),
         }],
       };
     },

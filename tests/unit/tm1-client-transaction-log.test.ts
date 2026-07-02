@@ -171,4 +171,19 @@ describe("TM1Client – getTransactionLog()", () => {
     const entries = await client.server.getTransactionLog({ top: 5 });
     expect(entries).toEqual([]); // degraded, not thrown
   });
+
+  it("no `since`: a PERMISSION_DENIED window rejects — never silently returns []", async () => {
+    // The cheap unfiltered probe can succeed while a cubeName-filtered window
+    // hits cube-level security. A denial must surface, not degrade to an empty
+    // window that reads as "no transactions in range".
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe ok
+      .mockResolvedValue(
+        mockResponse({ error: { code: "65", message: "ObjectSecurityNoReadRights" } }, 400),
+      ); // filtered window denied
+
+    await expect(
+      client.server.getTransactionLog({ cubeName: "SecretCube", top: 5 }),
+    ).rejects.toMatchObject({ code: TM1ErrorCode.PERMISSION_DENIED });
+  });
 });

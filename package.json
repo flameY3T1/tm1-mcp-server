@@ -1,7 +1,7 @@
 {
   "name": "tm1-mcp-server",
-  "version": "1.0.1",
-  "description": "MCP server for IBM Planning Analytics / TM1 \u2014 full model lifecycle via REST API",
+  "version": "1.0.2",
+  "description": "MCP server for IBM Planning Analytics / TM1 — full model lifecycle via REST API",
   "repository": {
     "type": "git",
     "url": "https://github.com/flameY3T1/tm1-mcp-server.git"
@@ -33,8 +33,9 @@
     "lint:no-flat-api": "node scripts/check-no-flat-tm1-methods.mjs",
     "lint:annotations": "node scripts/check-annotation-coverage.mjs",
     "lint:output-schema": "node scripts/check-output-schema-coverage.mjs",
+    "lint:output-schema-budget": "node scripts/check-output-schema-budget.mjs",
     "lint:tool-registration": "node scripts/check-tool-registration.mjs",
-    "verify": "npm run typecheck && npm run lint:no-flat-api && npm run lint:annotations && npm run lint:output-schema && npm run lint:tool-registration && npm run lint:eslint && npm test",
+    "verify": "npm run typecheck && npm run lint:no-flat-api && npm run lint:annotations && npm run lint:output-schema && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:eslint && npm test",
     "tools:list": "node scripts/gen-tool-list.mjs",
     "tools:update-readme": "node scripts/gen-tool-list.mjs --write-readme",
     "lint:eslint": "eslint ."
@@ -55,7 +56,7 @@
     "pino": "^10.3.1",
     "safe-regex": "^2.1.1",
     "undici": "^7.28.0",
-    "zod": "^4.4.3"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -53,7 +53,7 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
             ...(typeChanges.length > 0 && {
               warning: `${typeChanges.length} element(s) had their type changed in place; any existing leaf cell values for those elements were discarded.`,
             }),
-          }, null, 2),
+          }),
         }],
       };
     },

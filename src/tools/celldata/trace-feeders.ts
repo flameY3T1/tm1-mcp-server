@@ -37,7 +37,7 @@ export function registerTraceFeeders(server: McpServer, tm1Client: TM1Client): v
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ count: result.fedCells.length, ...result }, null, 2),
+            text: JSON.stringify({ count: result.fedCells.length, ...result }),
           },
         ],
       };

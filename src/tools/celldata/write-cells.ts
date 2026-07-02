@@ -10,7 +10,7 @@ export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
     [
       "Write one or more cell values directly to a TM1 cube via REST.",
       "IMPORTANT: TI processes are the standard path for data loads — use this tool only for ad-hoc writes or when explicitly requested.",
-      "Each cell specifies element names in the cube's dimension order and a numeric or string value. Writes to consolidated cells are rejected by TM1.",
+      "Writes to consolidated cells are rejected by TM1.",
       "Before: tm1_check_writable_coords to validate that target coordinates are leaf-level and addressable.",
       "Related: tm1_clear_cube for bulk wipe, tm1_get_cell_value to read back, tm1_execute_process for production data loads.",
     ].join(" "),

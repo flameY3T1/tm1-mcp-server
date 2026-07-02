@@ -17,10 +17,8 @@ export function registerGetServerInfo(server: McpServer, tm1Client: TM1Client): 
   server.tool(
     "tm1_get_server_info",
     [
-      "Return TM1 server identity + curated configuration (TI, Rules, MTQ, JobQueuing, Memory, Logging, HTTP, Security).",
-      "Reads /Configuration + /ActiveConfiguration and groups the cfg flags that drive TI behavior, MDX, rules, MTQ parallelism, job queuing, security, logging, and HTTP.",
-      "Use this instead of probing TI hacks (e.g. HierarchyCreate/Destroy) to detect feature support.",
-      "Raw merged configuration is preserved under `_raw` for power-user paths.",
+      "Return TM1 server identity + curated configuration (TI, Rules, MTQ, JobQueuing, Memory, Logging, HTTP, Security) from /Configuration + /ActiveConfiguration.",
+      "Use this instead of probing TI hacks (e.g. HierarchyCreate/Destroy) to detect feature support. Raw merged configuration is preserved under `_raw`.",
     ].join(" "),
     { ...FORMAT_SCHEMA },
     async ({ format }) => {

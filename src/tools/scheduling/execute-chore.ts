@@ -25,7 +25,7 @@ export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): v
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, choreName: name }, null, 2),
+          text: JSON.stringify({ success: true, choreName: name }),
         }],
       };
     },

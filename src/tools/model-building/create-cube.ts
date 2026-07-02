@@ -27,7 +27,7 @@ export function registerCreateCube(server: McpServer, tm1Client: TM1Client): voi
             cubeName: name,
             dimensionCount: dimensions.length,
             dimensions,
-          }, null, 2),
+          }),
         }],
       };
     },

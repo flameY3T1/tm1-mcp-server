@@ -17,7 +17,7 @@ export function registerCreateDimension(server: McpServer, tm1Client: TM1Client)
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, dimensionName: name }, null, 2),
+          text: JSON.stringify({ success: true, dimensionName: name }),
         }],
       };
     },

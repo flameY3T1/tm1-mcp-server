@@ -13,12 +13,8 @@ export function registerFindOrphanDimensions(server: McpServer, tm1Client: TM1Cl
   server.tool(
     "tm1_find_orphan_dimensions",
     [
-      "Identify dimensions that are not referenced by any cube — a model hygiene check.",
-      "Computes the set of dimensions used across all cubes (one $expand OData call) and",
-      "diffs against the full dimension list. Replaces the agent-side join over",
-      "tm1_list_cubes × tm1_list_dimensions which is token-heavy on large models.",
-      "Control dimensions ('}'-prefix) are excluded by default — set includeControl=true to include them.",
-      "Paginated (default 50/page). Inspect a hit with tm1_get_hierarchy or remove via tm1_delete_dimension.",
+      "Identify dimensions not referenced by any cube — a model-hygiene check. Computes the used-dimension set across all cubes (one OData call) and diffs against the full dimension list.",
+      "Control dimensions ('}'-prefixed) excluded unless includeControl=true. Paginated (default 50/page). Inspect a hit with tm1_get_hierarchy or remove via tm1_delete_dimension.",
     ].join(" "),
     {
       includeControl: z

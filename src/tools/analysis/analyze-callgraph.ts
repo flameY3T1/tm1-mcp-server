@@ -311,7 +311,7 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
         const result = globalRanking(index, { rankBy, topN, includeSystem });
         return {
           content: [
-            { type: "text" as const, text: JSON.stringify({ mode: "globalRanking", ...result }, null, 2) },
+            { type: "text" as const, text: JSON.stringify({ mode: "globalRanking", ...result }) },
           ],
         };
       }
@@ -347,7 +347,7 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(payload, null, 2),
+            text: JSON.stringify(payload),
           },
         ],
       };

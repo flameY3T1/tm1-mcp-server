@@ -13,7 +13,7 @@ export function registerDeleteClient(server: McpServer, tm1Client: TM1Client) {
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, clientName: name }, null, 2),
+          text: JSON.stringify({ success: true, clientName: name }),
         }],
       };
     },

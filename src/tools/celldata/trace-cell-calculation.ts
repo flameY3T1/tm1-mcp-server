@@ -48,7 +48,7 @@ export function registerTraceCellCalculation(server: McpServer, tm1Client: TM1Cl
         `TraceCellCalculation failed for cube '${cubeName}'. Verify dimension order/elements via tm1_list_cubes; alternate hierarchies are not supported. On v12 this action is unavailable.`,
       );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(tree, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(tree) }],
       };
     },
   );

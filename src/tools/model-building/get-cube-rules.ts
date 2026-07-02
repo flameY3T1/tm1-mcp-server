@@ -12,7 +12,7 @@ export function registerGetCubeRules(server: McpServer, tm1Client: TM1Client): v
     async ({ cubeName }) => {
       const rules = await tm1Client.cubes.getRules(cubeName);
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(rules, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(rules) }],
       };
     },
   );

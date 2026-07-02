@@ -16,11 +16,8 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
     "tm1_get_error_log_content",
     [
       "Fetch the raw text of one TI error log file produced by a failed process run.",
-      "Use tm1_list_error_logs first to discover available filenames.",
-      "Response is truncated by tail (preferred) or maxBytes to protect the MCP context.",
-      "Set includeRelated=true to also pull sibling logs whose embedded timestamp falls",
-      "within ±relatedWindowSec of the source log — useful for tracing cascade failures",
-      "in chained TI processes (one Bedrock chore -> N sub-processes failing seconds apart).",
+      "Use tm1_list_error_logs first to discover available filenames; response is tail/byte-truncated to protect the MCP context.",
+      "includeRelated also pulls sibling logs within a timestamp window — useful for tracing cascade failures in chained TI processes.",
     ].join(" "),
     {
       filename: z.string().describe(
@@ -131,7 +128,7 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
       }
 
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(payload) }],
       };
     },
   );

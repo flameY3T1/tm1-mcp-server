@@ -184,6 +184,7 @@ export interface ViewResult {
   viewName: string;
   cells: Array<{ value: CellValue; formattedValue: string }>;
   axes: MdxAxis[];
+  totalCellCount: number;
 }
 
 export interface ViewAxisSubsetRef {

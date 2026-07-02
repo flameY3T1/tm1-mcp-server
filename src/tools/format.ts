@@ -157,7 +157,7 @@ export function payloadResponse<T>(
     };
   }
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+    content: [{ type: "text" as const, text: JSON.stringify(payload) }],
   };
 }
 
@@ -168,7 +168,7 @@ export function payloadResponse<T>(
 // is satisfied without the Proxy re-parsing the JSON body.
 export function actionResponse<T extends object>(payload: T): TextResult {
   return {
-    content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+    content: [{ type: "text" as const, text: JSON.stringify(payload) }],
     structuredContent: payload as unknown as { [k: string]: unknown },
   };
 }

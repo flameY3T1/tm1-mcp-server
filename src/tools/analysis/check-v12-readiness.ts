@@ -44,12 +44,8 @@ export function registerCheckV12Readiness(server: McpServer, tm1Client: TM1Clien
     "tm1_check_v12_readiness",
     [
       "Static gap-analysis against the TM1 / Planning Analytics v12 (Cloud Native) deprecation list.",
-      "Scans every TI process section (prolog/metadata/data/epilog) and every cube rule for calls",
-      "to functions that have been removed in v12, returning structured findings with severity,",
-      "location, and migration hint per occurrence.",
-      "Read-only, two bulk REST calls (Processes + Cubes/Rules). Replaces the agent-side workflow",
-      "of pulling all code and matching against a checklist — saves tokens on models with >50 processes.",
-      "Not exhaustive: covers syntactic deprecations only (runtime/semantic differences require manual review).",
+      "Scans every TI process section (prolog/metadata/data/epilog) and every cube rule for functions removed in v12, returning findings with severity, location, and migration hint per occurrence.",
+      "Read-only, two bulk REST calls. Not exhaustive: covers syntactic deprecations only (runtime/semantic differences require manual review).",
     ].join(" "),
     {
       scope: z

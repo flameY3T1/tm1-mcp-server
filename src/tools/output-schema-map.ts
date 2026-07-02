@@ -20,7 +20,6 @@ import {
   CheckFeedersResultSchema,
   ChoreGraphResultSchema,
   ChoreItemSchema,
-  DefaultMemberResolutionSchema,
   DefaultMembersBulkResultSchema,
   ClientItemSchema,
   CompileErrorSchema,
@@ -274,7 +273,6 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_export_process_to_git: asOutputSchema(ExportProcessToGitResultSchema),
   tm1_find_orphan_dimensions: asOutputSchema(FindOrphanDimensionsResultSchema),
   tm1_check_v12_readiness: asOutputSchema(V12ReadinessResultSchema),
-  tm1_resolve_default_member: asOutputSchema(DefaultMemberResolutionSchema),
   tm1_resolve_default_members: asOutputSchema(DefaultMembersBulkResultSchema),
 
   // ── Phase 2j: text→JSON-converted mutations ──────────────────────────────

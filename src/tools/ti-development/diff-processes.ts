@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import type { ProcessParameter, ProcessVariable, DataSource } from "../../types.js";
+import { maskCode } from "../../lib/mask-secrets.js";
 
 // ── LCS line diff ─────────────────────────────────────────────────────────────
 
@@ -191,9 +192,19 @@ export function registerDiffProcesses(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(3)
         .describe("Lines of context around each changed hunk (default 3, max 10)"),
+      maskSecrets: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Redact credential literals on BOTH sides before diffing (so a cred present on only one side can't leak via the diff). " +
+            "Masks the password arg of ODBCOpen() and quoted values assigned to credential-named identifiers (pPwd, sToken, …). " +
+            "Default: true. Set false only when explicitly auditing credentials.",
+        ),
     },
-    async ({ processA, processB, tabs, contextLines }) => {
+    async ({ processA, processB, tabs, contextLines, maskSecrets }) => {
       const diffTabs: readonly Tab[] = tabs && tabs.length > 0 ? tabs : ALL_TABS;
+      const mask = maskSecrets ? maskCode : (s: string) => s;
 
       const [codeA, codeB, paramsA, paramsB, varsA, varsB, dsA, dsB] = await Promise.all([
         tm1Client.processes.getCode(processA),
@@ -208,7 +219,7 @@ export function registerDiffProcesses(server: McpServer, tm1Client: TM1Client) {
 
       const tabResults: Record<string, ReturnType<typeof tabCodeDiff>> = {};
       for (const tab of diffTabs) {
-        tabResults[tab] = tabCodeDiff(codeA[tab] ?? "", codeB[tab] ?? "", contextLines);
+        tabResults[tab] = tabCodeDiff(mask(codeA[tab] ?? ""), mask(codeB[tab] ?? ""), contextLines);
       }
 
       const parameters = diffParams(paramsA, paramsB);

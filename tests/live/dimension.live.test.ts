@@ -216,10 +216,11 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     expect(r.json).toMatchObject({ success: true, hierarchyName: ALT_HIER });
   });
 
-  it("resolves a default member for the dimension", async () => {
-    const r = await h.ok("tm1_resolve_default_member", { dimensionName: DIM });
-    expect(r.json).toHaveProperty("source");
-    expect(r.json).toHaveProperty("confidence");
+  it("resolves a single default member via the bulk tool (1-item array)", async () => {
+    const r = await h.ok("tm1_resolve_default_members", { items: [{ dimensionName: DIM }] });
+    expect(r.json.results.length).toBe(1);
+    expect(r.json.results[0]).toHaveProperty("source");
+    expect(r.json.results[0]).toHaveProperty("confidence");
   });
 
   it("bulk-resolves default members", async () => {

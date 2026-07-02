@@ -162,7 +162,6 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_get_view: {
       cubeName: "Sales",
       viewName: "Default",
-      cells: [{ value: 100, formattedValue: "100.00" }],
       axes: [
         {
           tuples: [
@@ -170,6 +169,12 @@ describe("OUTPUT_SCHEMA_MAP", () => {
           ],
         },
       ],
+      total: 1,
+      count: 1,
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [{ value: 100, formattedValue: "100.00" }],
     },
     tm1_get_hierarchy: {
       name: "Region",
@@ -183,6 +188,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
           children: [{ name: "DE", weight: 1 }],
         },
       ],
+      truncated: false,
     },
     tm1_get_process_code: {
       prolog: "# pro",

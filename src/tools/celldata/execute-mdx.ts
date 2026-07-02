@@ -6,7 +6,7 @@ import { PAGINATION_SCHEMA } from "../pagination.js";
 import { FORMAT_SCHEMA, payloadResponse } from "../format.js";
 import { withToolHint } from "../error-format.js";
 
-interface MdxEnvelope {
+export interface MdxEnvelope {
   axes: MdxAxis[];
   total: number | null;
   count: number;
@@ -100,7 +100,7 @@ export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
     "tm1_execute_mdx",
     [
       "Execute an MDX query against the TM1 server and return structured cell data with axes (page-envelope shape consistent with list_*).",
-      "format='markdown' renders a pivot grid (2 axes, full result via fetchAll) or a flat coordinate table otherwise — token-efficient for slice comparison; default 'json' returns the structured envelope.",
+      "format='markdown' renders a pivot grid (2 axes, full result — set fetchAll=true to avoid a partial grid) or a flat coordinate table; 'json' (default) returns the structured envelope.",
       "Related: tm1_create_mdx_view to persist a query as a public view, tm1_sample_cells for cheap sparsity probe, tm1_get_cell_value for a single coordinate.",
     ].join(" "),
     {

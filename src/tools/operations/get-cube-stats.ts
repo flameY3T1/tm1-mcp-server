@@ -10,7 +10,6 @@ export function registerGetCubeStats(server: McpServer, tm1Client: TM1Client) {
     "tm1_get_cube_stats",
     [
       "Read }StatsByCube metrics for one or more cubes (memory, populated cells, fed cells, feeder efficiency).",
-      "Pass cubeName for a single cube or cubeNames for batch mode (parallel queries).",
       "Well-known metrics are mapped to typed fields; the full element-name → value map is also returned under `raw` so server-side renames don't break the tool.",
       "Per-cube errors are reported as items[].error without failing the whole call.",
     ].join(" "),
