@@ -502,13 +502,35 @@ export class TM1HttpClient {
     // "AbortError" can only come from a caller-supplied signal (cancellation),
     // which must propagate immediately — retrying a cancelled request 3× is a
     // bug. The request loop also guards opts.signal.aborted before reaching
-    // here; this is the defensive backstop for any other abort source.
-    if (error instanceof DOMException && error.name === "AbortError") {
+    // here; this is the defensive backstop for any other abort source. Match on
+    // name (not just DOMException) since some fetch impls throw a plain Error.
+    if (error instanceof Error && error.name === "AbortError") {
       return false;
     }
+
+    // Primary, robust path: undici surfaces the OS-level failure on the wrapped
+    // cause's `.code` (e.g. ECONNREFUSED, ENOTFOUND, ETIMEDOUT, ECONNRESET). Some
+    // raw socket errors expose `.code` directly. Classifying by code is stable
+    // across Node/undici versions and locale, unlike message-substring matching.
+    const causeCode = errorCodeOf((error as { cause?: unknown }).cause);
+    if (causeCode !== undefined && NETWORK_ERROR_CODES.has(causeCode)) {
+      return true;
+    }
+    const directCode = errorCodeOf(error);
+    if (directCode !== undefined && NETWORK_ERROR_CODES.has(directCode)) {
+      return true;
+    }
+
+    // Fallback: undici wraps every fetch-level network failure in
+    // `TypeError: fetch failed`. This catches wrappers whose cause carries no
+    // recognised code (or no cause at all) — preserves the old TypeError branch.
     if (error instanceof TypeError) {
       return true;
     }
+
+    // Last-resort backstop: an error that stringified a network failure into its
+    // message without exposing a code or cause (rare, but the old code matched
+    // it — kept so nothing is silently dropped). Not the primary classifier.
     if (error instanceof Error) {
       const msg = error.message.toLowerCase();
       return (
@@ -521,6 +543,39 @@ export class TM1HttpClient {
     }
     return false;
   }
+}
+
+/**
+ * OS/undici-level error codes that indicate a transient network failure worth
+ * retrying (connection refused, DNS failure, timeout, socket reset, etc.).
+ * undici exposes these on `err.cause.code`; raw sockets on `err.code`.
+ */
+const NETWORK_ERROR_CODES: ReadonlySet<string> = new Set([
+  "ECONNREFUSED", // connection actively refused (server down / wrong port)
+  "ENOTFOUND", // DNS: host not found
+  "EAI_AGAIN", // DNS: temporary resolution failure
+  "ETIMEDOUT", // OS-level connect/read timeout
+  "ECONNRESET", // socket reset by peer
+  "ECONNABORTED", // connection aborted mid-flight
+  "EPIPE", // broken pipe writing to a closed socket
+  "EHOSTUNREACH", // host unreachable
+  "ENETUNREACH", // network unreachable
+  "ENETDOWN", // network is down
+  "UND_ERR_CONNECT_TIMEOUT", // undici connect timeout
+  "UND_ERR_SOCKET", // undici socket error (e.g. other side closed)
+]);
+
+/**
+ * Read a string `.code` off an unknown error-ish value, narrowing safely under
+ * strict TS (`cause`/`error` are `unknown`). Returns undefined if absent or not
+ * a string.
+ */
+function errorCodeOf(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const code = (value as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
 }
 
 function isTimeoutError(error: unknown): boolean {
