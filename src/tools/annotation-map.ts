@@ -78,7 +78,6 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_list_dimensions: READ_ONLY,
   tm1_list_processes: READ_ONLY,
   tm1_list_processes_grouped: READ_ONLY,
-  tm1_resolve_default_member: READ_ONLY,
   tm1_resolve_default_members: READ_ONLY,
 
   // model-building

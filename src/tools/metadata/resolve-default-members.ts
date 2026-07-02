@@ -7,7 +7,7 @@ export function registerResolveDefaultMembers(server: McpServer, tm1Client: TM1C
   server.tool(
     "tm1_resolve_default_members",
     [
-      "Bulk variant of tm1_resolve_default_member — resolves N hierarchies in parallel from a single tool call.",
+      "Resolve N hierarchies' effective default members in parallel from one tool call; pass items:[{dimensionName}] with a single entry for a one-off lookup.",
       "Designed for view-construction workflows where 8+ slicer dimensions previously required dozens of sequential round-trips.",
       "Each result carries its own source/confidence/alternatives so callers can audit per-dimension reliability.",
       "Per-item failures surface as result entries with an `error` field instead of `resolved`; the call itself does not fail unless input is empty/invalid.",
