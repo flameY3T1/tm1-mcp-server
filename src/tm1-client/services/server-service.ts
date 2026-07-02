@@ -14,6 +14,7 @@ import type {
   TransactionLogEntry,
 } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
+import { rethrowIfSystemicOrDenied } from "./fallback.js";
 
 // TM1 references the per-run TI error file inside the free-text message, either
 // wrapped in angle brackets (e.g. German `Fehlerdatei: <…log>`) or bare
@@ -240,13 +241,12 @@ export class ServerService {
           until: opts.until,
         });
       } catch (err) {
-        // Permission/auth must surface; a window timeout just stops widening.
-        if (
-          err instanceof TM1Error &&
-          (err.code === TM1ErrorCode.PERMISSION_DENIED || err.code === TM1ErrorCode.AUTH_FAILED)
-        ) {
-          throw err;
-        }
+        // Systemic transport/auth failures (CONNECTION_FAILED, AUTH_FAILED,
+        // LOCK_TIMEOUT) AND permission denials must surface — swallowing them
+        // would return an empty or partial window as if the range simply held no
+        // data (or as if a denied cube were empty). A window timeout (TM1_ERROR
+        // from queryTransactionLog) is expected and just stops widening.
+        rethrowIfSystemicOrDenied(err);
         break;
       }
       if (entries.length >= top) return entries;
@@ -258,8 +258,10 @@ export class ServerService {
   /**
    * Single bounded TransactionLogEntries query. Runs once (retry disabled) under
    * a dedicated timeout: the endpoint is deterministically slow, so a timeout
-   * means "range too large", not a transient blip. PERMISSION_DENIED/AUTH_FAILED
-   * pass through; anything else becomes an actionable "narrow the range" error.
+   * means "range too large", not a transient blip. Our own timeout (the
+   * controller abort) and other non-systemic failures become an actionable
+   * "narrow the range" error; systemic transport/auth failures propagate
+   * unmasked and permission denials surface as-is.
    */
   private async queryTransactionLog(q: {
     top: number;
@@ -299,11 +301,14 @@ export class ServerService {
         newValue: e.NewValue ?? null,
       }));
     } catch (err) {
-      if (
-        err instanceof TM1Error &&
-        (err.code === TM1ErrorCode.PERMISSION_DENIED || err.code === TM1ErrorCode.AUTH_FAILED)
-      ) {
-        throw err;
+      // Our own dedicated timeout aborts via the controller and surfaces as a
+      // raw (non-TM1) abort — that IS the "range too large" signal. For every
+      // other error, systemic transport/auth failures (CONNECTION_FAILED,
+      // AUTH_FAILED, LOCK_TIMEOUT) and unexpected non-TM1 throws must propagate
+      // unmasked, and a permission denial stays actionable; only then do we fall
+      // through and treat the failure as an actionable "narrow the range" error.
+      if (!controller.signal.aborted) {
+        rethrowIfSystemicOrDenied(err);
       }
       throw new TM1Error({
         code: TM1ErrorCode.TM1_ERROR,
@@ -320,9 +325,10 @@ export class ServerService {
   /**
    * Cheap reachability/permission probe for the transaction log. A bare
    * `$top=1` (no $orderby/$filter) returns at most one row so TM1 can short-
-   * circuit; a dedicated short-timeout AbortController caps the wait. Passes
-   * through PERMISSION_DENIED/AUTH_FAILED as-is; anything else (timeout,
-   * connection failure) becomes an actionable TM1_ERROR.
+   * circuit; a dedicated short-timeout AbortController caps the wait. That
+   * timeout (and other non-systemic failures) becomes an actionable TM1_ERROR;
+   * permission denials surface as-is and systemic transport/auth failures
+   * (e.g. CONNECTION_FAILED) propagate unmasked.
    */
   private async probeTransactionLog(): Promise<void> {
     const controller = new AbortController();
@@ -335,11 +341,13 @@ export class ServerService {
         { signal: controller.signal },
       );
     } catch (err) {
-      if (
-        err instanceof TM1Error &&
-        (err.code === TM1ErrorCode.PERMISSION_DENIED || err.code === TM1ErrorCode.AUTH_FAILED)
-      ) {
-        throw err;
+      // Our own probe timeout aborts via the controller and yields the friendly
+      // preflight message. For every other error, systemic transport/auth
+      // failures (CONNECTION_FAILED, AUTH_FAILED, LOCK_TIMEOUT) and unexpected
+      // non-TM1 throws must propagate unmasked, and a permission denial stays
+      // actionable (fail fast); only then do we wrap as a TM1_ERROR preflight.
+      if (!controller.signal.aborted) {
+        rethrowIfSystemicOrDenied(err);
       }
       throw new TM1Error({
         code: TM1ErrorCode.TM1_ERROR,
