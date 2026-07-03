@@ -1,13 +1,14 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createLogger } from "../../src/logger.js";
 import { Writable } from "node:stream";
-import pino from "pino";
 
 /**
- * Helper: create a logger that writes to an in-memory buffer so we can
- * inspect the serialised JSON without touching stderr or real files.
+ * Helper: drive the REAL createLogger with an in-memory destination so masking,
+ * timestamp and level behaviour are asserted against the production redact
+ * config (not a hand-copied one). Deleting a field from redactPaths() in
+ * src/logger.ts now fails these tests, as it should.
  */
-function createTestLogger(level: string = "debug") {
+function createTestLogger(level: "debug" | "info" | "warn" | "error" = "debug") {
   const lines: string[] = [];
 
   const dest = new Writable({
@@ -17,30 +18,9 @@ function createTestLogger(level: string = "debug") {
     },
   });
 
-  const logger = pino(
-    {
-      level,
-      redact: {
-        paths: [
-          "password",
-          "*.password",
-          "headers.password",
-          "Authorization",
-          "*.Authorization",
-          "headers.Authorization",
-          "TM1SessionId",
-          "*.TM1SessionId",
-          "headers.TM1SessionId",
-        ],
-        censor: "***",
-      },
-      timestamp: pino.stdTimeFunctions.isoTime,
-    },
-    dest
-  );
+  const logger = createLogger({ logLevel: level }, dest);
 
   function flush(): object[] {
-    // pino buffers internally – flushSync forces it out
     logger.flush();
     return lines
       .map((l) => l.trim())

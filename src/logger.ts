@@ -15,8 +15,26 @@ function redactPaths(): string[] {
 }
 
 export function createLogger(
-  config: Pick<TM1Config, "logLevel" | "logFile">
+  config: Pick<TM1Config, "logLevel" | "logFile">,
+  // Test-only: inject an in-memory destination to assert on real output. When
+  // omitted (production), logs go to stderr (+ optional file) via a transport.
+  // Redaction is configured on the pino instance itself, so it applies to any
+  // destination — tests that drive this function exercise the real mask config.
+  destination?: pino.DestinationStream,
 ): pino.Logger {
+  const options: pino.LoggerOptions = {
+    level: config.logLevel,
+    redact: {
+      paths: redactPaths(),
+      censor: MASK_VALUE,
+    },
+    timestamp: pino.stdTimeFunctions.isoTime,
+  };
+
+  if (destination) {
+    return pino(options, destination);
+  }
+
   const targets: pino.TransportTargetOptions[] = [];
 
   // Always log to stderr so stdout stays clean for MCP stdio transport
@@ -35,17 +53,5 @@ export function createLogger(
     });
   }
 
-  const transport = pino.transport({ targets });
-
-  return pino(
-    {
-      level: config.logLevel,
-      redact: {
-        paths: redactPaths(),
-        censor: MASK_VALUE,
-      },
-      timestamp: pino.stdTimeFunctions.isoTime,
-    },
-    transport
-  );
+  return pino(options, pino.transport({ targets }));
 }

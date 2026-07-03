@@ -8,9 +8,11 @@
  */
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-import pino from "pino";
 import { Writable } from "node:stream";
+import { createLogger } from "../../src/logger.js";
 
+// Drive the REAL createLogger with an in-memory destination so the property
+// holds against the production redact config, not a hand-copied duplicate.
 function createTestLogger() {
   const lines: string[] = [];
   const dest = new Writable({
@@ -20,21 +22,7 @@ function createTestLogger() {
     },
   });
 
-  const logger = pino(
-    {
-      level: "debug",
-      redact: {
-        paths: [
-          "password", "*.password", "headers.password",
-          "Authorization", "*.Authorization", "headers.Authorization",
-          "TM1SessionId", "*.TM1SessionId", "headers.TM1SessionId",
-        ],
-        censor: "***",
-      },
-      timestamp: pino.stdTimeFunctions.isoTime,
-    },
-    dest,
-  );
+  const logger = createLogger({ logLevel: "debug" }, dest);
 
   function flush(): Array<Record<string, unknown>> {
     logger.flush();
