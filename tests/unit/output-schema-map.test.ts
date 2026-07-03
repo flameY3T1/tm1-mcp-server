@@ -283,6 +283,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       variableCount: 3,
       dataSourceType: "ASCII",
       credentialsOmitted: false,
+      hasSecurityAccess: false,
       writtenTo: { json: null, ti: null },
       json: '{\n  "name": "Load.Sales",\n  "parameters": [],\n  "variables": [],\n  "dataSource": { "type": "ASCII" }\n}\n',
       ti: "### TM1-TI-TAB: prolog ###\nsX=1;\n### TM1-TI-TAB: metadata ###\n### TM1-TI-TAB: data ###\n### TM1-TI-TAB: epilog ###\n",

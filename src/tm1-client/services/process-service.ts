@@ -356,6 +356,27 @@ export class ProcessService {
   }
 
   /**
+   * Read deploy-relevant entity metadata not covered by getCode/params/
+   * vars/datasource: HasSecurityAccess + display Caption. Caption is
+   * omitted when empty or equal to Name (TM1 defaults Caption to Name).
+   * GET /api/v1/Processes('{name}')?$select=HasSecurityAccess,Attributes
+   */
+  async getDeployMeta(
+    processName: string,
+  ): Promise<{ hasSecurityAccess: boolean; caption?: string }> {
+    const path = `/api/v1/Processes('${enc(processName)}')?$select=HasSecurityAccess,Attributes`;
+    const response = await this.http.request<{
+      HasSecurityAccess?: boolean;
+      Attributes?: { Caption?: string };
+    }>("GET", path);
+    const caption = response.Attributes?.Caption;
+    return {
+      hasSecurityAccess: response.HasSecurityAccess === true,
+      ...(caption && caption !== processName ? { caption } : {}),
+    };
+  }
+
+  /**
    * Update one or more code tabs of a TI process (partial update).
    * PATCH /api/v1/Processes('{name}') with only the tabs to update.
    */

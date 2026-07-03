@@ -985,6 +985,8 @@ export const ExportProcessToGitResultSchema = z.object({
   variableCount: z.number().int(),
   dataSourceType: z.string(),
   credentialsOmitted: z.boolean(),
+  hasSecurityAccess: z.boolean(),
+  caption: z.string().optional(),
   writtenTo: z.object({
     json: z.string().nullable(),
     ti: z.string().nullable(),

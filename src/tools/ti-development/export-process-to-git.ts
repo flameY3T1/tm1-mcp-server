@@ -33,11 +33,12 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         ),
     },
     async ({ processName, writeToDir, maskSecrets }) => {
-      const [code, parameters, variables, dataSource] = await Promise.all([
+      const [code, parameters, variables, dataSource, deployMeta] = await Promise.all([
         tm1Client.processes.getCode(processName),
         tm1Client.processes.getParameters(processName),
         tm1Client.processes.getVariables(processName),
         tm1Client.processes.getDataSource(processName),
+        tm1Client.processes.getDeployMeta(processName),
       ]);
 
       const mask = maskSecrets ? maskCode : (s: string) => s;
@@ -50,6 +51,8 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         parameters,
         variables,
         dataSource,
+        hasSecurityAccess: deployMeta.hasSecurityAccess,
+        ...(deployMeta.caption ? { caption: deployMeta.caption } : {}),
       });
 
       const jsonFileName = `${processName}.json`;
@@ -85,6 +88,8 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
             variableCount: variables.length,
             dataSourceType: dataSource.type,
             credentialsOmitted,
+            hasSecurityAccess: deployMeta.hasSecurityAccess,
+            ...(deployMeta.caption ? { caption: deployMeta.caption } : {}),
             writtenTo,
             json,
             ti,
