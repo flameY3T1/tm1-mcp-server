@@ -58,7 +58,7 @@ export interface ParsedGitProcess {
   parameters: ProcessParameter[];
   variables: ProcessVariable[];
   dataSource: DataSource;
-  hasSecurityAccess: boolean;
+  hasSecurityAccess?: boolean;
   caption?: string;
 }
 
@@ -129,7 +129,7 @@ export function parseProcessFromGit(
   const name = typeof meta.name === "string" ? meta.name : "";
 
   const hasSecurityAccess =
-    typeof meta.hasSecurityAccess === "boolean" ? meta.hasSecurityAccess : false;
+    typeof meta.hasSecurityAccess === "boolean" ? meta.hasSecurityAccess : undefined;
   const caption = typeof meta.caption === "string" && meta.caption.length > 0
     ? meta.caption
     : undefined;
@@ -194,7 +194,7 @@ export function parseProcessFromGit(
 
   return {
     name,
-    hasSecurityAccess,
+    ...(hasSecurityAccess !== undefined ? { hasSecurityAccess } : {}),
     ...(caption !== undefined ? { caption } : {}),
     prolog: buckets.prolog.join("\n"),
     metadata: buckets.metadata.join("\n"),

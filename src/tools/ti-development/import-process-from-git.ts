@@ -149,13 +149,19 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         );
       }
 
-      await withToolHint(
-        tm1Client.processes.updateSecurityAccess(processName, parsed.hasSecurityAccess),
-        `HasSecurityAccess update failed for '${processName}'. Code+params+vars+datasource applied. Re-run with mode=update once root cause fixed.`,
-      );
+      if (parsed.hasSecurityAccess !== undefined) {
+        await withToolHint(
+          tm1Client.processes.updateSecurityAccess(processName, parsed.hasSecurityAccess),
+          `HasSecurityAccess update failed for '${processName}'. Code+params+vars+datasource applied. Re-run with mode=update once root cause fixed.`,
+        );
+      }
 
       let captionApplied = false;
       if (parsed.caption) {
+        // Best-effort: writing Caption to }ElementAttributes_}Processes is empirically
+        // rejected on TM1 v11 (nested "}" in the control-cube name breaks the MDX build).
+        // See docs/superpowers/specs/2026-07-03-git-process-lossless-fields-design.md (Risks).
+        // Do not "fix" this by removing the try/catch without confirming server behavior.
         try {
           await tm1Client.elements.updateAttributeValue("}Processes", processName, "Caption", parsed.caption);
           captionApplied = true;
@@ -172,7 +178,7 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
               {
                 action,
                 processName,
-                hasSecurityAccess: parsed.hasSecurityAccess,
+                ...(parsed.hasSecurityAccess !== undefined ? { hasSecurityAccess: parsed.hasSecurityAccess } : {}),
                 captionApplied,
                 parsed: {
                   prologLines: parsed.prolog.split("\n").length,

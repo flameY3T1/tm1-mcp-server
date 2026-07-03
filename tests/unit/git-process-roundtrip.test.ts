@@ -176,7 +176,12 @@ describe("git-process round-trip", () => {
     const ti = "### TM1-TI-TAB: prolog ###\n### TM1-TI-TAB: metadata ###\n" +
                "### TM1-TI-TAB: data ###\n### TM1-TI-TAB: epilog ###\n";
     const parsed = parseProcessFromGit(legacy, ti);
-    expect(parsed.hasSecurityAccess).toBe(false);
+    expect(parsed.hasSecurityAccess).toBeUndefined();
     expect(parsed.caption).toBeUndefined();
+  });
+
+  it("round-trips a declared hasSecurityAccess=false as false (not undefined)", () => {
+    const { parsed } = roundTrip(fixture({ hasSecurityAccess: false }));
+    expect(parsed.hasSecurityAccess).toBe(false);
   });
 });
