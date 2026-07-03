@@ -1,8 +1,33 @@
-# Design: Lossless git-process roundtrip (HasSecurityAccess + Caption)
+# Design: Lossless git-process roundtrip (HasSecurityAccess)
 
 **Date:** 2026-07-03
-**Status:** Approved (design), pending implementation plan
+**Status:** Implemented. **Caption dropped** — see "Update: Caption dropped" below.
 **Area:** `tm1_export_process_to_git` / `tm1_import_process_from_git`
+
+## Update: Caption dropped (2026-07-03)
+
+Caption was cut from the feature after live investigation. Shipped scope is
+**HasSecurityAccess only** (read on export, applied on import via PATCH, live
+verified). `tm1_upsert_process` also gained an optional `hasSecurityAccess`
+input.
+
+Why Caption was dropped: writing a process Caption routes through
+`ElementService.updateAttributeValue` → `CellService.writeCells`, which is
+MDX-based (`ExecuteMDX` to build a cellset, then PATCH the cell). That write
+targets the control cube `}ElementAttributes_}Processes`, **which does not
+exist** unless `}Processes` has user-defined element attributes — and a stock
+process dimension has none. A non-existent cube in the MDX `FROM` clause is
+reported by TM1 as a syntax error. This is not specific to the `}` in the name
+(the earlier "nested `}` breaks MDX" guess was wrong): it applies to any
+dimension with no attributes. Confirmed live — the same MDX shape succeeds
+against `}ElementAttributes_Account` (Account has attributes) and fails for
+`}ElementAttributes_}Processes` (no attributes → no cube). Caption is also an
+intrinsic display attribute that isn't stored in that cube in this state. The
+direct OData attribute endpoint (`PATCH .../Elements('x')/Attributes`) returned
+"PATCH not supported on this resource!" on this v11. Rather than ship a
+half-working, export-only Caption or add a TI-`AttrPutS` workaround for a purely
+cosmetic alias, Caption was removed entirely. The sections below describe the
+original two-field design; treat every Caption mention as superseded by this note.
 
 ## Problem
 

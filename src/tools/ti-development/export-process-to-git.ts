@@ -52,7 +52,6 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         variables,
         dataSource,
         hasSecurityAccess: deployMeta.hasSecurityAccess,
-        ...(deployMeta.caption ? { caption: deployMeta.caption } : {}),
       });
 
       const jsonFileName = `${processName}.json`;
@@ -89,7 +88,6 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
             dataSourceType: dataSource.type,
             credentialsOmitted,
             hasSecurityAccess: deployMeta.hasSecurityAccess,
-            ...(deployMeta.caption ? { caption: deployMeta.caption } : {}),
             writtenTo,
             json,
             ti,

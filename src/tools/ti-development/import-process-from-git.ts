@@ -156,20 +156,6 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         );
       }
 
-      let captionApplied = false;
-      if (parsed.caption) {
-        // Best-effort: writing Caption to }ElementAttributes_}Processes is empirically
-        // rejected on TM1 v11 (nested "}" in the control-cube name breaks the MDX build).
-        // See docs/superpowers/specs/2026-07-03-git-process-lossless-fields-design.md (Risks).
-        // Do not "fix" this by removing the try/catch without confirming server behavior.
-        try {
-          await tm1Client.elements.updateAttributeValue("}Processes", processName, "Caption", parsed.caption);
-          captionApplied = true;
-        } catch {
-          captionApplied = false;
-        }
-      }
-
       return {
         content: [
           {
@@ -179,7 +165,6 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
                 action,
                 processName,
                 ...(parsed.hasSecurityAccess !== undefined ? { hasSecurityAccess: parsed.hasSecurityAccess } : {}),
-                captionApplied,
                 parsed: {
                   prologLines: parsed.prolog.split("\n").length,
                   metadataLines: parsed.metadata.split("\n").length,

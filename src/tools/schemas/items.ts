@@ -552,7 +552,6 @@ export const ImportProcessFromGitResultSchema = z.object({
   action: z.string(),
   processName: z.string(),
   hasSecurityAccess: z.boolean().optional(),
-  captionApplied: z.boolean(),
   parsed: z.object({
     prologLines: z.number().int(),
     metadataLines: z.number().int(),
@@ -988,7 +987,6 @@ export const ExportProcessToGitResultSchema = z.object({
   dataSourceType: z.string(),
   credentialsOmitted: z.boolean(),
   hasSecurityAccess: z.boolean(),
-  caption: z.string().optional(),
   writtenTo: z.object({
     json: z.string().nullable(),
     ti: z.string().nullable(),

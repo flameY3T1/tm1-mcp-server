@@ -292,7 +292,6 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       action: "created",
       processName: "Load.Sales",
       hasSecurityAccess: false,
-      captionApplied: true,
       parsed: {
         prologLines: 5,
         metadataLines: 0,

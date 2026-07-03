@@ -157,16 +157,9 @@ describe("git-process round-trip", () => {
     expect(parsed.hasSecurityAccess).toBe(true);
   });
 
-  it("round-trips caption", () => {
-    const { parsed } = roundTrip(fixture({ caption: "Load Actuals" }));
-    expect(parsed.caption).toBe("Load Actuals");
-  });
-
-  it("defaults hasSecurityAccess to false and omits caption when absent", () => {
-    const { json, parsed } = roundTrip(fixture());
+  it("defaults hasSecurityAccess to false when declared false", () => {
+    const { parsed } = roundTrip(fixture());
     expect(parsed.hasSecurityAccess).toBe(false);
-    expect(parsed.caption).toBeUndefined();
-    expect(json).not.toContain("caption");
   });
 
   it("parses legacy JSON without the new keys to defaults", () => {
@@ -177,7 +170,6 @@ describe("git-process round-trip", () => {
                "### TM1-TI-TAB: data ###\n### TM1-TI-TAB: epilog ###\n";
     const parsed = parseProcessFromGit(legacy, ti);
     expect(parsed.hasSecurityAccess).toBeUndefined();
-    expect(parsed.caption).toBeUndefined();
   });
 
   it("round-trips a declared hasSecurityAccess=false as false (not undefined)", () => {
