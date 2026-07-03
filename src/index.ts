@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 import "./load-env.js";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createHash, timingSafeEqual } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type pino from "pino";
 import { loadConfig, type TM1Config } from "./config.js";
 import { createLogger } from "./logger.js";
@@ -16,6 +13,7 @@ import { SubscriptionRegistry } from "./resources/subscriptions.js";
 import { installPaginatedListHandler } from "./resources/list-handler.js";
 import { registerAllTools } from "./tools/index.js";
 import { withAnnotations } from "./tools/with-annotations.js";
+import { startHttpTransport } from "./http-transport.js";
 import { NAME, VERSION } from "./version.js";
 
 // stdio transport: existing Claude-Code/Desktop entry path.
@@ -31,107 +29,62 @@ async function startStdioTransport(
   };
 }
 
-// Streamable HTTP transport (stateless JSON, single /mcp endpoint). Per MCP
-// best practices: bind 127.0.0.1 by default and enable DNS rebinding
-// protection. allowedHosts/Origins narrow what the underlying transport will
-// accept on incoming requests.
-async function startHttpTransport(
-  server: McpServer,
+// Build a fully-registered MCP server (tools + resources + prompts). Called once
+// for stdio, and once per request for the stateless HTTP transport — so the
+// per-build logging is at debug to avoid per-request spam. Registration is pure
+// in-memory wiring (no I/O); the TM1 client is shared, not rebuilt.
+//
+// Capabilities are declared explicitly per MCP spec recommendation:
+//   tools / resources / prompts — auto-registered by the SDK when the respective
+//     register* helper is first called; declared here for self-documentation and
+//     to allow listChanged toggling later.
+//   logging — NOT auto-registered by the SDK; declaring it unlocks
+//     server.sendLoggingMessage() (delivered on stdio; HTTP stateless has no
+//     standing stream, so notifications are not pushed there).
+function buildMcpServer(
+  tm1Client: TM1Client,
   config: TM1Config,
   logger: pino.Logger,
-): Promise<() => Promise<void>> {
-  const allowedHost = `${config.httpHost}:${config.httpPort}`;
-  const transport = new StreamableHTTPServerTransport({
-    // sessionIdGenerator omitted → stateless mode
-    enableDnsRebindingProtection: true,
-    allowedHosts: [allowedHost, "127.0.0.1", "localhost"],
-    allowedOrigins: config.httpAllowedOrigins,
-  });
-  // Cast needed: StreamableHTTPServerTransport.onclose is `(() => void) | undefined`
-  // but Transport expects `() => void`; EOPT surfaces this library-internal mismatch.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await server.connect(transport as any);
-
-  if (!config.httpToken) {
-    logger.warn(
-      "HTTP transport has no TM1_MCP_HTTP_TOKEN set — /mcp requests are unauthenticated. " +
-        "Bind to loopback only, or front the server with an authenticating reverse proxy.",
-    );
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- async request handler is intentional; errors are caught internally
-  const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    if (!req.url || !req.url.startsWith("/mcp")) {
-      res.statusCode = 404;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: "Not found. Use POST /mcp." }));
-      return;
-    }
-    if (config.httpToken) {
-      // Constant-time comparison: hashing both sides to fixed-length digests avoids
-      // both the length-mismatch throw and the per-character timing oracle that `!==`
-      // would leak, so the token can't be brute-forced via response-timing analysis.
-      const expected = createHash("sha256").update(`Bearer ${config.httpToken}`).digest();
-      const provided = createHash("sha256").update(req.headers.authorization ?? "").digest();
-      if (!timingSafeEqual(expected, provided)) {
-        res.statusCode = 401;
-        res.setHeader("Content-Type", "application/json");
-        res.setHeader("WWW-Authenticate", "Bearer");
-        res.end(JSON.stringify({ error: "Unauthorized" }));
-        return;
-      }
-    }
-    let body: unknown;
-    if (req.method === "POST") {
-      try {
-        const chunks: Buffer[] = [];
-        for await (const chunk of req) {
-          chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : (chunk as Buffer));
-        }
-        const raw = Buffer.concat(chunks).toString("utf8");
-        body = raw ? JSON.parse(raw) : undefined;
-      } catch (err) {
-        logger.warn({ err }, "Bad JSON in /mcp body");
-        res.statusCode = 400;
-        res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify({ error: "Invalid JSON" }));
-        return;
-      }
-    }
-    try {
-      await transport.handleRequest(req, res, body);
-    } catch (err) {
-      logger.error({ err }, "Transport handleRequest threw");
-      if (!res.headersSent) {
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify({ error: "Internal transport error" }));
-      }
-    }
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    httpServer.once("error", reject);
-    httpServer.listen(config.httpPort, config.httpHost, () => {
-      httpServer.off("error", reject);
-      resolve();
-    });
-  });
-  logger.info(
+): McpServer {
+  const server = new McpServer(
     {
-      host: config.httpHost,
-      port: config.httpPort,
-      endpoint: "/mcp",
-      allowedOrigins: config.httpAllowedOrigins,
-      dnsRebindingProtection: true,
+      name: NAME,
+      version: VERSION,
     },
-    "MCP server listening on HTTP (Streamable, stateless)",
+    {
+      capabilities: {
+        tools: { listChanged: true },
+        resources: { listChanged: true, subscribe: true },
+        prompts: { listChanged: true },
+        logging: {},
+      },
+    },
   );
 
-  return async () => {
-    await new Promise<void>((resolve) => httpServer.close(() => resolve()));
-    await transport.close();
-  };
+  // Register all tools — wrap the server so each registration receives the
+  // annotation hint from ANNOTATION_MAP without editing call sites. In readonly
+  // mode the proxy silently drops write/destructive tools so they never appear
+  // in the tool listing — no autoApprove lists needed.
+  registerAllTools(withAnnotations(server, logger, config.mode), tm1Client);
+  logger.debug(`All MCP tools registered (mode: ${config.mode})`);
+
+  // Register MCP Resources (URI-addressable read-only views over TM1 objects).
+  const resourceCatalog = registerAllResources(server, tm1Client);
+
+  // R2-07: replace the SDK's default ListResourcesRequestSchema handler with a
+  // cursor-aware override that paginates the combined static + template list.
+  installPaginatedListHandler(server, resourceCatalog, logger);
+
+  // R2-05: install subscribe/unsubscribe handlers and bridge HTTP-layer mutation
+  // events to notifications/resources/updated for subscribers of tm1://server/state.
+  const subscriptions = new SubscriptionRegistry(server, logger);
+  subscriptions.install();
+
+  // Register MCP Prompts (parameterised workflow templates surfaced as slash-commands).
+  registerAllPrompts(server);
+  logger.debug("All MCP resources and prompts registered");
+
+  return server;
 }
 
 async function main(): Promise<void> {
@@ -157,77 +110,19 @@ async function main(): Promise<void> {
     );
   }
 
-  // Create MCP server.
-  // Capabilities explicitly declared per MCP spec recommendation:
-  //   tools / resources / prompts — auto-registered by the SDK when the
-  //     respective register* helper is first called, declared here for
-  //     self-documentation and to allow listChanged toggling later.
-  //   logging — NOT auto-registered by the SDK; declaring it unlocks
-  //     server.sendLoggingMessage() so we can surface slow-query and
-  //     deprecation events in the client-side log panel.
-  const server = new McpServer(
-    {
-      name: NAME,
-      version: VERSION,
-    },
-    {
-      capabilities: {
-        // R2-06: declare listChanged so clients listen for
-        // notifications/tools/list_changed. SDK fires automatically when
-        // McpServer.tool() is called post-connect (currently never; lays
-        // groundwork for future version-conditional tool gating).
-        tools: { listChanged: true },
-        resources: { listChanged: true, subscribe: true },
-        prompts: { listChanged: true },
-        logging: {},
-      },
-    },
-  );
-
-  // Register all tools — wrap server so each registration receives the
-  // annotation hint from ANNOTATION_MAP without editing call sites.
-  // In readonly mode the proxy silently drops write/destructive tools so they
-  // never appear in the tool listing — no autoApprove lists needed.
   if (config.mode === "readonly") {
     logger.info("TM1_MODE=readonly — write and destructive tools will not be registered");
   }
-  registerAllTools(withAnnotations(server, logger, config.mode), tm1Client);
-  logger.info(`All MCP tools registered (mode: ${config.mode})`);
-
-  // Register MCP Resources (URI-addressable read-only views over TM1
-  // objects). Mirrors a subset of the get_* tool surface so IDE clients
-  // can `#`-reference TM1 objects in chat or browse a sidebar tree.
-  const resourceCatalog = registerAllResources(server, tm1Client);
-  logger.info("All MCP resources registered");
-
-  // R2-07: replace SDK's default ListResourcesRequestSchema handler with a
-  // cursor-aware override that paginates the combined static + template
-  // resource list. SDK 1.29.0 does not forward params.cursor or honor
-  // nextCursor on its high-level handler; this override is the only way to
-  // serve TM1 sites with thousands of processes/cubes spec-compliantly.
-  installPaginatedListHandler(server, resourceCatalog, logger);
-
-  // R2-05: install subscribe/unsubscribe handlers and bridge HTTP-layer
-  // mutation events to notifications/resources/updated for any client that
-  // subscribed to tm1://server/state. Decoupled from the HTTP layer via
-  // the tm1Events bus so transport-side concerns don't reach into MCP.
-  const subscriptions = new SubscriptionRegistry(server, logger);
-  subscriptions.install();
-  logger.info("Resource subscription registry installed");
-
-  // Register MCP Prompts (parameterised templates surfaced as slash-
-  // commands in IDE clients). Each prompt briefs the LLM with a concrete
-  // tool sequence for a common TM1 workflow.
-  registerAllPrompts(server);
-  logger.info("All MCP prompts registered");
 
   // Branch on transport. stdio is the default for local MCP-client setups
-  // (Claude Code, Claude Desktop). http (Streamable HTTP, stateless) is for
-  // remote/multi-client deploys; binds to 127.0.0.1 by default with DNS-
-  // rebinding protection per MCP spec recommendation.
+  // (Claude Code, Claude Desktop) and gets one long-lived server. http
+  // (Streamable HTTP, stateless) is for remote/multi-client deploys and builds a
+  // fresh server per request (single-use transport); binds to 127.0.0.1 by
+  // default with DNS-rebinding protection per MCP spec recommendation.
   const httpCloser = config.transport === "http"
-    ? await startHttpTransport(server, config, logger)
-    : await startStdioTransport(server, logger);
+    ? await startHttpTransport(() => buildMcpServer(tm1Client, config, logger), config, logger)
+    : await startStdioTransport(buildMcpServer(tm1Client, config, logger), logger);
+  logger.info(`MCP server configured (mode: ${config.mode}, transport: ${config.transport})`);
 
   // Graceful shutdown — ensure TM1 session is always cleaned up.
   let shuttingDown = false;
