@@ -22,23 +22,24 @@ function fixture(over: Partial<GitProcessInput> = {}): GitProcessInput {
       { name: "vCol2", type: "Numeric", position: 2 },
     ],
     dataSource: { type: "None" },
+    hasSecurityAccess: false,
     ...over,
   };
 }
 
 function roundTrip(input: GitProcessInput) {
   const { json, ti } = serializeProcessToGit(input);
-  return parseProcessFromGit(json, ti);
+  return { json, parsed: parseProcessFromGit(json, ti) };
 }
 
 describe("git-process round-trip", () => {
   it("name survives", () => {
-    expect(roundTrip(fixture()).name).toBe("MyProc");
+    expect(roundTrip(fixture()).parsed.name).toBe("MyProc");
   });
 
   it("code tabs survive (prolog/metadata/data/epilog)", () => {
     const input = fixture();
-    const parsed = roundTrip(input);
+    const parsed = roundTrip(input).parsed;
     expect(parsed.prolog).toBe(input.prolog);
     expect(parsed.metadata).toBe(input.metadata);
     expect(parsed.data).toBe(input.data);
@@ -47,11 +48,11 @@ describe("git-process round-trip", () => {
 
   it("CRLF code is normalized to LF and survives", () => {
     const input = fixture({ prolog: "a=1;\r\nb=2;\r\n" });
-    expect(roundTrip(input).prolog).toBe("a=1;\nb=2;");
+    expect(roundTrip(input).parsed.prolog).toBe("a=1;\nb=2;");
   });
 
   it("parameters survive (names, types, defaults, prompts)", () => {
-    const parsed = roundTrip(fixture());
+    const parsed = roundTrip(fixture()).parsed;
     expect(parsed.parameters).toHaveLength(2);
     expect(parsed.parameters.find((p) => p.name === "pNum")).toMatchObject({
       type: "Numeric",
@@ -65,7 +66,7 @@ describe("git-process round-trip", () => {
   });
 
   it("variables survive (names, types, positions)", () => {
-    const parsed = roundTrip(fixture());
+    const parsed = roundTrip(fixture()).parsed;
     expect(parsed.variables.find((v) => v.name === "vCol1")).toMatchObject({ type: "String", position: 1 });
     expect(parsed.variables.find((v) => v.name === "vCol2")).toMatchObject({ type: "Numeric", position: 2 });
   });
@@ -81,7 +82,7 @@ describe("git-process round-trip", () => {
       asciiDecimalSeparator: ".",
       asciiThousandSeparator: ".",
     };
-    expect(roundTrip(fixture({ dataSource: ds })).dataSource).toMatchObject({
+    expect(roundTrip(fixture({ dataSource: ds })).parsed.dataSource).toMatchObject({
       type: "ASCII",
       asciiDelimiterChar: ";",
       asciiHeaderRecords: 1,
@@ -108,7 +109,7 @@ describe("git-process round-trip", () => {
   });
 
   it("empty parameters/variables round-trip", () => {
-    const parsed = roundTrip(fixture({ parameters: [], variables: [] }));
+    const parsed = roundTrip(fixture({ parameters: [], variables: [] })).parsed;
     expect(parsed.parameters).toEqual([]);
     expect(parsed.variables).toEqual([]);
   });
@@ -149,5 +150,33 @@ describe("git-process round-trip", () => {
     const meta = JSON.parse(json) as Record<string, unknown>;
     meta.variables = { not: "an array" };
     expect(() => parseProcessFromGit(JSON.stringify(meta), ti)).toThrow(/invalid 'variables'/);
+  });
+
+  it("round-trips hasSecurityAccess=true", () => {
+    const { parsed } = roundTrip(fixture({ hasSecurityAccess: true }));
+    expect(parsed.hasSecurityAccess).toBe(true);
+  });
+
+  it("round-trips caption", () => {
+    const { parsed } = roundTrip(fixture({ caption: "Load Actuals" }));
+    expect(parsed.caption).toBe("Load Actuals");
+  });
+
+  it("defaults hasSecurityAccess to false and omits caption when absent", () => {
+    const { json, parsed } = roundTrip(fixture());
+    expect(parsed.hasSecurityAccess).toBe(false);
+    expect(parsed.caption).toBeUndefined();
+    expect(json).not.toContain("caption");
+  });
+
+  it("parses legacy JSON without the new keys to defaults", () => {
+    const legacy = JSON.stringify({
+      name: "Old", parameters: [], variables: [], dataSource: { type: "None" },
+    });
+    const ti = "### TM1-TI-TAB: prolog ###\n### TM1-TI-TAB: metadata ###\n" +
+               "### TM1-TI-TAB: data ###\n### TM1-TI-TAB: epilog ###\n";
+    const parsed = parseProcessFromGit(legacy, ti);
+    expect(parsed.hasSecurityAccess).toBe(false);
+    expect(parsed.caption).toBeUndefined();
   });
 });
