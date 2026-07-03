@@ -16,7 +16,7 @@ import type {
   ViewResult,
 } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
-import { transformCellsetResponse } from "./cellset-transform.js";
+import { freeCellset, transformCellsetResponse } from "./cellset-transform.js";
 import { rethrowIfSystemic } from "./fallback.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
@@ -90,15 +90,22 @@ export class ViewService {
       }>;
     }>("POST", path, undefined, opts);
 
-    const mdxResult = transformCellsetResponse(response);
+    try {
+      const mdxResult = transformCellsetResponse(response);
 
-    return {
-      cubeName,
-      viewName,
-      cells: mdxResult.cells,
-      axes: mdxResult.axes,
-      totalCellCount: mdxResult.totalCellCount,
-    };
+      return {
+        cubeName,
+        viewName,
+        cells: mdxResult.cells,
+        axes: mdxResult.axes,
+        totalCellCount: mdxResult.totalCellCount,
+      };
+    } finally {
+      // Cellsets are session-scoped and never auto-expire while keep-alive holds
+      // the session open; free the read-path cellset best-effort so it doesn't
+      // leak TM1 server memory indefinitely (mirrors TM1py's delete_cellset).
+      await freeCellset(this.http, response.ID, opts);
+    }
   }
 
   /**

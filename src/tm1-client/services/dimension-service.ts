@@ -4,6 +4,7 @@
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import type { Dimension } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
+import { freeCellset } from "./cellset-transform.js";
 
 export type DefaultMemberSource =
   | "defined"
@@ -179,6 +180,7 @@ export class DimensionService {
       "SELECT {[}DimensionProperties].[LAST_TIME_UPDATED]} ON 0, " +
       "NON EMPTY [}Dimensions].MEMBERS ON 1 FROM [}DimensionProperties]";
     const res = await this.http.request<{
+      ID: string;
       Cells: Array<{ Value: string | number | null }>;
       Axes: Array<{ Tuples: Array<{ Members: Array<{ Name: string }> }> }>;
     }>(
@@ -186,16 +188,22 @@ export class DimensionService {
       "/api/v1/ExecuteMDX?$expand=Cells($select=Value),Axes($expand=Tuples($expand=Members($select=Name)))",
       { MDX: mdx },
     );
-    const map = new Map<string, string>();
-    const rows = res.Axes?.[1]?.Tuples ?? [];
-    rows.forEach((tuple, i) => {
-      const name = tuple.Members[0]?.Name;
-      const value = res.Cells[i]?.Value;
-      if (name && value != null && String(value).trim() !== "") {
-        map.set(name, String(value));
-      }
-    });
-    return map;
+    try {
+      const map = new Map<string, string>();
+      const rows = res.Axes?.[1]?.Tuples ?? [];
+      rows.forEach((tuple, i) => {
+        const name = tuple.Members[0]?.Name;
+        const value = res.Cells[i]?.Value;
+        if (name && value != null && String(value).trim() !== "") {
+          map.set(name, String(value));
+        }
+      });
+      return map;
+    } finally {
+      // Free the session-scoped cellset best-effort so this metadata read doesn't
+      // leak TM1 server memory while keep-alive holds the session open.
+      await freeCellset(this.http, res.ID);
+    }
   }
 
   /**

@@ -13,7 +13,7 @@ import type {
   MdxResult,
 } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
-import { transformCellsetResponse } from "./cellset-transform.js";
+import { freeCellset, transformCellsetResponse } from "./cellset-transform.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
@@ -66,11 +66,16 @@ export class CellService {
       Cells?: Array<{ Value: CellValue; FormattedValue: string }>;
     }>("POST", "/api/v1/ExecuteMDX?$expand=Cells($select=Value,FormattedValue)", { MDX: mdx });
 
-    if (cellsetResponse.Cells && cellsetResponse.Cells.length > 0) {
-      return cellsetResponse.Cells[0]!.Value;
+    try {
+      if (cellsetResponse.Cells && cellsetResponse.Cells.length > 0) {
+        return cellsetResponse.Cells[0]!.Value;
+      }
+      return null;
+    } finally {
+      // Free the session-scoped cellset best-effort so single-value reads don't
+      // leak TM1 server memory while keep-alive holds the session open.
+      await freeCellset(this.http, cellsetResponse.ID);
     }
-
-    return null;
   }
 
   /**
@@ -110,7 +115,14 @@ export class CellService {
       }>;
     }>("POST", path, { MDX: mdx }, opts);
 
-    return transformCellsetResponse(response);
+    try {
+      return transformCellsetResponse(response);
+    } finally {
+      // Cellsets are session-scoped and never auto-expire while keep-alive holds
+      // the session open, so a read that leaves them behind leaks TM1 server
+      // memory indefinitely. Free it best-effort (mirrors TM1py's delete_cellset).
+      await freeCellset(this.http, response.ID, opts);
+    }
   }
 
   /**

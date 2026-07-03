@@ -228,6 +228,28 @@ describe("TM1Client – Cell Data Methods", () => {
       expect(result.totalCellCount).toBe(4);
     });
 
+    it("frees the server-side cellset with a DELETE after reading (H2)", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(sampleResponse))
+        .mockResolvedValueOnce(mockResponse({}));
+
+      await client.cells.executeMdx("SELECT {} ON COLUMNS FROM [SalesCube]");
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      const [delUrl, delOpts] = fetchSpy.mock.calls[1];
+      expect(delOpts.method).toBe("DELETE");
+      expect(delUrl).toContain("/api/v1/Cellsets('cellset-100')");
+    });
+
+    it("still returns the read result when cellset cleanup fails", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(sampleResponse))
+        .mockRejectedValueOnce(new Error("network blip on DELETE"));
+
+      const result = await client.cells.executeMdx("SELECT {} ON COLUMNS FROM [SalesCube]");
+      expect(result.totalCellCount).toBe(4);
+    });
+
     it("should send MDX in POST body", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleResponse));
 
