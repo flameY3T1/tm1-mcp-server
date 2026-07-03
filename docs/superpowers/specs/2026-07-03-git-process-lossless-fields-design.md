@@ -99,11 +99,29 @@ rejected best-effort Caption is visible.
 
 ## Risks / validation
 
-- **Caption write path unverified.** Must be validated live against the test
-  server during implementation. If setting Caption proves impossible or ugly,
-  fall back to HasSecurityAccess-only and document Caption as a known cosmetic
-  gap. Best-effort framing means this failure mode is non-fatal either way.
-- **HasSecurityAccess** write is a plain PATCH — low risk.
+- **Caption write path — confirmed empirically (2026-07-03, live test server).**
+  `tm1_import_process_from_git`'s best-effort Caption apply
+  (`ElementService.updateAttributeValue("}Processes", processName, "Caption",
+  ...)`) was exercised against the real TM1 test server via
+  `tests/live/process.live.test.ts` ("git export->import roundtrip preserves
+  hasSecurityAccess and reports caption best-effort"). Result: the write is
+  **rejected**, not accepted — the underlying `CellService.writeCells` call
+  against the `}ElementAttributes_}Processes` control cube fails with an
+  OData 400 (`ExecuteMDX` syntax error near the literal
+  `[}ElementAttributes_}Processes]`), i.e. the control-cube name itself
+  (containing a nested `}`) isn't accepted by the MDX-building path used
+  under the hood. The tool correctly swallows this into
+  `captionApplied: false` and the import still succeeds — HasSecurityAccess
+  and all other fields are applied and the process is fully usable. Caption
+  is therefore a confirmed **known cosmetic gap**: exported/re-imported
+  processes never actually get their Caption set via this path, but nothing
+  breaks. Best-effort framing did its job — the failure mode is non-fatal.
+  Fixing the underlying control-cube MDX/write path is out of scope for this
+  change; tracked as a follow-up if Caption fidelity is ever required.
+- **HasSecurityAccess** write is a plain PATCH — confirmed live: set via
+  `tm1_upsert_process({ hasSecurityAccess: true })`, survives export, a
+  same-name re-import, retargeted import to a second process name, and a
+  second re-export. Low risk, fully verified.
 
 ## Testing
 

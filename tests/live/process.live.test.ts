@@ -10,6 +10,8 @@ import { getHarness, LIVE_ENABLED, SANDBOX, type LiveHarness } from "./harness.j
 const PROC_A = `${SANDBOX}_PROC_A`;
 const PROC_B = `${SANDBOX}_PROC_B`;
 const PROC_BAD = `${SANDBOX}_PROC_BAD`;
+const PROC_GIT_SRC = `${SANDBOX}_PROC_GIT_SRC`;
+const PROC_GIT_DST = `${SANDBOX}_PROC_GIT_DST`;
 
 // Trivial, self-contained TI body: a parameter plus a couple of harmless
 // numeric/string variable assignments. Touches nothing on the server.
@@ -25,13 +27,13 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
   beforeAll(async () => {
     h = await getHarness();
     // Clean any leftovers from a previous interrupted run (idempotent).
-    for (const name of [PROC_A, PROC_B, PROC_BAD]) {
+    for (const name of [PROC_A, PROC_B, PROC_BAD, PROC_GIT_SRC, PROC_GIT_DST]) {
       await h.call("tm1_delete_process", { processName: name, confirm: name });
     }
   });
 
   afterAll(async () => {
-    for (const name of [PROC_A, PROC_B, PROC_BAD]) {
+    for (const name of [PROC_A, PROC_B, PROC_BAD, PROC_GIT_SRC, PROC_GIT_DST]) {
       try {
         await h.call("tm1_delete_process", { processName: name, confirm: name });
       } catch {
@@ -216,5 +218,78 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
     // Gone now: get_process_code should error.
     const gone = await h.call("tm1_get_process_code", { processName: PROC_B });
     expect(gone.isError).toBe(true);
+  });
+
+  it("git export->import roundtrip preserves hasSecurityAccess and reports caption best-effort", async () => {
+    try {
+      // 1. Seed a source process with HasSecurityAccess=true (upsert_process
+      // Step A extension under test).
+      await h.ok("tm1_upsert_process", {
+        name: PROC_GIT_SRC,
+        prolog: "# harmless git-roundtrip source\nnX = 1;",
+        hasSecurityAccess: true,
+        mode: "upsert",
+      });
+
+      // 2. Export: hasSecurityAccess must be carried into the exported JSON.
+      const exp1 = await h.ok("tm1_export_process_to_git", { processName: PROC_GIT_SRC });
+      expect(exp1.json.hasSecurityAccess).toBe(true);
+
+      // 3. Seed a Caption on the source by importing a modified JSON (mode=update,
+      // same name) that adds "caption". Determines empirically whether the TM1
+      // test server accepts the control-cube Caption write.
+      const jsonWithCaption = (exp1.json.json as string).replace(
+        `"hasSecurityAccess": true,`,
+        `"hasSecurityAccess": true,\n  "caption": "Roundtrip Alias",`,
+      );
+      const seedCaption = await h.ok("tm1_import_process_from_git", {
+        jsonContent: jsonWithCaption,
+        tiContent: exp1.json.ti,
+        mode: "update",
+      });
+      expect(seedCaption.json.processName).toBe(PROC_GIT_SRC);
+      expect(seedCaption.json.hasSecurityAccess).toBe(true);
+      expect(typeof seedCaption.json.captionApplied).toBe("boolean");
+      const captionWorks = seedCaption.json.captionApplied === true;
+
+      // 4. Re-export the source: hasSecurityAccess must still be true; caption
+      // present in the export iff the write path actually worked.
+      const exp2 = await h.ok("tm1_export_process_to_git", { processName: PROC_GIT_SRC });
+      expect(exp2.json.hasSecurityAccess).toBe(true);
+      if (captionWorks) {
+        expect(exp2.json.caption).toBe("Roundtrip Alias");
+      }
+
+      // 5. Retarget the re-exported JSON to a second process name and import
+      // fresh — the canonical git-roundtrip path.
+      const retargeted = (exp2.json.json as string).replace(
+        `"name": "${PROC_GIT_SRC}"`,
+        `"name": "${PROC_GIT_DST}"`,
+      );
+      const imp = await h.ok("tm1_import_process_from_git", {
+        jsonContent: retargeted,
+        tiContent: exp2.json.ti,
+        mode: "upsert",
+      });
+      expect(imp.json.processName).toBe(PROC_GIT_DST);
+      expect(imp.json.hasSecurityAccess).toBe(true);
+      expect(imp.json.captionApplied).toBe(captionWorks);
+
+      // 6. Re-export the second process: hasSecurityAccess (and caption, if the
+      // write path worked) must have survived the second hop too.
+      const exp3 = await h.ok("tm1_export_process_to_git", { processName: PROC_GIT_DST });
+      expect(exp3.json.hasSecurityAccess).toBe(true);
+      if (captionWorks) {
+        expect(exp3.json.caption).toBe("Roundtrip Alias");
+      }
+    } finally {
+      for (const name of [PROC_GIT_SRC, PROC_GIT_DST]) {
+        try {
+          await h.call("tm1_delete_process", { processName: name, confirm: name });
+        } catch {
+          /* idempotent teardown — ignore missing */
+        }
+      }
+    }
   });
 });
