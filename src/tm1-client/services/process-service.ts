@@ -118,6 +118,10 @@ export class ProcessService {
         processErrorStatus: "CompletedSuccessfully",
       };
     } catch (error) {
+      // Systemic transport/auth failures (LOCK_TIMEOUT, CONNECTION_FAILED,
+      // AUTH_FAILED) must propagate: a timed-out TI run is still executing
+      // server-side, so reporting {success:false} would invite a duplicate run.
+      rethrowIfSystemic(error);
       if (error instanceof TM1Error) {
         return {
           success: false,
@@ -167,6 +171,10 @@ export class ProcessService {
         errorLogFile: response?.ErrorLogFile?.Filename,
       };
     } catch (error) {
+      // Systemic transport/auth failures (LOCK_TIMEOUT, CONNECTION_FAILED,
+      // AUTH_FAILED) must propagate: a timed-out TI run is still executing
+      // server-side, so reporting {success:false} would invite a duplicate run.
+      rethrowIfSystemic(error);
       if (error instanceof TM1Error) {
         return {
           success: false,
@@ -585,6 +593,9 @@ export class ProcessService {
       }));
       return { success: errors.length === 0, errors };
     } catch (err) {
+      // Systemic transport/auth failures must propagate rather than be reported
+      // as a compile failure — an outage is not a broken process.
+      rethrowIfSystemic(err);
       if (err instanceof TM1Error) {
         return {
           success: false,
@@ -663,6 +674,9 @@ export class ProcessService {
       }));
       return { success: errors.length === 0, errors };
     } catch (err) {
+      // Systemic transport/auth failures must propagate rather than be reported
+      // as a compile failure — an outage is not a broken process.
+      rethrowIfSystemic(err);
       if (err instanceof TM1Error) {
         return {
           success: false,

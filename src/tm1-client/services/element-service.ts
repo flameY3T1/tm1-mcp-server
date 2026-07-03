@@ -10,6 +10,7 @@ import { TM1Error } from "../../types.js";
 import type { ElementAttributeValue, ElementCreate, ElementUpdate } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 import type { CellService } from "./cell-service.js";
+import { rethrowIfSystemic } from "./fallback.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
@@ -220,7 +221,14 @@ export class ElementService {
           // rather than have it occur silently.
           const existing = await this.http
             .request<{ Type: number | string }>("GET", `${baseUrl}('${enc(el.name)}')?$select=Type`)
-            .catch(() => null);
+            .catch((e: unknown): null => {
+              // A transport/auth outage here must NOT collapse into the
+              // unconditional-PATCH branch below: that would silently change the
+              // element type (discarding leaf values) on a network blip. Only a
+              // genuine "type unreadable" (e.g. NOT_FOUND) may fall through to null.
+              rethrowIfSystemic(e);
+              return null;
+            });
           const from = existing ? normalizeElementType(existing.Type) : null;
           if (from && from !== el.type) {
             await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });

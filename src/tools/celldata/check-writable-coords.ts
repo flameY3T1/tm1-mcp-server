@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { rethrowIfSystemic } from "../../tm1-client/services/fallback.js";
 
 interface CoordCheck {
   dimension: string;
@@ -65,7 +66,11 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
               type: el.type,
               isNLevel: el.type !== "Consolidated",
             };
-          } catch {
+          } catch (e) {
+            // A transport/auth outage must not masquerade as a missing element —
+            // that would tell the agent to "repair" coordinates that are actually
+            // fine. Only genuine lookup failures (NOT_FOUND) fall through.
+            rethrowIfSystemic(e);
             return {
               dimension: dim,
               element,
@@ -93,8 +98,10 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
               "Cube has rules. CellPutN/S to a coord that the rule computes will be silently overridden by the rule. Inspect the rules manually for LHS pattern overlap with this coord.",
           };
         }
-      } catch {
-        // No rules or error fetching — leave default.
+      } catch (e) {
+        // A missing/rule-less cube legitimately leaves the default; a systemic
+        // outage must surface rather than silently claim the cube has no rules.
+        rethrowIfSystemic(e);
       }
 
       const allExist = checks.every((c) => c.exists);

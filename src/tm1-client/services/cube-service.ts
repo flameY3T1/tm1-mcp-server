@@ -241,11 +241,22 @@ export class CubeService {
     });
 
     try {
-      await this.http.request<void>(
+      const result = await this.http.request<{ ProcessExecuteStatusCode?: string }>(
         "POST",
         `/api/v1/Processes('${enc(procName)}')/tm1.ExecuteWithReturn`,
         {},
       );
+      // ExecuteWithReturn returns HTTP 200 even when the process aborts; the real
+      // outcome is in ProcessExecuteStatusCode. Without this check an aborted
+      // clear (e.g. lock, security) would be reported as a successful clear.
+      const status = result?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
+      if (status !== "CompletedSuccessfully") {
+        throw new TM1Error({
+          code: TM1ErrorCode.TM1_ERROR,
+          message: `Cube clear via TI did not complete for cube '${cubeName}' (status: ${status}).`,
+          endpoint: `/api/v1/Processes('${enc(procName)}')/tm1.ExecuteWithReturn`,
+        });
+      }
     } finally {
       try {
         await this.http.request<void>("DELETE", `/api/v1/Processes('${enc(procName)}')`);

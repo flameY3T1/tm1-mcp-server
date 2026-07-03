@@ -174,6 +174,15 @@ describe("TM1Client – Process Execution Methods", () => {
       expect(result.processErrorStatus).toContain("not found");
     });
 
+    it("propagates a systemic transport failure instead of reporting success:false (M1)", async () => {
+      // A network drop maps to CONNECTION_FAILED. Unlike a TI runtime error, this
+      // must throw: the process may still be running server-side, so a
+      // {success:false} would invite the agent to re-run it (duplicate execution).
+      fetchSpy.mockRejectedValueOnce(new Error("ECONNREFUSED 10.0.0.1:8010"));
+
+      await expect(client.processes.execute("LongRunningLoad")).rejects.toThrow();
+    });
+
     it("should encode special characters in process name", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
