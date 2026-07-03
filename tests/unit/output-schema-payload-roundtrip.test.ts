@@ -173,6 +173,8 @@ describe("strict outputSchemas accept real handler payloads", () => {
     const payload = {
       action: "created",
       processName: "Load.Assumptions",
+      hasSecurityAccess: false,
+      captionApplied: true,
       parsed: {
         prologLines: 12,
         metadataLines: 1,

@@ -392,6 +392,15 @@ export class ProcessService {
   }
 
   /**
+   * Set HasSecurityAccess flag on process.
+   * PATCH /api/v1/Processes('{name}') { HasSecurityAccess }.
+   */
+  async updateSecurityAccess(processName: string, hasSecurityAccess: boolean): Promise<void> {
+    const path = `/api/v1/Processes('${enc(processName)}')`;
+    await this.http.request<void>("PATCH", path, { HasSecurityAccess: hasSecurityAccess });
+  }
+
+  /**
    * Get the data source configuration of a TI process.
    * GET /api/v1/Processes('{name}') and extract the DataSource field.
    */

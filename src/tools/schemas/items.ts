@@ -551,6 +551,8 @@ export const ImportProFileResultSchema = z.object({
 export const ImportProcessFromGitResultSchema = z.object({
   action: z.string(),
   processName: z.string(),
+  hasSecurityAccess: z.boolean(),
+  captionApplied: z.boolean(),
   parsed: z.object({
     prologLines: z.number().int(),
     metadataLines: z.number().int(),

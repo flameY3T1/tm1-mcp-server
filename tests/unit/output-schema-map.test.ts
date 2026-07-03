@@ -291,6 +291,8 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_import_process_from_git: {
       action: "created",
       processName: "Load.Sales",
+      hasSecurityAccess: false,
+      captionApplied: true,
       parsed: {
         prologLines: 5,
         metadataLines: 0,
