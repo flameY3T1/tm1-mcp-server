@@ -299,11 +299,17 @@ export class ElementService {
     dimensionName: string,
     elementName: string,
   ): Promise<ElementAttributeValue[]> {
-    const ctrlCube = `}ElementAttributes_${dimensionName}`;
+    // Escape `]` → `]]` in every bracketed identifier: an element or dimension
+    // named e.g. `Foo]` would otherwise break out of its MDX identifier and
+    // shift the read onto arbitrary members (MDX injection).
+    const esc = (s: string): string => s.replace(/]/g, "]]");
+    const dim = esc(dimensionName);
+    const elem = esc(elementName);
+    const ctrlCube = `}ElementAttributes_${dim}`;
     const mdx =
-      `SELECT {[}ElementAttributes_${dimensionName}].MEMBERS} ON COLUMNS ` +
+      `SELECT {[}ElementAttributes_${dim}].MEMBERS} ON COLUMNS ` +
       `FROM [${ctrlCube}] ` +
-      `WHERE ([${dimensionName}].[${elementName}])`;
+      `WHERE ([${dim}].[${elem}])`;
     const result = await this.cells.executeMdx(mdx);
     const out: ElementAttributeValue[] = [];
     const tuples = result.axes[0]?.tuples ?? [];
