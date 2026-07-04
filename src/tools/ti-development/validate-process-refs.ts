@@ -21,20 +21,68 @@ const CUBE_FN_RE =
   /\b(CellGetN|CellGetS|CellIsUpdateable|CubeExists|ViewExists|ViewCreate|ViewDestroy|ViewZeroOut|CubeClearData|SubsetCreatebyMDX|ViewSubsetAssign|DBR|DBS|DBSS|CubeProcessFeeders|CubeUnload|CubeLockOverride|CubeSetLogChanges)\s*\(\s*'([^']+)'/gi;
 
 // CellPutN/CellPutS/CellIncrementN/CellPutProportionalSpread take the value as
-// arg 1 and the cube as arg 2. The value can be any expression (literal,
-// identifier, '|'-concat) — skip to the first top-level comma. Nested calls in
-// the value arg defeat the skip and the ref is silently missed (same
-// limitation as DIM_AT_ARG2_RE below).
-const CUBE_AT_ARG2_RE =
-  /\b(CellPutN|CellPutS|CellIncrementN|CellPutProportionalSpread)\s*\(\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+)(?:\s*\|\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+))*\s*,\s*'([^']+)'/gi;
+// arg 1 and the cube as arg 2; AttrPutS/AttrPutN/ElementSecurityPut take the
+// dimension as arg 2. The value arg is an arbitrary expression (nested calls,
+// '|'-concat, multi-line), so these are resolved with a paren/quote walker
+// (secondArgLiteral) instead of a regex skip.
+const CUBE_ARG2_FN_RE = /\b(?:CellPutN|CellPutS|CellIncrementN|CellPutProportionalSpread)\s*\(/gi;
 
 const DIM_FN_RE =
   /\b(DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DimIx|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN)\s*\(\s*'([^']+)'/gi;
 
-// AttrPutS/AttrPutN/ElementSecurityPut: value is arg 1, dimension is arg 2.
-// The value can be a literal, identifier, or string-concat expression with '|' — skip over until first top-level comma.
-const DIM_AT_ARG2_RE =
-  /\b(AttrPutS|AttrPutN|ElementSecurityPut)\s*\(\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+)(?:\s*\|\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+))*\s*,\s*'([^']+)'/gi;
+const DIM_ARG2_FN_RE = /\b(?:AttrPutS|AttrPutN|ElementSecurityPut)\s*\(/gi;
+
+// Cap the argument walk so a pathological unterminated call cannot scan the
+// whole remaining tab.
+const ARG_SCAN_MAX_CHARS = 2000;
+
+// Walk the argument list starting after `(` at openParen, tracking paren depth
+// and TI string state ('' is the quote escape), and return the second
+// top-level argument iff it is a plain quoted literal. Newlines are ordinary
+// whitespace, so multi-line calls resolve too; TI strings cannot span lines,
+// so an open string is closed at end-of-line to resync.
+function secondArgLiteral(text: string, openParen: number): string | null {
+  let depth = 0;
+  let inStr = false;
+  let argIndex = 0;
+  let argStart = openParen + 1;
+  const end = Math.min(text.length, openParen + 1 + ARG_SCAN_MAX_CHARS);
+  for (let i = openParen + 1; i < end; i++) {
+    const ch = text[i]!;
+    if (inStr) {
+      if (ch === "'") {
+        if (text[i + 1] === "'") {
+          i++;
+          continue;
+        }
+        inStr = false;
+      } else if (ch === "\n") {
+        inStr = false;
+      }
+      continue;
+    }
+    if (ch === "'") {
+      inStr = true;
+    } else if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
+      if (depth === 0) {
+        return argIndex === 1 ? quotedLiteral(text.slice(argStart, i)) : null;
+      }
+      depth--;
+    } else if (ch === "," && depth === 0) {
+      if (argIndex === 1) return quotedLiteral(text.slice(argStart, i));
+      argIndex++;
+      argStart = i + 1;
+    }
+  }
+  return null;
+}
+
+function quotedLiteral(argText: string): string | null {
+  const m = /^\s*'((?:[^']|'')+)'\s*$/.exec(argText);
+  return m ? m[1]!.replace(/''/g, "'") : null;
+}
 
 function scanCode(code: string, tab: Tab, regex: RegExp): Map<string, { tab: Tab; line: number; context: string }> {
   const found = new Map<string, { tab: Tab; line: number; context: string }>();
@@ -50,6 +98,25 @@ function scanCode(code: string, tab: Tab, regex: RegExp): Map<string, { tab: Tab
         found.set(name, { tab, line: i + 1, context: ln.trim().slice(0, 200) });
       }
     }
+  }
+  return found;
+}
+
+// Arg-2 variant of scanCode: matches the function name across the whole tab
+// (comment lines blanked, so multi-line calls survive) and resolves the second
+// argument with the paren/quote walker.
+function scanArg2(code: string, tab: Tab, fnRe: RegExp): Map<string, { tab: Tab; line: number; context: string }> {
+  const found = new Map<string, { tab: Tab; line: number; context: string }>();
+  const lines = code.split(/\r?\n/).map((ln) => (/^\s*#/.test(ln) ? "" : ln));
+  const text = lines.join("\n");
+  fnRe.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = fnRe.exec(text)) !== null) {
+    // The pattern ends with '(' — its index is the end of the match.
+    const name = secondArgLiteral(text, m.index + m[0].length - 1);
+    if (!name || found.has(name)) continue;
+    const line = text.slice(0, m.index).split("\n").length;
+    found.set(name, { tab, line, context: lines[line - 1]!.trim().slice(0, 200) });
   }
   return found;
 }
@@ -99,13 +166,13 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         for (const [name, info] of scanCode(c, tab, CUBE_FN_RE)) {
           if (!cubeRefs.has(name)) cubeRefs.set(name, info);
         }
-        for (const [name, info] of scanCode(c, tab, CUBE_AT_ARG2_RE)) {
+        for (const [name, info] of scanArg2(c, tab, CUBE_ARG2_FN_RE)) {
           if (!cubeRefs.has(name)) cubeRefs.set(name, info);
         }
         for (const [name, info] of scanCode(c, tab, DIM_FN_RE)) {
           if (!dimRefs.has(name)) dimRefs.set(name, info);
         }
-        for (const [name, info] of scanCode(c, tab, DIM_AT_ARG2_RE)) {
+        for (const [name, info] of scanArg2(c, tab, DIM_ARG2_FN_RE)) {
           if (!dimRefs.has(name)) dimRefs.set(name, info);
         }
       }

@@ -88,6 +88,47 @@ describe("tm1_validate_process_refs reference extraction", () => {
     expect(payload.issues[0].name).toBe("MissingCube");
   });
 
+  it("resolves the cube behind a nested function call in the value arg", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: ["SomeDim"] });
+    const payload = await run(
+      cb,
+      "CellPutN(ATTRN('SomeDim', vsEl, 'Faktor') * nScale, 'MissingCube', 'E1', 'E2');"
+    );
+    expect(payload.cubeRefsScanned).toBe(1);
+    expect(payload.issues[0].name).toBe("MissingCube");
+    // The nested ATTRN dim ref is scanned by the arg-1 pattern too.
+    expect(payload.dimensionRefsScanned).toBe(1);
+    expect(payload.unresolved).toBe(1);
+  });
+
+  it("resolves multi-line calls and TI doubled-quote escapes", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: [] });
+    const payload = await run(
+      cb,
+      "CellPutS(SUBST(vsQuelle, 1, 2),\n  'It''s a Cube',\n  'E1', 'E2');"
+    );
+    expect(payload.issues[0].name).toBe("It's a Cube");
+  });
+
+  it("ignores a non-literal arg 2 without false positives", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: [] });
+    const payload = await run(cb, "CellPutN(nWert, sZielCube, 'E1');");
+    expect(payload.cubeRefsScanned).toBe(0);
+    expect(payload.unresolved).toBe(0);
+  });
+
+  it("resolves the dimension behind a nested call in AttrPutS", async () => {
+    const cb = captureHandler({ cubes: ["Quelle"], dimensions: [] });
+    const payload = await run(
+      cb,
+      "AttrPutS(CellGetS('Quelle', 'a', 'b'), 'MissingDim', vsEl, 'Alias');"
+    );
+    expect(payload.cubeRefsScanned).toBe(1);
+    expect(payload.dimensionRefsScanned).toBe(1);
+    expect(payload.issues[0].name).toBe("MissingDim");
+    expect(payload.issues[0].kind).toBe("dimension");
+  });
+
   it("scans ViewZeroOut and CubeClearData cube args", async () => {
     const cb = captureHandler({ cubes: ["Reporting"], dimensions: [] });
     const payload = await run(
