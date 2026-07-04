@@ -38,16 +38,22 @@ function collectInputSchemas(): Map<string, Record<string, unknown>> {
 // destructive op without repeating the target name. This gate fails if any of
 // these drops the field.
 //
-// NOTE: the destructive surface is wider than this set (delete_element/hierarchy/
-// subset/view/chore/client/file, remove_client_group). Extending confirm to those
-// is deliberately deferred (audit H4 coverage gap) — it changes those tool
-// contracts and needs the live suite re-run against a server. Tracked in
-// docs/internal/audit-2026-07-03-beyond-basics.md.
+// H4-full (2026-07-04): the guard now covers the whole object-destruction
+// surface. remove_client_group is technically reversible (re-assign) but guards
+// on clientName so an auto-approve client can't silently strip memberships.
 const CONFIRM_REQUIRED = [
   "tm1_delete_process",
   "tm1_clear_cube",
   "tm1_delete_cube",
   "tm1_delete_dimension",
+  "tm1_delete_element",
+  "tm1_delete_hierarchy",
+  "tm1_delete_subset",
+  "tm1_delete_view",
+  "tm1_delete_chore",
+  "tm1_delete_client",
+  "tm1_delete_file",
+  "tm1_remove_client_group",
 ];
 
 describe("confirmation-guard coverage", () => {

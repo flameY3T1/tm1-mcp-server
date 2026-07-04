@@ -33,8 +33,8 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
     h = await getHarness();
 
     // Clean any leftovers from a crashed prior run so create() calls don't 400.
-    await h.call("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW });
-    await h.call("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW });
+    await h.call("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW, confirm: NATIVE_VIEW });
+    await h.call("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW, confirm: MDX_VIEW });
     await h.call("tm1_delete_cube", { name: C1, confirm: C1 });
     await h.call("tm1_delete_dimension", { name: D1, confirm: D1 });
     await h.call("tm1_delete_dimension", { name: D2, confirm: D2 });
@@ -67,10 +67,10 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
         /* already gone */
       }
     };
-    await swallow(h.call("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW }));
-    await swallow(h.call("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW }));
+    await swallow(h.call("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW, confirm: NATIVE_VIEW }));
+    await swallow(h.call("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW, confirm: MDX_VIEW }));
     await swallow(
-      h.call("tm1_delete_subset", { dimensionName: D1, hierarchyName: D1, subsetName: SUBSET }),
+      h.call("tm1_delete_subset", { dimensionName: D1, hierarchyName: D1, subsetName: SUBSET, confirm: SUBSET }),
     );
     await swallow(h.call("tm1_delete_cube", { name: C1, confirm: C1 }));
     await swallow(h.call("tm1_delete_dimension", { name: D1, confirm: D1 }));
@@ -138,6 +138,7 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
       dimensionName: D1,
       hierarchyName: D1,
       subsetName: SUBSET,
+      confirm: SUBSET,
     });
     expect(r.json).toMatchObject({ success: true });
   });
@@ -194,7 +195,7 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
   });
 
   it("delete_view removes the native view", async () => {
-    const r = await h.ok("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW });
+    const r = await h.ok("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW, confirm: NATIVE_VIEW });
     expect(r.json).toMatchObject({ success: true });
   });
 
@@ -218,7 +219,7 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
     expect(typeof def.json.mdx).toBe("string");
     expect(def.json.mdx.length).toBeGreaterThan(0);
 
-    const d = await h.ok("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW });
+    const d = await h.ok("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW, confirm: MDX_VIEW });
     expect(d.json).toMatchObject({ success: true });
   });
 

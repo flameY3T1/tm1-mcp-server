@@ -37,7 +37,7 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
     // Idempotent teardown. Delete the chore FIRST so it can never fire, then
     // the process. Swallow errors so one failure doesn't mask the other.
     try {
-      await h.call("tm1_delete_chore", { name: CHORE });
+      await h.call("tm1_delete_chore", { name: CHORE, confirm: CHORE });
     } catch {
       /* already gone */
     }
@@ -128,6 +128,7 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
   it("delete_chore on a nonexistent chore returns an error envelope", async () => {
     const r = await h.call("tm1_delete_chore", {
       name: `${SANDBOX}_CHORE_DOES_NOT_EXIST`,
+      confirm: `${SANDBOX}_CHORE_DOES_NOT_EXIST`,
     });
     expect(r.isError).toBe(true);
     expect(r.json?.code).toBeTruthy();

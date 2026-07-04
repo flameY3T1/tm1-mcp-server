@@ -286,6 +286,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
       dimensionName: DIM,
       hierarchyName: HIER,
       elementName: QUOTE_EL,
+      confirm: QUOTE_EL,
     });
     const r = await h.ok("tm1_get_hierarchy", { dimensionName: DIM, hierarchyName: HIER });
     const names: string[] = r.json.elements.map((e: { name: string }) => e.name);
@@ -296,6 +297,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     const r = await h.ok("tm1_delete_hierarchy", {
       dimensionName: DIM,
       hierarchyName: ALT_HIER,
+      confirm: ALT_HIER,
     });
     expect(r.json).toMatchObject({ success: true, hierarchyName: ALT_HIER });
   });

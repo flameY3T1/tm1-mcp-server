@@ -37,7 +37,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
   afterAll(async () => {
     // Each step independently try/caught — teardown must be idempotent.
     try {
-      await h.call("tm1_delete_file", { fileName: FILE_NAME });
+      await h.call("tm1_delete_file", { fileName: FILE_NAME, confirm: FILE_NAME });
     } catch {
       /* already gone */
     }
@@ -47,13 +47,14 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
           await h.call("tm1_remove_client_group", {
             clientName: CLIENT_NAME,
             groupName: assignedGroup,
+            confirm: CLIENT_NAME,
           });
         } catch {
           /* already removed */
         }
       }
       try {
-        await h.call("tm1_delete_client", { name: CLIENT_NAME });
+        await h.call("tm1_delete_client", { name: CLIENT_NAME, confirm: CLIENT_NAME });
       } catch {
         /* already gone */
       }
@@ -199,7 +200,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
     expect(get.json.content).toBe(FILE_BODY);
     expect(get.json.truncated).toBe(false);
 
-    const del = await h.ok("tm1_delete_file", { fileName: FILE_NAME });
+    const del = await h.ok("tm1_delete_file", { fileName: FILE_NAME, confirm: FILE_NAME });
     expect(del.json).toMatchObject({ success: true, deleted: true });
 
     // Confirm gone: subsequent read errors with NOT_FOUND.
@@ -270,13 +271,14 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
       const rem = await h.ok("tm1_remove_client_group", {
         clientName: CLIENT_NAME,
         groupName: safeGroup,
+        confirm: CLIENT_NAME,
       });
       expect(rem.json).toMatchObject({ success: true });
       assignedGroup = undefined; // removed cleanly
     }
 
     // delete_client removes it.
-    const del = await h.ok("tm1_delete_client", { name: CLIENT_NAME });
+    const del = await h.ok("tm1_delete_client", { name: CLIENT_NAME, confirm: CLIENT_NAME });
     expect(del.json).toMatchObject({ success: true, clientName: CLIENT_NAME });
     createdClient = false; // gone; teardown no-op
   });
