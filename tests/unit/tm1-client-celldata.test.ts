@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
+import { TM1Error } from "../../src/types.js";
 import type { TM1Config } from "../../src/config.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -404,6 +405,82 @@ describe("TM1Client – Cell Data Methods", () => {
       expect(result.axes[0].tuples[0].members).toHaveLength(2);
       expect(result.axes[0].tuples[0].members[0]).toEqual({ name: "Jan", hierarchyName: "Time" });
       expect(result.axes[0].tuples[0].members[1]).toEqual({ name: "Actual", hierarchyName: "Version" });
+    });
+  });
+
+  // ── writeCells() partial-commit reporting (M4) ──────────────────────────────
+
+  describe("writeCells() partial commit", () => {
+    // Route by URL/body so one specific cell's PATCH fails while the rest
+    // succeed. Each cell = ExecuteMDX (→ cellset id) + PATCH Cells(0) + DELETE.
+    function routeWithBadCell(): void {
+      fetchSpy.mockImplementation((url: unknown, init: unknown) => {
+        const u = String(url);
+        const opts = init as { method: string; body?: string };
+        if (u.includes("/ExecuteMDX")) {
+          const mdx = JSON.parse(opts.body ?? "{}").MDX as string;
+          const id = mdx.includes("[Dim1].[Dim1].[BAD]") ? "bad" : "good";
+          return Promise.resolve(mockResponse({ ID: id }));
+        }
+        if (u.includes("/Cells(0)")) {
+          if (u.includes("Cellsets('bad')")) {
+            return Promise.resolve({
+              ok: false,
+              status: 400,
+              statusText: "Bad Request",
+              headers: new Headers(),
+              text: vi
+                .fn()
+                .mockResolvedValue(JSON.stringify({ error: { message: "consolidated cell" } })),
+            } as unknown as Response);
+          }
+          return Promise.resolve(mockResponse({}));
+        }
+        // DELETE cleanup
+        return Promise.resolve(mockResponse({}));
+      });
+    }
+
+    it("throws with written/failed/notAttempted split and stops after the failing batch", async () => {
+      routeWithBadCell();
+
+      // 12 cells → two batches (BATCH_SIZE 10). The failing cell sits in batch 1,
+      // so batch 2 (indices 10–11) must never be attempted.
+      const dimensions = ["Dim1", "Dim2"];
+      const cells = Array.from({ length: 12 }, (_, i) => ({
+        elements: [`E${i}`, "M"],
+        value: i,
+      }));
+      cells[3] = { elements: ["BAD", "M"], value: 3 };
+
+      let caught: unknown;
+      try {
+        await client.cells.writeCells("Sales", dimensions, cells);
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught).toBeInstanceOf(TM1Error);
+      const err = caught as TM1Error;
+      expect(err.code).toBe("TM1_ERROR");
+      expect(err.message).toMatch(/partially applied/);
+      expect(err.message).toMatch(/9 written/);
+      expect(err.message).toMatch(/1 failed/);
+      expect(err.message).toMatch(/2 not attempted/);
+
+      const details = JSON.parse(err.details ?? "{}");
+      expect(details.written).toBe(9);
+      expect(details.notAttempted).toBe(2);
+      expect(details.failed).toEqual([
+        { elements: ["BAD", "M"], error: "consolidated cell" },
+      ]);
+
+      // Batch 2 cells (E10 / E11) were never sent to ExecuteMDX.
+      const mdxBodies = fetchSpy.mock.calls
+        .filter(([u]) => String(u).includes("/ExecuteMDX"))
+        .map(([, o]) => (o as { body?: string }).body ?? "");
+      expect(mdxBodies.some((b) => b.includes("[E10]"))).toBe(false);
+      expect(mdxBodies.some((b) => b.includes("[E11]"))).toBe(false);
     });
   });
 

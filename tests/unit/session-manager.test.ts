@@ -86,6 +86,42 @@ describe("SessionManager", () => {
       expect(opts.headers.Authorization).toBe(expectedAuth);
     });
 
+    it("short-circuits to the current cookie when staleCookie was already rotated (no re-login)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=fresh; Path=/" })
+      );
+      const sm = new SessionManager(makeConfig(), mockLogger);
+      const first = await sm.authenticate();
+      expect(first).toBe("fresh");
+      expect(fetchSpy).toHaveBeenCalledOnce();
+
+      // A delayed 401 from a request still holding the old cookie asks to
+      // re-auth. The session was already rotated to "fresh", so this must return
+      // the fresh cookie without any logout+login (staggered-401 churn guard).
+      const cookie = await sm.authenticate("old-stale-cookie");
+      expect(cookie).toBe("fresh");
+      expect(fetchSpy).toHaveBeenCalledOnce(); // no additional round-trip
+    });
+
+    it("performs a full re-auth when staleCookie matches the current session (genuine expiry)", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(
+          mockFetchResponse({ ok: true, setCookie: "TM1SessionId=c1; Path=/" })
+        )
+        .mockResolvedValueOnce(mockFetchResponse({ ok: true })) // logout DELETE of c1
+        .mockResolvedValueOnce(
+          mockFetchResponse({ ok: true, setCookie: "TM1SessionId=c2; Path=/" })
+        );
+      const sm = new SessionManager(makeConfig(), mockLogger);
+      const first = await sm.authenticate();
+      expect(first).toBe("c1");
+
+      // staleCookie === current cookie → not rotated → real logout+login.
+      const second = await sm.authenticate("c1");
+      expect(second).toBe("c2");
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+    });
+
     it("should mark session as active after successful auth", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockFetchResponse({
@@ -291,7 +327,14 @@ describe("SessionManager", () => {
       fetchSpy.mockResolvedValueOnce(
         mockFetchResponse({ ok: false, status: 401, statusText: "Unauthorized" })
       );
-      // Re-auth
+      // Re-auth flow: doAuthenticate logs out the (now-dead) "old" session
+      // first — a best-effort DELETE — then performs the fresh login. The
+      // keep-alive path no longer nulls the cookie before re-auth so that a
+      // concurrent rotation isn't clobbered (staggered-401 churn fix), which is
+      // why the logout round-trip is now observable here.
+      fetchSpy.mockResolvedValueOnce(
+        mockFetchResponse({ ok: true }) // logout DELETE
+      );
       fetchSpy.mockResolvedValueOnce(
         mockFetchResponse({
           ok: true,
@@ -303,7 +346,7 @@ describe("SessionManager", () => {
       await sm.authenticate();
       await sm.keepAlive();
 
-      expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
       expect(sm.isSessionActive()).toBe(true);
     });
 

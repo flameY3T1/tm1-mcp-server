@@ -194,9 +194,45 @@ export class CellService {
       }
     };
 
+    // Batched concurrency. Each cell is an independent 3-call round-trip, so a
+    // failure mid-run leaves earlier cells committed — TM1 has no transaction
+    // across them. Report the split (written / failed / notAttempted) instead of
+    // surfacing only the single rejected cell, so the caller knows exactly what
+    // landed and what to retry. Stop at the first batch containing a failure;
+    // later batches are left unattempted rather than compounding partial state.
     const BATCH_SIZE = 10;
+    let written = 0;
     for (let i = 0; i < cells.length; i += BATCH_SIZE) {
-      await Promise.all(cells.slice(i, i + BATCH_SIZE).map(writeOne));
+      const batch = cells.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map(writeOne));
+
+      const failed: Array<{ elements: string[]; error: string }> = [];
+      results.forEach((r, j) => {
+        if (r.status === "fulfilled") {
+          written++;
+        } else {
+          failed.push({
+            elements: batch[j]!.elements,
+            error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+          });
+        }
+      });
+
+      if (failed.length > 0) {
+        const notAttempted = cells.length - (i + batch.length);
+        throw new TM1Error({
+          code: TM1ErrorCode.TM1_ERROR,
+          message:
+            `write_cells partially applied to '${cubeName}': ${written} written, ` +
+            `${failed.length} failed, ${notAttempted} not attempted. ` +
+            `Earlier writes are committed and will NOT be rolled back.`,
+          details: JSON.stringify({ written, failed, notAttempted }),
+          hint:
+            "Inspect `details` for the failed coordinates. Successful cells are already committed — " +
+            "retry ONLY the failed + notAttempted coords (re-sending written cells is harmless but wasteful). " +
+            "Validate targets first with tm1_check_writable_coords.",
+        });
+      }
     }
   }
 

@@ -57,8 +57,22 @@ export class SessionManager {
    * first, leaving the first request retrying with a now-stale cookie (the
    * "thundering herd on session expiry" race). All re-auth paths — ensureSession,
    * keepAlive, and the transport 401 retry — funnel through this guard.
+   *
+   * `staleCookie` (optional): the cookie the caller was using when it decided to
+   * re-auth. If another caller has ALREADY rotated the session since then
+   * (current cookie ≠ stale, and non-null), this returns the fresh cookie
+   * without a logout+login. Without this, a delayed 401 carrying an
+   * already-replaced cookie would tear down the healthy session that concurrent
+   * requests are using — the "staggered-401 re-auth churn" cascade.
    */
-  async authenticate(): Promise<string> {
+  async authenticate(staleCookie?: string): Promise<string> {
+    if (
+      staleCookie !== undefined &&
+      this.sessionCookie !== null &&
+      this.sessionCookie !== staleCookie
+    ) {
+      return this.sessionCookie;
+    }
     this.authInFlight ??= this.doAuthenticate().finally(() => {
       this.authInFlight = null;
     });
@@ -144,6 +158,11 @@ export class SessionManager {
     const url = `${this.config.baseUrl}/api/v1/ActiveSession`;
     this.logger.debug({ endpoint: url }, "Sending keep-alive");
 
+    // Snapshot the cookie this keep-alive is probing. If a concurrent request
+    // rotates the session mid-flight, we must not tear down the fresh cookie on
+    // our (now-stale) 401 — authenticate(usedCookie) handles that.
+    const usedCookie = this.sessionCookie;
+
     let response: Response;
     try {
       response = await withTimeout(
@@ -153,7 +172,7 @@ export class SessionManager {
           tm1Fetch(url, {
             method: "GET",
             headers: {
-              Cookie: `TM1SessionId=${this.sessionCookie}`,
+              Cookie: `TM1SessionId=${usedCookie}`,
               "User-Agent": USER_AGENT,
               "TM1-SessionContext": USER_AGENT,
               "TM1-Session-Context": USER_AGENT,
@@ -180,8 +199,9 @@ export class SessionManager {
 
     if (response.status === 401) {
       this.logger.warn("Session expired during keep-alive, re-authenticating");
-      this.sessionCookie = null;
-      await this.authenticate();
+      // Pass the probed cookie so a race that already rotated the session is a
+      // no-op here instead of a redundant logout+login (staggered-401 churn).
+      await this.authenticate(usedCookie ?? undefined);
       return;
     }
 

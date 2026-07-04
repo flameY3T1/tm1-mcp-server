@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { withToolHint } from "../error-format.js";
 
 export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) {
@@ -65,6 +66,20 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
           // normalizeErrorResult for diagnosis.
           ...(result.success === false ? { isError: true as const } : {}),
         };
+      } catch (err) {
+        // Client-side cancellation (notifications/cancelled) aborts the fetch,
+        // but the TI process keeps running server-side — TM1 REST has no
+        // mid-run abort. withToolHint's runtime-failure hint ("diagnose then
+        // re-run") is actively wrong here: it invites a duplicate execution.
+        // Detect the abort via the MCP signal and point at the live thread.
+        if (extra?.signal?.aborted) {
+          throw new TM1Error({
+            code: TM1ErrorCode.TM1_ERROR,
+            message: `Execution of '${processName}' was cancelled client-side before it returned; the TI process may still be running on the TM1 server.`,
+            hint: `Request aborted by the client — the process was NOT confirmed failed and may still be executing. Use tm1_list_threads to check for it and tm1_cancel_thread to stop it. Do NOT blindly re-run: that risks a duplicate execution.`,
+          });
+        }
+        throw err;
       } finally {
         if (heartbeatTimer !== undefined) clearInterval(heartbeatTimer);
       }

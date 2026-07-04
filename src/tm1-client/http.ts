@@ -117,7 +117,10 @@ export class TM1HttpClient {
 
         if (response.status === 401) {
           this.logger.warn({ endpoint: path }, "Received 401, re-authenticating");
-          const newCookie = await this.sessionManager.authenticate();
+          // Pass the cookie that got the 401 so a concurrent request that
+          // already rotated the session short-circuits to the fresh cookie
+          // instead of forcing another logout+login (staggered-401 churn).
+          const newCookie = await this.sessionManager.authenticate(cookie);
           const retryResponse = await this.executeRequest(
             url,
             method,
@@ -339,7 +342,7 @@ export class TM1HttpClient {
       throw err;
     }
     if (response.status === 401) {
-      const newCookie = await this.sessionManager.authenticate();
+      const newCookie = await this.sessionManager.authenticate(initialCookie);
       try {
         response = await send(newCookie);
       } catch (err) {
