@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-07-04
+
+Audit + live-sweep release: the 2026-07-03 "beyond the basics" audit fixes
+(transport lifecycle, cellset leak, error honesty, confirm-guard coverage)
+plus tool gaps found while sweeping ~35 tools against a production TM1 11.8
+server. One behavior change is called out below.
+
+### ⚠️ Behavior change
+
+- The `confirm: true` guard now covers the **entire** object-destruction
+  surface: `tm1_delete_element`, `tm1_delete_hierarchy`, `tm1_delete_subset`,
+  `tm1_delete_view`, `tm1_delete_chore`, `tm1_delete_client`,
+  `tm1_delete_file`, and `tm1_remove_client_group` join the previously guarded
+  deletes. Calls without `confirm: true` are rejected with a hint (a unit test
+  gates the tool set so new destructive tools cannot ship unguarded).
+- `tm1_write_cells` reports partial failures honestly: `allSettled` semantics
+  with `{ written, failed, notAttempted }` instead of failing the whole batch
+  on the first bad cell.
+
+### Added
+
+- Git-process roundtrip carries `HasSecurityAccess`: `tm1_export_process_to_git`
+  reads and emits it, `tm1_import_process_from_git` applies it (PATCH, only
+  when declared in the file — existing server values are preserved otherwise),
+  and `tm1_upsert_process` accepts it as an input field. `Caption` was
+  evaluated and deliberately left out: TM1 offers no reliable write path
+  (`}ElementAttributes_}Processes` is absent on attribute-less dimensions), so
+  a lossy field is not pretended to be lossless.
+- `tm1_validate_process_refs` now resolves much more of the real-world TI
+  surface: `DIMIX`, `CellIncrementN`, `CellPutProportionalSpread`,
+  `ViewZeroOut`, `CubeClearData`; cube/dimension args in position 2
+  (`CellPutN/S`, `AttrPutN/S`, `ElementSecurityPut`) are extracted with a
+  paren/quote walker that handles nested function calls, multi-line calls, and
+  TI `''` escapes; and variable object names bound to a single literal
+  (`sCube = 'Sales'; CellGetN(sCube, ...)`) resolve through the per-process
+  variable environment. Params, datasource variables, and reassigned
+  variables stay conservatively unresolved — no false positives.
+- HTTP transport (Streamable) builds an isolated server+transport pair per
+  request instead of sharing one across sessions.
+
+### Fixed
+
+- Read-path cellsets (`tm1_get_view`, `tm1_execute_mdx`, sampling) are freed
+  on the server after use — long-lived sessions no longer leak TM1 memory.
+- Service layer propagates systemic transport errors (auth loss, outages)
+  instead of degrading them to empty results (`exists()` probes pinned to
+  404-only, callgraph/audit tools fail loud on outage).
+- `tm1_execute_process`: client-side aborts are reported as *unconfirmed*
+  (with a list/cancel-thread hint) instead of pretending the process failed;
+  TI failure status keeps the `isError` flag.
+- Session manager: stale-cookie re-auth short-circuits the 401 storm when
+  many parallel requests race; keep-alive no longer clears a fresh cookie.
+- `tm1_check_process_code`: syntax errors return a self-describing
+  `VALIDATION_ERROR` payload (short message + actionable hint) instead of a
+  generic `TM1_ERROR` envelope with the whole payload duplicated into
+  `message`; the isError normalizer no longer falls back to raw-JSON
+  duplication for any tool.
+- OData key segments with embedded quotes are escaped in the rules linter;
+  `]` is escaped in attribute-value MDX.
+- `TM1_MODE` parsing is case-insensitive and fails fast on unknown values
+  (a typo no longer silently granted read-write).
+- Crash exit: `uncaughtException` terminates with exit code 1 (was 0), so
+  supervisors detect the failure.
+- Element "already exists" detection pinned cross-version (v11 HTTP 400 vs
+  409) with a unit test, keeping `tm1_bulk_upsert_elements` idempotent.
+- Masking property tests exercise the real logger construction path (a fake
+  copy had let redaction regressions slip); `Cookie` headers joined the
+  redaction list.
+
+### Security
+
+- Local `.mcp.json` (holds TM1 credentials) is git-ignored.
+- Cookie/session headers are redacted in logs.
+
 ## [1.0.2] - 2026-07-02
 
 Hardening release: security, bounded outputs, robustness, and internal
@@ -204,5 +278,8 @@ Initial public release.
 - Quality gates: strict typecheck, ESLint, `lint:no-flat-api`,
   annotation-coverage, and tool-registration wiring.
 
-[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/flameY3T1/tm1-mcp-server/releases/tag/v1.0.0
