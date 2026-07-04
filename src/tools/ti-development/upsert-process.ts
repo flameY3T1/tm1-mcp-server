@@ -50,6 +50,10 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
       parameters: z.array(parameterSchema).optional(),
       variables: z.array(variableSchema).optional(),
       dataSource: dataSourceSchema.optional(),
+      hasSecurityAccess: z
+        .boolean()
+        .optional()
+        .describe("When set, applies the process's HasSecurityAccess flag via a dedicated PATCH after the other steps."),
       mode: z.enum(["create", "update", "upsert"]).optional().default("upsert"),
       autoCompile: z
         .boolean()
@@ -59,7 +63,7 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
           "After deploy, run tm1.Compile and include the result in the response (compile: {ok, errorCount, errors}). Off by default — compile holds a brief lock on the process and serializes badly under bulk-deploy.",
         ),
     },
-    async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, mode, autoCompile }) => {
+    async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, hasSecurityAccess, mode, autoCompile }) => {
       const trail: string[] = [];
       const exists = await tm1Client.processes.exists(name);
       if (mode === "create" && exists) {
@@ -100,6 +104,10 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
       if (dataSource !== undefined) {
         await tm1Client.processes.updateDataSource(name, dataSource);
         trail.push("updateProcessDataSource");
+      }
+      if (hasSecurityAccess !== undefined) {
+        await tm1Client.processes.updateSecurityAccess(name, hasSecurityAccess);
+        trail.push("updateSecurityAccess");
       }
 
       // Process body/parameters/datasource may have changed call sites — drop the

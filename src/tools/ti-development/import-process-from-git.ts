@@ -149,6 +149,13 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         );
       }
 
+      if (parsed.hasSecurityAccess !== undefined) {
+        await withToolHint(
+          tm1Client.processes.updateSecurityAccess(processName, parsed.hasSecurityAccess),
+          `HasSecurityAccess update failed for '${processName}'. Code+params+vars+datasource applied. Re-run with mode=update once root cause fixed.`,
+        );
+      }
+
       return {
         content: [
           {
@@ -157,6 +164,7 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
               {
                 action,
                 processName,
+                ...(parsed.hasSecurityAccess !== undefined ? { hasSecurityAccess: parsed.hasSecurityAccess } : {}),
                 parsed: {
                   prologLines: parsed.prolog.split("\n").length,
                   metadataLines: parsed.metadata.split("\n").length,

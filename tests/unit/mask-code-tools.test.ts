@@ -66,6 +66,7 @@ function clientWith(codeByProcess: Record<string, Record<string, string>>): TM1C
       getParameters: async () => [],
       getVariables: async () => [],
       getDataSource: async () => NONE_DS,
+      getDeployMeta: async () => ({ hasSecurityAccess: false }),
     },
   } as unknown as TM1Client;
 }

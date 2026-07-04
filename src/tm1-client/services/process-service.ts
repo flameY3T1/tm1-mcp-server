@@ -364,6 +364,21 @@ export class ProcessService {
   }
 
   /**
+   * Read deploy-relevant entity metadata not covered by getCode/params/
+   * vars/datasource. Currently only HasSecurityAccess (functional elevation).
+   * GET /api/v1/Processes('{name}')?$select=HasSecurityAccess
+   */
+  async getDeployMeta(
+    processName: string,
+  ): Promise<{ hasSecurityAccess: boolean }> {
+    const path = `/api/v1/Processes('${enc(processName)}')?$select=HasSecurityAccess`;
+    const response = await this.http.request<{
+      HasSecurityAccess?: boolean;
+    }>("GET", path);
+    return { hasSecurityAccess: response.HasSecurityAccess === true };
+  }
+
+  /**
    * Update one or more code tabs of a TI process (partial update).
    * PATCH /api/v1/Processes('{name}') with only the tabs to update.
    */
@@ -376,6 +391,15 @@ export class ProcessService {
     if (code.epilog !== undefined) body.EpilogProcedure = code.epilog;
 
     await this.http.request<void>("PATCH", path, body);
+  }
+
+  /**
+   * Set HasSecurityAccess flag on process.
+   * PATCH /api/v1/Processes('{name}') { HasSecurityAccess }.
+   */
+  async updateSecurityAccess(processName: string, hasSecurityAccess: boolean): Promise<void> {
+    const path = `/api/v1/Processes('${enc(processName)}')`;
+    await this.http.request<void>("PATCH", path, { HasSecurityAccess: hasSecurityAccess });
   }
 
   /**

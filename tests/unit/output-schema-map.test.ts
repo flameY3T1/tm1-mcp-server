@@ -283,6 +283,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       variableCount: 3,
       dataSourceType: "ASCII",
       credentialsOmitted: false,
+      hasSecurityAccess: false,
       writtenTo: { json: null, ti: null },
       json: '{\n  "name": "Load.Sales",\n  "parameters": [],\n  "variables": [],\n  "dataSource": { "type": "ASCII" }\n}\n',
       ti: "### TM1-TI-TAB: prolog ###\nsX=1;\n### TM1-TI-TAB: metadata ###\n### TM1-TI-TAB: data ###\n### TM1-TI-TAB: epilog ###\n",
@@ -290,6 +291,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_import_process_from_git: {
       action: "created",
       processName: "Load.Sales",
+      hasSecurityAccess: false,
       parsed: {
         prologLines: 5,
         metadataLines: 0,

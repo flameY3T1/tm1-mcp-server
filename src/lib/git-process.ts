@@ -38,6 +38,7 @@ export interface GitProcessInput {
   parameters: ProcessParameter[];
   variables: ProcessVariable[];
   dataSource: DataSource;
+  hasSecurityAccess: boolean;
 }
 
 export interface GitProcessFiles {
@@ -56,6 +57,7 @@ export interface ParsedGitProcess {
   parameters: ProcessParameter[];
   variables: ProcessVariable[];
   dataSource: DataSource;
+  hasSecurityAccess?: boolean;
 }
 
 const TAB_ORDER = ["prolog", "metadata", "data", "epilog"] as const;
@@ -87,6 +89,7 @@ export function serializeProcessToGit(input: GitProcessInput): GitProcessFiles {
     JSON.stringify(
       {
         name: input.name,
+        hasSecurityAccess: input.hasSecurityAccess,
         parameters: input.parameters,
         variables: input.variables,
         dataSource: dataSourceNoPwd,
@@ -105,6 +108,7 @@ export function parseProcessFromGit(
 ): ParsedGitProcess {
   let meta: {
     name?: unknown;
+    hasSecurityAccess?: unknown;
     parameters?: unknown;
     variables?: unknown;
     dataSource?: unknown;
@@ -119,6 +123,9 @@ export function parseProcessFromGit(
   }
 
   const name = typeof meta.name === "string" ? meta.name : "";
+
+  const hasSecurityAccess =
+    typeof meta.hasSecurityAccess === "boolean" ? meta.hasSecurityAccess : undefined;
 
   // Validate the deployable parts instead of blind-casting user JSON: a
   // malformed entry (e.g. type:"bad" or a numeric name) would otherwise flow
@@ -180,6 +187,7 @@ export function parseProcessFromGit(
 
   return {
     name,
+    ...(hasSecurityAccess !== undefined ? { hasSecurityAccess } : {}),
     prolog: buckets.prolog.join("\n"),
     metadata: buckets.metadata.join("\n"),
     data: buckets.data.join("\n"),
