@@ -150,10 +150,17 @@ export function loadConfig(): TM1Config {
 
   const httpToken = process.env.TM1_MCP_HTTP_TOKEN || undefined;
 
-  const modeRaw = process.env.TM1_MODE ?? "readonly";
-  const mode = VALID_MODES.includes(modeRaw as (typeof VALID_MODES)[number])
-    ? (modeRaw as TM1Config["mode"])
-    : "readonly";
+  // Case-insensitive so a `TM1_MODE=ReadWrite` typo resolves to readwrite rather
+  // than silently falling back to readonly (dropping every write tool without a
+  // word). A genuinely-unknown value throws at startup — parity with the numeric
+  // env vars — instead of failing quietly.
+  const modeRaw = (process.env.TM1_MODE ?? "readonly").trim().toLowerCase();
+  if (!VALID_MODES.includes(modeRaw as (typeof VALID_MODES)[number])) {
+    throw new Error(
+      `Invalid TM1_MODE: "${process.env.TM1_MODE}". Expected "readwrite" or "readonly".`,
+    );
+  }
+  const mode = modeRaw as TM1Config["mode"];
 
   return {
     baseUrl: baseUrl!,

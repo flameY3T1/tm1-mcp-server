@@ -12,6 +12,11 @@ export type ApiRequestFn = (
   path: string,
 ) => Promise<{ statusCode: number; body: string }>;
 
+// OData key-segment encoding: double single quotes (OData literal escaping)
+// before percent-encoding, matching every service's `enc` helper. Cube/dim
+// names here come from semi-trusted rule text, so a `'` must not pass through raw.
+const odataKey = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+
 // ─── String/comment neutralization ──────────────────────────────────────────
 
 /** Replaces quoted strings with same-length spaces and strips trailing comments. */
@@ -619,7 +624,7 @@ export async function lintRulesServer(
   const cubeDimDetails = new Map<string, string[] | 'not-found'>();
   await Promise.all([...cubeOriginal.entries()].map(async ([lc, orig]) => {
     try {
-      const res = await api('GET', `Cubes('${encodeURIComponent(orig)}')/Dimensions?$select=Name`);
+      const res = await api('GET', `Cubes('${odataKey(orig)}')/Dimensions?$select=Name`);
       if (res.statusCode === 404) {
         cubeDimDetails.set(lc, 'not-found');
       } else if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -657,7 +662,7 @@ export async function lintRulesServer(
   const dimElements = new Map<string, Set<string> | 'not-found'>();
   await Promise.all([...dimOriginal.entries()].map(async ([lc, orig]) => {
     try {
-      const enc = encodeURIComponent(orig);
+      const enc = odataKey(orig);
       const res = await api('GET',
         `Dimensions('${enc}')/Hierarchies('${enc}')/Elements?$select=Name`,
       );

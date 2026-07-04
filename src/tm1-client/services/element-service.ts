@@ -19,7 +19,7 @@ const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "'
 // versions: some return 409 Conflict, but v11.x (REST 11.8) returns 400 with
 // the message "An element with name ... already exists". Detect both so bulk
 // upsert stays idempotent (update existing) rather than throwing on re-upsert.
-function isAlreadyExists(err: TM1Error): boolean {
+export function isAlreadyExists(err: TM1Error): boolean {
   if (err.httpStatus === 409) return true;
   if (err.httpStatus === 400) {
     const text = `${err.message} ${err.details ?? ""}`.toLowerCase();

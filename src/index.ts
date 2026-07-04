@@ -126,7 +126,7 @@ async function main(): Promise<void> {
 
   // Graceful shutdown — ensure TM1 session is always cleaned up.
   let shuttingDown = false;
-  const shutdown = async (signal?: string) => {
+  const shutdown = async (signal?: string, exitCode = 0) => {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info({ signal }, "Shutting down TM1 MCP Server");
@@ -140,7 +140,7 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err }, "Error during disconnect");
     }
-    process.exit(0);
+    process.exit(exitCode);
   };
 
   process.on("SIGINT", () => { void shutdown("SIGINT"); });
@@ -164,7 +164,9 @@ async function main(): Promise<void> {
   // Last resort — try to clean up the TM1 session on uncaught errors.
   process.on("uncaughtException", (err) => {
     logger.error({ err }, "Uncaught exception, attempting cleanup");
-    void shutdown("uncaughtException");
+    // Exit non-zero: a crash must not look like a clean shutdown to a
+    // supervisor/systemd, which would otherwise not restart or would mask it.
+    void shutdown("uncaughtException", 1);
   });
   process.on("unhandledRejection", (reason) => {
     logger.error({ reason }, "Unhandled rejection");
