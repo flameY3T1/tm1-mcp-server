@@ -18,10 +18,18 @@ const TABS = ["prolog", "metadata", "data", "epilog"] as const;
 type Tab = (typeof TABS)[number];
 
 const CUBE_FN_RE =
-  /\b(CellGetN|CellGetS|CellPutN|CellPutS|CellIsUpdateable|CubeExists|ViewExists|ViewCreate|ViewDestroy|SubsetCreatebyMDX|ViewSubsetAssign|DBR|DBS|DBSS|CubeProcessFeeders|CubeUnload|CubeLockOverride|CubeSetLogChanges)\s*\(\s*'([^']+)'/gi;
+  /\b(CellGetN|CellGetS|CellIsUpdateable|CubeExists|ViewExists|ViewCreate|ViewDestroy|ViewZeroOut|CubeClearData|SubsetCreatebyMDX|ViewSubsetAssign|DBR|DBS|DBSS|CubeProcessFeeders|CubeUnload|CubeLockOverride|CubeSetLogChanges)\s*\(\s*'([^']+)'/gi;
+
+// CellPutN/CellPutS/CellIncrementN/CellPutProportionalSpread take the value as
+// arg 1 and the cube as arg 2. The value can be any expression (literal,
+// identifier, '|'-concat) — skip to the first top-level comma. Nested calls in
+// the value arg defeat the skip and the ref is silently missed (same
+// limitation as DIM_AT_ARG2_RE below).
+const CUBE_AT_ARG2_RE =
+  /\b(CellPutN|CellPutS|CellIncrementN|CellPutProportionalSpread)\s*\(\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+)(?:\s*\|\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+))*\s*,\s*'([^']+)'/gi;
 
 const DIM_FN_RE =
-  /\b(DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN)\s*\(\s*'([^']+)'/gi;
+  /\b(DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DimIx|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN)\s*\(\s*'([^']+)'/gi;
 
 // AttrPutS/AttrPutN/ElementSecurityPut: value is arg 1, dimension is arg 2.
 // The value can be a literal, identifier, or string-concat expression with '|' — skip over until first top-level comma.
@@ -89,6 +97,9 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         const c = code[tab];
         if (!c) continue;
         for (const [name, info] of scanCode(c, tab, CUBE_FN_RE)) {
+          if (!cubeRefs.has(name)) cubeRefs.set(name, info);
+        }
+        for (const [name, info] of scanCode(c, tab, CUBE_AT_ARG2_RE)) {
           if (!cubeRefs.has(name)) cubeRefs.set(name, info);
         }
         for (const [name, info] of scanCode(c, tab, DIM_FN_RE)) {
