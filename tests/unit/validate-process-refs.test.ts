@@ -129,6 +129,42 @@ describe("tm1_validate_process_refs reference extraction", () => {
     expect(payload.issues[0].kind).toBe("dimension");
   });
 
+  it("resolves an arg-1 variable bound to a single literal (sCube = 'x')", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: [] });
+    const payload = await run(
+      cb,
+      "sCube = 'MissingCube';\nnV = CellGetN(sCube, 'E1', 'E2');"
+    );
+    expect(payload.cubeRefsScanned).toBe(1);
+    expect(payload.issues[0].name).toBe("MissingCube");
+    expect(payload.issues[0].kind).toBe("cube");
+  });
+
+  it("resolves an arg-2 variable bound to a single literal", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: [] });
+    const payload = await run(cb, "sZiel = 'MissingCube';\nCellPutN(nX, sZiel, 'E1');");
+    expect(payload.cubeRefsScanned).toBe(1);
+    expect(payload.issues[0].name).toBe("MissingCube");
+  });
+
+  it("resolves DIMIX with a literal-bound variable", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: ["Konten"] });
+    const payload = await run(cb, "sDim = 'GoneDim';\nnIx = DIMIX(sDim, 'KTO 1');");
+    expect(payload.dimensionRefsScanned).toBe(1);
+    expect(payload.issues[0].name).toBe("GoneDim");
+    expect(payload.issues[0].kind).toBe("dimension");
+  });
+
+  it("skips a reassigned variable (ambiguous binding stays dynamic)", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: [] });
+    const payload = await run(
+      cb,
+      "sCube = 'CubeA';\nsCube = 'CubeB';\nnV = CellGetN(sCube, 'E1');"
+    );
+    expect(payload.cubeRefsScanned).toBe(0);
+    expect(payload.unresolved).toBe(0);
+  });
+
   it("scans ViewZeroOut and CubeClearData cube args", async () => {
     const cb = captureHandler({ cubes: ["Reporting"], dimensions: [] });
     const payload = await run(

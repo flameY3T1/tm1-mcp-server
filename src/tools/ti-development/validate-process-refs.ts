@@ -5,6 +5,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
+import { buildProcessEnv, type ProcessEnv } from "../../lib/callgraph/variableEnv.js";
 
 interface RefIssue {
   kind: "cube" | "dimension";
@@ -17,18 +18,27 @@ interface RefIssue {
 const TABS = ["prolog", "metadata", "data", "epilog"] as const;
 type Tab = (typeof TABS)[number];
 
-const CUBE_FN_RE =
-  /\b(CellGetN|CellGetS|CellIsUpdateable|CubeExists|ViewExists|ViewCreate|ViewDestroy|ViewZeroOut|CubeClearData|SubsetCreatebyMDX|ViewSubsetAssign|DBR|DBS|DBSS|CubeProcessFeeders|CubeUnload|CubeLockOverride|CubeSetLogChanges)\s*\(\s*'([^']+)'/gi;
+const CUBE_ARG1_FNS =
+  "CellGetN|CellGetS|CellIsUpdateable|CubeExists|ViewExists|ViewCreate|ViewDestroy|ViewZeroOut|CubeClearData|SubsetCreatebyMDX|ViewSubsetAssign|DBR|DBS|DBSS|CubeProcessFeeders|CubeUnload|CubeLockOverride|CubeSetLogChanges";
+
+const DIM_ARG1_FNS =
+  "DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DimIx|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN";
+
+const CUBE_FN_RE = new RegExp(`\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*'([^']+)'`, "gi");
+const DIM_FN_RE = new RegExp(`\\b(${DIM_ARG1_FNS})\\s*\\(\\s*'([^']+)'`, "gi");
+
+// Arg-1 passed as a bare identifier (sCube = 'x'; CellGetN(sCube, ...)) —
+// resolved through the per-process variable env; unresolvable identifiers
+// (params, datasource vars, reassigned or computed values) are skipped.
+const CUBE_FN_IDENT_RE = new RegExp(`\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*([A-Za-z_]\\w*)\\s*[,)]`, "gi");
+const DIM_FN_IDENT_RE = new RegExp(`\\b(${DIM_ARG1_FNS})\\s*\\(\\s*([A-Za-z_]\\w*)\\s*[,)]`, "gi");
 
 // CellPutN/CellPutS/CellIncrementN/CellPutProportionalSpread take the value as
 // arg 1 and the cube as arg 2; AttrPutS/AttrPutN/ElementSecurityPut take the
 // dimension as arg 2. The value arg is an arbitrary expression (nested calls,
 // '|'-concat, multi-line), so these are resolved with a paren/quote walker
-// (secondArgLiteral) instead of a regex skip.
+// (secondArgText) instead of a regex skip.
 const CUBE_ARG2_FN_RE = /\b(?:CellPutN|CellPutS|CellIncrementN|CellPutProportionalSpread)\s*\(/gi;
-
-const DIM_FN_RE =
-  /\b(DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DimIx|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN)\s*\(\s*'([^']+)'/gi;
 
 const DIM_ARG2_FN_RE = /\b(?:AttrPutS|AttrPutN|ElementSecurityPut)\s*\(/gi;
 
@@ -37,11 +47,11 @@ const DIM_ARG2_FN_RE = /\b(?:AttrPutS|AttrPutN|ElementSecurityPut)\s*\(/gi;
 const ARG_SCAN_MAX_CHARS = 2000;
 
 // Walk the argument list starting after `(` at openParen, tracking paren depth
-// and TI string state ('' is the quote escape), and return the second
-// top-level argument iff it is a plain quoted literal. Newlines are ordinary
-// whitespace, so multi-line calls resolve too; TI strings cannot span lines,
-// so an open string is closed at end-of-line to resync.
-function secondArgLiteral(text: string, openParen: number): string | null {
+// and TI string state ('' is the quote escape), and return the raw text of the
+// second top-level argument. Newlines are ordinary whitespace, so multi-line
+// calls resolve too; TI strings cannot span lines, so an open string is closed
+// at end-of-line to resync.
+function secondArgText(text: string, openParen: number): string | null {
   let depth = 0;
   let inStr = false;
   let argIndex = 0;
@@ -67,11 +77,11 @@ function secondArgLiteral(text: string, openParen: number): string | null {
       depth++;
     } else if (ch === ")") {
       if (depth === 0) {
-        return argIndex === 1 ? quotedLiteral(text.slice(argStart, i)) : null;
+        return argIndex === 1 ? text.slice(argStart, i) : null;
       }
       depth--;
     } else if (ch === "," && depth === 0) {
-      if (argIndex === 1) return quotedLiteral(text.slice(argStart, i));
+      if (argIndex === 1) return text.slice(argStart, i);
       argIndex++;
       argStart = i + 1;
     }
@@ -84,7 +94,22 @@ function quotedLiteral(argText: string): string | null {
   return m ? m[1]!.replace(/''/g, "'") : null;
 }
 
-function scanCode(code: string, tab: Tab, regex: RegExp): Map<string, { tab: Tab; line: number; context: string }> {
+// Resolve a bare identifier through the process env: only a variable bound to
+// exactly one string literal counts; params, datasource vars, and dynamic
+// bindings return null (unresolvable at parse time).
+function identLiteral(argText: string, env: ProcessEnv): string | null {
+  const m = /^\s*([A-Za-z_]\w*)\s*$/.exec(argText);
+  if (!m) return null;
+  const binding = env.vars.get(m[1]!.toLowerCase());
+  return binding?.kind === "literal" ? binding.value : null;
+}
+
+function scanCode(
+  code: string,
+  tab: Tab,
+  regex: RegExp,
+  resolveName?: (raw: string) => string | null,
+): Map<string, { tab: Tab; line: number; context: string }> {
   const found = new Map<string, { tab: Tab; line: number; context: string }>();
   const lines = code.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -93,8 +118,8 @@ function scanCode(code: string, tab: Tab, regex: RegExp): Map<string, { tab: Tab
     regex.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = regex.exec(ln)) !== null) {
-      const name = m[2]!;
-      if (!found.has(name)) {
+      const name = resolveName ? resolveName(m[2]!) : m[2]!;
+      if (name && !found.has(name)) {
         found.set(name, { tab, line: i + 1, context: ln.trim().slice(0, 200) });
       }
     }
@@ -105,7 +130,12 @@ function scanCode(code: string, tab: Tab, regex: RegExp): Map<string, { tab: Tab
 // Arg-2 variant of scanCode: matches the function name across the whole tab
 // (comment lines blanked, so multi-line calls survive) and resolves the second
 // argument with the paren/quote walker.
-function scanArg2(code: string, tab: Tab, fnRe: RegExp): Map<string, { tab: Tab; line: number; context: string }> {
+function scanArg2(
+  code: string,
+  tab: Tab,
+  fnRe: RegExp,
+  env: ProcessEnv,
+): Map<string, { tab: Tab; line: number; context: string }> {
   const found = new Map<string, { tab: Tab; line: number; context: string }>();
   const lines = code.split(/\r?\n/).map((ln) => (/^\s*#/.test(ln) ? "" : ln));
   const text = lines.join("\n");
@@ -113,7 +143,9 @@ function scanArg2(code: string, tab: Tab, fnRe: RegExp): Map<string, { tab: Tab;
   let m: RegExpExecArray | null;
   while ((m = fnRe.exec(text)) !== null) {
     // The pattern ends with '(' — its index is the end of the match.
-    const name = secondArgLiteral(text, m.index + m[0].length - 1);
+    const argText = secondArgText(text, m.index + m[0].length - 1);
+    if (argText === null) continue;
+    const name = quotedLiteral(argText) ?? identLiteral(argText, env);
     if (!name || found.has(name)) continue;
     const line = text.slice(0, m.index).split("\n").length;
     found.set(name, { tab, line, context: lines[line - 1]!.trim().slice(0, 200) });
@@ -158,6 +190,13 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         resolvedName = parsed.name ?? "(from-file)";
       }
 
+      // Variable env across all tabs in runtime order: a prolog assignment
+      // like sCube = 'Sales'; makes CellGetN(sCube, ...) resolvable. Params
+      // are unknown here (only code is fetched), so param-fed identifiers
+      // stay unresolvable — conservative.
+      const env = buildProcessEnv(TABS.map((t) => code[t]).join("\n"), []);
+      const resolveIdent = (raw: string) => identLiteral(raw, env);
+
       const cubeRefs = new Map<string, { tab: Tab; line: number; context: string }>();
       const dimRefs = new Map<string, { tab: Tab; line: number; context: string }>();
       for (const tab of TABS) {
@@ -166,13 +205,19 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         for (const [name, info] of scanCode(c, tab, CUBE_FN_RE)) {
           if (!cubeRefs.has(name)) cubeRefs.set(name, info);
         }
-        for (const [name, info] of scanArg2(c, tab, CUBE_ARG2_FN_RE)) {
+        for (const [name, info] of scanCode(c, tab, CUBE_FN_IDENT_RE, resolveIdent)) {
+          if (!cubeRefs.has(name)) cubeRefs.set(name, info);
+        }
+        for (const [name, info] of scanArg2(c, tab, CUBE_ARG2_FN_RE, env)) {
           if (!cubeRefs.has(name)) cubeRefs.set(name, info);
         }
         for (const [name, info] of scanCode(c, tab, DIM_FN_RE)) {
           if (!dimRefs.has(name)) dimRefs.set(name, info);
         }
-        for (const [name, info] of scanArg2(c, tab, DIM_ARG2_FN_RE)) {
+        for (const [name, info] of scanCode(c, tab, DIM_FN_IDENT_RE, resolveIdent)) {
+          if (!dimRefs.has(name)) dimRefs.set(name, info);
+        }
+        for (const [name, info] of scanArg2(c, tab, DIM_ARG2_FN_RE, env)) {
           if (!dimRefs.has(name)) dimRefs.set(name, info);
         }
       }
