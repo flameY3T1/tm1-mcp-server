@@ -161,7 +161,9 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
     const r = await h.ok("tm1_get_view", { cubeName: C1, viewName: NATIVE_VIEW });
     expect(r.json.cubeName).toBe(C1);
     expect(r.json.viewName).toBe(NATIVE_VIEW);
-    expect(Array.isArray(r.json.cells)).toBe(true);
+    // get_view returns a page-envelope: cells live under `items` (renamed from
+    // `cells` in the 2026-07-01 pagination refactor 1d163e9).
+    expect(Array.isArray(r.json.items)).toBe(true);
     expect(Array.isArray(r.json.axes)).toBe(true);
   });
 
