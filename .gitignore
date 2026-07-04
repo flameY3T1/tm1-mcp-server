@@ -3,6 +3,9 @@ dist/
 .env
 .env.local
 .npmrc
+
+# local MCP server config — holds TM1 creds (TM1_PASSWORD); never commit
+.mcp.json
 *.log
 .DS_Store
 coverage/
