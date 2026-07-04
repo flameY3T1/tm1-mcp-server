@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import type { ProcessParameter, ProcessVariable } from "../../types.js";
+import { TM1ErrorCode } from "../../types.js";
 import {
   parameterSchema,
   variableSchema,
@@ -45,11 +46,21 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
         ...(resolvedVars !== undefined ? { variables: resolvedVars } : {}),
         ...(dataSource !== undefined ? { dataSource: dataSource } : {}),
       });
+      // Syntax errors are the expected output of a validator, so the failure
+      // payload carries its own code/message/hint — otherwise the isError
+      // normalizer stamps a generic TM1_ERROR envelope over it.
       const payload = {
         ok: result.success,
         processName: name ?? "_compile_check",
         errorCount: result.errors.length,
         errors: result.errors,
+        ...(result.success
+          ? {}
+          : {
+              code: TM1ErrorCode.VALIDATION_ERROR,
+              message: `TI syntax check failed: ${result.errors.length} error(s)`,
+              hint: "Nothing was saved. Fix the lines listed in errors[] (procedure + lineNumber) and re-run tm1_check_process_code before tm1_upsert_process.",
+            }),
       };
       return {
         isError: !result.success || undefined,

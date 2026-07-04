@@ -86,6 +86,24 @@ describe("normalizeErrorResult", () => {
     expect(payload.hint.length).toBeGreaterThan(0);
   });
 
+  it("does not duplicate the payload into message when message is absent", () => {
+    const result = normalizeErrorResult({
+      isError: true,
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ ok: false, errorCount: 2, errors: ["a", "b"] }),
+        },
+      ],
+    });
+    const payload = parsePayload(result);
+
+    expect(payload.code).toBe("TM1_ERROR");
+    expect(payload.errorCount).toBe(2);
+    expect(payload.message).not.toContain("errorCount");
+    expect(payload.message.length).toBeLessThan(100);
+  });
+
   it("wraps plain-text error bodies into the uniform shape", () => {
     const result = normalizeErrorResult({
       isError: true,

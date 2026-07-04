@@ -83,7 +83,11 @@ export function normalizeErrorResult(result: McpToolResult): McpToolResult {
     const enriched = {
       ...parsed,
       code,
-      message: (parsed.message as string | undefined) ?? raw,
+      // Payload fields are preserved via the spread — falling back to `raw`
+      // here would duplicate the entire JSON body inside `message`.
+      message:
+        (parsed.message as string | undefined) ??
+        "Tool reported an error — see the payload fields for detail.",
       hint: (parsed.hint as string | undefined) ?? hintForCode(code),
     };
     return {
