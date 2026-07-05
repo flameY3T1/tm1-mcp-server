@@ -27,8 +27,12 @@ export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) 
         "Redact credential literals in the returned code. Masks the password arg of ODBCOpen() and quoted values " +
           "assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
       ),
+      includeSecurityAccess: z.boolean().optional().default(false).describe(
+        "Also fetch process's HasSecurityAccess elevation flag (one extra GET). " +
+          "Default false — pure code reads stay single request.",
+      ),
     },
-    async ({ processName, stripComments, maskSecrets }) => {
+    async ({ processName, stripComments, maskSecrets, includeSecurityAccess }) => {
       const code = await tm1Client.processes.getCode(processName);
       let hint: string | undefined;
 
@@ -66,7 +70,16 @@ export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) 
         for (const tab of TABS) code[tab] = maskCode(code[tab]);
       }
 
-      const payload = { ...code, ...(hint ? { hint } : {}) };
+      let hasSecurityAccess: boolean | undefined;
+      if (includeSecurityAccess) {
+        hasSecurityAccess = (await tm1Client.processes.getDeployMeta(processName)).hasSecurityAccess;
+      }
+
+      const payload = {
+        ...code,
+        ...(hasSecurityAccess !== undefined ? { hasSecurityAccess } : {}),
+        ...(hint ? { hint } : {}),
+      };
       return {
         content: [{ type: "text" as const, text: JSON.stringify(payload) }],
       };
