@@ -7,14 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.3] - 2026-07-04
+## [1.0.3] - 2026-07-05
 
-Audit + live-sweep release: the 2026-07-03 "beyond the basics" audit fixes
-(transport lifecycle, cellset leak, error honesty, confirm-guard coverage)
-plus tool gaps found while sweeping ~35 tools against a production TM1 11.8
-server. One behavior change is called out below.
+Audit + live-sweep release, plus the process `HasSecurityAccess` read-side and
+a git-export format alignment. Bundles the 2026-07-03 "beyond the basics" audit
+fixes (transport lifecycle, cellset leak, error honesty, confirm-guard
+coverage) and tool gaps found while sweeping ~35 tools against a production
+TM1 11.8 server; the read-side of `HasSecurityAccess` (the write path landed in
+the same release); and the git-export `.json` moved to TM1's native OData
+shape. Behavior changes are called out below.
 
 ### ⚠️ Behavior change
+
+- `tm1_export_process_to_git` now emits the `.json` in TM1's OData-native
+  shape: top-level order `name, hasSecurityAccess, dataSource, parameters,
+  variables`, and parameter objects as `name, prompt, value, type`. The
+  parameter default uses the OData-native key **`value`** (previously the
+  internal name `defaultValue`). `tm1_import_process_from_git` reads `value`
+  and still accepts legacy `defaultValue` files for back-compat. The change is
+  confined to the git file format; the internal contract and
+  `tm1_upsert_process` input remain `defaultValue`. JSON key order is cosmetic
+  — import parses by key, so the round-trip is unaffected.
 
 - The `confirm: true` guard now covers the **entire** object-destruction
   surface: `tm1_delete_element`, `tm1_delete_hierarchy`, `tm1_delete_subset`,
@@ -35,6 +48,20 @@ server. One behavior change is called out below.
   evaluated and deliberately left out: TM1 offers no reliable write path
   (`}ElementAttributes_}Processes` is absent on attribute-less dimensions), so
   a lossy field is not pretended to be lossless.
+- `tm1_get_process` — a native full read of a TI process, the read-twin of
+  `tm1_upsert_process`. One call returns the four code tabs, parameters,
+  variables, datasource, and the `HasSecurityAccess` flag using the same field
+  names as `upsert_process`. Every part sits behind an include-flag (all
+  default `true`) that gates its REST call, so a caller can skip parts it does
+  not need; `maskSecrets` and `stripComments` mirror `tm1_get_process_code`.
+  For git persistence use `tm1_export_process_to_git` instead — this tool is
+  for reading/understanding a process, not serialization.
+- `tm1_get_all_processes_code` now carries each process's `hasSecurityAccess`
+  flag per row, so the audit bulk-load can answer which processes run elevated
+  (previously the flag was readable only through the git export).
+- `tm1_get_process_code` gains an opt-in `includeSecurityAccess` flag (default
+  `false`, so pure code reads stay a single request); when `true` it adds the
+  `hasSecurityAccess` field via a dedicated metadata GET.
 - `tm1_validate_process_refs` now resolves much more of the real-world TI
   surface: `DIMIX`, `CellIncrementN`, `CellPutProportionalSpread`,
   `ViewZeroOut`, `CubeClearData`; cube/dimension args in position 2
@@ -75,11 +102,6 @@ server. One behavior change is called out below.
 - Masking property tests exercise the real logger construction path (a fake
   copy had let redaction regressions slip); `Cookie` headers joined the
   redaction list.
-
-### Security
-
-- Local `.mcp.json` (holds TM1 credentials) is git-ignored.
-- Cookie/session headers are redacted in logs.
 
 ## [1.0.2] - 2026-07-02
 
