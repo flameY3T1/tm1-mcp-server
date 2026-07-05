@@ -19,6 +19,7 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
+    "prepack": "rm -rf dist && npm run build",
     "prepublishOnly": "npm run verify",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",

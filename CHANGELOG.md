@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Publishing now runs a clean `prepack` (`rm -rf dist && npm run build`) so the
+  npm tarball can never carry stale `dist/` build artifacts. The release flow is
+  documented in `RELEASING.md`.
+
 ## [1.0.3] - 2026-07-05
 
 Audit + live-sweep release, plus the process `HasSecurityAccess` read-side and
