@@ -397,4 +397,56 @@ describe("TM1Client – Process Execution Methods", () => {
       expect(body.Parameters[1]).not.toHaveProperty("Prompt");
     });
   });
+
+  describe("TM1Client – getAllCode security access", () => {
+    it("selects HasSecurityAccess and maps it onto each row", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          value: [
+            {
+              Name: "proc.elevated",
+              PrologProcedure: "p",
+              MetadataProcedure: "m",
+              DataProcedure: "d",
+              EpilogProcedure: "e",
+              HasSecurityAccess: true,
+            },
+            {
+              Name: "proc.normal",
+              PrologProcedure: "",
+              MetadataProcedure: "",
+              DataProcedure: "",
+              EpilogProcedure: "",
+              HasSecurityAccess: false,
+            },
+          ],
+        }),
+      );
+
+      const rows = await client.processes.getAllCode(false);
+
+      const url = String(fetchSpy.mock.calls[0][0]);
+      expect(url).toContain("HasSecurityAccess");
+      expect(rows[0]).toMatchObject({ name: "proc.elevated", hasSecurityAccess: true });
+      expect(rows[1]).toMatchObject({ name: "proc.normal", hasSecurityAccess: false });
+    });
+
+    it("defaults missing HasSecurityAccess to false", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          value: [
+            {
+              Name: "proc.legacy",
+              PrologProcedure: "",
+              MetadataProcedure: "",
+              DataProcedure: "",
+              EpilogProcedure: "",
+            },
+          ],
+        }),
+      );
+      const rows = await client.processes.getAllCode(false);
+      expect(rows[0].hasSecurityAccess).toBe(false);
+    });
+  });
 });

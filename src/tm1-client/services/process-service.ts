@@ -321,9 +321,11 @@ export class ProcessService {
    * GET /api/v1/Processes?$select=Name,PrologProcedure,...
    * Control processes (Name starts with `}`) excluded unless includeControl=true.
    */
-  async getAllCode(includeControl = false): Promise<Array<ProcessCode & { name: string }>> {
+  async getAllCode(
+    includeControl = false,
+  ): Promise<Array<ProcessCode & { name: string; hasSecurityAccess: boolean }>> {
     const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const path = `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure${filter}`;
+    const path = `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,HasSecurityAccess${filter}`;
     const response = await this.http.request<{
       value: Array<{
         Name: string;
@@ -331,6 +333,7 @@ export class ProcessService {
         MetadataProcedure: string;
         DataProcedure: string;
         EpilogProcedure: string;
+        HasSecurityAccess?: boolean;
       }>;
     }>("GET", path);
     return response.value.map((p) => ({
@@ -339,6 +342,7 @@ export class ProcessService {
       metadata: p.MetadataProcedure ?? "",
       data: p.DataProcedure ?? "",
       epilog: p.EpilogProcedure ?? "",
+      hasSecurityAccess: p.HasSecurityAccess === true,
     }));
   }
 
