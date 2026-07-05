@@ -12,6 +12,7 @@ const PROC_B = `${SANDBOX}_PROC_B`;
 const PROC_BAD = `${SANDBOX}_PROC_BAD`;
 const PROC_GIT_SRC = `${SANDBOX}_PROC_GIT_SRC`;
 const PROC_GIT_DST = `${SANDBOX}_PROC_GIT_DST`;
+const PROC_SEC = `${SANDBOX}_PROC_SEC`;
 
 // Trivial, self-contained TI body: a parameter plus a couple of harmless
 // numeric/string variable assignments. Touches nothing on the server.
@@ -262,5 +263,41 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
         }
       }
     }
+  });
+});
+
+describe.skipIf(!LIVE_ENABLED)("HasSecurityAccess read paths (live)", () => {
+  let h: LiveHarness;
+  beforeAll(async () => {
+    h = await getHarness();
+    // Own fixture — the top-level "live: process" describe above tears down
+    // its own processes (including PROC_A) in its afterAll, which runs before
+    // this sibling describe starts, so an independent process is needed here.
+    await h.ok("tm1_upsert_process", {
+      name: PROC_SEC,
+      prolog: "# harmless fixture for HasSecurityAccess read paths\nnX = 1;",
+      mode: "upsert",
+    });
+  });
+
+  afterAll(async () => {
+    try {
+      await h.call("tm1_delete_process", { processName: PROC_SEC, confirm: PROC_SEC });
+    } catch {
+      /* idempotent teardown — ignore missing */
+    }
+  });
+
+  it("getAllCode(false) returns hasSecurityAccess as a boolean on every row", async () => {
+    const rows = await h.client.processes.getAllCode(false);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(typeof row.hasSecurityAccess).toBe("boolean");
+    }
+  });
+
+  it("getDeployMeta returns a boolean hasSecurityAccess for an existing process", async () => {
+    const meta = await h.client.processes.getDeployMeta(PROC_SEC);
+    expect(typeof meta.hasSecurityAccess).toBe("boolean");
   });
 });
