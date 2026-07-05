@@ -4,7 +4,7 @@ import type { TM1Client } from "../../tm1-client.js";
 export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_get_all_processes_code",
-    "Bulk-load source code (Prolog/Metadata/Data/Epilog) of every TI process in one call. Control objects (names starting with '}') excluded by default.",
+    "Bulk-load source code (Prolog/Metadata/Data/Epilog) of every TI process in one call, plus each process's HasSecurityAccess elevation flag (hasSecurityAccess) for audit. Control objects (names starting with '}') excluded by default.",
     {
       includeControl: z
         .boolean()

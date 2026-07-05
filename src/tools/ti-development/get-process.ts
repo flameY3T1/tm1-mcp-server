@@ -13,7 +13,9 @@ export function registerGetProcess(server: McpServer, tm1Client: TM1Client) {
     "tm1_get_process",
     "Native full read of a TI process — the read-twin of tm1_upsert_process. Returns the four code " +
       "tabs, parameters, variables, datasource and the HasSecurityAccess elevation flag in one call, " +
-      "using the same field names as upsert_process for a clean round-trip. Every part is behind an " +
+      "using the same field names as upsert_process. Field-name parity makes it easy to feed back into " +
+      "upsert_process, but the datasource round-trip is lossy for ODBC/ASCII: upsert_process does not " +
+      "accept the oDBCConnection/query/usesUnicode fields this read can surface. Every part is behind an " +
       "include-flag (all default true); set a flag false to skip that part's REST call. For git " +
       "persistence use tm1_export_process_to_git instead.",
     {
@@ -24,7 +26,9 @@ export function registerGetProcess(server: McpServer, tm1Client: TM1Client) {
       includeDataSource: z.boolean().optional().default(true).describe("Include the datasource config (default true)."),
       includeSecurityAccess: z.boolean().optional().default(true).describe("Include the HasSecurityAccess elevation flag (default true)."),
       maskSecrets: z.boolean().optional().default(true).describe(
-        "Redact credential literals in code tabs and the datasource password. Default true; set false only when explicitly auditing credentials.",
+        "Redact credential literals in the code tabs (ODBCOpen passwords, credential-named vars). Default true; " +
+          "set false only when explicitly auditing credentials. Note: the datasource password is already " +
+          "redacted server-side by TM1, so this flag never reveals a real datasource secret.",
       ),
       stripComments: z.boolean().optional().default(false).describe(
         "Collapse runs of 4+ comment lines in the code tabs into a marker (dead-code reduction). Default false.",
