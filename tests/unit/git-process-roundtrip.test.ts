@@ -33,6 +33,39 @@ function roundTrip(input: GitProcessInput) {
 }
 
 describe("git-process round-trip", () => {
+  it("serializes json in OData-native field order (top-level + param fields)", () => {
+    const { json } = serializeProcessToGit({
+      name: "P",
+      prolog: "",
+      metadata: "",
+      data: "",
+      epilog: "",
+      parameters: [{ name: "pA", type: "Numeric", defaultValue: 1, prompt: "ask" }],
+      variables: [],
+      dataSource: { type: "None" },
+      hasSecurityAccess: true,
+    });
+    expect(json).toBe(
+      `{
+  "name": "P",
+  "hasSecurityAccess": true,
+  "dataSource": {
+    "type": "None"
+  },
+  "parameters": [
+    {
+      "name": "pA",
+      "prompt": "ask",
+      "defaultValue": 1,
+      "type": "Numeric"
+    }
+  ],
+  "variables": []
+}
+`,
+    );
+  });
+
   it("name survives", () => {
     expect(roundTrip(fixture()).parsed.name).toBe("MyProc");
   });

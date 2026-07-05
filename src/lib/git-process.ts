@@ -85,14 +85,24 @@ export function serializeProcessToGit(input: GitProcessInput): GitProcessFiles {
   const { password, ...dataSourceNoPwd } = input.dataSource;
   const credentialsOmitted = password !== undefined && password !== "";
 
+  // Field order mirrors TM1's OData Process entity (Name, HasSecurityAccess,
+  // DataSource, then Parameters/Variables) so the .json reads close to IBM's
+  // native serialization. Parameter objects follow the OData order too
+  // (Name, Prompt, Value, Type). Order is cosmetic — parseProcessFromGit reads
+  // by key, so the round-trip is unaffected.
   const json =
     JSON.stringify(
       {
         name: input.name,
         hasSecurityAccess: input.hasSecurityAccess,
-        parameters: input.parameters,
-        variables: input.variables,
         dataSource: dataSourceNoPwd,
+        parameters: input.parameters.map((p) => ({
+          name: p.name,
+          ...(p.prompt !== undefined ? { prompt: p.prompt } : {}),
+          defaultValue: p.defaultValue,
+          type: p.type,
+        })),
+        variables: input.variables,
       },
       null,
       2,
