@@ -56,7 +56,7 @@ describe("git-process round-trip", () => {
     {
       "name": "pA",
       "prompt": "ask",
-      "defaultValue": 1,
+      "value": 1,
       "type": "Numeric"
     }
   ],
@@ -64,6 +64,33 @@ describe("git-process round-trip", () => {
 }
 `,
     );
+  });
+
+  it("parses git param 'value' (native) into internal defaultValue", () => {
+    const ti =
+      "### TM1-TI-TAB: prolog ###\n### TM1-TI-TAB: metadata ###\n### TM1-TI-TAB: data ###\n### TM1-TI-TAB: epilog ###\n";
+    const json = JSON.stringify({
+      name: "P",
+      hasSecurityAccess: false,
+      dataSource: { type: "None" },
+      parameters: [{ name: "pA", prompt: "ask", value: 7, type: "Numeric" }],
+      variables: [],
+    });
+    const parsed = parseProcessFromGit(json, ti);
+    expect(parsed.parameters[0]).toMatchObject({ name: "pA", defaultValue: 7, type: "Numeric" });
+  });
+
+  it("still parses legacy 'defaultValue' git files (back-compat)", () => {
+    const ti =
+      "### TM1-TI-TAB: prolog ###\n### TM1-TI-TAB: metadata ###\n### TM1-TI-TAB: data ###\n### TM1-TI-TAB: epilog ###\n";
+    const json = JSON.stringify({
+      name: "P",
+      parameters: [{ name: "pA", type: "String", defaultValue: "x" }],
+      variables: [],
+      dataSource: { type: "None" },
+    });
+    const parsed = parseProcessFromGit(json, ti);
+    expect(parsed.parameters[0]).toMatchObject({ name: "pA", defaultValue: "x", type: "String" });
   });
 
   it("name survives", () => {

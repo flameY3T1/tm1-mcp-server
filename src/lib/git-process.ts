@@ -99,7 +99,7 @@ export function serializeProcessToGit(input: GitProcessInput): GitProcessFiles {
         parameters: input.parameters.map((p) => ({
           name: p.name,
           ...(p.prompt !== undefined ? { prompt: p.prompt } : {}),
-          defaultValue: p.defaultValue,
+          value: p.defaultValue,
           type: p.type,
         })),
         variables: input.variables,
@@ -141,7 +141,19 @@ export function parseProcessFromGit(
   // malformed entry (e.g. type:"bad" or a numeric name) would otherwise flow
   // straight into encodeParameter / the REST payload and surface as a confusing
   // TM1 400. Missing/absent parts still default to empty / {type:"None"}.
-  const paramsResult = z.array(parameterSchema).safeParse(meta.parameters ?? []);
+  // Git .json uses the OData-native param field name `value`; the internal
+  // schema/contract uses `defaultValue`. Normalize value→defaultValue before
+  // validation, keeping back-compat with legacy files that wrote `defaultValue`.
+  const rawParams = Array.isArray(meta.parameters)
+    ? meta.parameters.map((p) => {
+        if (p && typeof p === "object" && "value" in p && !("defaultValue" in p)) {
+          const { value, ...rest } = p as Record<string, unknown>;
+          return { ...rest, defaultValue: value };
+        }
+        return p;
+      })
+    : (meta.parameters ?? []);
+  const paramsResult = z.array(parameterSchema).safeParse(rawParams);
   if (!paramsResult.success) {
     throw new Error(
       `Process JSON has invalid 'parameters': ${paramsResult.error.issues[0]?.message ?? "shape mismatch"}`,
