@@ -80,6 +80,13 @@ npm run tools:update-readme
 - Never commit real customer object names, server hostnames, or credentials —
   use synthetic or redacted values in tests and docs.
 
+## Releasing
+
+See [`RELEASING.md`](RELEASING.md). In short: work lands on `main` continuously
+and each change adds a `CHANGELOG.md` entry under `[Unreleased]`; the version is
+picked and tagged only at publish time via `npm version` — never bump
+`package.json` or tag mid-stream.
+
 ## License
 
 By contributing, you agree your contributions are licensed under the
