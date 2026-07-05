@@ -153,6 +153,7 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_import_process_from_git: IDEMPOTENT_WRITE,
   tm1_get_all_processes_code: READ_ONLY,
   tm1_get_process_code: READ_ONLY,
+  tm1_get_process: READ_ONLY,
   tm1_get_process_datasource: READ_ONLY,
   tm1_get_process_variables: READ_ONLY,
   tm1_import_pro_file: withVersion(IDEMPOTENT_WRITE, "v11"),

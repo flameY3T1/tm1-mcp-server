@@ -27,6 +27,7 @@ import { registerTraceCellCalculation } from "./celldata/trace-cell-calculation.
 import { registerExecuteProcess } from "./ti-development/execute-process.js";
 import { registerGetProcessParameters } from "./ti-development/get-process-parameters.js";
 import { registerGetProcessCode } from "./ti-development/get-process-code.js";
+import { registerGetProcess } from "./ti-development/get-process.js";
 import { registerGetProcessDatasource } from "./ti-development/get-process-datasource.js";
 import { registerGetProcessVariables } from "./ti-development/get-process-variables.js";
 import { registerDeleteProcess } from "./ti-development/delete-process.js";
@@ -171,6 +172,7 @@ const REGISTRARS: ToolRegistrar[] = [
   registerExecuteProcess,
   registerGetProcessParameters,
   registerGetProcessCode,
+  registerGetProcess,
   registerGetProcessDatasource,
   registerGetProcessVariables,
   registerDeleteProcess,
