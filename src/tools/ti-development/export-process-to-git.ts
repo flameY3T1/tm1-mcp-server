@@ -14,7 +14,7 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
     [
       "Serialize a TM1 process to the tm1-git two-file layout: a '{name}.json' (parameters, variables, datasource) plus a '{name}.ti' (Prolog/Metadata/Data/Epilog as plain code).",
       "This is the diff-friendly format TM1's native Git integration and TM1py use — code lives outside the JSON so Git diffs stay readable.",
-      "Returns both files inline by default; pass writeToDir to also persist them. Round-trip safe with tm1_import_process_from_git.",
+      "Returns both file bodies (json + ti) inline by default. Pass writeToDir to persist them to disk instead: the code is then written to files and omitted from the response to avoid duplicating it into the context window; only metadata (filenames, counts, writtenTo paths) comes back. Round-trip safe with tm1_import_process_from_git.",
       "Security: the ODBC datasource password is never written; credentialsOmitted=true flags when one was stripped.",
     ].join(" "),
     {
@@ -89,8 +89,10 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
             credentialsOmitted,
             hasSecurityAccess: deployMeta.hasSecurityAccess,
             writtenTo,
-            json,
-            ti,
+            // Echo the file bodies inline only when NOT persisting to disk. With
+            // writeToDir the caller already has the files, so returning the code
+            // would just duplicate thousands of tokens into the context window.
+            ...(writeToDir ? {} : { json, ti }),
           }),
         }],
       };

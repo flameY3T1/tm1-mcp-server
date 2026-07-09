@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publishing now runs a clean `prepack` (`rm -rf dist && npm run build`) so the
   npm tarball can never carry stale `dist/` build artifacts. The release flow is
   documented in `RELEASING.md`.
+- `tm1_export_process_to_git` no longer echoes the full `json`/`ti` file bodies
+  in its response when `writeToDir` is set — the code is written to disk and the
+  response carries only metadata (filenames, counts, `writtenTo` paths). Avoids
+  duplicating thousands of tokens into the context window on every disk export;
+  the inline echo is unchanged when `writeToDir` is omitted. Mirrors the
+  metadata-only response of `tm1_import_process_from_git`.
 
 ## [1.0.3] - 2026-07-05
 

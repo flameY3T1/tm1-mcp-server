@@ -136,6 +136,30 @@ describe("tm1_export_process_to_git masks inline ODBC credentials", () => {
       expect(onDisk).not.toContain("S3cr3t_Pw!");
       expect(onDisk).toContain("***");
     });
+
+    // When persisting to disk the caller has the files, so the full code bodies
+    // must NOT be echoed back — otherwise every export doubles into the context
+    // window. Metadata (filenames, counts, writtenTo paths) still comes back.
+    it("omits json/ti from the response when writeToDir is set", async () => {
+      const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales", writeToDir: root });
+      const res = JSON.parse(text) as Record<string, unknown>;
+      expect(res.json).toBeUndefined();
+      expect(res.ti).toBeUndefined();
+      expect(res.jsonFileName).toBe("Load.Sales.json");
+      expect(res.tiFileName).toBe("Load.Sales.ti");
+      expect(res.writtenTo).toMatchObject({
+        json: path.join(root, "Load.Sales.json"),
+        ti: path.join(root, "Load.Sales.ti"),
+      });
+    });
+
+    it("echoes json/ti inline when writeToDir is omitted", async () => {
+      const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales" });
+      const res = JSON.parse(text) as Record<string, unknown>;
+      expect(typeof res.json).toBe("string");
+      expect(typeof res.ti).toBe("string");
+      expect(res.writtenTo).toMatchObject({ json: null, ti: null });
+    });
   });
 });
 

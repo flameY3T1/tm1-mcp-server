@@ -991,6 +991,9 @@ export const ExportProcessToGitResultSchema = z.object({
     json: z.string().nullable(),
     ti: z.string().nullable(),
   }),
-  json: z.string(),
-  ti: z.string(),
+  // Full file bodies are echoed inline only when writeToDir is NOT set; when
+  // exporting to disk the caller already has the files, so we omit them to
+  // avoid flooding the context window with duplicate code.
+  json: z.string().optional(),
+  ti: z.string().optional(),
 });
