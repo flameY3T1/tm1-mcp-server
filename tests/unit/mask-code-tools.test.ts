@@ -155,6 +155,30 @@ describe("tm1_export_process_to_git masks inline ODBC credentials", () => {
       });
     });
 
+    // A not-yet-existing subdir below the root must be created (mkdir -p) after
+    // confinement instead of surfacing a raw ENOENT.
+    it("creates a missing subdirectory below the root before writing", async () => {
+      const nested = path.join(root, "exports", "sales");
+      const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales", writeToDir: nested });
+      const res = JSON.parse(text) as Record<string, unknown>;
+      expect(res.writtenTo).toMatchObject({
+        json: path.join(nested, "Load.Sales.json"),
+        ti: path.join(nested, "Load.Sales.ti"),
+      });
+      const onDisk = await fs.readFile(path.join(nested, "Load.Sales.ti"), "utf8");
+      expect(onDisk).toContain("***");
+    });
+
+    // Same ENOENT gap existed on tm1_export_process_to_pro's writeToFile.
+    it("tm1_export_process_to_pro creates missing parent dirs for writeToFile", async () => {
+      const target = path.join(root, "pro", "deep", "Load.Sales.pro");
+      const text = await run(registerExportProcessToPro, client, { processName: "Load.Sales", writeToFile: target });
+      const res = JSON.parse(text) as Record<string, unknown>;
+      expect(res.writtenTo).toBe(target);
+      const onDisk = await fs.readFile(target, "utf8");
+      expect(onDisk).toContain("***");
+    });
+
     it("echoes json/ti inline when writeToDir is omitted", async () => {
       const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales" });
       const res = JSON.parse(text) as Record<string, unknown>;

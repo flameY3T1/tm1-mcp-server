@@ -70,6 +70,9 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         const dir = resolveLocalPath(writeToDir, "writeToDir");
         const jsonPath = resolveLocalPath(path.join(dir, jsonFileName), "writeToDir");
         const tiPath = resolveLocalPath(path.join(dir, tiFileName), "writeToDir");
+        // Create the target directory only AFTER confinement above, so the
+        // symlink-aware realpath check ran against the pre-existing tree.
+        await fs.mkdir(dir, { recursive: true });
         await fs.writeFile(jsonPath, json, "utf8");
         await fs.writeFile(tiPath, ti, "utf8");
         writtenTo.json = jsonPath;

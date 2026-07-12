@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
@@ -53,6 +54,9 @@ export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Clie
       let writtenTo: string | null = null;
       if (writeToFile) {
         const target = resolveLocalPath(writeToFile, "writeToFile");
+        // Create the parent directory only AFTER confinement above, so the
+        // symlink-aware realpath check ran against the pre-existing tree.
+        await fs.mkdir(path.dirname(target), { recursive: true });
         await fs.writeFile(target, proContent, "utf8");
         writtenTo = target;
       }

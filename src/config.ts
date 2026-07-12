@@ -150,6 +150,21 @@ export function loadConfig(): TM1Config {
 
   const httpToken = process.env.TM1_MCP_HTTP_TOKEN || undefined;
 
+  // Refuse a non-loopback HTTP bind without transport auth: TM1_MCP_HTTP_HOST=0.0.0.0
+  // (or any LAN address) with no bearer token would expose an unauthenticated,
+  // TM1-credentialed /mcp endpoint to the network. Loopback binds keep the
+  // warn-only behavior (see http-transport.ts).
+  const hostLower = httpHost.toLowerCase();
+  const isLoopbackHost =
+    hostLower === "localhost" || hostLower === "::1" || /^127\./.test(hostLower);
+  if (transport === "http" && !isLoopbackHost && !httpToken) {
+    throw new Error(
+      `TM1_MCP_HTTP_HOST="${httpHost}" is not loopback and TM1_MCP_HTTP_TOKEN is unset. ` +
+        `Refusing to expose an unauthenticated /mcp endpoint beyond localhost — set ` +
+        `TM1_MCP_HTTP_TOKEN, or bind to 127.0.0.1/localhost.`,
+    );
+  }
+
   // Case-insensitive so a `TM1_MODE=ReadWrite` typo resolves to readwrite rather
   // than silently falling back to readonly (dropping every write tool without a
   // word). A genuinely-unknown value throws at startup — parity with the numeric

@@ -195,4 +195,45 @@ describe("loadConfig", () => {
     setRequiredEnv();
     expect(loadConfig().httpToken).toBeUndefined();
   });
+
+  // Non-loopback HTTP bind without a bearer token would expose an
+  // unauthenticated /mcp endpoint to the network — refuse at startup.
+  describe("non-loopback HTTP bind requires TM1_MCP_HTTP_TOKEN", () => {
+    it("throws for http transport on 0.0.0.0 without a token", () => {
+      setRequiredEnv();
+      process.env.TM1_MCP_TRANSPORT = "http";
+      process.env.TM1_MCP_HTTP_HOST = "0.0.0.0";
+      expect(() => loadConfig()).toThrow(/TM1_MCP_HTTP_TOKEN/);
+    });
+
+    it("throws for http transport on a LAN address without a token", () => {
+      setRequiredEnv();
+      process.env.TM1_MCP_TRANSPORT = "http";
+      process.env.TM1_MCP_HTTP_HOST = "192.168.1.10";
+      expect(() => loadConfig()).toThrow(/not loopback/);
+    });
+
+    it("allows a non-loopback bind when a token is set", () => {
+      setRequiredEnv();
+      process.env.TM1_MCP_TRANSPORT = "http";
+      process.env.TM1_MCP_HTTP_HOST = "0.0.0.0";
+      process.env.TM1_MCP_HTTP_TOKEN = "s3cret";
+      expect(loadConfig().httpHost).toBe("0.0.0.0");
+    });
+
+    it("keeps warn-only behavior for loopback binds without a token", () => {
+      setRequiredEnv();
+      process.env.TM1_MCP_TRANSPORT = "http";
+      for (const host of ["127.0.0.1", "127.0.0.2", "localhost", "::1"]) {
+        process.env.TM1_MCP_HTTP_HOST = host;
+        expect(loadConfig().httpHost).toBe(host);
+      }
+    });
+
+    it("does not throw for stdio transport even with a non-loopback host set", () => {
+      setRequiredEnv();
+      process.env.TM1_MCP_HTTP_HOST = "0.0.0.0"; // stray var, http transport not selected
+      expect(loadConfig().transport).toBe("stdio");
+    });
+  });
 });

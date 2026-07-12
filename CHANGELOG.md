@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `password` field was stripped while the connection string passed through
   verbatim. `maskSecrets: false` still yields the raw values for explicit
   credential audits.
+- Local-file path confinement (`TM1_LOCAL_FILE_ROOT`) is now symlink-aware: the
+  nearest existing ancestor of the target is `realpath`-resolved and re-checked
+  against the (also resolved) root, so a symlink placed inside the root can no
+  longer redirect writes outside it. Purely lexical `..`/absolute-path escapes
+  were already blocked.
+- The Streamable-HTTP transport refuses to start on a non-loopback host
+  (`TM1_MCP_HTTP_HOST`) unless `TM1_MCP_HTTP_TOKEN` is set — previously an
+  operator could accidentally expose an unauthenticated endpoint on `0.0.0.0`
+  with only a log warning. Loopback binds keep the warn-only behavior.
 
 ### Changed
 
@@ -40,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publishing now runs a clean `prepack` (`rm -rf dist && npm run build`) so the
   npm tarball can never carry stale `dist/` build artifacts. The release flow is
   documented in `RELEASING.md`.
+- `tm1_export_process_to_git` (`writeToDir`) and `tm1_export_process_to_pro`
+  (`writeToFile`) create missing target directories (`mkdir -p` after path
+  confinement) instead of surfacing a raw `ENOENT`.
 - `tm1_export_process_to_git` no longer echoes the full `json`/`ti` file bodies
   in its response when `writeToDir` is set — the code is written to disk and the
   response carries only metadata (filenames, counts, `writtenTo` paths). Avoids

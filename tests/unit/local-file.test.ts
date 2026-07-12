@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { resolveLocalPath } from "../../src/tools/local-file.js";
 import { TM1Error } from "../../src/types.js";
@@ -57,5 +59,55 @@ describe("resolveLocalPath", () => {
     process.env.TM1_LOCAL_FILE_ROOT = ROOT;
     // /srv/pro-bundles-evil shares the string prefix but is a different dir
     expect(() => resolveLocalPath("/srv/pro-bundles-evil/x.pro")).toThrow(/escapes/);
+  });
+});
+
+// A symlink placed INSIDE the root that points outside it passes the lexical
+// check — the realpath-based second check must catch it. Uses a real tmpdir
+// because symlink resolution needs an actual filesystem.
+describe("resolveLocalPath symlink confinement", () => {
+  let base: string;
+  let root: string;
+  let outside: string;
+  let prev: string | undefined;
+
+  beforeEach(() => {
+    prev = process.env.TM1_LOCAL_FILE_ROOT;
+    base = mkdtempSync(path.join(os.tmpdir(), "tm1-local-file-"));
+    root = path.join(base, "root");
+    outside = path.join(base, "outside");
+    mkdirSync(root);
+    mkdirSync(outside);
+    // root/link -> ../outside : lexically inside the root, really outside it
+    symlinkSync(outside, path.join(root, "link"));
+    process.env.TM1_LOCAL_FILE_ROOT = root;
+  });
+  afterEach(() => {
+    if (prev === undefined) delete process.env.TM1_LOCAL_FILE_ROOT;
+    else process.env.TM1_LOCAL_FILE_ROOT = prev;
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  it("rejects a write path through a symlink that escapes the root", () => {
+    expect(() => resolveLocalPath(path.join(root, "link", "evil.pro"))).toThrow(TM1Error);
+    expect(() => resolveLocalPath(path.join(root, "link", "evil.pro"))).toThrow(/escapes/);
+  });
+
+  it("rejects the symlink itself as a directory target", () => {
+    expect(() => resolveLocalPath(path.join(root, "link"), "directory")).toThrow(/escapes/);
+  });
+
+  it("still accepts a normal (not-yet-existing) path inside the root", () => {
+    const target = path.join(root, "deploy", "load.pro");
+    expect(resolveLocalPath(target)).toBe(target);
+  });
+
+  it("accepts paths when the root itself is a symlink", () => {
+    // e.g. TM1_LOCAL_FILE_ROOT=/tmp where /tmp is a symlink on some systems
+    const rootLink = path.join(base, "root-link");
+    symlinkSync(root, rootLink);
+    process.env.TM1_LOCAL_FILE_ROOT = rootLink;
+    const target = path.join(rootLink, "x.pro");
+    expect(resolveLocalPath(target)).toBe(target);
   });
 });
