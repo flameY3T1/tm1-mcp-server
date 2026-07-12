@@ -220,7 +220,33 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       truncated: false,
       cubes: [{ cubeName: "Sales", rulesText: "[]=N:1;", skipCheck: false }],
     },
-    tm1_get_all_processes_code: { count: 0, processes: [] },
+    tm1_get_all_processes_code: {
+      count: 2,
+      returned: 2,
+      truncated: false,
+      processes: [
+        // Full mode: tab bodies present.
+        {
+          name: "Load.Sales",
+          hasSecurityAccess: false,
+          prolog: "# pro",
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
+        // Summary mode: bodies replaced by line metrics.
+        {
+          name: "Load.Fx",
+          hasSecurityAccess: true,
+          totalLines: 5,
+          prologLines: 5,
+          metadataLines: 0,
+          dataLines: 0,
+          epilogLines: 0,
+          commentLines: 2,
+        },
+      ],
+    },
     tm1_get_element_attribute_values: {
       dimensionName: "Region",
       elementName: "EU",

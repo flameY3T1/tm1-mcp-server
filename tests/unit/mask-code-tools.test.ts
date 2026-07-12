@@ -264,6 +264,56 @@ describe("tm1_get_all_processes_code masks inline ODBC credentials", () => {
   });
 });
 
+// L5: summary mode drops the tab bodies and reports line metrics instead
+// (mirrors tm1_get_all_cube_rules summary mode).
+describe("tm1_get_all_processes_code summary mode", () => {
+  const prolog = ["# header", "# more header", ODBC("Sum_Pw!"), "x = 1;"].join("\n");
+  const client = {
+    processes: {
+      getAllCode: async () => [
+        { name: "Load.Sales", prolog, metadata: "# meta only", data: "", epilog: "y = 2;", hasSecurityAccess: true },
+      ],
+    },
+  } as unknown as TM1Client;
+
+  it("returns per-process line metrics and no code bodies", async () => {
+    const text = await run(registerGetAllProcessesCode, client, { summary: true });
+    const parsed = JSON.parse(text) as {
+      count: number;
+      returned: number;
+      truncated: boolean;
+      processes: Array<Record<string, unknown>>;
+    };
+    expect(parsed.count).toBe(1);
+    expect(parsed.returned).toBe(1);
+    expect(parsed.truncated).toBe(false);
+    // Exact-shape assert: metrics present, none of the four tab bodies.
+    expect(parsed.processes[0]).toEqual({
+      name: "Load.Sales",
+      hasSecurityAccess: true,
+      totalLines: 6,
+      prologLines: 4,
+      metadataLines: 1,
+      dataLines: 0,
+      epilogLines: 1,
+      commentLines: 3,
+    });
+  });
+
+  it("leaks no credentials even with maskSecrets=false (no code returned)", async () => {
+    const text = await run(registerGetAllProcessesCode, client, { summary: true, maskSecrets: false });
+    expect(text).not.toContain("Sum_Pw!");
+    expect(text).not.toContain("ODBCOpen");
+  });
+
+  it("default mode is unchanged: tab bodies present, no metric fields", async () => {
+    const text = await run(registerGetAllProcessesCode, client, {});
+    const parsed = JSON.parse(text) as { processes: Array<Record<string, unknown>> };
+    expect(parsed.processes[0]!.prolog).toContain("ODBCOpen");
+    expect(parsed.processes[0]!.totalLines).toBeUndefined();
+  });
+});
+
 // Audit 2026-07-12 M1: oDBCConnection strings carry PWD=/UID= pairs and passed
 // through unmasked (tool output and git .json on disk).
 const ODBC_DS: DataSource = {

@@ -57,6 +57,7 @@ import {
   DataFlowResultSchema,
   AncestorsResultSchema,
   GetProcessResultSchema,
+  ProcessCodeBundleSchema,
   ProcessCodeSchema,
   ProcessItemSchema,
   ProcessParameterSchema,
@@ -149,8 +150,10 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
     cubes: z.array(CubeRulesSchema).describe("Per-cube rule bundles"),
   },
   tm1_get_all_processes_code: {
-    count: z.number().int().describe("Number of processes returned"),
-    processes: z.array(z.unknown()).describe("Per-process code bundles"),
+    count: z.number().int().describe("Total processes matched before limit"),
+    returned: z.number().int().describe("Processes in this response after limit"),
+    truncated: z.boolean().describe("True when limit dropped processes"),
+    processes: z.array(ProcessCodeBundleSchema).describe("Per-process code bundles"),
   },
   tm1_get_element_attribute_values: {
     dimensionName: z.string(),

@@ -383,6 +383,26 @@ export const CubeRulesSchema = z.object({
   referencedCubes: z.array(z.string()).optional(),
 });
 
+export const ProcessCodeBundleSchema = z.object({
+  name: z.string(),
+  hasSecurityAccess: z.boolean(),
+  // Full mode (default): the four TI tab bodies verbatim (credentials masked
+  // by default via maskSecrets).
+  prolog: z.string().optional(),
+  metadata: z.string().optional(),
+  data: z.string().optional(),
+  epilog: z.string().optional(),
+  // Summary mode (tm1_get_all_processes_code summary=true): tab bodies are
+  // replaced by aggregate line metrics so analysis agents can survey the
+  // process landscape without paying full token cost.
+  totalLines: z.number().int().optional(),
+  prologLines: z.number().int().optional(),
+  metadataLines: z.number().int().optional(),
+  dataLines: z.number().int().optional(),
+  epilogLines: z.number().int().optional(),
+  commentLines: z.number().int().optional(),
+});
+
 export const MdxAxisSchema = z.object({
   tuples: z.array(
     z.object({
