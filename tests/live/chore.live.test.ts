@@ -116,7 +116,7 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
   });
 
   it("analyze_chore_graph returns task structure", async () => {
-    const r = await h.ok("tm1_analyze_chore_graph", { chore: CHORE });
+    const r = await h.ok("tm1_analyze_chore_graph", { name: CHORE });
     expect(r.json.choreName).toBeTruthy();
     expect(Array.isArray(r.json.tasks)).toBe(true);
     expect(r.json.tasks.length).toBeGreaterThanOrEqual(1);

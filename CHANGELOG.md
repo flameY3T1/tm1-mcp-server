@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking (input param renames for cross-tool consistency):**
+  `tm1_bulk_upsert_elements` param `hierarchy` → `hierarchyName` (matches the
+  19 other hierarchy-taking tools); `tm1_analyze_chore_graph` param `chore` →
+  `name` (matches the scheduling tools). MCP clients re-read tool schemas per
+  session, so agents pick the new names up automatically.
+- `tm1_get_process` now declares a strict `outputSchema` (structuredContent +
+  drift validation) like its sibling `get_process_*` tools.
 - Publishing now runs a clean `prepack` (`rm -rf dist && npm run build`) so the
   npm tarball can never carry stale `dist/` build artifacts. The release flow is
   documented in `RELEASING.md`.

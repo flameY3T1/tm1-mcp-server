@@ -22,11 +22,11 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
     ].join(" "),
     {
       dimensionName: z.string().describe("Dimension name"),
-      hierarchy: z.string().optional().describe("Hierarchy name (defaults to dimension name)"),
+      hierarchyName: z.string().optional().describe("Hierarchy name (defaults to dimension name)"),
       elements: z.array(ElementSchema).min(1).describe("Elements to create or update"),
     },
-    async ({ dimensionName, hierarchy, elements }) => {
-      const hier = hierarchy ?? dimensionName;
+    async ({ dimensionName, hierarchyName, elements }) => {
+      const hier = hierarchyName ?? dimensionName;
       const { typeChanges } = await withToolHint(
         tm1Client.elements.bulkUpsert(dimensionName, hier, elements),
         "Bulk upsert failed. Common causes: Consolidated element references a child that is not in this batch and does not exist yet (list leafs first), dimension/hierarchy name mismatch (tm1_list_dimensions to verify), or attempt to change an element's type (delete + recreate instead).",

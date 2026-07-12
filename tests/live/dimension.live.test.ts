@@ -73,7 +73,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
   it("bulk-upserts more elements (leafs before consolidation)", async () => {
     const r = await h.ok("tm1_bulk_upsert_elements", {
       dimensionName: DIM,
-      hierarchy: HIER,
+      hierarchyName: HIER,
       elements: [
         { name: LEAF2, type: "Numeric" },
         { name: LEAF3, type: "Numeric" },
@@ -91,7 +91,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     // Create a standalone leaf.
     const a = await h.ok("tm1_bulk_upsert_elements", {
       dimensionName: DIM,
-      hierarchy: HIER,
+      hierarchyName: HIER,
       elements: [{ name: TC, type: "Numeric" }],
     });
     expect(a.json).toMatchObject({ success: true });
@@ -102,7 +102,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     // escape the conflict handler and throw.
     const b = await h.ok("tm1_bulk_upsert_elements", {
       dimensionName: DIM,
-      hierarchy: HIER,
+      hierarchyName: HIER,
       elements: [{ name: TC, type: "Numeric" }],
     });
     expect(b.json).toMatchObject({ success: true });
@@ -111,7 +111,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
     // Changing the type in place must be reported (it discards leaf data).
     const c = await h.ok("tm1_bulk_upsert_elements", {
       dimensionName: DIM,
-      hierarchy: HIER,
+      hierarchyName: HIER,
       elements: [{ name: TC, type: "String" }],
     });
     expect(c.json.typeChanges).toEqual([{ name: TC, from: "Numeric", to: "String" }]);

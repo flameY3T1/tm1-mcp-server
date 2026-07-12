@@ -190,6 +190,17 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       ],
       truncated: false,
     },
+    tm1_get_process: {
+      name: "Load.Sales",
+      prolog: "# pro",
+      metadata: "",
+      data: "",
+      epilog: "",
+      parameters: [{ name: "pYear", type: "String", defaultValue: "2026" }],
+      variables: [{ name: "vAmount", type: "Numeric", position: 1 }],
+      dataSource: { type: "None" },
+      hasSecurityAccess: false,
+    },
     tm1_get_process_code: {
       prolog: "# pro",
       metadata: "",

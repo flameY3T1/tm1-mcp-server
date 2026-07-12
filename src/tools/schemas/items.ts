@@ -352,6 +352,22 @@ export const DataSourceSchema = z
   })
   .passthrough();
 
+// tm1_get_process — every section is gated by an include-flag, so all fields
+// except `name` are optional. The code tabs sit at the TOP level (the handler
+// spreads them into the payload), not under a `tabs` object.
+export const GetProcessResultSchema = z.object({
+  name: z.string(),
+  prolog: z.string().optional(),
+  metadata: z.string().optional(),
+  data: z.string().optional(),
+  epilog: z.string().optional(),
+  parameters: z.array(ProcessParameterSchema).optional(),
+  variables: z.array(ProcessVariableSchema).optional(),
+  dataSource: DataSourceSchema.optional(),
+  hasSecurityAccess: z.boolean().optional(),
+  hint: z.string().optional(),
+});
+
 export const CubeRulesSchema = z.object({
   cubeName: z.string(),
   skipCheck: z.boolean(),

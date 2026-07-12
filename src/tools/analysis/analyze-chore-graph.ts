@@ -81,7 +81,7 @@ export function registerAnalyzeChoreGraph(server: McpServer, tm1Client: TM1Clien
     "tm1_analyze_chore_graph",
     "Build downstream call graphs for every task of a TM1 chore. Each task's tree is seeded with the chore's task params (literals) which propagate through ExecuteProcess calls. Returns one tree per task plus the chore's own params per task.",
     {
-      chore: z.string().describe("Chore name (case-insensitive)"),
+      name: z.string().describe("Chore name (case-insensitive)"),
       includeSystem: z
         .boolean()
         .optional()
@@ -100,16 +100,16 @@ export function registerAnalyzeChoreGraph(server: McpServer, tm1Client: TM1Clien
           "Redact param values whose name matches /pass|pwd|secret|token|key|credential|auth/i to '***'. Includes chore-task params, edge params, env, and snippet. Default: true.",
         ),
     },
-    async ({ chore, includeSystem, includeControl, maskSecrets }) => {
+    async ({ name, includeSystem, includeControl, maskSecrets }) => {
       const index = await buildIndexFromTM1(tm1Client, { includeControl });
-      const graph = buildChoreGraph(index, chore, { includeSystem });
+      const graph = buildChoreGraph(index, name, { includeSystem });
       if (!graph) {
         return {
           content: [
             {
               type: "text" as const,
               text: JSON.stringify({
-                warning: `Chore "${chore}" not found.`,
+                warning: `Chore "${name}" not found.`,
                 indexedChoreCount: index.choreTasks.size,
               }),
             },
