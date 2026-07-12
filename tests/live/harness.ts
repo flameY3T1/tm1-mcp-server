@@ -176,7 +176,7 @@ export async function sweepSandbox(h: LiveHarness): Promise<void> {
   for (const c of chores.json?.items ?? []) {
     const name = typeof c === "string" ? c : c?.name;
     if (typeof name === "string" && name.startsWith(SANDBOX)) {
-      await swallow(h.call("tm1_delete_chore", { name }));
+      await swallow(h.call("tm1_delete_chore", { choreName: name, confirm: name }));
     }
   }
 

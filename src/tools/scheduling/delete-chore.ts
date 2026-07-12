@@ -8,16 +8,16 @@ export function registerDeleteChore(server: McpServer, tm1Client: TM1Client): vo
     "tm1_delete_chore",
     "Delete a TM1 chore permanently. Irreversible — pass confirm=<chore name verbatim>.",
     {
-      name: z.string().describe("Chore name (case-sensitive)"),
+      choreName: z.string().describe("Chore name (case-sensitive)"),
       ...CONFIRM_SCHEMA,
     },
-    async ({ name, confirm }) => {
-      requireConfirm(confirm, name, "chore");
-      await tm1Client.chores.delete(name);
+    async ({ choreName, confirm }) => {
+      requireConfirm(confirm, choreName, "chore");
+      await tm1Client.chores.delete(choreName);
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, choreName: name }),
+          text: JSON.stringify({ success: true, choreName }),
         }],
       };
     },

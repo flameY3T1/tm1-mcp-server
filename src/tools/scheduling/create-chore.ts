@@ -26,7 +26,7 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
       "After: tm1_toggle_chore to activate scheduling, tm1_execute_chore to run immediately.",
     ].join(" "),
     {
-      name: z.string().describe("Chore name"),
+      choreName: z.string().describe("Chore name"),
       startTime: z.string().describe(
         "Start time in ISO 8601 format with timezone (Z or ±HH:MM). If no offset is given, UTC ('Z') is auto-appended. Example: '2025-01-01T06:00:00Z'.",
       ),
@@ -44,15 +44,15 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
       }).describe("How often the chore runs"),
       steps: z.array(ChoreStepSchema).min(1).describe("Ordered list of TI processes to execute"),
     },
-    async ({ name, startTime, active, dstSensitive, executionMode, frequency, steps }) => {
+    async ({ choreName, startTime, active, dstSensitive, executionMode, frequency, steps }) => {
       const { value: normalizedStartTime, coerced } = coerceUtc(startTime);
-      await tm1Client.chores.create({ name, startTime: normalizedStartTime, active, dstSensitive, executionMode, frequency, steps });
+      await tm1Client.chores.create({ name: choreName, startTime: normalizedStartTime, active, dstSensitive, executionMode, frequency, steps });
       return {
         content: [{
           type: "text" as const,
           text: JSON.stringify({
             success: true,
-            name,
+            name: choreName,
             stepCount: steps.length,
             active,
             startTime: normalizedStartTime,

@@ -11,7 +11,7 @@ export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): v
       "On failure: tm1_diagnose_process_error for the failing step (chores fail-fast on first error).",
     ].join(" "),
     {
-      name: z.string().describe("Chore name (case-sensitive)"),
+      choreName: z.string().describe("Chore name (case-sensitive)"),
       timeoutMs: z
         .number()
         .int()
@@ -20,12 +20,12 @@ export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): v
         .optional()
         .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for chores running long TI chains."),
     },
-    async ({ name, timeoutMs }, extra) => {
-      await tm1Client.chores.execute(name, { signal: extra?.signal, ...(timeoutMs ? { timeoutMs } : {}) });
+    async ({ choreName, timeoutMs }, extra) => {
+      await tm1Client.chores.execute(choreName, { signal: extra?.signal, ...(timeoutMs ? { timeoutMs } : {}) });
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, choreName: name }),
+          text: JSON.stringify({ success: true, choreName }),
         }],
       };
     },

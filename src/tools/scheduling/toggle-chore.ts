@@ -7,15 +7,15 @@ export function registerToggleChore(server: McpServer, tm1Client: TM1Client): vo
     "tm1_toggle_chore",
     "Activate or deactivate a TM1 chore (enable/disable its schedule).",
     {
-      name: z.string().describe("Chore name (case-sensitive)"),
+      choreName: z.string().describe("Chore name (case-sensitive)"),
       active: z.boolean().describe("true to activate scheduling, false to deactivate"),
     },
-    async ({ name, active }) => {
-      await tm1Client.chores.toggleActive(name, active);
+    async ({ choreName, active }) => {
+      await tm1Client.chores.toggleActive(choreName, active);
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, choreName: name, active }),
+          text: JSON.stringify({ success: true, choreName, active }),
         }],
       };
     },

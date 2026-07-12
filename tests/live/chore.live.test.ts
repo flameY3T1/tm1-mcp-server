@@ -37,7 +37,7 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
     // Idempotent teardown. Delete the chore FIRST so it can never fire, then
     // the process. Swallow errors so one failure doesn't mask the other.
     try {
-      await h.call("tm1_delete_chore", { name: CHORE, confirm: CHORE });
+      await h.call("tm1_delete_chore", { choreName: CHORE, confirm: CHORE });
     } catch {
       /* already gone */
     }
@@ -50,7 +50,7 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
 
   it("create_chore creates a deactivated chore", async () => {
     const r = await h.ok("tm1_create_chore", {
-      name: CHORE,
+      choreName: CHORE,
       startTime: START,
       active: false, // never auto-runs
       frequency: { days: 1, hours: 0, minutes: 0, seconds: 0 },
@@ -80,14 +80,14 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
 
   it("toggle_chore flips active state", async () => {
     // Activate.
-    const on = await h.ok("tm1_toggle_chore", { name: CHORE, active: true });
+    const on = await h.ok("tm1_toggle_chore", { choreName: CHORE, active: true });
     expect(on.json).toMatchObject({ success: true, choreName: CHORE, active: true });
     const afterOn = await h.ok("tm1_list_chores", { fetchAll: true });
     const onItem = afterOn.json.items.find((c: { name?: string }) => c?.name === CHORE);
     expect(onItem.active).toBe(true);
 
     // Deactivate again (leave it OFF — schedule must never fire post-test).
-    const off = await h.ok("tm1_toggle_chore", { name: CHORE, active: false });
+    const off = await h.ok("tm1_toggle_chore", { choreName: CHORE, active: false });
     expect(off.json).toMatchObject({ success: true, choreName: CHORE, active: false });
     const afterOff = await h.ok("tm1_list_chores", { fetchAll: true });
     const offItem = afterOff.json.items.find((c: { name?: string }) => c?.name === CHORE);
@@ -97,7 +97,7 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
   it("update_chore changes the start time", async () => {
     const NEW_START = "2099-06-15T09:30:00Z";
     const r = await h.ok("tm1_update_chore", {
-      name: CHORE,
+      choreName: CHORE,
       startTime: NEW_START,
     });
     expect(r.json).toMatchObject({ success: true, choreName: CHORE });
@@ -111,12 +111,12 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
 
   it("execute_chore runs it once on demand", async () => {
     // Chore is deactivated; on-demand execute bypasses the schedule.
-    const r = await h.ok("tm1_execute_chore", { name: CHORE });
+    const r = await h.ok("tm1_execute_chore", { choreName: CHORE });
     expect(r.json).toMatchObject({ success: true, choreName: CHORE });
   });
 
   it("analyze_chore_graph returns task structure", async () => {
-    const r = await h.ok("tm1_analyze_chore_graph", { name: CHORE });
+    const r = await h.ok("tm1_analyze_chore_graph", { choreName: CHORE });
     expect(r.json.choreName).toBeTruthy();
     expect(Array.isArray(r.json.tasks)).toBe(true);
     expect(r.json.tasks.length).toBeGreaterThanOrEqual(1);
@@ -127,7 +127,7 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
 
   it("delete_chore on a nonexistent chore returns an error envelope", async () => {
     const r = await h.call("tm1_delete_chore", {
-      name: `${SANDBOX}_CHORE_DOES_NOT_EXIST`,
+      choreName: `${SANDBOX}_CHORE_DOES_NOT_EXIST`,
       confirm: `${SANDBOX}_CHORE_DOES_NOT_EXIST`,
     });
     expect(r.isError).toBe(true);
