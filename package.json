@@ -1,6 +1,6 @@
 {
   "name": "tm1-mcp-server",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "MCP server for IBM Planning Analytics / TM1 — full model lifecycle via REST API",
   "repository": {
     "type": "git",
