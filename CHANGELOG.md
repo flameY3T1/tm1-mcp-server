@@ -45,8 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Output-schema drift (a handler emitting a field its strict schema doesn't
   declare) now returns a regular `isError` tool result with a descriptive
   message instead of surfacing as a raw JSON-RPC protocol error.
-- `tm1_get_process` fires its enabled section fetches in parallel (up to 5
-  REST round-trips were sequential).
+- `tm1_analyze_chore_graph` on a nonexistent chore returns its not-found
+  warning again: the warning payload omitted required schema fields and was
+  rejected by the strict output schema (caught by the live sweep via the new
+  drift guard). The warning branch now carries the full top-level shape
+  (`choreName`, empty `tasks`, `warning`, `indexedChoreCount`).
+- `tm1_export_process_to_git` (`writeToDir`) and `tm1_export_process_to_pro`
+  (`writeToFile`) create missing target directories (`mkdir -p` after path
+  confinement) instead of surfacing a raw `ENOENT`.
 
 ### Changed
 
@@ -64,12 +70,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   param (default 1000) plus a `truncated` flag in the output. Previously a call
   on a root consolidation of a large flat dimension dumped the entire
   dimension into the context window.
+- `tm1_get_process` fires its enabled section fetches in parallel (up to 5
+  REST round-trips were sequential) — same result, lower latency.
 - Publishing now runs a clean `prepack` (`rm -rf dist && npm run build`) so the
   npm tarball can never carry stale `dist/` build artifacts. The release flow is
   documented in `RELEASING.md`.
-- `tm1_export_process_to_git` (`writeToDir`) and `tm1_export_process_to_pro`
-  (`writeToFile`) create missing target directories (`mkdir -p` after path
-  confinement) instead of surfacing a raw `ENOENT`.
 - `tm1_export_process_to_git` no longer echoes the full `json`/`ti` file bodies
   in its response when `writeToDir` is set — the code is written to disk and the
   response carries only metadata (filenames, counts, `writtenTo` paths). Avoids
