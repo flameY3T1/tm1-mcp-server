@@ -669,6 +669,7 @@ export const CallgraphResultSchema = z
 
 export const ChoreGraphResultSchema = z.object({
   choreName: z.string(),
+  maskSecrets: z.boolean().optional(),
   tasks: z.array(
     z
       .object({
@@ -679,6 +680,9 @@ export const ChoreGraphResultSchema = z.object({
       })
       .passthrough(),
   ),
+  // Not-found branch: tasks is empty and these two explain why.
+  warning: z.string().optional(),
+  indexedChoreCount: z.number().int().optional(),
 });
 
 // `usages` is present in full mode; `sources`/`sourceCount`/`mode` are present

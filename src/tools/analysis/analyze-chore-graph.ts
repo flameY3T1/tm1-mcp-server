@@ -109,6 +109,10 @@ export function registerAnalyzeChoreGraph(server: McpServer, tm1Client: TM1Clien
             {
               type: "text" as const,
               text: JSON.stringify({
+                // Same top-level shape as the success branch so the strict
+                // output schema accepts the not-found payload.
+                choreName,
+                tasks: [],
                 warning: `Chore "${choreName}" not found.`,
                 indexedChoreCount: index.choreTasks.size,
               }),

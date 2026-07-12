@@ -119,6 +119,23 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     expect(result.success).toBe(true);
   });
 
+  // Live-sweep regression 2026-07-12: the not-found branch omitted choreName/
+  // tasks and was rejected by the strict output schema (surfaced as isError
+  // via the drift pre-validation). Both branches must conform.
+  it("tm1_analyze_chore_graph: not-found warning payload validates against schema", () => {
+    const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_analyze_chore_graph);
+    const payload = {
+      choreName: "ZZZ_missing",
+      tasks: [],
+      warning: 'Chore "ZZZ_missing" not found.',
+      indexedChoreCount: 12,
+    };
+    const result = schema.safeParse(payload);
+    if (!result.success) {
+      throw new Error(`warning-branch validation failed: ${JSON.stringify(result.error.issues, null, 2)}`);
+    }
+  });
+
   it("tm1_list_sessions: compact-mode summary output validates against schema", () => {
     const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_list_sessions);
     const payload = {
