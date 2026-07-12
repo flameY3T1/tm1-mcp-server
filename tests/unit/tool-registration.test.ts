@@ -5,7 +5,7 @@ import type { TM1Client } from "../../src/tm1-client.js";
 import { ANNOTATION_MAP } from "../../src/tools/annotation-map.js";
 import { OUTPUT_SCHEMA_MAP } from "../../src/tools/output-schema-map.js";
 import { registerAllTools } from "../../src/tools/index.js";
-import { withAnnotations } from "../../src/tools/with-annotations.js";
+import { withAnnotations, deriveTitle } from "../../src/tools/with-annotations.js";
 
 const mockLogger = {
   info: vi.fn(),
@@ -48,6 +48,110 @@ describe("#9 map reconciliation", () => {
     const schemaKeys = Object.keys(OUTPUT_SCHEMA_MAP);
     const missing = schemaKeys.filter((k) => !registered.has(k));
     expect(missing).toEqual([]);
+  });
+});
+
+// Capture (config, wrappedCb) per tool name so registration-level behavior
+// (title injection, output-schema drift guard) can be asserted directly.
+function captureRegistrations(): Map<
+  string,
+  { config: Record<string, unknown>; cb: (...a: unknown[]) => unknown }
+> {
+  const server = makeServer();
+  const captured = new Map<
+    string,
+    { config: Record<string, unknown>; cb: (...a: unknown[]) => unknown }
+  >();
+  server.registerTool = ((...args: unknown[]) => {
+    captured.set(args[0] as string, {
+      config: args[1] as Record<string, unknown>,
+      cb: args[2] as (...a: unknown[]) => unknown,
+    });
+    return {} as ReturnType<typeof server.registerTool>;
+  }) as typeof server.registerTool;
+  const wrapped = withAnnotations(server, mockLogger, "readwrite");
+  registerAllTools(wrapped, {} as TM1Client);
+  return captured;
+}
+
+describe("L8 auto-derived tool titles", () => {
+  it("deriveTitle: strips tm1_, capitalizes words, keeps acronym casing", () => {
+    expect(deriveTitle("tm1_get_process_code")).toBe("Get Process Code");
+    expect(deriveTitle("tm1_list_cubes")).toBe("List Cubes");
+    expect(deriveTitle("tm1_execute_mdx")).toBe("Execute MDX");
+    expect(deriveTitle("tm1_create_mdx_view")).toBe("Create MDX View");
+    expect(deriveTitle("tm1_check_v12_readiness")).toBe("Check v12 Readiness");
+    expect(deriveTitle("no_prefix_tool")).toBe("No Prefix Tool");
+  });
+
+  it("every registered tool carries a derived title in its config", () => {
+    const captured = captureRegistrations();
+    expect(captured.size).toBeGreaterThan(0);
+    for (const [name, { config }] of captured) {
+      expect(config.title, `${name} missing title`).toBe(deriveTitle(name));
+    }
+    expect(captured.get("tm1_list_cubes")?.config.title).toBe("List Cubes");
+  });
+});
+
+describe("L9 output-schema drift guard", () => {
+  const mkResult = (payload: unknown) => ({
+    content: [{ type: "text", text: JSON.stringify(payload) }],
+  });
+
+  function registerFake(
+    name: string,
+    handler: () => unknown,
+  ): { config: Record<string, unknown>; cb: (...a: unknown[]) => unknown } {
+    const server = makeServer();
+    let captured:
+      | { config: Record<string, unknown>; cb: (...a: unknown[]) => unknown }
+      | undefined;
+    server.registerTool = ((...args: unknown[]) => {
+      captured = {
+        config: args[1] as Record<string, unknown>,
+        cb: args[2] as (...a: unknown[]) => unknown,
+      };
+      return {} as ReturnType<typeof server.registerTool>;
+    }) as typeof server.registerTool;
+    const wrapped = withAnnotations(server, mockLogger, "readwrite");
+    // Real tool name so ANNOTATION_MAP + OUTPUT_SCHEMA_MAP entries exist.
+    (wrapped.tool as (...a: unknown[]) => unknown)(name, "fake", {}, handler);
+    if (!captured) throw new Error("tool was not registered");
+    return captured;
+  }
+
+  it("schema-violating payload → isError envelope with drift message, no structuredContent", async () => {
+    const { cb } = registerFake("tm1_list_cubes", () =>
+      mkResult({ totally: "wrong shape" }),
+    );
+    const result = (await cb()) as {
+      isError?: boolean;
+      structuredContent?: unknown;
+      content: Array<{ type: string; text: string }>;
+    };
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    const payload = JSON.parse(result.content[0].text) as { message: string };
+    expect(payload.message).toContain("output schema drift in tm1_list_cubes");
+  });
+
+  it("schema-conforming payload → structuredContent attached, no isError", async () => {
+    const good = {
+      total: 1,
+      count: 1,
+      offset: 0,
+      has_more: false,
+      next_offset: null,
+      items: [{ name: "Cube_Sales" }],
+    };
+    const { cb } = registerFake("tm1_list_cubes", () => mkResult(good));
+    const result = (await cb()) as {
+      isError?: boolean;
+      structuredContent?: unknown;
+    };
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toEqual(good);
   });
 });
 

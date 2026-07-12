@@ -30,6 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   operator could accidentally expose an unauthenticated endpoint on `0.0.0.0`
   with only a log warning. Loopback binds keep the warn-only behavior.
 
+### Added
+
+- `tm1_get_all_processes_code` gains a `summary` mode (mirrors
+  `tm1_get_all_cube_rules`): drops the four code-tab bodies and returns
+  per-process line metrics (`totalLines`, per-tab counts, `commentLines`)
+  plus `name`/`hasSecurityAccess` — landscape surveys without the token cost.
+- Every tool now carries a human-readable `title` (auto-derived from the tool
+  name, e.g. `tm1_get_process_code` → "Get Process Code"), so MCP clients can
+  show display names instead of raw snake_case.
+
+### Fixed
+
+- Output-schema drift (a handler emitting a field its strict schema doesn't
+  declare) now returns a regular `isError` tool result with a descriptive
+  message instead of surfacing as a raw JSON-RPC protocol error.
+- `tm1_get_process` fires its enabled section fetches in parallel (up to 5
+  REST round-trips were sequential).
+
 ### Changed
 
 - **Breaking (input param renames for cross-tool consistency):**

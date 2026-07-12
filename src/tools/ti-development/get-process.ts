@@ -48,8 +48,17 @@ export function registerGetProcess(server: McpServer, tm1Client: TM1Client) {
       const payload: Record<string, unknown> = { name: processName };
       let hint: string | undefined;
 
-      if (includeCode) {
-        const code = await tm1Client.processes.getCode(processName);
+      // All enabled fetches run in parallel; disabled flags resolve to
+      // undefined so the destructuring below stays positional.
+      const [code, parameters, variables, dataSourceRaw, deployMeta] = await Promise.all([
+        includeCode ? tm1Client.processes.getCode(processName) : undefined,
+        includeParameters ? tm1Client.processes.getParameters(processName) : undefined,
+        includeVariables ? tm1Client.processes.getVariables(processName) : undefined,
+        includeDataSource ? tm1Client.processes.getDataSource(processName) : undefined,
+        includeSecurityAccess ? tm1Client.processes.getDeployMeta(processName) : undefined,
+      ]);
+
+      if (code !== undefined) {
         const tabs: Record<(typeof TABS)[number], string> = {
           prolog: code.prolog,
           metadata: code.metadata,
@@ -93,23 +102,17 @@ export function registerGetProcess(server: McpServer, tm1Client: TM1Client) {
         Object.assign(payload, tabs);
       }
 
-      if (includeParameters) {
-        payload.parameters = await tm1Client.processes.getParameters(processName);
-      }
-      if (includeVariables) {
-        payload.variables = await tm1Client.processes.getVariables(processName);
-      }
-      if (includeDataSource) {
-        const ds = await tm1Client.processes.getDataSource(processName);
+      if (parameters !== undefined) payload.parameters = parameters;
+      if (variables !== undefined) payload.variables = variables;
+      if (dataSourceRaw !== undefined) {
+        const ds = dataSourceRaw;
         if (maskSecrets) {
           if (ds.password !== undefined && ds.password !== "") ds.password = MASK;
           if (ds.oDBCConnection !== undefined) ds.oDBCConnection = maskConnectionString(ds.oDBCConnection);
         }
         payload.dataSource = ds;
       }
-      if (includeSecurityAccess) {
-        payload.hasSecurityAccess = (await tm1Client.processes.getDeployMeta(processName)).hasSecurityAccess;
-      }
+      if (deployMeta !== undefined) payload.hasSecurityAccess = deployMeta.hasSecurityAccess;
       if (hint) payload.hint = hint;
 
       return {

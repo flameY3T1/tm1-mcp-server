@@ -7,7 +7,7 @@
 //   READ_ONLY         GET / list / search / analyze / validate / compile / diff
 //   IDEMPOTENT_WRITE  PUT-style updates: same input -> same end state
 //   WRITE             POST-style creates / non-idempotent (toggle, write_cells)
-//   DESTRUCTIVE       delete / clear / unload / cancel / remove / invalidate /
+//   DESTRUCTIVE       delete / clear / unload / cancel / remove /
 //                     execute (TI side effects)
 import {
   READ_ONLY,

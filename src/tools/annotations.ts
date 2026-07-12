@@ -31,10 +31,10 @@ export function withVersion(
 }
 
 // GET / list / search / analyze / validate / compile / diff — no server-side state change.
+// No idempotentHint: per MCP spec it is only meaningful when readOnlyHint=false.
 export const READ_ONLY: ToolAnnotations = {
   readOnlyHint: true,
   destructiveHint: false,
-  idempotentHint: true,
   openWorldHint: true,
 };
 

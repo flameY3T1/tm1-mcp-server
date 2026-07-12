@@ -1,5 +1,6 @@
 import type pino from "pino";
 import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z, type ZodRawShape, type ZodTypeAny } from "zod";
 import { ANNOTATION_MAP } from "./annotation-map.js";
 import { OUTPUT_SCHEMA_MAP } from "./output-schema-map.js";
 import {
@@ -7,6 +8,36 @@ import {
   normalizeErrorResult,
   type McpToolResult,
 } from "./error-format.js";
+
+// Words whose display casing differs from simple capitalization.
+const TITLE_CASING: Record<string, string> = {
+  mdx: "MDX",
+  ti: "TI",
+  v12: "v12",
+  v11: "v11",
+};
+
+// Derive a human-readable title from a snake_case tool name:
+// "tm1_get_process_code" → "Get Process Code". Single point of derivation —
+// no per-tool overrides in ANNOTATION_MAP.
+export function deriveTitle(toolName: string): string {
+  return toolName
+    .replace(/^tm1_/, "")
+    .split("_")
+    .filter((w) => w.length > 0)
+    .map((w) => TITLE_CASING[w] ?? w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+// OUTPUT_SCHEMA_MAP entries are either a raw shape or a full Zod schema
+// (passthrough/catchall). Normalize to a parseable schema.
+function isZodSchema(entry: ZodRawShape | ZodTypeAny): entry is ZodTypeAny {
+  return "_def" in entry;
+}
+
+function asZodSchema(entry: ZodRawShape | ZodTypeAny): ZodTypeAny {
+  return isZodSchema(entry) ? entry : z.object(entry);
+}
 
 // Wrap McpServer so every server.tool(name, desc, schema, cb) call:
 //   1) injects the matching annotation from ANNOTATION_MAP
@@ -45,8 +76,10 @@ export function withAnnotations(
   const wrapCb = (
     toolName: string,
     cb: ToolCallback,
-    hasOutputSchema: boolean,
+    outputSchema: ZodRawShape | ZodTypeAny | undefined,
   ): ToolCallback => {
+    // Normalize once per tool, not per call.
+    const schema = outputSchema ? asZodSchema(outputSchema) : undefined;
     return async (...cbArgs: unknown[]) => {
       const start = Date.now();
       try {
@@ -68,8 +101,32 @@ export function withAnnotations(
         if (result && result.isError) {
           return normalizeErrorResult(result);
         }
-        if (result && hasOutputSchema) {
-          return attachStructured(result);
+        if (result && schema) {
+          const withStructured = attachStructured(result);
+          if (withStructured.structuredContent !== undefined) {
+            // Pre-validate against the outputSchema HERE so drift surfaces as
+            // a graceful isError result. The SDK validates structuredContent
+            // AFTER the callback returns and turns a mismatch into a raw
+            // JSON-RPC protocol error; it skips that validation for isError
+            // results (validateToolOutput returns early on result.isError),
+            // so the error envelope below — which carries no
+            // structuredContent — passes through cleanly.
+            const parsed = schema.safeParse(withStructured.structuredContent);
+            if (!parsed.success) {
+              const issue = parsed.error.issues[0];
+              const detail = issue
+                ? `${issue.path.join(".") || "(root)"}: ${issue.message}`
+                : "unknown issue";
+              logger.warn(
+                { tool: toolName, issues: parsed.error.issues.slice(0, 5) },
+                "output schema drift",
+              );
+              return formatTm1ErrorResult(
+                new Error(`output schema drift in ${toolName}: ${detail}`),
+              );
+            }
+          }
+          return withStructured;
         }
         return result;
       } catch (err) {
@@ -107,12 +164,9 @@ export function withAnnotations(
           return;
         }
         const outputSchema = OUTPUT_SCHEMA_MAP[name];
-        const wrappedCb = wrapCb(
-          name,
-          args[3] as ToolCallback,
-          Boolean(outputSchema),
-        );
+        const wrappedCb = wrapCb(name, args[3] as ToolCallback, outputSchema);
         const config: Record<string, unknown> = {
+          title: deriveTitle(name),
           description,
           inputSchema,
           annotations: annot,
