@@ -9,78 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- `tm1_get_all_processes_code` now masks credential literals in every returned
-  tab by default (new `maskSecrets` flag, default `true`) — it was the only
-  code-returning tool that skipped masking, so one call could dump every inline
-  ODBC password in the model unmasked.
-- ODBC connection strings (`DataSource.oDBCConnection`, which routinely embed
-  `PWD=`/`UID=` pairs) are now masked by default in `tm1_get_process`,
-  `tm1_get_process_datasource` (new `maskSecrets` flag) and in the `.json`
-  emitted/written by `tm1_export_process_to_git`. Previously only the
-  `password` field was stripped while the connection string passed through
-  verbatim. `maskSecrets: false` still yields the raw values for explicit
-  credential audits.
-- Local-file path confinement (`TM1_LOCAL_FILE_ROOT`) is now symlink-aware: the
-  nearest existing ancestor of the target is `realpath`-resolved and re-checked
-  against the (also resolved) root, so a symlink placed inside the root can no
-  longer redirect writes outside it. Purely lexical `..`/absolute-path escapes
-  were already blocked.
-- The Streamable-HTTP transport refuses to start on a non-loopback host
-  (`TM1_MCP_HTTP_HOST`) unless `TM1_MCP_HTTP_TOKEN` is set — previously an
-  operator could accidentally expose an unauthenticated endpoint on `0.0.0.0`
-  with only a log warning. Loopback binds keep the warn-only behavior.
+- `tm1_get_all_processes_code` masks credential literals by default (new
+  `maskSecrets` flag) — it was the only code-returning tool without masking.
+- ODBC connection strings (`oDBCConnection`, `PWD=`/`UID=` pairs) are masked
+  by default in `tm1_get_process`, `tm1_get_process_datasource` (new
+  `maskSecrets` flag) and the git-export `.json`; previously only the
+  `password` field was stripped.
+- Local-file confinement (`TM1_LOCAL_FILE_ROOT`) is symlink-aware: targets are
+  `realpath`-checked against the resolved root.
+- HTTP transport refuses a non-loopback bind (`TM1_MCP_HTTP_HOST`) without
+  `TM1_MCP_HTTP_TOKEN`; loopback stays warn-only.
 
 ### Added
 
-- `tm1_get_all_processes_code` gains a `summary` mode (mirrors
-  `tm1_get_all_cube_rules`): drops the four code-tab bodies and returns
-  per-process line metrics (`totalLines`, per-tab counts, `commentLines`)
-  plus `name`/`hasSecurityAccess` — landscape surveys without the token cost.
-- Every tool now carries a human-readable `title` (auto-derived from the tool
-  name, e.g. `tm1_get_process_code` → "Get Process Code"), so MCP clients can
-  show display names instead of raw snake_case.
+- `tm1_get_all_processes_code` `summary` mode: per-process line metrics
+  instead of code bodies.
+- Every tool carries an auto-derived human-readable `title`
+  (`tm1_get_process_code` → "Get Process Code").
 
 ### Fixed
 
-- Output-schema drift (a handler emitting a field its strict schema doesn't
-  declare) now returns a regular `isError` tool result with a descriptive
-  message instead of surfacing as a raw JSON-RPC protocol error.
-- `tm1_analyze_chore_graph` on a nonexistent chore returns its not-found
-  warning again: the warning payload omitted required schema fields and was
-  rejected by the strict output schema (caught by the live sweep via the new
-  drift guard). The warning branch now carries the full top-level shape
-  (`choreName`, empty `tasks`, `warning`, `indexedChoreCount`).
-- `tm1_export_process_to_git` (`writeToDir`) and `tm1_export_process_to_pro`
-  (`writeToFile`) create missing target directories (`mkdir -p` after path
-  confinement) instead of surfacing a raw `ENOENT`.
+- Output-schema drift returns an `isError` tool result instead of a raw
+  JSON-RPC protocol error.
+- `tm1_analyze_chore_graph` not-found warning conforms to the output schema
+  again (was rejected by strict validation, so it never reached the client).
+- Git/pro export create missing target directories instead of raw `ENOENT`.
 
 ### Changed
 
-- **Breaking (input param renames for cross-tool consistency):**
-  `tm1_bulk_upsert_elements` param `hierarchy` → `hierarchyName` (matches the
-  19 other hierarchy-taking tools); the chore family — `tm1_create_chore`,
-  `tm1_delete_chore`, `tm1_execute_chore`, `tm1_toggle_chore`,
-  `tm1_update_chore`, `tm1_analyze_chore_graph` — now uniformly takes
-  `choreName` (was `name`; analyze was `chore`), matching the
-  `processName`/`cubeName` pattern. MCP clients re-read tool schemas per
-  session, so agents pick the new names up automatically.
-- `tm1_get_process` now declares a strict `outputSchema` (structuredContent +
-  drift validation) like its sibling `get_process_*` tools.
-- `tm1_get_descendants` caps its result like `tm1_get_hierarchy`: new `topN`
-  param (default 1000) plus a `truncated` flag in the output. Previously a call
-  on a root consolidation of a large flat dimension dumped the entire
-  dimension into the context window.
-- `tm1_get_process` fires its enabled section fetches in parallel (up to 5
-  REST round-trips were sequential) — same result, lower latency.
-- Publishing now runs a clean `prepack` (`rm -rf dist && npm run build`) so the
-  npm tarball can never carry stale `dist/` build artifacts. The release flow is
-  documented in `RELEASING.md`.
-- `tm1_export_process_to_git` no longer echoes the full `json`/`ti` file bodies
-  in its response when `writeToDir` is set — the code is written to disk and the
-  response carries only metadata (filenames, counts, `writtenTo` paths). Avoids
-  duplicating thousands of tokens into the context window on every disk export;
-  the inline echo is unchanged when `writeToDir` is omitted. Mirrors the
-  metadata-only response of `tm1_import_process_from_git`.
+- **Breaking:** input params renamed for cross-tool consistency —
+  `tm1_bulk_upsert_elements` `hierarchy` → `hierarchyName`; the chore family
+  (`create/delete/execute/toggle/update_chore`, `analyze_chore_graph`) now
+  uniformly takes `choreName` (was `name`; analyze was `chore`). MCP clients
+  re-read schemas per session and pick the new names up automatically.
+- `tm1_get_process` declares a strict `outputSchema` like its siblings.
+- `tm1_get_descendants`: `topN` cap (default 1000) + `truncated` flag —
+  no more full-dimension dumps from a root consolidation.
+- `tm1_get_process` fetches its enabled sections in parallel (was up to 5
+  sequential REST calls).
+- Publishing runs a clean `prepack` (`rm -rf dist && npm run build`); release
+  flow documented in `RELEASING.md`.
+- `tm1_export_process_to_git` with `writeToDir` returns metadata only (no
+  inline `json`/`ti` echo); inline export unchanged. Mirrors
+  `tm1_import_process_from_git`.
 
 ## [1.0.3] - 2026-07-05
 
