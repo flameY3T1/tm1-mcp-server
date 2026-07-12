@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   session, so agents pick the new names up automatically.
 - `tm1_get_process` now declares a strict `outputSchema` (structuredContent +
   drift validation) like its sibling `get_process_*` tools.
+- `tm1_get_descendants` caps its result like `tm1_get_hierarchy`: new `topN`
+  param (default 1000) plus a `truncated` flag in the output. Previously a call
+  on a root consolidation of a large flat dimension dumped the entire
+  dimension into the context window.
 - Publishing now runs a clean `prepack` (`rm -rf dist && npm run build`) so the
   npm tarball can never carry stale `dist/` build artifacts. The release flow is
   documented in `RELEASING.md`.

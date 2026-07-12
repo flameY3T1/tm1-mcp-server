@@ -876,6 +876,8 @@ export const DescendantsResultSchema = z.object({
       depth: z.number().int(),
     }),
   ),
+  // true when the topN cap clipped the descendant set — raise topN.
+  truncated: z.boolean(),
 });
 
 export const DefaultMemberResolutionSchema = z.object({

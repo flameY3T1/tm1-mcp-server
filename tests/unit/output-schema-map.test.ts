@@ -190,6 +190,11 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       ],
       truncated: false,
     },
+    tm1_get_descendants: {
+      element: "EU",
+      descendants: [{ name: "DE", type: "Numeric", level: 0, depth: 1 }],
+      truncated: false,
+    },
     tm1_get_process: {
       name: "Load.Sales",
       prolog: "# pro",
