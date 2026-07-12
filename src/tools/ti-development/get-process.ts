@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { commentStats, stripCommentBlocks } from "../../lib/strip-comments.js";
-import { maskCode, MASK } from "../../lib/mask-secrets.js";
+import { maskCode, maskConnectionString, MASK } from "../../lib/mask-secrets.js";
 
 const TABS = ["prolog", "metadata", "data", "epilog"] as const;
 const HEAVY_MIN_LINES = 20;
@@ -26,9 +26,10 @@ export function registerGetProcess(server: McpServer, tm1Client: TM1Client) {
       includeDataSource: z.boolean().optional().default(true).describe("Include the datasource config (default true)."),
       includeSecurityAccess: z.boolean().optional().default(true).describe("Include the HasSecurityAccess elevation flag (default true)."),
       maskSecrets: z.boolean().optional().default(true).describe(
-        "Redact credential literals in the code tabs (ODBCOpen passwords, credential-named vars). Default true; " +
-          "set false only when explicitly auditing credentials. Note: the datasource password is already " +
-          "redacted server-side by TM1, so this flag never reveals a real datasource secret.",
+        "Redact credential literals in the code tabs (ODBCOpen passwords, credential-named vars) and credential pairs " +
+          "(PWD=, UID=) in the datasource's ODBC connection string. Default true; " +
+          "set false only when explicitly auditing credentials. Note: the datasource password field is always " +
+          "redacted at the service layer, so that field never reveals a real secret either way.",
       ),
       stripComments: z.boolean().optional().default(false).describe(
         "Collapse runs of 4+ comment lines in the code tabs into a marker (dead-code reduction). Default false.",
@@ -100,8 +101,9 @@ export function registerGetProcess(server: McpServer, tm1Client: TM1Client) {
       }
       if (includeDataSource) {
         const ds = await tm1Client.processes.getDataSource(processName);
-        if (maskSecrets && ds.password !== undefined && ds.password !== "") {
-          ds.password = MASK;
+        if (maskSecrets) {
+          if (ds.password !== undefined && ds.password !== "") ds.password = MASK;
+          if (ds.oDBCConnection !== undefined) ds.oDBCConnection = maskConnectionString(ds.oDBCConnection);
         }
         payload.dataSource = ds;
       }

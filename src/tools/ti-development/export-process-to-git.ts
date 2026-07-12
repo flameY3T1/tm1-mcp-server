@@ -6,7 +6,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeProcessToGit } from "../../lib/git-process.js";
-import { maskCode } from "../../lib/mask-secrets.js";
+import { maskCode, maskDataSourceSecrets } from "../../lib/mask-secrets.js";
 
 export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -15,7 +15,7 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
       "Serialize a TM1 process to the tm1-git two-file layout: a '{name}.json' (parameters, variables, datasource) plus a '{name}.ti' (Prolog/Metadata/Data/Epilog as plain code).",
       "This is the diff-friendly format TM1's native Git integration and TM1py use — code lives outside the JSON so Git diffs stay readable.",
       "Returns both file bodies (json + ti) inline by default. Pass writeToDir to persist them to disk instead: the code is then written to files and omitted from the response to avoid duplicating it into the context window; only metadata (filenames, counts, writtenTo paths) comes back. Round-trip safe with tm1_import_process_from_git.",
-      "Security: the ODBC datasource password is never written; credentialsOmitted=true flags when one was stripped.",
+      "Security: the ODBC datasource password is never written; conn-string credential pairs (PWD=, UID=) in oDBCConnection are masked when maskSecrets is on; credentialsOmitted=true flags when a password was stripped.",
     ].join(" "),
     {
       processName: z.string().describe("Name of the TI process to export"),
@@ -28,8 +28,8 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         .optional()
         .default(true)
         .describe(
-          "Redact credential literals in the exported .ti code (inline and written file). Masks the password arg of ODBCOpen() and quoted values " +
-            "assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
+          "Redact credential literals in the exported .ti code (inline and written file) and credential pairs (PWD=, UID=) in the datasource's ODBC connection string in the .json. " +
+            "Masks the password arg of ODBCOpen() and quoted values assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
         ),
     },
     async ({ processName, writeToDir, maskSecrets }) => {
@@ -50,7 +50,7 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         epilog: mask(code.epilog),
         parameters,
         variables,
-        dataSource,
+        dataSource: maskSecrets ? maskDataSourceSecrets(dataSource) : dataSource,
         hasSecurityAccess: deployMeta.hasSecurityAccess,
       });
 

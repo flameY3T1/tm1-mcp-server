@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { isSecretName, maskCode, maskCodeLine, MASK } from "../../src/lib/mask-secrets.js";
+import {
+  isSecretName,
+  maskCode,
+  maskCodeLine,
+  maskConnectionString,
+  maskDataSourceSecrets,
+  MASK,
+} from "../../src/lib/mask-secrets.js";
 
 describe("isSecretName", () => {
   it.each([
@@ -91,5 +98,43 @@ describe("maskCode", () => {
     const out = maskCode(code);
     expect(out).toContain("\r\n");
     expect(out).not.toContain("'pw'");
+  });
+});
+
+describe("maskConnectionString", () => {
+  it("masks PWD and UID values, keeps non-credential pairs", () => {
+    const out = maskConnectionString("Driver={SQL Server};Server=srv01;UID=admin;PWD=hunter2;Database=Sales");
+    expect(out).not.toContain("hunter2");
+    expect(out).not.toContain("admin");
+    expect(out).toBe(`Driver={SQL Server};Server=srv01;UID=${MASK};PWD=${MASK};Database=Sales`);
+  });
+
+  it("masks Password= and User Id= variants case-insensitively", () => {
+    const out = maskConnectionString("server=s;user id=svc;password=S3cr3t!;");
+    expect(out).not.toContain("svc");
+    expect(out).not.toContain("S3cr3t!");
+  });
+
+  it("leaves credential-free connection strings unchanged", () => {
+    const conn = "Driver={SQL Server};Server=srv01;Database=Sales;Trusted_Connection=yes";
+    expect(maskConnectionString(conn)).toBe(conn);
+  });
+});
+
+describe("maskDataSourceSecrets", () => {
+  it("masks oDBCConnection and preserves the other fields", () => {
+    const ds = { type: "ODBC", userName: "svc", oDBCConnection: "DSN=Sales;UID=admin;PWD=hunter2;" };
+    const out = maskDataSourceSecrets(ds);
+    expect(out.oDBCConnection).not.toContain("hunter2");
+    expect(out.oDBCConnection).toContain(MASK);
+    expect(out.type).toBe("ODBC");
+    expect(out.userName).toBe("svc");
+    // Input object untouched (copy, not mutation).
+    expect(ds.oDBCConnection).toContain("hunter2");
+  });
+
+  it("is a no-op when oDBCConnection is absent", () => {
+    const ds = { type: "TM1CubeView", view: "Default" };
+    expect(maskDataSourceSecrets(ds)).toBe(ds);
   });
 });

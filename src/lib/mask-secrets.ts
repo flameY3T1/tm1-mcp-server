@@ -52,3 +52,21 @@ export function maskCodeLine(line: string): string {
 export function maskCode(code: string): string {
   return code.split("\n").map(maskCodeLine).join("\n");
 }
+
+// Mask credential values (PWD=…, UID=…, Password=…) inside a bare ODBC
+// connection string (DataSource.oDBCConnection). Reuses maskCodeLine so the
+// key=value masking stays in one regex; its other passes are no-ops on a
+// conn string that isn't TI code.
+export function maskConnectionString(conn: string): string {
+  return maskCodeLine(conn);
+}
+
+// Copy of a TI datasource with the ODBC connection string's credential pairs
+// masked. Structural generic so tool code can pass its own DataSource type
+// without an import cycle. The password field is already redacted at the
+// service layer (ProcessService.getDataSource), so only oDBCConnection needs
+// handling here.
+export function maskDataSourceSecrets<T extends { oDBCConnection?: string | undefined }>(ds: T): T {
+  if (ds.oDBCConnection === undefined) return ds;
+  return { ...ds, oDBCConnection: maskConnectionString(ds.oDBCConnection) };
+}

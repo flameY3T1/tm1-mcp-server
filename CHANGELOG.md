@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `tm1_get_all_processes_code` now masks credential literals in every returned
+  tab by default (new `maskSecrets` flag, default `true`) — it was the only
+  code-returning tool that skipped masking, so one call could dump every inline
+  ODBC password in the model unmasked.
+- ODBC connection strings (`DataSource.oDBCConnection`, which routinely embed
+  `PWD=`/`UID=` pairs) are now masked by default in `tm1_get_process`,
+  `tm1_get_process_datasource` (new `maskSecrets` flag) and in the `.json`
+  emitted/written by `tm1_export_process_to_git`. Previously only the
+  `password` field was stripped while the connection string passed through
+  verbatim. `maskSecrets: false` still yields the raw values for explicit
+  credential audits.
+
 ### Changed
 
 - Publishing now runs a clean `prepack` (`rm -rf dist && npm run build`) so the

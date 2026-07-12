@@ -7,6 +7,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../src/tm1-client.js";
 import type { DataSource } from "../../src/types.js";
 import { registerGetProcessCode } from "../../src/tools/ti-development/get-process-code.js";
+import { registerGetAllProcessesCode } from "../../src/tools/ti-development/get-all-processes-code.js";
+import { registerGetProcessDatasource } from "../../src/tools/ti-development/get-process-datasource.js";
 import { registerExportProcessToPro } from "../../src/tools/ti-development/export-process-to-pro.js";
 import { registerExportProcessToGit } from "../../src/tools/ti-development/export-process-to-git.js";
 import { registerDiffProcesses } from "../../src/tools/ti-development/diff-processes.js";
@@ -212,5 +214,80 @@ describe("tm1_diff_process_with_file masks both sides before diffing", () => {
     const parsed = JSON.parse(text) as { tabs: Array<{ tab: string; identical: boolean }> };
     const prolog = parsed.tabs.find((t) => t.tab === "prolog")!;
     expect(prolog.identical).toBe(false);
+  });
+});
+
+// Audit 2026-07-12 H1: the bulk code tool was the sole code-returning tool
+// that skipped masking.
+describe("tm1_get_all_processes_code masks inline ODBC credentials", () => {
+  const client = {
+    processes: {
+      getAllCode: async () => [
+        { name: "Load.Sales", prolog: ODBC("Bulk_Pw!"), metadata: "", data: "", epilog: "", hasSecurityAccess: false },
+      ],
+    },
+  } as unknown as TM1Client;
+
+  it("masks passwords in every returned tab by default", async () => {
+    const text = await run(registerGetAllProcessesCode, client, {});
+    expect(text).not.toContain("Bulk_Pw!");
+    expect(text).toContain("***");
+  });
+
+  it("returns raw code when maskSecrets=false", async () => {
+    const text = await run(registerGetAllProcessesCode, client, { maskSecrets: false });
+    expect(text).toContain("Bulk_Pw!");
+  });
+});
+
+// Audit 2026-07-12 M1: oDBCConnection strings carry PWD=/UID= pairs and passed
+// through unmasked (tool output and git .json on disk).
+const ODBC_DS: DataSource = {
+  type: "ODBC",
+  dataSourceNameForServer: "SalesDSN",
+  userName: "svc_user",
+  oDBCConnection: "Driver={SQL Server};Server=srv01;UID=conn_admin;PWD=Conn_Pw!;",
+};
+
+function clientWithDs(ds: DataSource): TM1Client {
+  return {
+    processes: {
+      getCode: async () => ({ prolog: "", metadata: "", data: "", epilog: "" }),
+      getParameters: async () => [],
+      getVariables: async () => [],
+      getDataSource: async () => ds,
+      getDeployMeta: async () => ({ hasSecurityAccess: false }),
+    },
+  } as unknown as TM1Client;
+}
+
+describe("tm1_get_process_datasource masks conn-string credentials", () => {
+  const client = clientWithDs(ODBC_DS);
+
+  it("masks PWD/UID pairs by default", async () => {
+    const text = await run(registerGetProcessDatasource, client, { processName: "Load.Sales" });
+    expect(text).not.toContain("Conn_Pw!");
+    expect(text).not.toContain("conn_admin");
+    expect(text).toContain("Driver={SQL Server}");
+  });
+
+  it("returns the raw connection string when maskSecrets=false", async () => {
+    const text = await run(registerGetProcessDatasource, client, { processName: "Load.Sales", maskSecrets: false });
+    expect(text).toContain("Conn_Pw!");
+  });
+});
+
+describe("tm1_export_process_to_git masks the datasource conn-string in .json", () => {
+  const client = clientWithDs(ODBC_DS);
+
+  it("masks PWD/UID pairs in the emitted json by default", async () => {
+    const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales" });
+    expect(text).not.toContain("Conn_Pw!");
+    expect(text).not.toContain("conn_admin");
+  });
+
+  it("emits the raw connection string when maskSecrets=false", async () => {
+    const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales", maskSecrets: false });
+    expect(text).toContain("Conn_Pw!");
   });
 });
