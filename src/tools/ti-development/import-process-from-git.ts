@@ -120,13 +120,12 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         );
       }
 
+      // Write code via TM1's native Code property: send the raw #region blob
+      // (normalized to CRLF, as TM1 emits/expects) and let the server split it
+      // into the four tabs. This is a full replace — tabs whose region is
+      // absent are cleared, matching the exported .ti exactly.
       await withToolHint(
-        tm1Client.processes.updateCode(processName, {
-          prolog: parsed.prolog,
-          metadata: parsed.metadata,
-          data: parsed.data,
-          epilog: parsed.epilog,
-        }),
+        tm1Client.processes.updateCodeBlob(processName, ti.replace(/\r?\n/g, "\r\n")),
         `Code update failed after process '${processName}' was ${exists ? "located" : "created"}. PARTIAL APPLY: shell exists but tabs are stale/empty. Re-run with mode=update once root cause fixed, or tm1_delete_process to roll back.`,
       );
 
