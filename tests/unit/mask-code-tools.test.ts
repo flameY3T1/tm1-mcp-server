@@ -65,6 +65,11 @@ function clientWith(codeByProcess: Record<string, Record<string, string>>): TM1C
         const c = codeByProcess[name] ?? {};
         return { prolog: c.prolog ?? "", metadata: c.metadata ?? "", data: c.data ?? "", epilog: c.epilog ?? "" };
       },
+      getCodeBlob: async (name: string) => {
+        const c = codeByProcess[name] ?? {};
+        // Reconstruct the blob from structured code: prolog + metadata + data + epilog
+        return (c.prolog ?? "") + (c.metadata ?? "") + (c.data ?? "") + (c.epilog ?? "");
+      },
       getParameters: async () => [],
       getVariables: async () => [],
       getDataSource: async () => NONE_DS,
@@ -327,6 +332,7 @@ function clientWithDs(ds: DataSource): TM1Client {
   return {
     processes: {
       getCode: async () => ({ prolog: "", metadata: "", data: "", epilog: "" }),
+      getCodeBlob: async () => "",
       getParameters: async () => [],
       getVariables: async () => [],
       getDataSource: async () => ds,

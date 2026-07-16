@@ -13,7 +13,7 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
     "tm1_export_process_to_git",
     [
       "Serialize a TM1 process to the tm1-git two-file layout: a '{name}.json' (parameters, variables, datasource) plus a '{name}.ti' (Prolog/Metadata/Data/Epilog as plain code).",
-      "This is the diff-friendly format TM1's native Git integration and TM1py use — code lives outside the JSON so Git diffs stay readable.",
+      "The .ti holds the code in TM1's native `Code` representation (#region <Tab> / #endregion, CRLF, empty tabs omitted); the .json holds the structure. Code lives outside the JSON so Git diffs stay readable.",
       "Returns both file bodies (json + ti) inline by default. Pass writeToDir to persist them to disk instead: the code is then written to files and omitted from the response to avoid duplicating it into the context window; only metadata (filenames, counts, writtenTo paths) comes back. Round-trip safe with tm1_import_process_from_git.",
       "Security: the ODBC datasource password is never written; conn-string credential pairs (PWD=, UID=) in oDBCConnection are masked when maskSecrets is on; credentialsOmitted=true flags when a password was stripped.",
     ].join(" "),
@@ -33,8 +33,8 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         ),
     },
     async ({ processName, writeToDir, maskSecrets }) => {
-      const [code, parameters, variables, dataSource, deployMeta] = await Promise.all([
-        tm1Client.processes.getCode(processName),
+      const [codeBlob, parameters, variables, dataSource, deployMeta] = await Promise.all([
+        tm1Client.processes.getCodeBlob(processName),
         tm1Client.processes.getParameters(processName),
         tm1Client.processes.getVariables(processName),
         tm1Client.processes.getDataSource(processName),
@@ -42,12 +42,9 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
       ]);
 
       const mask = maskSecrets ? maskCode : (s: string) => s;
-      const { json, ti, credentialsOmitted } = serializeProcessToGit({
+      const ti = mask(codeBlob);
+      const { json, credentialsOmitted } = serializeProcessToGit({
         name: processName,
-        prolog: mask(code.prolog),
-        metadata: mask(code.metadata),
-        data: mask(code.data),
-        epilog: mask(code.epilog),
         parameters,
         variables,
         dataSource: maskSecrets ? maskDataSourceSecrets(dataSource) : dataSource,
