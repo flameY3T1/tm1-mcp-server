@@ -11,39 +11,30 @@ import {
 } from "./process-parts-schema.js";
 
 /**
- * tm1-git-style two-file representation of a TI process.
+ * tm1-git two-file representation of a TI process.
  *
- * TM1's native Git integration serializes each process to a `{name}.json`
- * (structure: parameters, variables, datasource) plus a `{name}.ti` (the four
- * procedure tabs as plain code). Splitting the code out of the JSON keeps Git
- * diffs readable — escaped-newline code blobs inside JSON are unreviewable.
+ * `{name}.json` holds the structure (parameters, variables, datasource,
+ * hasSecurityAccess). `{name}.ti` holds the code as TM1's native `Code`
+ * representation — `#region <Tab>` / `#endregion` blocks (CRLF, empty tabs
+ * omitted), byte-identical to `GET /Processes('x')/Code/$value`. The `.ti`
+ * blob is produced by the server, not built here; this module only parses it
+ * back (for import preflight). The `.json` is built by serializeProcessToGit.
  *
- * This module produces that pair and parses it back. The round-trip is lossless
- * with `tm1_import_process_from_git` (line endings are normalized to LF, which is
- * the correct, diff-stable form for a Git working tree). It is NOT byte-identical
- * to IBM's internal serializer — the tab markers below are our own, documented
- * convention.
- *
- * Credentials: like the `.pro` serializer, the ODBC `password` is never written to
- * the JSON. A committed password is a leaked secret. On import the password must be
- * re-supplied out of band (see `dataSourcePassword` on the import tool).
+ * Credentials: the ODBC `password` is never written to the .json. A committed
+ * password would be a leaked secret; on import it is re-supplied out of band
+ * (see `dataSourcePassword` on the import tool).
  */
 
 export interface GitProcessInput {
   name: string;
-  prolog: string;
-  metadata: string;
-  data: string;
-  epilog: string;
   parameters: ProcessParameter[];
   variables: ProcessVariable[];
   dataSource: DataSource;
   hasSecurityAccess: boolean;
 }
 
-export interface GitProcessFiles {
+export interface GitProcessJson {
   json: string;
-  ti: string;
   /** True when an ODBC password was present and stripped from the JSON. */
   credentialsOmitted: boolean;
 }
@@ -63,33 +54,16 @@ export interface ParsedGitProcess {
 const TAB_ORDER = ["prolog", "metadata", "data", "epilog"] as const;
 type Tab = (typeof TAB_ORDER)[number];
 
-const tabMarker = (tab: Tab): string => `### TM1-TI-TAB: ${tab} ###`;
-const TAB_LINE_RE = /^### TM1-TI-TAB: (prolog|metadata|data|epilog) ###\s*$/;
-
-function normalizeNewlines(s: string): string {
-  return s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-}
-
-/** Serialize a process into the json + ti file pair. */
-export function serializeProcessToGit(input: GitProcessInput): GitProcessFiles {
-  // --- .ti: four tabs, each behind a marker line ---
-  const lines: string[] = [];
-  for (const tab of TAB_ORDER) {
-    lines.push(tabMarker(tab));
-    const content = normalizeNewlines(input[tab] ?? "");
-    if (content.length > 0) lines.push(...content.split("\n"));
-  }
-  const ti = lines.join("\n") + "\n";
-
-  // --- .json: structure only, password stripped ---
+/**
+ * Build only the `{name}.json` (structure). Field order mirrors TM1's OData
+ * Process entity (Name, HasSecurityAccess, DataSource, then Parameters/
+ * Variables); parameter objects follow OData order (Name, Prompt, Value, Type).
+ * Order is cosmetic — parseProcessFromGit reads by key.
+ */
+export function serializeProcessToGit(input: GitProcessInput): GitProcessJson {
   const { password, ...dataSourceNoPwd } = input.dataSource;
   const credentialsOmitted = password !== undefined && password !== "";
 
-  // Field order mirrors TM1's OData Process entity (Name, HasSecurityAccess,
-  // DataSource, then Parameters/Variables) so the .json reads close to IBM's
-  // native serialization. Parameter objects follow the OData order too
-  // (Name, Prompt, Value, Type). Order is cosmetic — parseProcessFromGit reads
-  // by key, so the round-trip is unaffected.
   const json =
     JSON.stringify(
       {
@@ -108,10 +82,37 @@ export function serializeProcessToGit(input: GitProcessInput): GitProcessFiles {
       2,
     ) + "\n";
 
-  return { json, ti, credentialsOmitted };
+  return { json, credentialsOmitted };
 }
 
-/** Parse a json + ti file pair back into deployable process parts. */
+/**
+ * Parse a native `#region <Tab>` / `#endregion` code blob into the four tabs.
+ * Case-insensitive on keyword and tab name; a tab whose region is absent
+ * defaults to "". Throws if the blob has no region markers at all (rejects the
+ * pre-1.x `### TM1-TI-TAB:` layout — no longer supported).
+ */
+function parseCodeBlob(ti: string): Record<Tab, string> {
+  const out: Record<Tab, string> = { prolog: "", metadata: "", data: "", epilog: "" };
+  const re =
+    /^[ \t]*#region[ \t]+(prolog|metadata|data|epilog)\b[^\r\n]*\r?\n([\s\S]*?)^[ \t]*#endregion\b[^\r\n]*$/gim;
+  let m: RegExpExecArray | null;
+  let found = 0;
+  while ((m = re.exec(ti)) !== null) {
+    const tab = m[1]!.toLowerCase() as Tab;
+    // Strip the single newline the server places before #endregion.
+    out[tab] = m[2]!.replace(/\r?\n$/, "");
+    found++;
+  }
+  if (found === 0) {
+    throw new Error(
+      "TI file has no #region markers (expected `#region Prolog` … `#endregion`). " +
+        "Pre-1.x `### TM1-TI-TAB:` files are no longer supported — re-export from the server.",
+    );
+  }
+  return out;
+}
+
+/** Parse a `{name}.json` + `{name}.ti` pair back into deployable process parts. */
 export function parseProcessFromGit(
   jsonContent: string,
   tiContent: string,
@@ -125,25 +126,17 @@ export function parseProcessFromGit(
   };
   try {
     meta = JSON.parse(jsonContent) as typeof meta;
-  } catch (err) {
-    throw new Error(
-      `Process JSON is not valid JSON: ${(err as Error).message}`,
-      { cause: err },
-    );
+  } catch {
+    throw new Error("Process JSON is not valid JSON");
   }
 
   const name = typeof meta.name === "string" ? meta.name : "";
-
   const hasSecurityAccess =
     typeof meta.hasSecurityAccess === "boolean" ? meta.hasSecurityAccess : undefined;
 
-  // Validate the deployable parts instead of blind-casting user JSON: a
-  // malformed entry (e.g. type:"bad" or a numeric name) would otherwise flow
-  // straight into encodeParameter / the REST payload and surface as a confusing
-  // TM1 400. Missing/absent parts still default to empty / {type:"None"}.
   // Git .json uses the OData-native param field name `value`; the internal
-  // schema/contract uses `defaultValue`. Normalize value→defaultValue before
-  // validation, keeping back-compat with legacy files that wrote `defaultValue`.
+  // schema uses `defaultValue`. Normalize value→defaultValue before validation,
+  // keeping back-compat with legacy files that wrote `defaultValue`.
   const rawParams = Array.isArray(meta.parameters)
     ? meta.parameters.map((p) => {
         if (p && typeof p === "object" && "value" in p && !("defaultValue" in p)) {
@@ -153,6 +146,7 @@ export function parseProcessFromGit(
         return p;
       })
     : (meta.parameters ?? []);
+
   const paramsResult = z.array(parameterSchema).safeParse(rawParams);
   if (!paramsResult.success) {
     throw new Error(
@@ -177,43 +171,15 @@ export function parseProcessFromGit(
   }
   const dataSource: DataSource = dsResult.data;
 
-  // --- split .ti by tab markers ---
-  const buckets: Record<Tab, string[]> = {
-    prolog: [],
-    metadata: [],
-    data: [],
-    epilog: [],
-  };
-  let current: Tab | null = null;
-  let sawMarker = false;
-  for (const raw of normalizeNewlines(tiContent).split("\n")) {
-    const m = raw.match(TAB_LINE_RE);
-    if (m) {
-      current = m[1] as Tab;
-      sawMarker = true;
-      continue;
-    }
-    if (current) buckets[current].push(raw);
-  }
-  if (!sawMarker) {
-    throw new Error(
-      "TI file has no tab markers (### TM1-TI-TAB: prolog ### ...); not a tm1-git .ti file",
-    );
-  }
-
-  // Trim the single trailing empty line introduced by the serializer's final "\n".
-  for (const tab of TAB_ORDER) {
-    const arr = buckets[tab];
-    if (arr.length > 0 && arr[arr.length - 1] === "") arr.pop();
-  }
+  const tabs = parseCodeBlob(tiContent);
 
   return {
     name,
     ...(hasSecurityAccess !== undefined ? { hasSecurityAccess } : {}),
-    prolog: buckets.prolog.join("\n"),
-    metadata: buckets.metadata.join("\n"),
-    data: buckets.data.join("\n"),
-    epilog: buckets.epilog.join("\n"),
+    prolog: tabs.prolog,
+    metadata: tabs.metadata,
+    data: tabs.data,
+    epilog: tabs.epilog,
     parameters,
     variables,
     dataSource,
