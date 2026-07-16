@@ -301,3 +301,55 @@ describe.skipIf(!LIVE_ENABLED)("HasSecurityAccess read paths (live)", () => {
     expect(typeof meta.hasSecurityAccess).toBe("boolean");
   });
 });
+
+describe.skipIf(!LIVE_ENABLED)("native #region blob round-trip (live)", () => {
+  let h: LiveHarness;
+  const PROC_GIT_NATIVE = `${SANDBOX}_PROC_GIT_NATIVE`;
+
+  beforeAll(async () => {
+    h = await getHarness();
+    // Clean any leftover from a previous interrupted run (idempotent).
+    await h.client.processes.delete(PROC_GIT_NATIVE).catch(() => {
+      /* idempotent — ignore missing */
+    });
+  });
+
+  afterAll(async () => {
+    await h.client.processes.delete(PROC_GIT_NATIVE).catch(() => {
+      /* idempotent teardown — ignore missing */
+    });
+  });
+
+  it("process code round-trips via the native #region blob (getCodeBlob/updateCodeBlob), empty tab cleared", async () => {
+    try {
+      // Seed a process with 3 non-empty tabs; Metadata is intentionally left
+      // empty to exercise the server's "omit empty tab" + "clear on full
+      // replace" behavior.
+      await h.client.processes.create(PROC_GIT_NATIVE);
+      await h.client.processes.updateCodeBlob(
+        PROC_GIT_NATIVE,
+        "#region Prolog\r\nsP='p';\r\n#endregion\r\n#region Data\r\nsD='d';\r\n#endregion\r\n#region Epilog\r\nsE='e';\r\n#endregion",
+      );
+
+      // Export the blob: non-empty tabs present, the empty tab omitted by TM1.
+      const blob = await h.client.processes.getCodeBlob(PROC_GIT_NATIVE);
+      expect(blob).toContain("#region Prolog");
+      expect(blob).toContain("#region Data");
+      expect(blob).toContain("#region Epilog");
+      expect(blob).not.toContain("#region Metadata"); // empty tab omitted
+
+      // Re-import the exact exported blob (full replace) → tabs match,
+      // Metadata cleared to "" since its region is absent from the blob.
+      await h.client.processes.updateCodeBlob(PROC_GIT_NATIVE, blob);
+      const code = await h.client.processes.getCode(PROC_GIT_NATIVE);
+      expect(code.prolog).toContain("sP='p';");
+      expect(code.data).toContain("sD='d';");
+      expect(code.epilog).toContain("sE='e';");
+      expect(code.metadata).toBe("");
+    } finally {
+      await h.client.processes.delete(PROC_GIT_NATIVE).catch(() => {
+        /* idempotent teardown — ignore missing */
+      });
+    }
+  });
+});
