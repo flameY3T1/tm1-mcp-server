@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING:** `tm1_export_process_to_git` / `tm1_import_process_from_git` now use
+- **Breaking:** `tm1_export_process_to_git` / `tm1_import_process_from_git` now use
   TM1's native `#region <Tab>` / `#endregion` code format (the server `Code`
   property) instead of the previous `### TM1-TI-TAB:` markers. Exported `.ti`
   files are byte-identical to `GET /Processes('x')/Code/$value` (CRLF, empty

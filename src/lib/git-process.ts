@@ -51,8 +51,7 @@ export interface ParsedGitProcess {
   hasSecurityAccess?: boolean;
 }
 
-const TAB_ORDER = ["prolog", "metadata", "data", "epilog"] as const;
-type Tab = (typeof TAB_ORDER)[number];
+type Tab = "prolog" | "metadata" | "data" | "epilog";
 
 /**
  * Build only the `{name}.json` (structure). Field order mirrors TM1's OData
