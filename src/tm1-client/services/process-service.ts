@@ -398,6 +398,28 @@ export class ProcessService {
   }
 
   /**
+   * Read the whole process code as TM1's native `#region <Tab>` / `#endregion`
+   * blob. GET /api/v1/Processes('{name}')/Code/$value (text/plain). Empty tabs
+   * are omitted by the server; newlines are CRLF.
+   */
+  async getCodeBlob(processName: string): Promise<string> {
+    const path = `/api/v1/Processes('${enc(processName)}')/Code/$value`;
+    return this.http.requestRaw("GET", path);
+  }
+
+  /**
+   * Write the whole process code from a native `#region` blob. PATCH
+   * /api/v1/Processes('{name}') { Code }. The server parses the region markers
+   * and does a FULL replace of all four tabs — tabs whose region is absent are
+   * cleared. `$value` PUT is not supported by TM1, so this JSON PATCH is the
+   * only write path.
+   */
+  async updateCodeBlob(processName: string, blob: string): Promise<void> {
+    const path = `/api/v1/Processes('${enc(processName)}')`;
+    await this.http.request<void>("PATCH", path, { Code: blob });
+  }
+
+  /**
    * Set HasSecurityAccess flag on process.
    * PATCH /api/v1/Processes('{name}') { HasSecurityAccess }.
    */

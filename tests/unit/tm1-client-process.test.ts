@@ -398,6 +398,36 @@ describe("TM1Client – Process Execution Methods", () => {
     });
   });
 
+  describe("Code ($value blob transport)", () => {
+    it("getCodeBlob GETs Code/$value and returns raw text", async () => {
+      const blob = "#region Prolog\r\nsX=1;\r\n#endregion";
+      fetchSpy.mockResolvedValueOnce({
+        ok: true, status: 200, statusText: "OK",
+        headers: new Headers({ "content-type": "text/plain" }),
+        text: vi.fn().mockResolvedValue(blob),
+        json: vi.fn().mockRejectedValue(new Error("not json")),
+      } as unknown as Response);
+
+      const result = await client.processes.getCodeBlob("My.Proc");
+
+      expect(result).toBe(blob);
+      const calledUrl = fetchSpy.mock.calls[0][0] as string;
+      expect(calledUrl).toContain("/Processes('My.Proc')/Code/$value");
+    });
+
+    it("updateCodeBlob PATCHes { Code } to the process entity", async () => {
+      fetchSpy.mockResolvedValueOnce(mock204Response());
+      const blob = "#region Prolog\r\nsX=1;\r\n#endregion";
+
+      await client.processes.updateCodeBlob("My.Proc", blob);
+
+      const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain("/Processes('My.Proc')");
+      expect((init.method as string).toUpperCase()).toBe("PATCH");
+      expect(JSON.parse(init.body as string)).toEqual({ Code: blob });
+    });
+  });
+
   describe("TM1Client – getAllCode security access", () => {
     it("selects HasSecurityAccess and maps it onto each row", async () => {
       fetchSpy.mockResolvedValueOnce(
