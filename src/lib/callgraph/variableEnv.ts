@@ -69,7 +69,8 @@ function splitTopLevelConcat(expr: string): string[] {
  * Classify a single right-hand-side expression (no surrounding whitespace).
  * Only handles simple cases:
  *   'literal', 42, varName (→ lookup), paramName (→ param-ref), dsVarName (→ datasource-ref).
- * Everything else (function calls, concatenation `||`/`|`, arithmetic, IF, brackets) → dynamic.
+ * Constant string-concatenation (all operands resolve to literals) folds to a literal.
+ * Everything else (function calls, concatenation with any non-literal operand, arithmetic, IF, brackets) → dynamic.
  */
 export function resolveExpression(expr: string, env: ProcessEnv): VarBinding {
   const e = expr.trim().replace(/;+$/, '').trim();

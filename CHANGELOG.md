@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `tm1_analyze_callgraph` / `tm1_analyze_object_usage` now fold constant string
+  concatenations when resolving TI variable targets, so `sProc = 'zA' | 'zB';
+  ExecuteProcess(sProc)` resolves to a real edge (`zAzB`) instead of being flagged
+  unresolvable. Concatenations with a runtime operand (parameter, `CellGet*`, …)
+  remain unresolved.
 - `tm1_analyze_callgraph` now surfaces `ExecuteProcess`/`RunProcess` calls whose
   target is a computed expression or a process parameter as `unresolvedCalls`
   (full/compact modes) / `unresolvedCount` (summary) instead of silently dropping
