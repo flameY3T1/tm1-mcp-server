@@ -87,6 +87,16 @@ export interface ChoreTaskRef {
   params: Array<{ name: string; value: string; type: 'string' | 'numeric' }>;
 }
 
+/** An ExecuteProcess/RunProcess call-site whose target could not be resolved to a literal process name. */
+export interface UnresolvedCall {
+  section: RefSection;                 // prolog | metadata | data | epilog
+  line: number;                        // 0-based within section text
+  funcName: string;                    // ExecuteProcess | RunProcess
+  expr: string;                        // raw target-arg text, e.g. "sDyn" or "'te'|'st'"
+  snippet: string;                     // trimmed source line
+  reason: 'dynamic' | 'param';         // param = callee target is itself a process parameter
+}
+
 export interface ReferenceIndex {
   all: TmReference[];
   byCube:    Map<string, TmReference[]>;
@@ -94,6 +104,8 @@ export interface ReferenceIndex {
   byProcess: Map<string, TmReference[]>;
   /** Process name (lowercased) → refs originating FROM that process (for call-graph downstream traversal). */
   bySourceProcess: Map<string, TmReference[]>;
+  /** Process name (lowercased) → unresolved ExecuteProcess/RunProcess call sites (dynamic/param target). */
+  unresolvedCallsBySourceProcess: Map<string, UnresolvedCall[]>;
   /** Process name (lowercased) → declared param names (original casing). */
   processParams: Map<string, string[]>;
   /** Process name (lowercased) → param-name → default value (string form), for root-env seeding. */
@@ -155,6 +167,14 @@ interface RawTiRef {
   params?: CallParam[] | undefined;
 }
 
+interface RawUnresolvedCall {
+  line: number;
+  funcName: string;
+  expr: string;
+  snippet: string;
+  reason: 'dynamic' | 'param';
+}
+
 /**
  * Resolve a single value-arg of an ExecuteProcess param-value pair.
  * Uses the caller's ProcessEnv to resolve bare variables to literals or
@@ -198,6 +218,7 @@ export function extractTiReferences(
   text: string,
   env?: ProcessEnv,
   sharedLiveVars?: Map<string, VarBinding>,
+  unresolvedOut?: RawUnresolvedCall[],
 ): RawTiRef[] {
   const baseEnv: ProcessEnv = env ?? {
     paramsLc: new Set(),
@@ -262,7 +283,20 @@ export function extractTiReferences(
         let targetName = extractStringLiteral(argVal);
         if (targetName === null) {
           const binding = resolveExpression(argVal, callerEnv);
-          if (binding.kind !== 'literal') { return; }
+          if (binding.kind !== 'literal') {
+            // Surface (do not resolve) a process-call target that isn't a literal —
+            // it's still a real call edge, just one we can't name statically.
+            if (unresolvedOut && kind === 'process' && PROCESS_CALL_FUNCS.has(funcLower)) {
+              unresolvedOut.push({
+                line: lineIdx,
+                funcName: m![1]!,
+                expr: argVal.trim(),
+                snippet,
+                reason: binding.kind === 'param' ? 'param' : 'dynamic',
+              });
+            }
+            return;
+          }
           targetName = binding.value;
         }
         const params = kind === 'process' && PROCESS_CALL_FUNCS.has(funcLower)
@@ -382,6 +416,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
   ]);
 
   const all: TmReference[] = [];
+  const unresolvedCallsBySourceProcess = new Map<string, UnresolvedCall[]>();
 
   const pushTi = (
     sourceName: string,
@@ -391,7 +426,8 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
     sharedLiveVars: Map<string, VarBinding>,
   ) => {
     if (!text) { return; }
-    for (const r of extractTiReferences(text, env, sharedLiveVars)) {
+    const unresolvedOut: RawUnresolvedCall[] = [];
+    for (const r of extractTiReferences(text, env, sharedLiveVars, unresolvedOut)) {
       all.push({
         sourceKind: 'process',
         sourceName,
@@ -403,6 +439,14 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
         targetName: r.targetName,
         params: r.params,
       });
+    }
+    if (unresolvedOut.length > 0) {
+      const key = sourceName.toLowerCase();
+      const bucket = unresolvedCallsBySourceProcess.get(key) ?? [];
+      for (const u of unresolvedOut) {
+        bucket.push({ section, line: u.line, funcName: u.funcName, expr: u.expr, snippet: u.snippet, reason: u.reason });
+      }
+      unresolvedCallsBySourceProcess.set(key, bucket);
     }
   };
 
@@ -477,7 +521,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
     choreTasks.set(c.name.toLowerCase(), c.tasks);
   }
 
-  return { all, byCube, byDim, byProcess, bySourceProcess, processParams, processDefaults, choreTasks };
+  return { all, byCube, byDim, byProcess, bySourceProcess, unresolvedCallsBySourceProcess, processParams, processDefaults, choreTasks };
 }
 
 /** Convenience lookup — returns [] if target is not indexed. */

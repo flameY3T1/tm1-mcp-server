@@ -22,6 +22,7 @@ function index(refs: TmReference[]): ReferenceIndex {
     byDim: new Map(),
     byProcess: new Map(),
     bySourceProcess: new Map(),
+    unresolvedCallsBySourceProcess: new Map(),
     processParams: new Map(),
     processDefaults: new Map(),
     choreTasks: new Map(),

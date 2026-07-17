@@ -37,6 +37,7 @@ function mkIndex(all: TmReference[], procNames: string[]): ReferenceIndex {
     byDim: new Map(),
     byProcess: new Map(),
     bySourceProcess: new Map(),
+    unresolvedCallsBySourceProcess: new Map(),
     processParams,
     processDefaults: new Map(),
     choreTasks: new Map(),
