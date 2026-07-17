@@ -45,6 +45,7 @@ interface CompactNode {
   process: string;
   cycle?: boolean;
   depthLimitReached?: boolean;
+  unresolvedCalls?: Array<{ section: string; line: number; funcName: string; expr: string; reason: string }>;
   children: CompactNode[];
 }
 
@@ -55,6 +56,15 @@ function serializeCompact(node: CallGraphNode): CompactNode {
   };
   if (node.cycle) out.cycle = true;
   if (node.depthLimitReached) out.depthLimitReached = true;
+  if (node.unresolvedCalls && node.unresolvedCalls.length > 0) {
+    out.unresolvedCalls = node.unresolvedCalls.map((u) => ({
+      section: u.section,
+      line: u.line,
+      funcName: u.funcName,
+      expr: u.expr,
+      reason: u.reason,
+    }));
+  }
   return out;
 }
 
@@ -80,6 +90,16 @@ function serializeNode(node: CallGraphNode, mask: boolean): unknown {
         }
       : null,
     env: node.env ? (mask ? maskEnv(node.env) : Object.fromEntries(node.env.entries())) : undefined,
+    unresolvedCalls: node.unresolvedCalls
+      ? node.unresolvedCalls.map((u) => ({
+          section: u.section,
+          line: u.line,
+          funcName: u.funcName,
+          expr: u.expr,
+          snippet: mask ? maskCodeLine(u.snippet) : u.snippet,
+          reason: u.reason,
+        }))
+      : undefined,
     children: node.children.map((c) => serializeNode(c, mask)),
   };
 }
@@ -91,6 +111,7 @@ interface SummaryEntry {
   occurrences: number;
   cycle: boolean;
   depthLimitReached: boolean;
+  unresolvedCount: number;
 }
 
 function summarize(root: CallGraphNode): {
@@ -131,6 +152,7 @@ function summarize(root: CallGraphNode): {
         occurrences: 1,
         cycle: isCycle,
         depthLimitReached: isDepthLimit,
+        unresolvedCount: node.unresolvedCalls?.length ?? 0,
       });
     }
 
@@ -256,7 +278,7 @@ export function globalRanking(
 export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_analyze_callgraph",
-    "Build a process call graph (ExecuteProcess/RunProcess) for a TI process. direction='downstream' shows what `start` calls (with parameter env propagation: literal/passthrough/dynamic). direction='upstream' shows callers. Returns nested JSON tree. Omit `start` for a global ranking: every process ranked by outgoing (fan-out) or incoming (fan-in) call counts — answers 'which process triggers/is triggered by the most others' without a per-process traversal.",
+    "Build a process call graph (ExecuteProcess/RunProcess) for a TI process. direction='downstream' shows what `start` calls (with parameter env propagation: literal/passthrough/dynamic). direction='upstream' shows callers. Returns nested JSON tree. Omit `start` for a global ranking: every process ranked by outgoing (fan-out) or incoming (fan-in) call counts — answers 'which process triggers/is triggered by the most others' without a per-process traversal. ExecuteProcess/RunProcess calls whose target is a computed expression or process parameter (not statically resolvable) are surfaced per node via `unresolvedCalls` (full/compact) or `unresolvedCount` (summary) — flagged, not resolved.",
     {
       start: z
         .string()

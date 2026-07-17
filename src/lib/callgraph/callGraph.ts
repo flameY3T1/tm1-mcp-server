@@ -1,4 +1,4 @@
-import type { ReferenceIndex, TmReference, CallParam, CallParamResolution } from './referenceIndex.js';
+import type { ReferenceIndex, TmReference, CallParam, CallParamResolution, UnresolvedCall } from './referenceIndex.js';
 import { lookupReferences } from './referenceIndex.js';
 
 /**
@@ -48,6 +48,8 @@ export interface CallGraphNode {
   children: CallGraphNode[];
   cycle: boolean;
   depthLimitReached?: boolean | undefined;
+  /** Outgoing calls target could not statically resolved (downstream only). */
+  unresolvedCalls?: UnresolvedCall[] | undefined;
 }
 
 export type Direction = 'downstream' | 'upstream';
@@ -161,6 +163,16 @@ function deriveChildEnv(
   return env;
 }
 
+function unresolvedFor(
+  index: ReferenceIndex,
+  process: string,
+  direction: Direction,
+): UnresolvedCall[] | undefined {
+  if (direction !== 'downstream') { return undefined; }
+  const u = index.unresolvedCallsBySourceProcess.get(lc(process));
+  return u && u.length > 0 ? u : undefined;
+}
+
 // ─── Graph construction ─────────────────────────────────────────────────────
 
 /**
@@ -189,6 +201,7 @@ export function buildCallGraph(
     env: rootEnv,
     children: [],
     cycle: false,
+    unresolvedCalls: unresolvedFor(index, start, opts.direction),
   };
 
   const visit = (node: CallGraphNode, ancestors: Set<string>, depth: number) => {
@@ -219,6 +232,7 @@ export function buildCallGraph(
         env: childEnv,
         children: [],
         cycle: ancestors.has(lc(nextProc)),
+        unresolvedCalls: unresolvedFor(index, nextProc, opts.direction),
       };
       node.children.push(childNode);
       if (!childNode.cycle) {
