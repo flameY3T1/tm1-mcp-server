@@ -31,6 +31,7 @@ export class TM1Client {
   private readonly http: TM1HttpClient;
   private readonly sessionManager: SessionManager;
   private readonly logger: pino.Logger;
+  private readonly config: TM1Config;
 
   // Domain services. Init order matters when services depend on each other —
   // `cells` is created before `elements` because the latter holds a CellService
@@ -50,6 +51,7 @@ export class TM1Client {
   readonly files: FileService;
 
   constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
+    this.config = config;
     this.http = new TM1HttpClient(config, sessionManager, logger);
     this.sessionManager = sessionManager;
     this.logger = logger;
@@ -72,6 +74,11 @@ export class TM1Client {
     this.server = new ServerService(this.http);
     this.monitoring = new MonitoringService(this.http);
     this.files = new FileService(this.http);
+  }
+
+  /** The configured TM1 major version (11 or 12). Fixed for this connection. */
+  get version(): 11 | 12 {
+    return this.config.version;
   }
 
   /**

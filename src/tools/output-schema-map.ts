@@ -71,6 +71,7 @@ import {
   AuditNamingResultSchema,
   DiffProcessesResultSchema,
   TraceFeedersResultSchema,
+  JobItemSchema,
   ServerInfoSchema,
   ServerStateResultSchema,
   SessionItemSchema,
@@ -114,6 +115,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_list_files: filePageShape,
   tm1_search_files: searchFilePageShape,
   tm1_list_threads: pageShapeFor(ThreadItemSchema),
+  tm1_list_jobs: pageShapeFor(JobItemSchema),
   tm1_list_sessions: {
     ...pageShapeFor(SessionItemSchema),
     summary: z
@@ -248,6 +250,7 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   // asOutputSchema preserves the .passthrough() flag automatically.
   tm1_assign_client_group: asOutputSchema(MutationResultSchema),
   tm1_cancel_thread: asOutputSchema(MutationResultSchema),
+  tm1_cancel_job: asOutputSchema(MutationResultSchema),
   tm1_clear_cube: asOutputSchema(MutationResultSchema),
   tm1_create_chore: asOutputSchema(MutationResultSchema),
   tm1_create_client: asOutputSchema(MutationResultSchema),

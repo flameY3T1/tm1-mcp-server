@@ -102,6 +102,8 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_list_sessions: READ_ONLY,
   tm1_list_threads: READ_ONLY,
   tm1_cancel_thread: DESTRUCTIVE,
+  tm1_list_jobs: READ_ONLY,
+  tm1_cancel_job: DESTRUCTIVE,
   tm1_get_transaction_log: READ_ONLY,
   // v11-only: /AuditLogEntries (file-based audit log) is not exposed by the
   // v12 REST API.

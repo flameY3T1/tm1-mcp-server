@@ -274,6 +274,24 @@ export const ThreadItemSchema = z.object({
   context: z.string().optional(),
 });
 
+export const JobItemSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  state: z.string(),
+  elapsedTime: z.string().optional(),
+  waitTime: z.string().optional(),
+  session: z
+    .object({
+      id: z.string(),
+      context: z.string().optional(),
+      user: z.string().optional(),
+    })
+    .optional(),
+  waitingOn: z
+    .array(z.object({ id: z.string(), description: z.string(), state: z.string() }))
+    .optional(),
+});
+
 export const SessionItemSchema = z.object({
   id: z.string(),
   user: z.string(),

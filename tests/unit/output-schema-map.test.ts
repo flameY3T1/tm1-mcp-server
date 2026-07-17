@@ -78,15 +78,23 @@ const mockLogger = {
   level: "silent", flush: vi.fn(),
 } as unknown as pino.Logger;
 
+// Version-gated tools (tm1_list_jobs/tm1_cancel_job on v12, tm1_list_threads/
+// tm1_cancel_thread on v11) only register under one version at a time — union
+// both so "registered" reflects full coverage across the version split.
 function registeredToolNames(): Set<string> {
-  const server = new McpServer({ name: "test", version: "0.0.0" });
   const names = new Set<string>();
-  const orig = server.registerTool.bind(server);
-  server.registerTool = (...args: unknown[]) => {
-    names.add(args[0] as string);
-    return (orig as (...a: unknown[]) => unknown)(...args) as ReturnType<typeof server.registerTool>;
-  };
-  registerAllTools(withAnnotations(server, mockLogger, "readwrite"), {} as TM1Client);
+  for (const version of [11, 12] as const) {
+    const server = new McpServer({ name: "test", version: "0.0.0" });
+    const orig = server.registerTool.bind(server);
+    server.registerTool = (...args: unknown[]) => {
+      names.add(args[0] as string);
+      return (orig as (...a: unknown[]) => unknown)(...args) as ReturnType<typeof server.registerTool>;
+    };
+    registerAllTools(
+      withAnnotations(server, mockLogger, "readwrite"),
+      { version } as unknown as TM1Client,
+    );
+  }
   return names;
 }
 

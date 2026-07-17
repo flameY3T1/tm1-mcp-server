@@ -23,16 +23,21 @@ function makeServer(): McpServer {
   return new McpServer({ name: "test", version: "0.0.0" });
 }
 
+// Version-gated tools (tm1_list_jobs/tm1_cancel_job on v12, tm1_list_threads/
+// tm1_cancel_thread on v11) only register under one version at a time — union
+// both so "registered" reflects full coverage across the version split.
 function collectRegisteredNames(mode: "readwrite" | "readonly"): Set<string> {
-  const server = makeServer();
   const names = new Set<string>();
-  const original = server.registerTool.bind(server);
-  server.registerTool = (...args: unknown[]) => {
-    names.add(args[0] as string);
-    return (original as (...a: unknown[]) => unknown)(...args) as ReturnType<typeof server.registerTool>;
-  };
-  const wrapped = withAnnotations(server, mockLogger, mode);
-  registerAllTools(wrapped, {} as TM1Client);
+  for (const version of [11, 12] as const) {
+    const server = makeServer();
+    const original = server.registerTool.bind(server);
+    server.registerTool = (...args: unknown[]) => {
+      names.add(args[0] as string);
+      return (original as (...a: unknown[]) => unknown)(...args) as ReturnType<typeof server.registerTool>;
+    };
+    const wrapped = withAnnotations(server, mockLogger, mode);
+    registerAllTools(wrapped, { version } as unknown as TM1Client);
+  }
   return names;
 }
 
