@@ -24,6 +24,7 @@ function makeConfig(overrides?: Partial<TM1Config>): TM1Config {
     keepAliveIntervalMs: 60000,
     requestTimeoutMs: 30000,
     logLevel: "info",
+    version: 11,
     ...overrides,
   };
 }
@@ -243,6 +244,53 @@ describe("SessionManager", () => {
 
       const [, opts] = fetchSpy.mock.calls[0];
       expect(opts.headers.Authorization).toBe("CAMPassport PT");
+    });
+
+    it("v12 s2s: logs in via POST /{instance}/auth/v1/session with User body", async () => {
+      const config = makeConfig({
+        baseUrl: "http://host:4444",
+        user: "admin",
+        version: 12,
+        instance: "tm1",
+        database: "db1",
+        authMode: "s2s",
+        clientId: "cid",
+        clientSecret: "csec",
+      });
+      const sm = new SessionManager(config, mockLogger);
+      fetchSpy.mockResolvedValue(
+        mockFetchResponse({ status: 201, setCookie: "TM1SessionId=jwt-abc; Path=/; HttpOnly" }),
+      );
+
+      const cookie = await sm.authenticate();
+
+      expect(cookie).toBe("jwt-abc");
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(url).toBe("http://host:4444/tm1/auth/v1/session");
+      expect(init.method).toBe("POST");
+      expect(init.body).toBe(JSON.stringify({ User: "admin" }));
+      expect(init.headers.Authorization).toBe("Basic " + Buffer.from("cid:csec").toString("base64"));
+    });
+
+    it("v12 keepAlive targets the database-rooted ActiveSession", async () => {
+      const config = makeConfig({
+        baseUrl: "http://host:4444",
+        version: 12,
+        instance: "tm1",
+        database: "db1",
+        authMode: "s2s",
+        clientId: "c",
+        clientSecret: "s",
+      });
+      const sm = new SessionManager(config, mockLogger);
+      fetchSpy.mockResolvedValue(
+        mockFetchResponse({ status: 201, setCookie: "TM1SessionId=jwt; Path=/" }),
+      );
+      await sm.authenticate();
+      fetchSpy.mockResolvedValue(mockFetchResponse({ ok: true, status: 200 }));
+      await sm.keepAlive();
+      const lastUrl = fetchSpy.mock.calls.at(-1)![0];
+      expect(lastUrl).toBe("http://host:4444/tm1/api/v1/Databases('db1')/ActiveSession");
     });
   });
 

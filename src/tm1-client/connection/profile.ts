@@ -24,9 +24,9 @@ function buildBasicToken(user: string, password: string): string {
   return "Basic " + Buffer.from(`${user}:${password}`).toString("base64");
 }
 
-// v11 Authorization header (Basic / CAMNamespace / CAMPassport) — moved here
-// from SessionManager.buildAuthorizationHeader so all login-header logic lives
-// in one place.
+// v11 Authorization header (Basic / CAMNamespace / CAMPassport). Lives here
+// (rather than on SessionManager) so all login-header logic — v11 and v12 —
+// is in one place.
 function buildV11Authorization(config: TM1Config): string {
   const { user, password, namespace, camPassport } = config;
   if (camPassport) return `CAMPassport ${camPassport}`;

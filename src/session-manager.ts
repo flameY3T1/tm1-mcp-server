@@ -1,5 +1,6 @@
 import type { TM1Config } from "./config.js";
 import { createLogger } from "./logger.js";
+import { createConnectionProfile, type ConnectionProfile } from "./tm1-client/connection/profile.js";
 import { getTm1Dispatcher, tm1Fetch } from "./tm1-client/dispatcher.js";
 import { NAME, VERSION } from "./version.js";
 import type pino from "pino";
@@ -40,15 +41,19 @@ export class SessionManager {
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
   private readonly config: TM1Config;
   private readonly logger: pino.Logger;
+  private readonly profile: ConnectionProfile;
 
   constructor(config: TM1Config, logger?: pino.Logger) {
     this.config = config;
     this.logger = logger ?? createLogger(config);
+    this.profile = createConnectionProfile(config);
   }
 
   /**
    * Authenticate against TM1. The auth scheme (Basic / CAMNamespace /
-   * CAMPassport) is selected by config — see buildAuthorizationHeader.
+   * CAMPassport for v11, or the configured v12 auth mode) is selected by
+   * config — see ConnectionProfile.buildLoginRequest in
+   * tm1-client/connection/profile.ts.
    *
    * Concurrent callers share a single in-flight login. The HTTP transport
    * re-authenticates directly from its 401 handler (http.ts), so two requests
@@ -80,8 +85,9 @@ export class SessionManager {
   }
 
   /**
-   * Perform the actual login round-trip.
-   * GET /api/v1/Configuration/ProductVersion with Authorization header.
+   * Perform the actual login round-trip. The request (URL, method, headers,
+   * body) comes from the connection profile — v11 GETs
+   * /api/v1/Configuration/ProductVersion, v12 POSTs /{instance}/auth/v1/session.
    * Extracts TM1SessionId cookie from the response.
    */
   private async doAuthenticate(): Promise<string> {
@@ -95,24 +101,24 @@ export class SessionManager {
       }
     }
 
-    const url = `${this.config.baseUrl}/api/v1/Configuration/ProductVersion`;
-    const authorization = this.buildAuthorizationHeader();
+    const loginReq = await this.profile.buildLoginRequest();
 
-    this.logger.info({ endpoint: url, authMode: this.authMode() }, "Authenticating with TM1");
+    this.logger.info({ endpoint: loginReq.url, authMode: this.authMode() }, "Authenticating with TM1");
 
     const response = await withTimeout(
       this.config.requestTimeoutMs,
       "Authentication",
       (signal) =>
-        tm1Fetch(url, {
-          method: "GET",
+        tm1Fetch(loginReq.url, {
+          method: loginReq.method,
           headers: {
-            Authorization: authorization,
+            ...loginReq.headers,
             Accept: "application/json",
             "User-Agent": USER_AGENT,
             "TM1-SessionContext": USER_AGENT,
             "TM1-Session-Context": USER_AGENT,
           },
+          body: loginReq.body,
           signal,
           dispatcher: getTm1Dispatcher(this.config),
         } as unknown as RequestInit),
@@ -123,7 +129,7 @@ export class SessionManager {
 
     if (!response.ok) {
       this.logger.error(
-        { endpoint: url, status: response.status },
+        { endpoint: loginReq.url, status: response.status },
         "Authentication failed"
       );
       throw new Error(
@@ -155,7 +161,7 @@ export class SessionManager {
       return;
     }
 
-    const url = `${this.config.baseUrl}/api/v1/ActiveSession`;
+    const url = `${this.config.baseUrl}${this.profile.resolveApiPath("/api/v1/ActiveSession")}`;
     this.logger.debug({ endpoint: url }, "Sending keep-alive");
 
     // Snapshot the cookie this keep-alive is probing. If a concurrent request
@@ -284,7 +290,7 @@ export class SessionManager {
       return;
     }
 
-    const url = `${this.config.baseUrl}/api/v1/ActiveSession`;
+    const url = `${this.config.baseUrl}${this.profile.resolveApiPath("/api/v1/ActiveSession")}`;
     this.logger.info("Logging out from TM1");
 
     try {
@@ -319,37 +325,9 @@ export class SessionManager {
     }
   }
 
-  /**
-   * Extract TM1SessionId from Set-Cookie response headers.
-   */
-  /**
-   * Build the Authorization header value for the configured auth mode.
-   *
-   * Mirrors TM1py's RestService._build_authorization_token:
-   *   - camPassport set → "CAMPassport <token>"
-   *   - namespace set   → "CAMNamespace " + base64("user:password:namespace")
-   *   - otherwise       → "Basic " + base64("user:password")
-   *
-   * The base64 input is UTF-8 encoded (TM1py uses str.encode(), i.e. UTF-8, and
-   * Buffer.from defaults to UTF-8), so non-ASCII users/passwords/namespaces
-   * round-trip identically. The CAMNamespace credential ordering is
-   * user:password:namespace — confirmed against TM1py and IBM PA REST docs.
-   */
-  private buildAuthorizationHeader(): string {
-    const { user, password, namespace, camPassport } = this.config;
-    if (camPassport) {
-      return `CAMPassport ${camPassport}`;
-    }
-    if (namespace) {
-      const token = Buffer.from(`${user}:${password}:${namespace}`).toString("base64");
-      return `CAMNamespace ${token}`;
-    }
-    const token = Buffer.from(`${user}:${password}`).toString("base64");
-    return `Basic ${token}`;
-  }
-
   /** Human-readable auth mode for logging (never logs the credential itself). */
-  private authMode(): "CAMPassport" | "CAMNamespace" | "Basic" {
+  private authMode(): string {
+    if (this.config.version === 12) return `v12:${this.config.authMode ?? "s2s"}`;
     if (this.config.camPassport) return "CAMPassport";
     if (this.config.namespace) return "CAMNamespace";
     return "Basic";
