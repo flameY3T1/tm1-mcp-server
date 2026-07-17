@@ -236,4 +236,65 @@ describe("loadConfig", () => {
       expect(loadConfig().transport).toBe("stdio");
     });
   });
+
+  describe("v12 connection config", () => {
+    it("stays version 11 when no instance/database set", () => {
+      process.env.TM1_BASE_URL = "https://tm1:8010";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "secret";
+      delete process.env.TM1_INSTANCE;
+      delete process.env.TM1_DATABASE;
+      const cfg = loadConfig();
+      expect(cfg.version).toBe(11);
+    });
+
+    it("selects v12 s2s and parses instance/database/creds", () => {
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "";
+      process.env.TM1_INSTANCE = "tm1";
+      process.env.TM1_DATABASE = "db1";
+      process.env.TM1_AUTH_MODE = "s2s";
+      process.env.TM1_CLIENT_ID = "cid";
+      process.env.TM1_CLIENT_SECRET = "csec";
+      const cfg = loadConfig();
+      expect(cfg.version).toBe(12);
+      expect(cfg.instance).toBe("tm1");
+      expect(cfg.database).toBe("db1");
+      expect(cfg.authMode).toBe("s2s");
+      expect(cfg.clientId).toBe("cid");
+      expect(cfg.clientSecret).toBe("csec");
+    });
+
+    it("throws when instance set but database missing", () => {
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "x";
+      process.env.TM1_INSTANCE = "tm1";
+      delete process.env.TM1_DATABASE;
+      expect(() => loadConfig()).toThrow(/TM1_DATABASE/);
+    });
+
+    it("throws when s2s mode missing client secret", () => {
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "x";
+      process.env.TM1_INSTANCE = "tm1";
+      process.env.TM1_DATABASE = "db1";
+      process.env.TM1_AUTH_MODE = "s2s";
+      process.env.TM1_CLIENT_ID = "cid";
+      delete process.env.TM1_CLIENT_SECRET;
+      expect(() => loadConfig()).toThrow(/TM1_CLIENT_SECRET/);
+    });
+
+    it("throws on unknown auth mode", () => {
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "x";
+      process.env.TM1_INSTANCE = "tm1";
+      process.env.TM1_DATABASE = "db1";
+      process.env.TM1_AUTH_MODE = "banana";
+      expect(() => loadConfig()).toThrow(/TM1_AUTH_MODE/);
+    });
+  });
 });

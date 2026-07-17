@@ -37,11 +37,24 @@ export interface TM1Config {
   // TM1_MODE=readwrite, so an unconfigured server cannot mutate or delete TM1
   // objects by accident.
   mode: "readwrite" | "readonly";
+  // v12 (Planning Analytics Engine). version===12 selects the v12 connection
+  // profile (URL reroot + POST /{instance}/auth/v1/session login). Selected
+  // when instance+database are set, or TM1_VERSION major is 12.
+  version: 11 | 12;
+  instance?: string | undefined;
+  database?: string | undefined;
+  authMode?: "s2s" | "basic" | "access_token" | "oidc" | "iam" | undefined;
+  clientId?: string | undefined;
+  clientSecret?: string | undefined;
+  accessToken?: string | undefined;
+  apiKey?: string | undefined;
+  iamUrl?: string | undefined;
 }
 
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 const VALID_TRANSPORTS = ["stdio", "http"] as const;
 const VALID_MODES = ["readwrite", "readonly"] as const;
+const VALID_AUTH_MODES = ["s2s", "basic", "access_token", "oidc", "iam"] as const;
 
 // Parse a positive-integer env var. Empty/unset → default. A non-numeric or
 // non-positive value throws at startup instead of silently becoming NaN — NaN
@@ -177,6 +190,61 @@ export function loadConfig(): TM1Config {
   }
   const mode = modeRaw as TM1Config["mode"];
 
+  // --- v12 (Planning Analytics Engine) connection ---------------------------
+  const instance = process.env.TM1_INSTANCE || undefined;
+  const database = process.env.TM1_DATABASE || undefined;
+  const versionMajor = Number.parseInt(tm1Version, 10);
+  const isV12 = Boolean(instance || database) || versionMajor === 12;
+  const version: 11 | 12 = isV12 ? 12 : 11;
+
+  let authMode: TM1Config["authMode"];
+  let clientId: string | undefined;
+  let clientSecret: string | undefined;
+  let accessToken: string | undefined;
+  let apiKey: string | undefined;
+  let iamUrl: string | undefined;
+
+  if (version === 12) {
+    if (!instance) {
+      throw new Error("v12 connection requires TM1_INSTANCE (set alongside TM1_DATABASE).");
+    }
+    if (!database) {
+      throw new Error("v12 connection requires TM1_DATABASE (set alongside TM1_INSTANCE).");
+    }
+    const modeRaw = (process.env.TM1_AUTH_MODE ?? "s2s").trim().toLowerCase();
+    if (!VALID_AUTH_MODES.includes(modeRaw as (typeof VALID_AUTH_MODES)[number])) {
+      throw new Error(
+        `Invalid TM1_AUTH_MODE: "${process.env.TM1_AUTH_MODE}". ` +
+          `Expected one of: ${VALID_AUTH_MODES.join(", ")}.`,
+      );
+    }
+    authMode = modeRaw as TM1Config["authMode"];
+
+    clientId = process.env.TM1_CLIENT_ID || undefined;
+    clientSecret = process.env.TM1_CLIENT_SECRET || undefined;
+    accessToken = process.env.TM1_ACCESS_TOKEN || undefined;
+    apiKey = process.env.TM1_API_KEY || undefined;
+    iamUrl = process.env.TM1_IAM_URL || undefined;
+
+    const missingV12: string[] = [];
+    if (authMode === "s2s") {
+      if (!clientId) missingV12.push("TM1_CLIENT_ID");
+      if (!clientSecret) missingV12.push("TM1_CLIENT_SECRET");
+    } else if (authMode === "access_token" || authMode === "oidc") {
+      if (!accessToken) missingV12.push("TM1_ACCESS_TOKEN");
+    } else if (authMode === "iam") {
+      if (!apiKey) missingV12.push("TM1_API_KEY");
+      if (!iamUrl) missingV12.push("TM1_IAM_URL");
+    }
+    // authMode === "basic" reuses TM1_USER/TM1_PASSWORD, already validated above.
+    if (missingV12.length > 0) {
+      throw new Error(
+        `TM1_AUTH_MODE="${authMode}" requires: ${missingV12.join(", ")}. ` +
+          `Set them before starting the server.`,
+      );
+    }
+  }
+
   return {
     baseUrl: baseUrl!,
     // In passport mode user/password are unused; default to "" so the type stays
@@ -197,5 +265,14 @@ export function loadConfig(): TM1Config {
     httpAllowedOrigins,
     httpToken,
     mode,
+    version,
+    instance,
+    database,
+    authMode,
+    clientId,
+    clientSecret,
+    accessToken,
+    apiKey,
+    iamUrl,
   };
 }
