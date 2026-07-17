@@ -119,6 +119,36 @@ declared there — otherwise the server value is preserved; also settable via
 `tm1_upsert_process`). `Caption` is intentionally not roundtripped: TM1 exposes
 no reliable write path for it.
 
+### TM1 v12 (Planning Analytics Engine)
+
+Setting `TM1_INSTANCE` + `TM1_DATABASE` auto-selects v12: requests are rerooted
+to `/{instance}/api/v1/Databases('{database}')/...` and login goes through
+`POST /{instance}/auth/v1/session` instead of the v11 `/api/v1/ActiveSession`
+flow. For v12, `TM1_BASE_URL` is address:port only (no path) — e.g.
+`https://your-pae-host:443`.
+
+```env
+TM1_INSTANCE=my-instance
+TM1_DATABASE=my-database
+TM1_AUTH_MODE=s2s                   # s2s (default) | basic | access_token | oidc | iam
+TM1_USER=admin                      # supplies the session login "User" in every mode
+```
+
+`TM1_AUTH_MODE` selects how the `auth/v1/session` request authenticates, each
+with its own env vars:
+
+| Mode            | Vars                                 | Validation status                     |
+| --------------- | ------------------------------------- | -------------------------------------- |
+| `s2s` (default) | `TM1_CLIENT_ID`, `TM1_CLIENT_SECRET`  | **Live-validated** against PAE 12.5.9  |
+| `basic`         | `TM1_USER`, `TM1_PASSWORD`            | Unit-validated request builder only    |
+| `access_token`  | `TM1_ACCESS_TOKEN`                    | Unit-validated request builder only    |
+| `oidc`          | `TM1_ACCESS_TOKEN`                    | Unit-validated request builder only    |
+| `iam`           | `TM1_API_KEY`, `TM1_IAM_URL`          | Unit-validated request builder only    |
+
+> Only `s2s` has been exercised against a live PAE server. The other modes'
+> request builders are covered by unit tests but not yet confirmed against a
+> real server — verify against your environment before relying on them.
+
 ## Use with Claude Code
 
 Credentials live in `.env` (loaded at startup from the repo root — the directory

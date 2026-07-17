@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- TM1 v12 (Planning Analytics Engine) connection support: URL rerooting under
+  `/{instance}/api/v1/Databases('{database}')` and a `POST /{instance}/auth/v1/session`
+  login. Auth modes: `s2s` (live-validated), `basic`/`access_token`/`oidc`/`iam`
+  (unit-validated request builders, not yet live-validated).
+
+### Fixed
+
+- `tm1_get_server_info` now reports the correct product version on v12: v12
+  omits `ProductVersion` from the `Configuration` body, so `getInfo()` falls
+  back to the `/Configuration/ProductVersion` scalar.
+
 ### Changed
 
 - **Breaking:** `tm1_export_process_to_git` / `tm1_import_process_from_git` now use
