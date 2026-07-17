@@ -6,10 +6,9 @@
 import type { Job, Session, Thread } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 
-function encKey(id: string): string {
-  // Double single-quotes for OData escaping, then URL-encode each quote as %27
-  const doubled = id.replace(/'/g, "''");
-  return doubled.replace(/'/g, "%27");
+function encKey(s: string): string {
+  // Double single-quotes for OData escaping, then percent-encode all URL-unsafe chars
+  return encodeURIComponent(String(s).replace(/'/g, "''")).replace(/'/g, "%27");
 }
 
 export class MonitoringService {

@@ -58,4 +58,10 @@ describe("MonitoringService.cancelJob", () => {
     await svc.cancelJob("j'1");
     expect(request).toHaveBeenCalledWith("POST", "/api/v1/Jobs('j%27%271')/tm1.Cancel", {});
   });
+
+  it("url-encodes non-quote special characters in the id", async () => {
+    const { svc, request } = svcWith(undefined);
+    await svc.cancelJob("a b/c");
+    expect(request).toHaveBeenCalledWith("POST", "/api/v1/Jobs('a%20b%2Fc')/tm1.Cancel", {});
+  });
 });
