@@ -1,0 +1,64 @@
+// Connection profile: the v11↔v12 seam. Owns URL re-rooting and the login
+// round-trip descriptor. Built from config inside SessionManager and
+// TM1HttpClient. v11 = identity reroot + existing GET-ProductVersion login;
+// v12 = database-rooted paths + POST /{instance}/auth/v1/session login.
+import type { TM1Config } from "../../config.js";
+
+export interface LoginRequest {
+  url: string;
+  method: "GET" | "POST";
+  headers: Record<string, string>;
+  body?: string;
+}
+
+export interface ConnectionProfile {
+  resolveApiPath(path: string): string;
+  buildLoginRequest(): Promise<LoginRequest>;
+}
+
+// OData single-quote escaping for a key segment (double the apostrophes),
+// then URL-encode. Mirrors the `enc` helper used across the service layer.
+const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+
+function buildBasicToken(user: string, password: string): string {
+  return "Basic " + Buffer.from(`${user}:${password}`).toString("base64");
+}
+
+// v11 Authorization header (Basic / CAMNamespace / CAMPassport) — moved here
+// from SessionManager.buildAuthorizationHeader so all login-header logic lives
+// in one place.
+function buildV11Authorization(config: TM1Config): string {
+  const { user, password, namespace, camPassport } = config;
+  if (camPassport) return `CAMPassport ${camPassport}`;
+  if (namespace) {
+    return "CAMNamespace " + Buffer.from(`${user}:${password}:${namespace}`).toString("base64");
+  }
+  return buildBasicToken(user, password);
+}
+
+export function createConnectionProfile(config: TM1Config): ConnectionProfile {
+  if (config.version === 12) {
+    // Implemented in Task 3.
+    return createV12Profile(config);
+  }
+
+  return {
+    resolveApiPath: (path) => path,
+    buildLoginRequest: () =>
+      Promise.resolve({
+        url: `${config.baseUrl}/api/v1/Configuration/ProductVersion`,
+        method: "GET",
+        headers: { Authorization: buildV11Authorization(config) },
+      }),
+  };
+}
+
+function createV12Profile(config: TM1Config): ConnectionProfile {
+  const instance = config.instance ?? "";
+  const database = config.database ?? "";
+  const dbRoot = `/${instance}/api/v1/Databases('${enc(database)}')`;
+  return {
+    resolveApiPath: (path) => path.replace(/^\/api\/v1/, dbRoot),
+    buildLoginRequest: () => Promise.reject(new Error("v12 login not implemented yet")),
+  };
+}
