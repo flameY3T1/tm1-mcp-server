@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.local
+.env.v12
 .npmrc
 
 # local MCP server config — holds TM1 creds (TM1_PASSWORD); never commit
