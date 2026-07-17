@@ -105,49 +105,52 @@ export class MonitoringService {
    * GET /api/v1/Jobs?$select=ID,Description,State,ElapsedTime,WaitTime&$expand=Session,WaitingOn
    */
   async getJobs(): Promise<Job[]> {
+    // Fields below are typed loosely to match observed reality: the PA Engine
+    // can send `null` (not just omit) for any of these, and IDs have been seen
+    // as both string and number. Mapping below is null/undefined-safe.
     const response = await this.http.request<{
       value: Array<{
-        ID: string;
-        Description: string;
-        State: string;
-        ElapsedTime?: string;
-        WaitTime?: string;
+        ID: string | number;
+        Description?: string | null;
+        State?: string | null;
+        ElapsedTime?: string | null;
+        WaitTime?: string | null;
         Session?: {
           ID: number;
-          Context?: string;
-          User?: { Name?: string };
-        };
+          Context?: string | null;
+          User?: { Name?: string | null } | null;
+        } | null;
         WaitingOn?: Array<{
-          ID: string;
-          Description: string;
-          State: string;
-        }>;
+          ID: string | number;
+          Description?: string | null;
+          State?: string | null;
+        }> | null;
       }>;
     }>(
       "GET",
       "/api/v1/Jobs?$select=ID,Description,State,ElapsedTime,WaitTime&$expand=Session($select=ID,Context;$expand=User($select=Name)),WaitingOn($select=ID,Description,State)",
     );
     return response.value.map((j) => ({
-      id: j.ID,
-      description: j.Description,
-      state: j.State,
-      ...(j.ElapsedTime !== undefined ? { elapsedTime: j.ElapsedTime } : {}),
-      ...(j.WaitTime !== undefined ? { waitTime: j.WaitTime } : {}),
+      id: String(j.ID),
+      description: j.Description ?? "",
+      state: j.State ?? "",
+      ...(j.ElapsedTime != null ? { elapsedTime: j.ElapsedTime } : {}),
+      ...(j.WaitTime != null ? { waitTime: j.WaitTime } : {}),
       ...(j.Session
         ? {
             session: {
               id: String(j.Session.ID),
-              ...(j.Session.Context !== undefined ? { context: j.Session.Context } : {}),
-              ...(j.Session.User?.Name !== undefined ? { user: j.Session.User.Name } : {}),
+              ...(j.Session.Context != null ? { context: j.Session.Context } : {}),
+              ...(j.Session.User?.Name != null ? { user: j.Session.User.Name } : {}),
             },
           }
         : {}),
       ...(j.WaitingOn
         ? {
             waitingOn: j.WaitingOn.map((w) => ({
-              id: w.ID,
-              description: w.Description,
-              state: w.State,
+              id: String(w.ID),
+              description: w.Description ?? "",
+              state: w.State ?? "",
             })),
           }
         : {}),

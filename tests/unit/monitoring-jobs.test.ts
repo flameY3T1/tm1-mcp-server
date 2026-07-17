@@ -44,6 +44,32 @@ describe("MonitoringService.getJobs", () => {
     const jobs = await svc.getJobs();
     expect(jobs[0]).toEqual({ id: "j", description: "d", state: "Running" });
   });
+
+  it("is null-safe: null/missing required and optional fields do not throw and map to safe defaults", async () => {
+    const { svc } = svcWith({
+      value: [
+        {
+          ID: 7,
+          Description: null,
+          State: null,
+          WaitTime: null,
+          ElapsedTime: null,
+          Session: { ID: 5, Context: null, User: { Name: null } },
+          WaitingOn: [{ ID: "j2", Description: null, State: null }],
+        },
+      ],
+    });
+    const jobs = await svc.getJobs();
+    expect(jobs).toEqual([
+      {
+        id: "7",
+        description: "",
+        state: "",
+        session: { id: "5" },
+        waitingOn: [{ id: "j2", description: "", state: "" }],
+      },
+    ]);
+  });
 });
 
 describe("MonitoringService.cancelJob", () => {

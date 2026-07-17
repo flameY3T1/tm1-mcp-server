@@ -287,6 +287,36 @@ describe("loadConfig", () => {
       expect(() => loadConfig()).toThrow(/TM1_CLIENT_SECRET/);
     });
 
+    it("aligns tm1Version with numeric v12 selection when TM1_VERSION is not set explicitly", () => {
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "x";
+      process.env.TM1_INSTANCE = "tm1";
+      process.env.TM1_DATABASE = "db1";
+      process.env.TM1_AUTH_MODE = "s2s";
+      process.env.TM1_CLIENT_ID = "cid";
+      process.env.TM1_CLIENT_SECRET = "csec";
+      delete process.env.TM1_VERSION;
+      const cfg = loadConfig();
+      expect(cfg.version).toBe(12);
+      expect(cfg.tm1Version.startsWith("11")).toBe(false);
+    });
+
+    it("keeps an explicitly-set TM1_VERSION unchanged", () => {
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "x";
+      process.env.TM1_INSTANCE = "tm1";
+      process.env.TM1_DATABASE = "db1";
+      process.env.TM1_AUTH_MODE = "s2s";
+      process.env.TM1_CLIENT_ID = "cid";
+      process.env.TM1_CLIENT_SECRET = "csec";
+      process.env.TM1_VERSION = "12";
+      const cfg = loadConfig();
+      expect(cfg.version).toBe(12);
+      expect(cfg.tm1Version).toBe("12");
+    });
+
     it("throws on unknown auth mode", () => {
       process.env.TM1_BASE_URL = "http://host:4444";
       process.env.TM1_USER = "admin";
