@@ -3,6 +3,7 @@
 import type pino from "pino";
 import type { TM1Config } from "../config.js";
 import type { SessionManager } from "../session-manager.js";
+import { createConnectionProfile, type ConnectionProfile } from "./connection/profile.js";
 import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
 import { getTm1Dispatcher, tm1Fetch } from "./dispatcher.js";
@@ -62,6 +63,9 @@ export class TM1HttpClient {
   private readonly config: TM1Config;
   public readonly logger: pino.Logger;
   protected readonly sessionManager: SessionManager;
+  // v11↔v12 URL-rerooting seam. v11: identity (paths unchanged). v12: rewrites
+  // `/api/v1/...` to the database-rooted `/{instance}/api/v1/Databases('{db}')/...`.
+  private readonly profile: ConnectionProfile;
 
   constructor(
     config: TM1Config,
@@ -71,6 +75,7 @@ export class TM1HttpClient {
     this.config = config;
     this.sessionManager = sessionManager;
     this.logger = logger;
+    this.profile = createConnectionProfile(config);
   }
 
   /** TM1 server version (e.g. "11.8.…") for version-conditional service code. */
@@ -95,7 +100,7 @@ export class TM1HttpClient {
     body?: unknown,
     opts?: RequestOptions,
   ): Promise<T> {
-    const url = `${this.config.baseUrl}${path}`;
+    const url = `${this.config.baseUrl}${this.profile.resolveApiPath(path)}`;
     const isSafeMethod = isSafeHttpMethod(method);
     const allowRetry = opts?.retry !== false;
     const maxAttempts = isSafeMethod && allowRetry ? MAX_NETWORK_RETRIES : 0;
@@ -205,7 +210,7 @@ export class TM1HttpClient {
    */
   /** @internal — for Service-layer use; not part of the public consumer API. */
   public async requestRaw(method: string, path: string, opts?: RequestOptions): Promise<string> {
-    const url = `${this.config.baseUrl}${path}`;
+    const url = `${this.config.baseUrl}${this.profile.resolveApiPath(path)}`;
     const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
     const cookie = await this.sessionManager.ensureSession();
 
@@ -253,7 +258,7 @@ export class TM1HttpClient {
     contentType: string = "application/octet-stream",
     opts?: RequestOptions,
   ): Promise<void> {
-    const url = `${this.config.baseUrl}${path}`;
+    const url = `${this.config.baseUrl}${this.profile.resolveApiPath(path)}`;
     const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
     const cookie = await this.sessionManager.ensureSession();
 
