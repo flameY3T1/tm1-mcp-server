@@ -48,7 +48,7 @@ export interface CallGraphNode {
   children: CallGraphNode[];
   cycle: boolean;
   depthLimitReached?: boolean | undefined;
-  /** Outgoing calls target could not statically resolved (downstream only). */
+  /** Outgoing calls whose target could not be statically resolved (downstream only). */
   unresolvedCalls?: UnresolvedCall[] | undefined;
 }
 
