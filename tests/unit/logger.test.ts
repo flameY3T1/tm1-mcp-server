@@ -118,6 +118,34 @@ describe("Logger", () => {
       expect(request.TM1SessionId).toBe("***");
     });
 
+    it("should mask v12 credential fields (clientSecret, accessToken, apiKey)", () => {
+      const { logger, flush } = createTestLogger();
+      logger.info(
+        {
+          config: {
+            clientId: "public-client-id",
+            clientSecret: "v12ClientSecret",
+            accessToken: "v12AccessToken",
+            apiKey: "v12ApiKey",
+          },
+        },
+        "v12 config"
+      );
+
+      const entries = flush();
+      expect(entries.length).toBeGreaterThanOrEqual(1);
+      const entry = entries[0] as Record<string, unknown>;
+      const config = entry.config as Record<string, unknown>;
+      expect(config.clientSecret).toBe("***");
+      expect(config.accessToken).toBe("***");
+      expect(config.apiKey).toBe("***");
+      // clientId is a non-secret identifier and must NOT be masked
+      expect(config.clientId).toBe("public-client-id");
+      expect(JSON.stringify(entry)).not.toContain("v12ClientSecret");
+      expect(JSON.stringify(entry)).not.toContain("v12AccessToken");
+      expect(JSON.stringify(entry)).not.toContain("v12ApiKey");
+    });
+
     it("should not mask non-sensitive fields", () => {
       const { logger, flush } = createTestLogger();
       logger.info(

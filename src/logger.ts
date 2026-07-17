@@ -4,7 +4,16 @@ import type { TM1Config } from "./config.js";
 // "Cookie"/"cookie" are defensive: the TM1SessionId travels as a Cookie header
 // VALUE, which path-based redaction of the field name would miss. No code logs
 // headers today, but a future logger.debug({ headers }) must not leak the session.
-const SENSITIVE_FIELDS = ["password", "Authorization", "TM1SessionId", "Cookie", "cookie"];
+const SENSITIVE_FIELDS = [
+  "password",
+  "Authorization",
+  "TM1SessionId",
+  "Cookie",
+  "cookie",
+  "clientSecret",
+  "accessToken",
+  "apiKey",
+];
 const MASK_VALUE = "***";
 
 function redactPaths(): string[] {

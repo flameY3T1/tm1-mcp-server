@@ -46,6 +46,50 @@ describe("resolveApiPath", () => {
     );
     expect(p.resolveApiPath("/api/v1/Cubes")).toBe("/tm1/api/v1/Databases('d''b')/Cubes");
   });
+
+  it("url-encodes an instance segment containing reserved/special characters", () => {
+    const p = createConnectionProfile(
+      baseConfig({
+        version: 12,
+        instance: "my instance$1",
+        database: "db1",
+        authMode: "s2s",
+        clientId: "c",
+        clientSecret: "s",
+      }),
+    );
+    expect(p.resolveApiPath("/api/v1/Cubes('Sales')")).toBe(
+      "/my%20instance%241/api/v1/Databases('db1')/Cubes('Sales')",
+    );
+  });
+
+  it("does not corrupt the path when instance contains $-replacement-pattern characters", () => {
+    // A raw String.replace(regex, dbRoot) would interpret "$&"/"$1"/"$$" inside
+    // dbRoot specially. Use an instance with a literal "$" to prove the
+    // replacement is treated as a literal string, not a pattern.
+    const p = createConnectionProfile(
+      baseConfig({
+        version: 12,
+        instance: "$&",
+        database: "db1",
+        authMode: "s2s",
+        clientId: "c",
+        clientSecret: "s",
+      }),
+    );
+    expect(p.resolveApiPath("/api/v1/Cubes('Sales')")).toBe(
+      "/%24%26/api/v1/Databases('db1')/Cubes('Sales')",
+    );
+  });
+
+  it("still yields the plain reroot for a normal instance (no regression)", () => {
+    const p = createConnectionProfile(
+      baseConfig({ version: 12, instance: "tm1", database: "db1", authMode: "s2s", clientId: "c", clientSecret: "s" }),
+    );
+    expect(p.resolveApiPath("/api/v1/Cubes('Sales')")).toBe(
+      "/tm1/api/v1/Databases('db1')/Cubes('Sales')",
+    );
+  });
 });
 
 describe("v12 buildLoginRequest", () => {

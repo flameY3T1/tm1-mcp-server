@@ -106,9 +106,14 @@ async function buildV12Authorization(config: TM1Config): Promise<string> {
 function createV12Profile(config: TM1Config): ConnectionProfile {
   const instance = config.instance ?? "";
   const database = config.database ?? "";
-  const dbRoot = `/${instance}/api/v1/Databases('${enc(database)}')`;
+  // encodeURIComponent (not `enc`) for the instance: it's a bare path segment,
+  // not an OData quoted key — no apostrophe-doubling needed, just percent-encoding.
+  const dbRoot = `/${encodeURIComponent(instance)}/api/v1/Databases('${enc(database)}')`;
   return {
-    resolveApiPath: (path) => path.replace(/^\/api\/v1/, dbRoot),
+    // Replacement FUNCTION, not a string: String.replace treats "$&"/"$$"/"$1"
+    // in a string replacement specially, which would corrupt dbRoot if instance
+    // or database contained a literal "$". A function return is used verbatim.
+    resolveApiPath: (path) => path.replace(/^\/api\/v1/, () => dbRoot),
     buildLoginRequest: async () => ({
       url: `${config.baseUrl}/${instance}/auth/v1/session`,
       method: "POST",
