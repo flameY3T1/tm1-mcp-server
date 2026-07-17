@@ -103,9 +103,27 @@ export class ServerService {
     }
     const merged: Record<string, unknown> = { ...cfg, ...active };
     delete merged["@odata.context"];
+    // v12 (Planning Analytics Engine) omits ProductVersion from the
+    // Configuration object body; it is exposed only as a scalar sub-resource.
+    // Fall back to it when the inline field is absent (v11 has it inline, so
+    // this extra request never fires there).
+    let productVersion = String(merged.ProductVersion ?? "");
+    if (!productVersion) {
+      try {
+        const pv = await this.http.request<{ value?: unknown }>(
+          "GET",
+          "/api/v1/Configuration/ProductVersion",
+        );
+        if (typeof pv.value === "string") {
+          productVersion = pv.value;
+        }
+      } catch {
+        // Scalar sub-resource unavailable — leave version empty.
+      }
+    }
     return {
       serverName: String(merged.ServerName ?? ""),
-      productVersion: String(merged.ProductVersion ?? ""),
+      productVersion,
       productEdition: merged.ProductEdition !== undefined ? String(merged.ProductEdition) : undefined,
       adminHost: merged.AdminHost !== undefined ? String(merged.AdminHost) : undefined,
       dataDirectory: merged.DataBaseDirectory !== undefined ? String(merged.DataBaseDirectory) : undefined,
