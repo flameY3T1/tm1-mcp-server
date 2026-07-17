@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `tm1_analyze_callgraph` now surfaces `ExecuteProcess`/`RunProcess` calls whose
+  target is a computed expression or a process parameter as `unresolvedCalls`
+  (full/compact modes) / `unresolvedCount` (summary) instead of silently dropping
+  them. The call is flagged for manual review — not resolved (statically impossible).
 - TM1 v12 (Planning Analytics Engine) connection support: URL rerooting under
   `/{instance}/api/v1/Databases('{database}')` and a `POST /{instance}/auth/v1/session`
   login. Auth modes: `s2s` (live-validated), `basic`/`access_token`/`oidc`/`iam`
