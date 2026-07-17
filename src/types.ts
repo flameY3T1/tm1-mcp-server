@@ -349,6 +349,29 @@ export interface Session {
   threads: Thread[];
 }
 
+export interface JobWaitingOn {
+  id: string;
+  description: string;
+  state: string;
+}
+
+export interface JobSession {
+  id: string;
+  context?: string;
+  user?: string;
+}
+
+/** An active task on a v12 database replica (the v12 successor to Thread). */
+export interface Job {
+  id: string;
+  description: string;
+  state: string;
+  elapsedTime?: string;
+  waitTime?: string;
+  session?: JobSession;
+  waitingOn?: JobWaitingOn[];
+}
+
 export interface RuleSyntaxError {
   message: string;
   lineNumber?: number;

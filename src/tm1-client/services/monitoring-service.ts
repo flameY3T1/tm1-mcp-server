@@ -3,8 +3,14 @@
 // which interrupts a running operation server-side.
 //
 // See docs/ARCHITECTURE.md for the layering.
-import type { Session, Thread } from "../../types.js";
+import type { Job, Session, Thread } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
+
+function encKey(id: string): string {
+  // Double single-quotes for OData escaping, then URL-encode each quote as %27
+  const doubled = id.replace(/'/g, "''");
+  return doubled.replace(/'/g, "%27");
+}
 
 export class MonitoringService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -93,5 +99,67 @@ export class MonitoringService {
         ...(t.Info !== undefined ? { info: t.Info } : {}),
       })),
     }));
+  }
+
+  /**
+   * List all active jobs on v12 database replica.
+   * GET /api/v1/Jobs?$select=ID,Description,State,ElapsedTime,WaitTime&$expand=Session,WaitingOn
+   */
+  async getJobs(): Promise<Job[]> {
+    const response = await this.http.request<{
+      value: Array<{
+        ID: string;
+        Description: string;
+        State: string;
+        ElapsedTime?: string;
+        WaitTime?: string;
+        Session?: {
+          ID: number;
+          Context?: string;
+          User?: { Name?: string };
+        };
+        WaitingOn?: Array<{
+          ID: string;
+          Description: string;
+          State: string;
+        }>;
+      }>;
+    }>(
+      "GET",
+      "/api/v1/Jobs?$select=ID,Description,State,ElapsedTime,WaitTime&$expand=Session($select=ID,Context;$expand=User($select=Name)),WaitingOn($select=ID,Description,State)",
+    );
+    return response.value.map((j) => ({
+      id: j.ID,
+      description: j.Description,
+      state: j.State,
+      ...(j.ElapsedTime !== undefined ? { elapsedTime: j.ElapsedTime } : {}),
+      ...(j.WaitTime !== undefined ? { waitTime: j.WaitTime } : {}),
+      ...(j.Session
+        ? {
+            session: {
+              id: String(j.Session.ID),
+              ...(j.Session.Context !== undefined ? { context: j.Session.Context } : {}),
+              ...(j.Session.User?.Name !== undefined ? { user: j.Session.User.Name } : {}),
+            },
+          }
+        : {}),
+      ...(j.WaitingOn
+        ? {
+            waitingOn: j.WaitingOn.map((w) => ({
+              id: w.ID,
+              description: w.Description,
+              state: w.State,
+            })),
+          }
+        : {}),
+    }));
+  }
+
+  /**
+   * Cancel running v12 job.
+   * POST /api/v1/Jobs('{id}')/tm1.Cancel
+   */
+  async cancelJob(jobId: string): Promise<void> {
+    await this.http.request<void>("POST", `/api/v1/Jobs('${encKey(jobId)}')/tm1.Cancel`, {});
   }
 }
