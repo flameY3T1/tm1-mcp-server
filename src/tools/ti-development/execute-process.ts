@@ -4,6 +4,17 @@ import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { withToolHint } from "../error-format.js";
 
+/**
+ * Client-abort recovery hint, branched by TM1 major version: v11 exposes
+ * server threads (tm1_list_threads / tm1_cancel_thread), v12 exposes jobs
+ * (tm1_list_jobs / tm1_cancel_job) instead.
+ */
+export function abortHint(version: 11 | 12): string {
+  const monitor = version === 12 ? "tm1_list_jobs" : "tm1_list_threads";
+  const cancel = version === 12 ? "tm1_cancel_job" : "tm1_cancel_thread";
+  return `Request aborted by the client — the process was NOT confirmed failed and may still be executing. Use ${monitor} to check for it and ${cancel} to stop it. Do NOT blindly re-run: that risks a duplicate execution.`;
+}
+
 export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_execute_process",
@@ -76,7 +87,7 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
           throw new TM1Error({
             code: TM1ErrorCode.TM1_ERROR,
             message: `Execution of '${processName}' was cancelled client-side before it returned; the TI process may still be running on the TM1 server.`,
-            hint: `Request aborted by the client — the process was NOT confirmed failed and may still be executing. Use tm1_list_threads to check for it and tm1_cancel_thread to stop it. Do NOT blindly re-run: that risks a duplicate execution.`,
+            hint: abortHint(tm1Client.version),
           });
         }
         throw err;

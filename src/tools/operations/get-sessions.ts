@@ -9,7 +9,7 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
     "tm1_list_sessions",
     [
       "List active sessions on the TM1 server with their associated user and threads.",
-      "Pair with tm1_list_threads / tm1_cancel_thread to see who is connected and what they are running.",
+      "Pair monitoring tools — tm1_list_threads/tm1_cancel_thread on v11, tm1_list_jobs/tm1_cancel_job on v12 — to see who is connected and what they are running.",
       "Paginated (default 50/page).",
     ].join(" "),
     {
