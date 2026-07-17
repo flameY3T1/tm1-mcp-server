@@ -54,8 +54,13 @@ export function createConnectionProfile(config: TM1Config): ConnectionProfile {
 }
 
 // IBM IAM api-key → access_token exchange (v12 iam mode). Mirrors TM1py's
-// _generate_ibm_iam_cloud_access_token.
-async function exchangeIamApiKey(apiKey: string, iamUrl: string): Promise<string> {
+// _generate_ibm_iam_cloud_access_token. Bounded by timeoutMs so a hung IAM
+// endpoint can't hang authenticate() forever.
+async function exchangeIamApiKey(
+  apiKey: string,
+  iamUrl: string,
+  timeoutMs: number,
+): Promise<string> {
   const body =
     "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=" +
     encodeURIComponent(apiKey);
@@ -63,6 +68,7 @@ async function exchangeIamApiKey(apiKey: string, iamUrl: string): Promise<string
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
     body,
+    signal: AbortSignal.timeout(timeoutMs ?? 30000),
   });
   if (!response.ok) {
     throw new Error(`IAM token exchange failed with status ${response.status}`);
@@ -85,7 +91,11 @@ async function buildV12Authorization(config: TM1Config): Promise<string> {
     case "oidc":
       return `Bearer ${config.accessToken}`;
     case "iam": {
-      const token = await exchangeIamApiKey(config.apiKey ?? "", config.iamUrl ?? "");
+      const token = await exchangeIamApiKey(
+        config.apiKey ?? "",
+        config.iamUrl ?? "",
+        config.requestTimeoutMs,
+      );
       return `Bearer ${token}`;
     }
     default:

@@ -211,14 +211,14 @@ export function loadConfig(): TM1Config {
     if (!database) {
       throw new Error("v12 connection requires TM1_DATABASE (set alongside TM1_INSTANCE).");
     }
-    const modeRaw = (process.env.TM1_AUTH_MODE ?? "s2s").trim().toLowerCase();
-    if (!VALID_AUTH_MODES.includes(modeRaw as (typeof VALID_AUTH_MODES)[number])) {
+    const authModeRaw = (process.env.TM1_AUTH_MODE ?? "s2s").trim().toLowerCase();
+    if (!VALID_AUTH_MODES.includes(authModeRaw as (typeof VALID_AUTH_MODES)[number])) {
       throw new Error(
         `Invalid TM1_AUTH_MODE: "${process.env.TM1_AUTH_MODE}". ` +
           `Expected one of: ${VALID_AUTH_MODES.join(", ")}.`,
       );
     }
-    authMode = modeRaw as TM1Config["authMode"];
+    authMode = authModeRaw as TM1Config["authMode"];
 
     clientId = process.env.TM1_CLIENT_ID || undefined;
     clientSecret = process.env.TM1_CLIENT_SECRET || undefined;
