@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/{instance}/api/v1/Databases('{database}')` and a `POST /{instance}/auth/v1/session`
   login. Auth modes: `s2s` (live-validated), `basic`/`access_token`/`oidc`/`iam`
   (unit-validated request builders, not yet live-validated).
+- TM1 v12 (Planning Analytics Engine) Jobs/Activity monitoring: `tm1_list_jobs`
+  and `tm1_cancel_job`. Monitoring tools are version-gated — v11 connections
+  expose the thread tools, v12 connections expose the job tools.
 
 ### Fixed
 

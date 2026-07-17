@@ -40,4 +40,26 @@ describe.skipIf(!isV12)("v12 S2S live connection", () => {
       await client.disconnect();
     }
   });
+
+  it("lists jobs (Activity) and rejects cancelling an unknown job", async () => {
+    const config = loadConfig();
+    const logger = createLogger({ logLevel: "error" });
+    const sessionManager = new SessionManager(config, logger);
+    const client = new TM1Client(config, sessionManager, logger);
+    try {
+      await client.connect();
+      const jobs = await client.monitoring.getJobs();
+      expect(Array.isArray(jobs)).toBe(true);
+      // An idle server has no jobs; if any exist, they must be shape-valid.
+      for (const j of jobs) {
+        expect(typeof j.id).toBe("string");
+        expect(typeof j.state).toBe("string");
+      }
+      await expect(
+        client.monitoring.cancelJob("definitely-not-a-real-job-id"),
+      ).rejects.toBeDefined();
+    } finally {
+      await client.disconnect();
+    }
+  });
 });
