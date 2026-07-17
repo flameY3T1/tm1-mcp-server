@@ -53,12 +53,60 @@ export function createConnectionProfile(config: TM1Config): ConnectionProfile {
   };
 }
 
+// IBM IAM api-key → access_token exchange (v12 iam mode). Mirrors TM1py's
+// _generate_ibm_iam_cloud_access_token.
+async function exchangeIamApiKey(apiKey: string, iamUrl: string): Promise<string> {
+  const body =
+    "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=" +
+    encodeURIComponent(apiKey);
+  const response = await fetch(iamUrl, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!response.ok) {
+    throw new Error(`IAM token exchange failed with status ${response.status}`);
+  }
+  const json = (await response.json()) as { access_token?: string };
+  if (!json.access_token) {
+    throw new Error(`IAM token exchange returned no access_token from ${iamUrl}`);
+  }
+  return json.access_token;
+}
+
+// The Authorization header for a v12 login POST, by auth mode.
+async function buildV12Authorization(config: TM1Config): Promise<string> {
+  switch (config.authMode) {
+    case "s2s":
+      return "Basic " + Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+    case "basic":
+      return buildBasicToken(config.user, config.password);
+    case "access_token":
+    case "oidc":
+      return `Bearer ${config.accessToken}`;
+    case "iam": {
+      const token = await exchangeIamApiKey(config.apiKey ?? "", config.iamUrl ?? "");
+      return `Bearer ${token}`;
+    }
+    default:
+      throw new Error(`Unsupported v12 auth mode: ${String(config.authMode)}`);
+  }
+}
+
 function createV12Profile(config: TM1Config): ConnectionProfile {
   const instance = config.instance ?? "";
   const database = config.database ?? "";
   const dbRoot = `/${instance}/api/v1/Databases('${enc(database)}')`;
   return {
     resolveApiPath: (path) => path.replace(/^\/api\/v1/, dbRoot),
-    buildLoginRequest: () => Promise.reject(new Error("v12 login not implemented yet")),
+    buildLoginRequest: async () => ({
+      url: `${config.baseUrl}/${instance}/auth/v1/session`,
+      method: "POST",
+      headers: {
+        Authorization: await buildV12Authorization(config),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ User: config.user }),
+    }),
   };
 }
