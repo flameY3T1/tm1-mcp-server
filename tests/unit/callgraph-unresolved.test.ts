@@ -8,7 +8,7 @@ describe("extractTiReferences unresolved process calls", () => {
   it("records dynamic (concatenated) ExecuteProcess target", () => {
     const unresolved: unknown[] = [];
     const refs = extractTiReferences(
-      "sDyn = 'te' | 'st';\nExecuteProcess(sDyn);",
+      "sDyn = sOther;\nExecuteProcess(sDyn);",
       undefined,
       undefined,
       unresolved as never,
@@ -66,7 +66,7 @@ describe("extractTiReferences unresolved process calls", () => {
   it("does NOT record dynamic CUBE targets (scope guard — process calls only)", () => {
     const unresolved: unknown[] = [];
     extractTiReferences(
-      "sDyn = 'a' | 'b';\nnV = CellGetN(sDyn, 'x');",
+      "sDyn = sOther;\nnV = CellGetN(sDyn, 'x');",
       undefined,
       undefined,
       unresolved as never,
@@ -79,7 +79,7 @@ describe("buildReferenceIndex — unresolvedCallsBySourceProcess", () => {
   it("buckets unresolved calls per source process section", async () => {
     const index = await buildReferenceIndex({
       fetchProcesses: async () => [
-        { name: "P", prolog: "sDyn = 'a' | 'b';\nExecuteProcess(sDyn);", metadata: "", data: "", epilog: "", parameters: [] },
+        { name: "P", prolog: "sDyn = sOther;\nExecuteProcess(sDyn);", metadata: "", data: "", epilog: "", parameters: [] },
       ],
       fetchCubesWithRules: async () => [],
       fetchChores: async () => [],

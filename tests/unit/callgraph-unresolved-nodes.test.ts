@@ -5,7 +5,7 @@ import { buildCallGraph } from "../../src/lib/callgraph/callGraph.js";
 async function indexWithDynamicCall() {
   return buildReferenceIndex({
     fetchProcesses: async () => [
-      { name: "Orchestrator", prolog: "ExecuteProcess('Child');\nsDyn = 'a' | 'b';\nExecuteProcess(sDyn);", metadata: "", data: "", epilog: "", parameters: [] },
+      { name: "Orchestrator", prolog: "ExecuteProcess('Child');\nsDyn = sOther;\nExecuteProcess(sDyn);", metadata: "", data: "", epilog: "", parameters: [] },
       { name: "Child", prolog: "", metadata: "", data: "", epilog: "", parameters: [] },
     ],
     fetchCubesWithRules: async () => [],

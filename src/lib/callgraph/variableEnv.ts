@@ -45,6 +45,27 @@ function neutralizeLine(line: string): string {
 const SECTION_MARKER_RE = /^57[2345],\d*$/;
 
 /**
+ * Split an expression on top-level '|' (TI string-concat), ignoring '|' inside
+ * 'string literals' or (parens). A single-element result means no top-level '|'
+ * was found (not a concatenation).
+ */
+function splitTopLevelConcat(expr: string): string[] {
+  const parts: string[] = [];
+  let cur = '';
+  let inStr = false;
+  let depth = 0;
+  for (const ch of expr) {
+    if (ch === "'") { inStr = !inStr; cur += ch; }
+    else if (!inStr && ch === '(') { depth++; cur += ch; }
+    else if (!inStr && ch === ')') { depth--; cur += ch; }
+    else if (!inStr && depth === 0 && ch === '|') { parts.push(cur); cur = ''; }
+    else { cur += ch; }
+  }
+  parts.push(cur);
+  return parts;
+}
+
+/**
  * Classify a single right-hand-side expression (no surrounding whitespace).
  * Only handles simple cases:
  *   'literal', 42, varName (→ lookup), paramName (→ param-ref), dsVarName (→ datasource-ref).
@@ -78,6 +99,18 @@ export function resolveExpression(expr: string, env: ProcessEnv): VarBinding {
     if (bound) { return bound; }
     // Unknown identifier — treat as dynamic (could be a global, a later-assigned var, etc.)
     return { kind: 'dynamic' };
+  }
+
+  // Constant string-concatenation: fold if every operand resolves to a literal.
+  const parts = splitTopLevelConcat(e);
+  if (parts.length >= 2) {
+    const values: string[] = [];
+    for (const part of parts) {
+      const resolved = resolveExpression(part, env);
+      if (resolved.kind !== 'literal') { return { kind: 'dynamic' }; }
+      values.push(resolved.value);
+    }
+    return { kind: 'literal', value: values.join('') };
   }
 
   return { kind: 'dynamic' };
