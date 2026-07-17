@@ -111,6 +111,15 @@ export function withAnnotations(
             // results (validateToolOutput returns early on result.isError),
             // so the error envelope below — which carries no
             // structuredContent — passes through cleanly.
+            //
+            // COVERAGE BOUNDARY: this guard only bites schemas that can actually
+            // fail safeParse. A `.passthrough()` object or a `z.unknown()` field
+            // accepts anything, so tools whose OUTPUT_SCHEMA_MAP entry is
+            // permissive (e.g. MutationResultSchema.passthrough(), audit/feeder
+            // schemas) get no structural drift protection here — extra/renamed
+            // fields slip through silently. Prefer a strict, fully-modelled
+            // schema for any new output whose shape you want enforced (the
+            // callgraph tree was tightened for exactly this reason).
             const parsed = schema.safeParse(withStructured.structuredContent);
             if (!parsed.success) {
               const issue = parsed.error.issues[0];

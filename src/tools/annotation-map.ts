@@ -100,6 +100,14 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_get_server_state: READ_ONLY,
   tm1_list_error_logs: READ_ONLY,
   tm1_list_sessions: READ_ONLY,
+  // Monitoring tools are registration-gated by connection version (v11 → thread
+  // tools, v12 → job tools; see get-threads.ts / get-jobs.ts early-return). They
+  // deliberately use plain READ_ONLY/DESTRUCTIVE, NOT withVersion(): a hard-gated
+  // tool is simply absent from the listing on the wrong version, so its absence
+  // is self-documenting per connection — a requiresVersion hint would be dead
+  // metadata a client can never observe. (Contrast the soft-gated tools below —
+  // tm1_get_audit_log / tm1_save_data — which DO register on both versions and
+  // only no-op on v12, so they carry withVersion for machine-readable scope.)
   tm1_list_threads: READ_ONLY,
   tm1_cancel_thread: DESTRUCTIVE,
   tm1_list_jobs: READ_ONLY,
