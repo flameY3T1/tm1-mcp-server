@@ -138,3 +138,16 @@ describe("maskDataSourceSecrets", () => {
     expect(maskDataSourceSecrets(ds)).toBe(ds);
   });
 });
+
+describe("v12 credential names", () => {
+  it("treats v12 secret fields as secrets", () => {
+    expect(isSecretName("clientSecret")).toBe(true);
+    expect(isSecretName("accessToken")).toBe(true);
+    expect(isSecretName("apiKey")).toBe(true);
+    expect(isSecretName("TM1_CLIENT_SECRET")).toBe(true);
+  });
+
+  it("does not mask the non-secret client id", () => {
+    expect(isSecretName("clientId")).toBe(false);
+  });
+});
