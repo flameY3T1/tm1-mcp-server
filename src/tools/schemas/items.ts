@@ -651,8 +651,9 @@ export const TraceFeedersResultSchema = z.object({
   statements: z.array(z.string()),
 });
 
-// Recursive component tree — children typed as unknown (same precedent as
-// CallgraphResultSchema.tree) to avoid recursive JSON-schema emission.
+// Recursive component tree — children typed as unknown to avoid recursive
+// JSON-schema emission (kept permissive; unlike CallgraphResultSchema this
+// one is not yet fully typed).
 export const CalculationTraceResultSchema = z
   .object({
     type: z.string().optional(),
@@ -666,24 +667,152 @@ export const CalculationTraceResultSchema = z
   })
   .passthrough();
 
-export const CallgraphResultSchema = z
-  .object({
-    warning: z.string().optional(),
-    indexedProcessCount: z.number().int().optional(),
-    start: z.string().optional(),
-    direction: z.string().optional(),
-    mode: z.string().optional(),
-    summary: z.unknown().optional(),
-    tree: z.unknown().optional(),
-    // global-ranking shape (start omitted)
-    rankBy: z.string().optional(),
-    totalProcessesIndexed: z.number().int().optional(),
-    processesWithEdges: z.number().int().optional(),
-    totalCallEdges: z.number().int().optional(),
-    truncated: z.boolean().optional(),
-    ranking: z.array(z.unknown()).optional(),
-  })
-  .passthrough();
+// ─── Callgraph output schema (typed, recursive) ──────────────────────────────
+// Faithfully mirrors what src/tools/analysis/analyze-callgraph.ts emits so the
+// output-schema drift-guard (with-annotations.ts) actually validates the tree
+// instead of being blind (`z.unknown()` + `.passthrough()`). One response is
+// exactly one of 5 shapes: warning | full tree | compact tree | summary |
+// globalRanking. Fields the serializers emit as `undefined` are dropped by the
+// JSON round-trip the guard performs, so they are modelled `.optional()`.
+
+// EffectiveValue: {kind:'literal';value}|{kind:'unknown';viaParam}|{kind:'dynamic'}
+const EffectiveValueSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("literal"), value: z.string() }),
+  z.object({ kind: z.literal("unknown"), viaParam: z.string() }),
+  z.object({ kind: z.literal("dynamic") }),
+]);
+
+// CallParamResolution: {kind:'literal';value}|{kind:'passthrough';paramName}|{kind:'dynamic'}
+const CallParamResolutionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("literal"), value: z.string() }),
+  z.object({ kind: z.literal("passthrough"), paramName: z.string() }),
+  z.object({ kind: z.literal("dynamic") }),
+]);
+
+// CallParam = {name, resolution, valueRaw}
+const CallParamSchema = z.object({
+  name: z.string(),
+  resolution: CallParamResolutionSchema,
+  valueRaw: z.string(),
+});
+
+// effectiveParams entry = {name, effective, valueRaw}
+const EffectiveParamSchema = z.object({
+  name: z.string(),
+  effective: EffectiveValueSchema,
+  valueRaw: z.string(),
+});
+
+// incomingEdge object (serializeNode) — null on the root node.
+const CallgraphEdgeSchema = z.object({
+  caller: z.string(),
+  callee: z.string(),
+  section: z.string(),
+  line: z.number().int(),
+  funcName: z.string(),
+  snippet: z.string(),
+  params: z.array(CallParamSchema),
+  effectiveParams: z.array(EffectiveParamSchema).optional(),
+});
+
+// unresolvedCalls entry — full mode carries `snippet`, compact mode does not.
+const UnresolvedFullSchema = z.object({
+  section: z.string(),
+  line: z.number().int(),
+  funcName: z.string(),
+  expr: z.string(),
+  snippet: z.string(),
+  reason: z.string(),
+});
+const UnresolvedCompactSchema = z.object({
+  section: z.string(),
+  line: z.number().int(),
+  funcName: z.string(),
+  expr: z.string(),
+  reason: z.string(),
+});
+
+// Full-mode node (serializeNode). Recursive via z.lazy on `children`.
+const FullNodeBase = z.object({
+  process: z.string(),
+  cycle: z.boolean(),
+  depthLimitReached: z.boolean().optional(),
+  incomingEdge: CallgraphEdgeSchema.nullable(),
+  env: z.record(z.string(), EffectiveValueSchema).optional(),
+  unresolvedCalls: z.array(UnresolvedFullSchema).optional(),
+});
+type FullNode = z.infer<typeof FullNodeBase> & { children: FullNode[] };
+const FullNodeSchema: z.ZodType<FullNode> = FullNodeBase.extend({
+  children: z.lazy(() => z.array(FullNodeSchema)),
+});
+
+// Compact-mode node (serializeCompact). Recursive via z.lazy on `children`.
+const CompactNodeBase = z.object({
+  process: z.string(),
+  cycle: z.boolean().optional(),
+  depthLimitReached: z.boolean().optional(),
+  unresolvedCalls: z.array(UnresolvedCompactSchema).optional(),
+});
+type CompactNode = z.infer<typeof CompactNodeBase> & { children: CompactNode[] };
+const CompactNodeSchema: z.ZodType<CompactNode> = CompactNodeBase.extend({
+  children: z.lazy(() => z.array(CompactNodeSchema)),
+});
+
+// summarize() result.
+const SummaryEntrySchema = z.object({
+  process: z.string(),
+  depthMin: z.number().int(),
+  depthMax: z.number().int(),
+  occurrences: z.number().int(),
+  cycle: z.boolean(),
+  depthLimitReached: z.boolean(),
+  unresolvedCount: z.number().int(),
+});
+const CallgraphSummarySchema = z.object({
+  root: z.string(),
+  totalNodes: z.number().int(),
+  uniqueProcesses: z.number().int(),
+  maxDepth: z.number().int(),
+  cyclesDetected: z.number().int(),
+  depthLimitsHit: z.number().int(),
+  processes: z.array(SummaryEntrySchema),
+});
+
+// globalRanking() RankEntry.
+const RankEntrySchema = z.object({
+  process: z.string(),
+  outgoingCalls: z.number().int(),
+  outgoingDistinct: z.number().int(),
+  incomingCalls: z.number().int(),
+  incomingDistinct: z.number().int(),
+});
+
+// One permissive top-level object whose optional fields are now precisely
+// typed — every real payload validates, and the typed fields are enforced.
+// `tree` accepts both full and compact nodes (full is tried first; a compact
+// node fails FullNode because `cycle`/`incomingEdge` are required there).
+// No `.passthrough()` — that is what made the guard structurally blind.
+export const CallgraphResultSchema = z.object({
+  // shape 1: warning (process not found)
+  warning: z.string().optional(),
+  indexedProcessCount: z.number().int().optional(),
+  // shared across the traversal shapes
+  start: z.string().optional(),
+  direction: z.string().optional(),
+  mode: z.string().optional(),
+  maskSecrets: z.boolean().optional(),
+  // shape 4: summary
+  summary: CallgraphSummarySchema.optional(),
+  // shapes 2 & 3: full / compact tree
+  tree: z.union([FullNodeSchema, CompactNodeSchema]).optional(),
+  // shape 5: global-ranking (start omitted)
+  rankBy: z.string().optional(),
+  totalProcessesIndexed: z.number().int().optional(),
+  processesWithEdges: z.number().int().optional(),
+  totalCallEdges: z.number().int().optional(),
+  truncated: z.boolean().optional(),
+  ranking: z.array(RankEntrySchema).optional(),
+});
 
 export const ChoreGraphResultSchema = z.object({
   choreName: z.string(),

@@ -377,8 +377,9 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_analyze_callgraph: {
       start: "Load.Sales",
       direction: "downstream",
-      mode: "tree",
-      tree: { name: "Load.Sales", children: [] },
+      mode: "full",
+      maskSecrets: false,
+      tree: { process: "Load.Sales", cycle: false, incomingEdge: null, children: [] },
     },
     tm1_analyze_chore_graph: {
       choreName: "Daily.Load",

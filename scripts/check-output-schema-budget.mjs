@@ -23,10 +23,13 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-// Current total is ~68KB (111 schemas). Budget = round number ~13% above that,
-// so ordinary additions pass but a runaway new schema (or a sloppy .describe()
-// spree) trips the gate. Re-baseline deliberately when a real feature needs it.
-const BUDGET_BYTES = 78_000;
+// Current total is ~78.6KB (114 schemas). Budget = round number a few % above
+// that, so ordinary additions pass but a runaway new schema (or a sloppy
+// .describe() spree) trips the gate. Re-baseline deliberately when a real
+// feature needs it — e.g. G1 typed the recursive tm1_analyze_callgraph output
+// schema (was z.unknown()/passthrough, now ~6.3KB) to close the drift-guard
+// blind spot, which lifted the total past the previous 78KB baseline.
+const BUDGET_BYTES = 82_000;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
