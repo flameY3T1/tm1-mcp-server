@@ -9,88 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### TM1 v12 (Planning Analytics Engine) support
-
-- Connection layer: URL rerooting under `/{instance}/api/v1/Databases('{database}')`
-  and a `POST /{instance}/auth/v1/session` login. Auth modes: `s2s`
-  (live-validated), `basic`/`access_token`/`oidc`/`iam` (unit-validated request
-  builders, not yet live-validated).
-- Jobs/Activity monitoring: `tm1_list_jobs` and `tm1_cancel_job`. Monitoring tools
-  are version-gated — v11 connections expose the thread tools (`tm1_list_threads`/
-  `tm1_cancel_thread`), v12 connections expose the job tools.
-
-#### Element-level data-flow analysis (`tm1_trace_data_flow`)
-
-- Callgraph now tracks an **element** grain for subset-membership calls
-  (`SubsetElementInsert`/`SubsetElementAdd`/`SubsetElementDelete`): the element name +
-  owning dimension are indexed, and non-literal element args are surfaced as unresolved
-  (not silently dropped).
-- Optional `element` + `dimension` inputs answer "which processes touch element X of
-  dimension D" (via in-code subset-membership calls); each data-flow row also lists the
-  in-code elements that process manipulates.
-- Element tracing classifies each touching process by how it uses the element's subset:
-  `source` (read/datasource), `write`, `zero-out` (e.g. `ViewZeroOut`), or
-  `indeterminate` (built but not classifiable — not evidence the element goes untouched).
-  New `elementAccess` input filters roles (default source+write+zero-out); suppressed
-  `indeterminate` processes are counted.
-- Element tracing resolves **stored** view/subset datasources: native-view title members
-  and static subsets are matched exactly; MDX views and MDX subset expressions by literal
-  member reference. Each such process is tagged `access: source` with a `via` provenance
-  tag. Computed selectors (`TM1FILTERBYLEVEL`, `DESCENDANTS`, `TM1SUBSETALL`, …) are
-  reported in `computedInProcesses` (scoped to the traced dimension), not silently
-  dropped. `resolveDatasourceMembership=false` skips the extra fetches.
-- Opt-in `resolveComputed`: computed native-view axis selectors used as datasources are
-  resolved to exact members by live-evaluating just that dimension's set against the
-  view's cube (read-only, `via: view-native-computed`). Off by default; when off, such
-  axes stay flagged in `computedInProcesses`.
-
-#### Callgraph analysis (`tm1_analyze_callgraph` / `tm1_analyze_object_usage`)
-
-- Surfaces `ExecuteProcess`/`RunProcess` calls whose target is a computed expression or a
-  process parameter as `unresolvedCalls` (full/compact) / `unresolvedCount` (summary)
-  instead of silently dropping them — flagged for manual review, not resolved.
-- Folds constant string concatenations when resolving TI variable targets, so
-  `sProc = 'zA' | 'zB'; ExecuteProcess(sProc)` resolves to a real edge (`zAzB`).
-  Concatenations with a runtime operand (parameter, `CellGet*`, …) stay unresolved.
+- **TM1 v12 (Planning Analytics Engine) support** — rerooted REST + `/{instance}/auth/v1/session` login (`s2s` live-validated; `basic`/`access_token`/`oidc`/`iam` unit-validated).
+- **v12 Jobs/Activity monitoring** — `tm1_list_jobs`, `tm1_cancel_job`; monitoring tools version-gated (v11 → thread tools, v12 → job tools).
+- **Element-level data flow** — `tm1_trace_data_flow` gains `element`+`dimension` inputs answering "which processes touch element X of dimension D". Each process is classified `access = source | write | zero-out | indeterminate`, resolved from in-code subset builds, stored view/subset datasources (native-title/static exact, MDX by literal member), and — opt-in `resolveComputed` — live-evaluated computed axis selectors. Unresolved/computed cases are flagged, never silently dropped.
+- `tm1_analyze_callgraph` surfaces dynamic/parameter `ExecuteProcess` targets as `unresolvedCalls`, and folds constant string-concat targets (`'zA'|'zB'` → `zAzB`) into real edges.
 
 ### Changed
 
-- **Breaking:** `tm1_export_process_to_git` / `tm1_import_process_from_git` now use
-  TM1's native `#region <Tab>` / `#endregion` code format (the server `Code`
-  property) instead of the previous `### TM1-TI-TAB:` markers. Exported `.ti`
-  files are byte-identical to `GET /Processes('x')/Code/$value` (CRLF, empty
-  tabs omitted); nested user folding regions inside a tab are preserved. `.ti`
-  files produced by earlier versions are no longer importable — re-export from
-  the server to regenerate.
-- `tm1_analyze_callgraph` output is now a typed, recursive schema (was untyped
-  passthrough), so schema-drift is caught by the output-schema gate.
+- **Breaking:** git tools use TM1's native `#region <Tab>` / `#endregion` code format (byte-identical to the server `Code` blob; nested user folds preserved). `.ti` files from earlier versions are no longer importable — re-export.
+- `tm1_analyze_callgraph` output is now a typed, recursive schema.
 
 ### Fixed
 
-- `tm1_import_process_from_git` code-blob parsing is now depth-aware: nested user folding
-  regions (`#region <label>` / `#endregion` inside a tab's TI code, as PAW/Arc emit) are
-  preserved verbatim through a round-trip, while a genuinely **malformed** blob — an
-  unbalanced/unclosed `#region`/`#endregion`, or a stray/top-level non-tab region — is
-  now **rejected** with a clear error instead of silently dropping a tab's code and
-  deploying a partial process.
-- `tm1_get_server_info` reports the correct product version on v12: v12 omits
-  `ProductVersion` from the `Configuration` body, so `getInfo()` falls back to the
-  `/Configuration/ProductVersion` scalar.
-- v12: when `TM1_INSTANCE`/`TM1_DATABASE` select a v12 connection, the effective server
-  version is coerced to 12 even if `TM1_VERSION` is left at a v11 value, so version-gated
-  service code paths no longer misfire.
-- v12 request rerooting hardened: the instance segment is URL-encoded and the
-  reroot replacement neutralizes literal `$` in instance/database names (no
-  `$&`/`$n` substitution); the IAM API-key token exchange is bounded by a request
-  timeout.
-- `tm1_list_jobs` mapping is null-safe (a job with a null field no longer errors the
-  list).
+- git import rejects malformed/unbalanced `#region` blobs instead of silently deploying partial code.
+- v12: correct product version (`ProductVersion` scalar fallback); version coerced to 12 when instance-configured; rerooting hardened (instance URL-encode, `$`-injection guard, bounded IAM token exchange); `tm1_list_jobs` null-safe.
 
 ### Security
 
-- v12 credential fields (`clientSecret`, `accessToken`, `apiKey`, CAM `camPassport`) are
-  redacted in logs alongside the existing `password`/`Authorization`/`Cookie`/session
-  masking; no credential reaches a log line or thrown error.
+- v12 credentials (`clientSecret`/`accessToken`/`apiKey`/`camPassport`) redacted in logs.
 
 ## [1.0.4] - 2026-07-12
 
