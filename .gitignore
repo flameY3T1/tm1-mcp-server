@@ -18,6 +18,8 @@ coverage/
 
 # internal planning/review docs — not for public release
 docs/internal/
+docs/superpowers/
+.superpowers/
 
 # agent entry point — local only, not for public release
 CLAUDE.md
