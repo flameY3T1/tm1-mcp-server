@@ -3,6 +3,7 @@ import { extractDbCalls, extractBracketRefs, parseBracketDimRefs, validateBracke
 import { joinContinuationLines } from './tiParser.js';
 import { buildProcessEnv, resolveExpression, type ProcessEnv, type VarBinding } from './variableEnv.js';
 import { rethrowIfSystemic } from '../../tm1-client/services/fallback.js';
+import { extractSubsetUsage, type SubsetUsage } from './subsetUsage.js';
 
 // ─── Argument-Index Auto-Derivation ──────────────────────────────────────────
 
@@ -130,6 +131,8 @@ export interface ReferenceIndex {
   byElement: Map<string, TmReference[]>;
   /** Process name (lowercased) → element args that could not be resolved to a literal. */
   unresolvedElementRefsBySourceProcess: Map<string, UnresolvedElementRef[]>;
+  /** Process (lc) → subset (lc) → how that subset is used in the process (view assign / zero-out / loop). */
+  subsetUsageByProcess: Map<string, Map<string, SubsetUsage>>;
   /** Process name (lowercased) → declared param names (original casing). */
   processParams: Map<string, string[]>;
   /** Process name (lowercased) → param-name → default value (string form), for root-env seeding. */
@@ -169,7 +172,7 @@ export function elementKey(dimension: string, element: string): string {
   return `${dimension.toLowerCase()} ${element.toLowerCase()}`;
 }
 
-function extractStringLiteral(arg: string): string | null {
+export function extractStringLiteral(arg: string): string | null {
   const t = arg.trim();
   if (t.startsWith("'") && t.endsWith("'") && t.length >= 3) {
     const inner = t.slice(1, -1);
@@ -524,6 +527,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
   const all: TmReference[] = [];
   const unresolvedCallsBySourceProcess = new Map<string, UnresolvedCall[]>();
   const unresolvedElementRefsBySourceProcess = new Map<string, UnresolvedElementRef[]>();
+  const subsetUsageByProcess = new Map<string, Map<string, SubsetUsage>>();
 
   const pushTi = (
     sourceName: string,
@@ -581,6 +585,8 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
     pushTi(p.name, 'metadata', p.metadata, env, sharedLiveVars);
     pushTi(p.name, 'data',     p.data,     env, sharedLiveVars);
     pushTi(p.name, 'epilog',   p.epilog,   env, sharedLiveVars);
+
+    subsetUsageByProcess.set(p.name.toLowerCase(), extractSubsetUsage(combinedText, env));
   }
 
   for (const c of cubes) {
@@ -657,6 +663,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
     bySourceProcess,
     unresolvedCallsBySourceProcess,
     unresolvedElementRefsBySourceProcess,
+    subsetUsageByProcess,
     processParams,
     processDefaults,
     choreTasks,
