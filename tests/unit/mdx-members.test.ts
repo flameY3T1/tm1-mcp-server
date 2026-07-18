@@ -1,0 +1,35 @@
+import { describe, it, expect } from "vitest";
+import { extractMdxMemberRefs } from "../../src/lib/callgraph/mdxMembers.js";
+
+describe("extractMdxMemberRefs", () => {
+  it("extracts a two-part [Dim].[Element] member", () => {
+    const r = extractMdxMemberRefs("{ [Datenquellen].[SuDatenquellen_C] }");
+    expect(r.members).toEqual([{ dimension: "Datenquellen", element: "SuDatenquellen_C" }]);
+    expect(r.computedSelectors).toEqual([]);
+  });
+
+  it("takes dimension from first part and element from last part of a 3-part ref", () => {
+    const r = extractMdxMemberRefs("[Kunde].[Kunde].[K100]");
+    expect(r.members).toEqual([{ dimension: "Kunde", element: "K100" }]);
+  });
+
+  it("flags computed selectors and does NOT invent members for them", () => {
+    const r = extractMdxMemberRefs("{TM1FILTERBYLEVEL(TM1SUBSETALL([Datenquellen]),0)}");
+    expect(r.members).toEqual([]); // [Datenquellen] alone is a dimension ref, not a member
+    expect(r.computedSelectors.sort()).toEqual(["TM1FILTERBYLEVEL", "TM1SUBSETALL"]);
+  });
+
+  it("captures explicit members even alongside a computed selector", () => {
+    const r = extractMdxMemberRefs("{ DESCENDANTS([Zeit].[2026]) , [Datenquellen].[SuDatenquellen_C] }");
+    expect(r.members).toEqual([
+      { dimension: "Zeit", element: "2026" },
+      { dimension: "Datenquellen", element: "SuDatenquellen_C" },
+    ]);
+    expect(r.computedSelectors).toEqual(["DESCENDANTS"]);
+  });
+
+  it("dedupes repeated members", () => {
+    const r = extractMdxMemberRefs("[D].[E] + [D].[E]");
+    expect(r.members).toEqual([{ dimension: "D", element: "E" }]);
+  });
+});
