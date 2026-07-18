@@ -147,6 +147,14 @@ TM1_INSTANCE=my-instance
 TM1_DATABASE=my-database
 TM1_AUTH_MODE=s2s                   # s2s (default) | basic | access_token | oidc | iam
 TM1_USER=admin                      # supplies the session login "User" in every mode
+
+# Per-mode credentials — set the ones your TM1_AUTH_MODE requires:
+TM1_CLIENT_ID=my-client-id          # s2s
+TM1_CLIENT_SECRET=my-client-secret  # s2s
+# TM1_PASSWORD=...                   # basic (with TM1_USER)
+# TM1_ACCESS_TOKEN=...               # access_token / oidc
+# TM1_API_KEY=...                    # iam
+# TM1_IAM_URL=https://iam.host       # iam
 ```
 
 `TM1_AUTH_MODE` selects how the `auth/v1/session` request authenticates, each
