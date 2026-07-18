@@ -91,21 +91,73 @@ describe("git-process #region round-trip", () => {
 
   it("rejects a blob with a missing #endregion (next tab's #region follows directly) instead of silently swallowing the following tab", () => {
     // Prolog's #endregion is missing/typo'd; Metadata's #region follows directly.
-    // The old non-greedy parser silently absorbed Metadata's content into Prolog
-    // and reported found:1 with no error — a silent partial-deploy hazard.
+    // Depth-aware parsing treats the unclosed Metadata #region as nested inside
+    // Prolog (depth 2), so depth never returns to 0 by EOF — an unclosed tab,
+    // still rejected, rather than silently absorbing Metadata into Prolog.
     const ti =
       "#region Prolog\r\nsP='p';\r\n#region Metadata\r\nsM='m';\r\n#endregion";
     const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
     expect(() => parseProcessFromGit(json, ti)).toThrow(/#region/);
   });
 
-  it("rejects a blob with a nested #region/#endregion inside a tab's code (e.g. editor folding markers) instead of silently dropping trailing content", () => {
-    // A #region/#endregion pair nested inside Prolog's code (e.g. a PAW folding
-    // comment). The old non-greedy parser closed on the FIRST #endregion (the
-    // inner one) and silently dropped everything after it — up to and including
-    // the real #endregion — with no error.
+  it("parses a nested #region/#endregion inside a tab's code (e.g. an editor folding comment) — preserved verbatim, not rejected", () => {
+    // A #region/#endregion pair nested inside Prolog's code (e.g. a PAW/Arc
+    // folding comment). This is legitimate user content, not a structural
+    // marker: depth-aware parsing must keep it as part of Prolog's code rather
+    // than closing on the first #endregion it finds.
     const ti =
       "#region Prolog\r\ncode before;\r\n#region MyFold\r\nfolded stuff;\r\n#endregion\r\ncode after;\r\n#endregion";
+    const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
+    const parsed = parseProcessFromGit(json, ti);
+    expect(parsed.prolog).toBe(
+      "code before;\r\n#region MyFold\r\nfolded stuff;\r\n#endregion\r\ncode after;",
+    );
+  });
+
+  it("parses the live-confirmed export: a WHILE loop wrapped in a nested #region fold inside Prolog", () => {
+    // Live-confirmed export of a process where the TM1 user wrapped a WHILE
+    // loop in their own #region schleife1 / #endregion folding comment inside
+    // the Prolog tab. #region Prolog is the tab; #region schleife1 … #endregion
+    // is the nested user fold; the final #endregion closes the Prolog tab.
+    const ti =
+      "#region Prolog\r\nLogOutput('INFO','start');\r\n#region schleife1\r\nnI = 1;\r\n" +
+      "WHILE(nI <= 3);\r\nLogOutput('INFO', NumberToString(nI));\r\nnI = nI + 1;\r\nEND;\r\n" +
+      "#endregion\r\nLogOutput('INFO','end');\r\n#endregion";
+    const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
+    const parsed = parseProcessFromGit(json, ti);
+    const expectedProlog =
+      "LogOutput('INFO','start');\r\n#region schleife1\r\nnI = 1;\r\n" +
+      "WHILE(nI <= 3);\r\nLogOutput('INFO', NumberToString(nI));\r\nnI = nI + 1;\r\nEND;\r\n" +
+      "#endregion\r\nLogOutput('INFO','end');";
+    expect(parsed.prolog).toBe(expectedProlog);
+    expect(parsed.prolog).toContain("#region schleife1");
+    expect(parsed.prolog).toContain("#endregion");
+
+    // Round-trips: re-serializing the same blob shape reproduces the tab.
+    const roundTrip = `#region Prolog\r\n${parsed.prolog}\r\n#endregion`;
+    expect(roundTrip).toBe(ti);
+  });
+
+  it("parses a deeply nested fold (2 levels of user #region inside a tab)", () => {
+    const ti =
+      "#region Prolog\r\nouter start;\r\n#region Outer\r\nouter code;\r\n#region Inner\r\n" +
+      "inner code;\r\n#endregion\r\nmore outer;\r\n#endregion\r\nouter end;\r\n#endregion";
+    const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
+    const parsed = parseProcessFromGit(json, ti);
+    expect(parsed.prolog).toBe(
+      "outer start;\r\n#region Outer\r\nouter code;\r\n#region Inner\r\n" +
+        "inner code;\r\n#endregion\r\nmore outer;\r\n#endregion\r\nouter end;",
+    );
+  });
+
+  it("rejects a stray #endregion at the top level with no matching #region", () => {
+    const ti = "#region Prolog\r\nsP='p';\r\n#endregion\r\n#endregion";
+    const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
+    expect(() => parseProcessFromGit(json, ti)).toThrow(/#region/);
+  });
+
+  it("rejects a top-level #region whose name is not a recognized TI tab", () => {
+    const ti = "#region NotATab\r\nsP='p';\r\n#endregion";
     const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
     expect(() => parseProcessFromGit(json, ti)).toThrow(/#region/);
   });

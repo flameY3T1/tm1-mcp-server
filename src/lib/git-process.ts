@@ -126,17 +126,24 @@ function extractRegionMarkers(ti: string): RegionMarker[] {
  * Parse a native `#region <Tab>` / `#endregion` code blob into the four tabs.
  * Case-insensitive on keyword and tab name; a tab whose region is absent
  * defaults to "". Throws if the blob has no region markers at all (rejects the
- * pre-1.x `### TM1-TI-TAB:` layout — no longer supported), and — critically —
- * throws on ANY structural violation instead of silently mis-parsing:
- *   - unbalanced #region/#endregion counts (e.g. a missing/typo'd #endregion,
- *     which would otherwise let the next tab's content get silently absorbed
- *     into the previous tab)
- *   - a nested/stray #region (e.g. an editor folding-region comment inside a
- *     tab's code), which would otherwise cause the parser to close on the
- *     FIRST #endregion it finds and silently drop everything after it
- * A well-formed blob must be a flat, non-nested sequence of top-level
- * `#region <KnownTab>` … `#endregion` pairs (arbitrary code content between
- * them is fine — only marker lines are structurally significant).
+ * pre-1.x `### TM1-TI-TAB:` layout — no longer supported).
+ *
+ * Depth-aware: TM1 users can write their OWN `#region <label>` / `#endregion`
+ * FOLDING COMMENTS inside a tab's TI code (PAW/Arc supports this), and the
+ * server stores them nested inside the tab's region — that is legitimate code
+ * content, not a structural marker. A `#region`/`#endregion` pair encountered
+ * while already inside a tab is therefore just a depth increment/decrement;
+ * its lines stay part of the tab's code, preserved verbatim. Only the
+ * top-level (depth 0→1) `#region` opens a tab, and only the marker that
+ * brings depth back to 0 closes it.
+ *
+ * Still throws on genuine structural corruption:
+ *   - an unclosed tab (depth never returns to 0 by EOF — a missing/typo'd
+ *     #endregion, which would otherwise let the next tab's content get
+ *     silently absorbed into the previous tab)
+ *   - a stray #endregion at the top level (depth would go negative)
+ *   - a top-level `#region` whose name isn't a recognized TI tab
+ *     (Prolog/Metadata/Data/Epilog) — genuinely malformed, not a user fold
  */
 function parseCodeBlob(ti: string): Record<Tab, string> {
   const out: Record<Tab, string> = { prolog: "", metadata: "", data: "", epilog: "" };
@@ -149,43 +156,50 @@ function parseCodeBlob(ti: string): Record<Tab, string> {
     );
   }
 
-  const regionCount = markers.filter((m) => m.kind === "region").length;
-  const endregionCount = markers.length - regionCount;
-  if (regionCount !== endregionCount) {
-    throw regionBlobError(
-      `found ${regionCount} #region marker(s) but ${endregionCount} #endregion marker(s) ` +
-        "(unbalanced) — the blob is truncated or a closing #endregion is missing.",
-    );
+  let depth = 0;
+  let currentTab: Tab | null = null;
+  let contentStart = 0;
+  let found = 0;
+
+  for (const marker of markers) {
+    if (marker.kind === "region") {
+      if (depth === 0) {
+        // Top-level #region: must be a known tab delimiter, not a user fold.
+        const tabName = marker.name.toLowerCase();
+        if (!TAB_NAMES.has(tabName as Tab)) {
+          throw regionBlobError(
+            `found "#region ${marker.name}" at the top level, which is not a recognized TI tab ` +
+              "(expected Prolog/Metadata/Data/Epilog).",
+          );
+        }
+        currentTab = tabName as Tab;
+        contentStart = marker.contentStart;
+      }
+      // depth > 0: a nested user #region fold — part of the tab's code content.
+      depth++;
+    } else {
+      depth--;
+      if (depth < 0) {
+        throw regionBlobError(
+          `found a stray #endregion with no matching #region near offset ${marker.start}.`,
+        );
+      }
+      if (depth === 0) {
+        // Back to top level: this #endregion closes the current tab. Strip
+        // the single newline the server places before #endregion; nested
+        // #region/#endregion lines (user folds) stay in the sliced content.
+        out[currentTab as Tab] = ti.slice(contentStart, marker.start).replace(/\r?\n$/, "");
+        found++;
+        currentTab = null;
+      }
+    }
   }
 
-  let found = 0;
-  let i = 0;
-  while (i < markers.length) {
-    const opener = markers[i]!;
-    if (opener.kind !== "region") {
-      throw regionBlobError(
-        `found a stray #endregion with no matching #region near offset ${opener.start}.`,
-      );
-    }
-    const tabName = opener.name.toLowerCase();
-    if (!TAB_NAMES.has(tabName as Tab)) {
-      throw regionBlobError(
-        `found "#region ${opener.name}" which is not a recognized TI tab ` +
-          "(expected Prolog/Metadata/Data/Epilog) — this looks like a nested or stray #region " +
-          "(e.g. an editor folding marker) inside a tab's code, which is not supported.",
-      );
-    }
-    const closer = markers[i + 1];
-    if (!closer || closer.kind !== "endregion") {
-      throw regionBlobError(
-        `"#region ${opener.name}" is missing its matching #endregion immediately after it — ` +
-          "either the #endregion was dropped/mistyped, or another #region is nested inside it.",
-      );
-    }
-    // Strip the single newline the server places before #endregion.
-    out[tabName as Tab] = ti.slice(opener.contentStart, closer.start).replace(/\r?\n$/, "");
-    found++;
-    i += 2;
+  if (depth !== 0) {
+    throw regionBlobError(
+      `"#region ${currentTab ?? "?"}" is missing its matching #endregion — the blob is truncated ` +
+        "or a closing #endregion is missing.",
+    );
   }
 
   // Structurally unreachable given the checks above, but keep the original
