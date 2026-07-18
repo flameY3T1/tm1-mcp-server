@@ -18,14 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking:** git tools use TM1's native `#region <Tab>` / `#endregion` code format (byte-identical to the server `Code` blob; nested user folds preserved). `.ti` files from earlier versions are no longer importable — re-export.
 - `tm1_analyze_callgraph` output is now a typed, recursive schema.
+- `tm1_get_all_processes_code` / `tm1_get_all_cube_rules` default-cap full-code responses at 50 objects, pushed server-side (`$top`) — the default call no longer dumps the whole model. `limit=0` restores uncapped; summary mode still surveys everything. New `countIsExact` output flag marks `count` as a lower bound when the server omits a total.
 
 ### Fixed
 
+- `tm1_execute_process` reports the real TI outcome (via `tm1.ExecuteWithReturn`): runs finishing `CompletedWithMinorErrors` or aborted no longer read as clean success; the error log file is surfaced.
+- `tm1_get_hierarchy` returns real consolidation edge weights from the Edges collection — previously every child weight was reported as `1` (wrong for e.g. P&L dims consolidating costs with `-1`).
+- All user-facing lint/parser/v12-deprecation messages are now English (were German).
+- README documents the actual `.env` resolution order (shell/MCP env > `DOTENV_CONFIG_PATH` > cwd > package root) — the old instructions could not work under `npx`.
 - git import rejects malformed/unbalanced `#region` blobs instead of silently deploying partial code.
 - v12: correct product version (`ProductVersion` scalar fallback); version coerced to 12 when instance-configured; rerooting hardened (instance URL-encode, `$`-injection guard, bounded IAM token exchange); `tm1_list_jobs` null-safe.
 
 ### Security
 
+- MCP **resources** now mask secrets like the tool surface: `tm1://process/{name}/code` masks credential literals unconditionally; `tm1://server/info` no longer exposes the raw server configuration dump.
 - v12 credentials (`clientSecret`/`accessToken`/`apiKey`/`camPassport`) redacted in logs.
 
 ## [1.0.4] - 2026-07-12
