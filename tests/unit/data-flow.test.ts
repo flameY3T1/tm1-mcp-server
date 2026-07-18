@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { traceDataFlow, type DataSourceEntry } from "../../src/lib/callgraph/dataFlow.js";
-import { buildReferenceIndex } from "../../src/lib/callgraph/referenceIndex.js";
+import { buildReferenceIndex, elementKey } from "../../src/lib/callgraph/referenceIndex.js";
 import { buildDatasourceMembership } from "../../src/lib/callgraph/datasourceMembership.js";
 import type { ReferenceIndex, TmReference } from "../../src/lib/callgraph/referenceIndex.js";
 import type { DatasourceMembership } from "../../src/lib/callgraph/datasourceMembership.js";
@@ -171,6 +171,29 @@ describe("traceDataFlow — element filter", () => {
     // unresolvedElementRefsBySourceProcess is keyed lowercased (existing referenceIndex behavior).
     expect(flow.element?.unresolvedInProcesses).toContain("dynamicelemproc");
   });
+
+  it("excludes a process's unresolved element arg from unresolvedInProcesses when it's on a different dimension", async () => {
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        {
+          // Unresolved arg is on dimension "Kunde" — tracing an element of "Region" must not
+          // surface this process, exercising the dimension filter at the unresolvedInProcesses build.
+          name: "DynamicElemProc",
+          prolog: "SubsetElementInsert('Kunde','sTmp',CellGetS('C','x'),1);",
+          metadata: "",
+          data: "",
+          epilog: "",
+          parameters: [],
+        },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    const flow = traceDataFlow(index, [], "AnyCube", "both", {
+      element: { dimension: "Region", name: "EMEA" },
+    });
+    expect(flow.element?.unresolvedInProcesses).toBeUndefined();
+  });
 });
 
 describe("traceDataFlow — element access classification", () => {
@@ -217,6 +240,32 @@ describe("traceDataFlow — element access classification", () => {
     expect(flow.element!.processes[0]!.access).not.toContain("source");
     expect(flow.element!.processes[0]!.access).toEqual(["indeterminate"]);
   });
+  it("tags write (not zero-out) for a loop write with a non-literal CellPutN value", async () => {
+    // Same shape as the loopWrite/loopZero unit in subset-usage.test.ts: SubsetGetElementName
+    // feeds a variable-value CellPutN (not a literal 0), so loopWrite=true and loopZero=false —
+    // the only path that produces the "write" AccessKind (every other test's CellPutN is literal-0).
+    const index = await idx(
+      "SubsetElementInsert('Currency','sTmp','USD',1);\nsEl=SubsetGetElementName('sTmp','Currency',1);\nCellPutN(pValue,'Sales',sEl);",
+    );
+    const flow = traceDataFlow(index, [], "Sales", "both", {
+      element: { dimension: "Currency", name: "USD" },
+    });
+    expect(flow.element!.processes).toEqual([
+      { process: "P", funcNames: ["SubsetElementInsert"], access: ["write"] },
+    ]);
+  });
+
+  it("tags source via a direct TM1DimensionSubset match (in-code subset === datasource subset, on the traced dimension)", async () => {
+    const index = await idx("SubsetElementInsert('Kunde','sMy','C001',1);");
+    const ds: DataSourceEntry[] = [{ name: "P", type: "TM1DimensionSubset", sourceName: "Kunde", subset: "sMy" }];
+    const flow = traceDataFlow(index, ds, "AnyCube", "both", {
+      element: { dimension: "Kunde", name: "C001" },
+    });
+    expect(flow.element!.processes).toEqual([
+      { process: "P", funcNames: ["SubsetElementInsert"], access: ["source"] },
+    ]);
+  });
+
   it("does not tag source when a same-named view belongs to a different cube's datasource", async () => {
     // View name "Default" is reused across cubes; the process assigns the element's subset to
     // view "Default" of cube Sales, but the process datasource is view "Default" of cube Other.
@@ -334,5 +383,38 @@ describe("traceDataFlow — element filter incl. datasource membership", () => {
       datasourceMembership: membership,
     });
     expect(flow.element!.computedInProcesses).toEqual(["P"]);
+  });
+
+  it("merges in-code and stored-datasource access for the SAME process into one union, via populated, no dropped role", async () => {
+    // In-code: SubsetElementInsert + ViewSubsetAssign + ViewZeroOut → contributes "zero-out".
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        {
+          name: "P",
+          prolog:
+            "SubsetElementInsert('Currency','sTmp','USD',1);\nViewSubsetAssign('Sales','vTmp','Currency','sTmp');\nViewZeroOut('Sales','vTmp');",
+          metadata: "",
+          data: "",
+          epilog: "",
+          parameters: [],
+        },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    // Bucket B: a stored-datasource membership hit for the SAME process + element → contributes "source".
+    const membership: DatasourceMembership = {
+      byElement: new Map([[elementKey("Currency", "USD"), [{ process: "P", via: "subset-static" }]]]),
+      computedByProcess: new Map(),
+      fetchErrors: [],
+    };
+    const flow = traceDataFlow(index, [], "Sales", "both", {
+      element: { dimension: "Currency", name: "USD" },
+      elementAccess: ["source", "write", "zero-out"],
+      datasourceMembership: membership,
+    });
+    expect(flow.element!.processes).toEqual([
+      { process: "P", funcNames: ["SubsetElementInsert"], access: ["source", "zero-out"], via: ["subset-static"] },
+    ]);
   });
 });

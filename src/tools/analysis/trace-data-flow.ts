@@ -4,6 +4,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { traceDataFlow } from "../../lib/callgraph/dataFlow.js";
 import { buildDatasourceMembership, type DatasourceMembership } from "../../lib/callgraph/datasourceMembership.js";
+import { membersFromAxis } from "../../lib/callgraph/mdxMembers.js";
 
 export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -82,16 +83,7 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
                       `SELECT {${mdxSet}} ON 0 FROM [${cube.replace(/\]/g, "]]")}]`,
                       1,
                     );
-                    const axis0 = res.axes[0];
-                    if (!axis0) return [];
-                    const wantHier = dim.toLowerCase();
-                    const names: string[] = [];
-                    for (const t of axis0.tuples) {
-                      for (const mem of t.members) {
-                        if (mem.hierarchyName?.toLowerCase() === wantHier) names.push(mem.name);
-                      }
-                    }
-                    return names;
+                    return membersFromAxis(res, dim);
                   },
                 }
               : {}),

@@ -86,3 +86,26 @@ export function extractMdxMemberRefs(mdx: string): MdxExtractResult {
 
   return { members, computedSelectors: [...computedSelectors].sort((a, b) => a.localeCompare(b)) };
 }
+
+/**
+ * Pure member-extraction step for a live executeMdx result: picks axis-0 tuple
+ * member names belonging to one dimension's hierarchy. Used by the C1
+ * (resolveComputed) path in tm1_trace_data_flow, which builds the
+ * `SELECT {expr} ON 0 FROM [cube]` MDX and calls executeMdx itself — this
+ * just filters/flattens the response so that glue stays inline at the call site.
+ */
+export function membersFromAxis(
+  res: { axes?: Array<{ tuples: Array<{ members: Array<{ name: string; hierarchyName?: string }> }> }> },
+  dimension: string,
+): string[] {
+  const axis0 = res.axes?.[0];
+  if (!axis0) return [];
+  const wantHier = dimension.toLowerCase();
+  const names: string[] = [];
+  for (const t of axis0.tuples) {
+    for (const mem of t.members) {
+      if (mem.hierarchyName?.toLowerCase() === wantHier) names.push(mem.name);
+    }
+  }
+  return names;
+}

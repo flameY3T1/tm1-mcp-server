@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractMdxMemberRefs } from "../../src/lib/callgraph/mdxMembers.js";
+import { extractMdxMemberRefs, membersFromAxis } from "../../src/lib/callgraph/mdxMembers.js";
 
 describe("extractMdxMemberRefs", () => {
   it("extracts a two-part [Dim].[Element] member", () => {
@@ -36,5 +36,35 @@ describe("extractMdxMemberRefs", () => {
   it("dedupes members case-insensitively, keeping the first-seen casing", () => {
     const r = extractMdxMemberRefs("[Kunde].[K100] + [KUNDE].[k100]");
     expect(r.members).toEqual([{ dimension: "Kunde", element: "K100" }]);
+  });
+});
+
+describe("membersFromAxis", () => {
+  it("returns only the matching-dimension names from a mixed-hierarchy axis 0", () => {
+    const res = {
+      axes: [
+        {
+          tuples: [
+            { members: [{ name: "EMEA", hierarchyName: "Region" }, { name: "2026", hierarchyName: "Time" }] },
+            { members: [{ name: "APAC", hierarchyName: "Region" }, { name: "2027", hierarchyName: "Time" }] },
+          ],
+        },
+      ],
+    };
+    expect(membersFromAxis(res, "Region")).toEqual(["EMEA", "APAC"]);
+  });
+
+  it("matches the dimension case-insensitively", () => {
+    const res = { axes: [{ tuples: [{ members: [{ name: "EMEA", hierarchyName: "REGION" }] }] }] };
+    expect(membersFromAxis(res, "region")).toEqual(["EMEA"]);
+  });
+
+  it("returns [] when axis 0 is absent", () => {
+    expect(membersFromAxis({ axes: [] }, "Region")).toEqual([]);
+    expect(membersFromAxis({}, "Region")).toEqual([]);
+  });
+
+  it("returns [] for empty tuples", () => {
+    expect(membersFromAxis({ axes: [{ tuples: [] }] }, "Region")).toEqual([]);
   });
 });
