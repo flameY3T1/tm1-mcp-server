@@ -8,6 +8,7 @@ export type MembershipVia =
   | "view-mdx"
   | "view-native-title"
   | "view-native-expr"
+  | "view-native-computed"
   | "subset-static"
   | "subset-mdx";
 
@@ -23,6 +24,8 @@ export interface DatasourceMembership {
 export interface MembershipDeps {
   getViewDefinition(cube: string, view: string): Promise<ViewDefinition>;
   getSubset(dimension: string, hierarchy: string, subset: string): Promise<Subset>;
+  /** C1 (opt-in): resolve a computed axis set to its concrete member names, already scoped to `dimension`. */
+  evaluateSetExpression?(cube: string, dimension: string, mdxSet: string): Promise<string[]>;
 }
 
 export async function buildDatasourceMembership(
@@ -32,6 +35,8 @@ export async function buildDatasourceMembership(
   const byElement = new Map<string, Array<{ process: string; via: MembershipVia }>>();
   const computedByProcess = new Map<string, Set<string>>();
   const fetchErrors: DatasourceMembership["fetchErrors"] = [];
+  // C1: per-run cache keyed by (cube, expression) — avoids re-evaluating a shared axis.
+  const evalCache = new Map<string, string[]>();
 
   const addMember = (process: string, dim: string, el: string, via: MembershipVia) => {
     const k = elementKey(dim, el);
@@ -79,7 +84,31 @@ export async function buildDatasourceMembership(
           const axes = [...def.native.columns, ...def.native.rows];
           for (const ax of axes) {
             if (ax.expression) {
-              addMdx(ds.name, ax.expression, "view-native-expr");
+              const { members, computedSelectors } = extractMdxMemberRefs(ax.expression);
+              for (const ref of members) addMember(ds.name, ref.dimension, ref.element, "view-native-expr");
+              addComputed(ds.name, computedSelectors);
+              // C1: if this axis is computed and a resolver is provided, resolve it exactly.
+              if (computedSelectors.length > 0 && deps.evaluateSetExpression && ax.dimensionName) {
+                const cacheKey = `${ds.sourceName.toLowerCase()} ${ax.expression}`;
+                let names = evalCache.get(cacheKey);
+                if (names === undefined) {
+                  try {
+                    names = await deps.evaluateSetExpression(ds.sourceName, ax.dimensionName, ax.expression);
+                    evalCache.set(cacheKey, names);
+                  } catch (evalErr) {
+                    if (evalErr instanceof TM1Error) rethrowIfSystemic(evalErr);
+                    fetchErrors.push({
+                      process: ds.name,
+                      object: `eval ${ds.sourceName}/${ax.dimensionName}`,
+                      message: evalErr instanceof Error ? evalErr.message : String(evalErr),
+                    });
+                    names = undefined;
+                  }
+                }
+                if (names) {
+                  for (const name of names) addMember(ds.name, ax.dimensionName, name, "view-native-computed");
+                }
+              }
             } else if (ax.subsetName && ax.dimensionName) {
               const sub = await deps.getSubset(ax.dimensionName, ax.hierarchyName ?? ax.dimensionName, ax.subsetName);
               applySubset(ds.name, sub);

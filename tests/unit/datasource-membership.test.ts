@@ -95,3 +95,63 @@ describe("buildDatasourceMembership", () => {
     expect(m.fetchErrors).toEqual([{ process: "P", object: "view C/vX", message: "boom" }]);
   });
 });
+
+describe("buildDatasourceMembership — computed axis resolution (C1)", () => {
+  it("resolves a computed native-axis expression via evaluateSetExpression", async () => {
+    const calls: Array<{ cube: string; dim: string; set: string }> = [];
+    const m = await buildDatasourceMembership(
+      {
+        getViewDefinition: async (cube: string, view: string) => ({
+          cubeName: cube, viewName: view, private: false, type: "Native" as const,
+          native: {
+            titles: [],
+            columns: [],
+            rows: [{ dimensionName: "Currency", hierarchyName: "Currency", expression: "{TM1FILTERBYLEVEL({TM1SUBSETALL([Currency])},0)}" }],
+          },
+        }),
+        getSubset: (async () => { throw new Error("n/a"); }) as never,
+        evaluateSetExpression: async (cube: string, dim: string, set: string) => {
+          calls.push({ cube, dim, set });
+          return ["EUR", "CHF", "USD", "Group_EUR"];
+        },
+      },
+      [{ name: "P", type: "TM1CubeView", sourceName: "Cube_Assumptions", view: "vC" }],
+    );
+    expect(m.byElement.get(elementKey("Currency", "USD"))).toEqual([{ process: "P", via: "view-native-computed" }]);
+    expect(calls).toEqual([{ cube: "Cube_Assumptions", dim: "Currency", set: "{TM1FILTERBYLEVEL({TM1SUBSETALL([Currency])},0)}" }]);
+    // computed selector still recorded (honest provenance) even though resolved
+    expect([...(m.computedByProcess.get("P") ?? [])]).toContain("TM1FILTERBYLEVEL");
+  });
+
+  it("without evaluateSetExpression, a computed axis stays flagged (no members)", async () => {
+    const m = await buildDatasourceMembership(
+      {
+        getViewDefinition: async (cube: string, view: string) => ({
+          cubeName: cube, viewName: view, private: false, type: "Native" as const,
+          native: { titles: [], columns: [], rows: [{ dimensionName: "Currency", hierarchyName: "Currency", expression: "{TM1FILTERBYLEVEL({TM1SUBSETALL([Currency])},0)}" }] },
+        }),
+        getSubset: (async () => { throw new Error("n/a"); }) as never,
+        // no evaluateSetExpression
+      },
+      [{ name: "P", type: "TM1CubeView", sourceName: "C", view: "vC" }],
+    );
+    expect(m.byElement.get(elementKey("Currency", "USD"))).toBeUndefined();
+    expect([...(m.computedByProcess.get("P") ?? [])]).toContain("TM1FILTERBYLEVEL");
+  });
+
+  it("eval failure is recorded in fetchErrors and does not throw", async () => {
+    const m = await buildDatasourceMembership(
+      {
+        getViewDefinition: async (cube: string, view: string) => ({
+          cubeName: cube, viewName: view, private: false, type: "Native" as const,
+          native: { titles: [], columns: [], rows: [{ dimensionName: "Currency", hierarchyName: "Currency", expression: "{DESCENDANTS([Currency])}" }] },
+        }),
+        getSubset: (async () => { throw new Error("n/a"); }) as never,
+        evaluateSetExpression: async () => { throw new Error("bad mdx"); },
+      },
+      [{ name: "P", type: "TM1CubeView", sourceName: "C", view: "vC" }],
+    );
+    expect(m.byElement.size).toBe(0);
+    expect(m.fetchErrors.some((e) => e.process === "P" && /eval/i.test(e.object))).toBe(true);
+  });
+});
