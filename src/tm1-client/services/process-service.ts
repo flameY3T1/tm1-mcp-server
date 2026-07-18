@@ -320,13 +320,34 @@ export class ProcessService {
    * Bulk-fetch code for every TI process in a single round trip.
    * GET /api/v1/Processes?$select=Name,PrologProcedure,...
    * Control processes (Name starts with `}`) excluded unless includeControl=true.
+   *
+   * With `top` set the cap is pushed server-side ($top + $orderby=Name for
+   * stable ordering + $count=true) and the return carries the server-side
+   * total matching the filter so callers can report truncation honestly.
    */
   async getAllCode(
+    includeControl?: boolean,
+  ): Promise<Array<ProcessCode & { name: string; hasSecurityAccess: boolean }>>;
+  async getAllCode(
+    includeControl: boolean,
+    top: number,
+  ): Promise<{
+    items: Array<ProcessCode & { name: string; hasSecurityAccess: boolean }>;
+    /** Server-side total ($count=true); undefined when the server omitted @odata.count. */
+    total: number | undefined;
+  }>;
+  async getAllCode(
     includeControl = false,
-  ): Promise<Array<ProcessCode & { name: string; hasSecurityAccess: boolean }>> {
+    top?: number,
+  ): Promise<
+    | Array<ProcessCode & { name: string; hasSecurityAccess: boolean }>
+    | { items: Array<ProcessCode & { name: string; hasSecurityAccess: boolean }>; total: number | undefined }
+  > {
     const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const path = `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,HasSecurityAccess${filter}`;
+    const cap = top !== undefined ? `&$orderby=Name&$top=${top}&$count=true` : "";
+    const path = `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,HasSecurityAccess${filter}${cap}`;
     const response = await this.http.request<{
+      "@odata.count"?: number;
       value: Array<{
         Name: string;
         PrologProcedure: string;
@@ -336,7 +357,7 @@ export class ProcessService {
         HasSecurityAccess?: boolean;
       }>;
     }>("GET", path);
-    return response.value.map((p) => ({
+    const items = response.value.map((p) => ({
       name: p.Name,
       prolog: p.PrologProcedure ?? "",
       metadata: p.MetadataProcedure ?? "",
@@ -344,6 +365,10 @@ export class ProcessService {
       epilog: p.EpilogProcedure ?? "",
       hasSecurityAccess: p.HasSecurityAccess === true,
     }));
+    if (top !== undefined) {
+      return { items, total: response["@odata.count"] };
+    }
+    return items;
   }
 
   /**

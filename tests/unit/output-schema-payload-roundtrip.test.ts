@@ -191,6 +191,7 @@ describe("strict outputSchemas accept real handler payloads", () => {
     const schema = asSchema(OUTPUT_SCHEMA_MAP.tm1_get_all_cube_rules);
     const payload = {
       count: 7,
+      countIsExact: true,
       returned: 7,
       truncated: false,
       cubes: [

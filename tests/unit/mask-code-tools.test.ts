@@ -57,6 +57,22 @@ async function run(
 const NONE_DS: DataSource = { type: "None" };
 const ODBC = (pw: string) => `ODBCOpen('SalesDSN', 'svc_user', '${pw}');`;
 
+// Bulk-code stub mirroring the ProcessService.getAllCode overload: plain array
+// without a cap, { items, total } when the tool pushes $top server-side.
+function bulkCodeClient(
+  rows: Array<{ name: string; prolog: string; metadata: string; data: string; epilog: string; hasSecurityAccess: boolean }>,
+  opts?: { omitCount?: boolean },
+): TM1Client {
+  return {
+    processes: {
+      getAllCode: async (_includeControl?: boolean, top?: number) =>
+        top === undefined
+          ? rows
+          : { items: rows.slice(0, top), total: opts?.omitCount ? undefined : rows.length },
+    },
+  } as unknown as TM1Client;
+}
+
 // A processes stub whose getCode returns per-process code maps.
 function clientWith(codeByProcess: Record<string, Record<string, string>>): TM1Client {
   return {
@@ -249,13 +265,9 @@ describe("tm1_diff_process_with_file masks both sides before diffing", () => {
 // Audit 2026-07-12 H1: the bulk code tool was the sole code-returning tool
 // that skipped masking.
 describe("tm1_get_all_processes_code masks inline ODBC credentials", () => {
-  const client = {
-    processes: {
-      getAllCode: async () => [
-        { name: "Load.Sales", prolog: ODBC("Bulk_Pw!"), metadata: "", data: "", epilog: "", hasSecurityAccess: false },
-      ],
-    },
-  } as unknown as TM1Client;
+  const client = bulkCodeClient([
+    { name: "Load.Sales", prolog: ODBC("Bulk_Pw!"), metadata: "", data: "", epilog: "", hasSecurityAccess: false },
+  ]);
 
   it("masks passwords in every returned tab by default", async () => {
     const text = await run(registerGetAllProcessesCode, client, {});
@@ -273,13 +285,9 @@ describe("tm1_get_all_processes_code masks inline ODBC credentials", () => {
 // (mirrors tm1_get_all_cube_rules summary mode).
 describe("tm1_get_all_processes_code summary mode", () => {
   const prolog = ["# header", "# more header", ODBC("Sum_Pw!"), "x = 1;"].join("\n");
-  const client = {
-    processes: {
-      getAllCode: async () => [
-        { name: "Load.Sales", prolog, metadata: "# meta only", data: "", epilog: "y = 2;", hasSecurityAccess: true },
-      ],
-    },
-  } as unknown as TM1Client;
+  const client = bulkCodeClient([
+    { name: "Load.Sales", prolog, metadata: "# meta only", data: "", epilog: "y = 2;", hasSecurityAccess: true },
+  ]);
 
   it("returns per-process line metrics and no code bodies", async () => {
     const text = await run(registerGetAllProcessesCode, client, { summary: true });
@@ -316,6 +324,87 @@ describe("tm1_get_all_processes_code summary mode", () => {
     const parsed = JSON.parse(text) as { processes: Array<Record<string, unknown>> };
     expect(parsed.processes[0]!.prolog).toContain("ODBCOpen");
     expect(parsed.processes[0]!.totalLines).toBeUndefined();
+  });
+});
+
+// Token-opt 2026-07-18: full-code responses default-cap at 50 processes
+// (server-side $top); summary mode still surveys the whole model by default.
+describe("tm1_get_all_processes_code default cap", () => {
+  const rows = Array.from({ length: 60 }, (_, i) => ({
+    name: `Proc.${String(i).padStart(2, "0")}`,
+    prolog: "x = 1;",
+    metadata: "",
+    data: "",
+    epilog: "",
+    hasSecurityAccess: false,
+  }));
+  const client = bulkCodeClient(rows);
+
+  it("caps full-code responses at 50 by default and flags truncation", async () => {
+    const text = await run(registerGetAllProcessesCode, client, {});
+    const parsed = JSON.parse(text) as {
+      count: number;
+      countIsExact: boolean;
+      returned: number;
+      truncated: boolean;
+      processes: unknown[];
+    };
+    expect(parsed.returned).toBe(50);
+    expect(parsed.processes).toHaveLength(50);
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.count).toBe(60);
+    expect(parsed.countIsExact).toBe(true);
+  });
+
+  it("flags count as inexact lower bound when truncated and @odata.count is absent", async () => {
+    const noCountClient = bulkCodeClient(rows, { omitCount: true });
+    const parsed = JSON.parse(await run(registerGetAllProcessesCode, noCountClient, {})) as {
+      count: number;
+      countIsExact: boolean;
+      truncated: boolean;
+    };
+    expect(parsed.truncated).toBe(true);
+    // Sentinel fetch saw cap+1 rows — count is a lower bound, not the model total.
+    expect(parsed.count).toBe(51);
+    expect(parsed.countIsExact).toBe(false);
+  });
+
+  it("explicit limit overrides the default cap", async () => {
+    const parsed = JSON.parse(await run(registerGetAllProcessesCode, client, { limit: 10 })) as {
+      count: number;
+      returned: number;
+      truncated: boolean;
+    };
+    expect(parsed.returned).toBe(10);
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.count).toBe(60);
+  });
+
+  it("limit=0 returns everything uncapped", async () => {
+    const parsed = JSON.parse(await run(registerGetAllProcessesCode, client, { limit: 0 })) as {
+      returned: number;
+      truncated: boolean;
+    };
+    expect(parsed.returned).toBe(60);
+    expect(parsed.truncated).toBe(false);
+  });
+
+  it("summary mode surveys all processes by default (no cap)", async () => {
+    const parsed = JSON.parse(await run(registerGetAllProcessesCode, client, { summary: true })) as {
+      returned: number;
+      truncated: boolean;
+    };
+    expect(parsed.returned).toBe(60);
+    expect(parsed.truncated).toBe(false);
+  });
+
+  it("explicit limit also caps summary mode", async () => {
+    const parsed = JSON.parse(
+      await run(registerGetAllProcessesCode, client, { summary: true, limit: 5 }),
+    ) as { returned: number; truncated: boolean; count: number };
+    expect(parsed.returned).toBe(5);
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.count).toBe(60);
   });
 });
 

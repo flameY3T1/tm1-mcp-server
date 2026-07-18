@@ -241,12 +241,14 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_get_cell_value: { value: 42 },
     tm1_get_all_cube_rules: {
       count: 1,
+      countIsExact: true,
       returned: 1,
       truncated: false,
       cubes: [{ cubeName: "Sales", rulesText: "[]=N:1;", skipCheck: false }],
     },
     tm1_get_all_processes_code: {
       count: 2,
+      countIsExact: true,
       returned: 2,
       truncated: false,
       processes: [

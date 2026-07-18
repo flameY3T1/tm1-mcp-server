@@ -478,5 +478,50 @@ describe("TM1Client – Process Execution Methods", () => {
       const rows = await client.processes.getAllCode(false);
       expect(rows[0].hasSecurityAccess).toBe(false);
     });
+
+    it("pushes $top/$orderby/$count server-side and returns items+total when top is set", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          "@odata.count": 7,
+          value: [
+            {
+              Name: "proc.a",
+              PrologProcedure: "p",
+              MetadataProcedure: "",
+              DataProcedure: "",
+              EpilogProcedure: "",
+            },
+          ],
+        }),
+      );
+
+      const result = await client.processes.getAllCode(false, 1);
+
+      const url = String(fetchSpy.mock.calls[0][0]);
+      expect(url).toContain("$top=1");
+      expect(url).toContain("$orderby=Name");
+      expect(url).toContain("$count=true");
+      expect(url).toContain("startswith(Name");
+      expect(result.items).toHaveLength(1);
+      expect(result.total).toBe(7);
+    });
+
+    it("returns undefined total when @odata.count is absent (caller decides honesty)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          value: [
+            {
+              Name: "proc.a",
+              PrologProcedure: "",
+              MetadataProcedure: "",
+              DataProcedure: "",
+              EpilogProcedure: "",
+            },
+          ],
+        }),
+      );
+      const result = await client.processes.getAllCode(false, 5);
+      expect(result.total).toBeUndefined();
+    });
   });
 });

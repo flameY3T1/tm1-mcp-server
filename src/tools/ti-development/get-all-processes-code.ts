@@ -4,6 +4,11 @@ import type { TM1Client } from "../../tm1-client.js";
 import { maskCode } from "../../lib/mask-secrets.js";
 import { commentStats } from "../../lib/strip-comments.js";
 
+// Default cap for full-code responses. Whole-model code dumps flood the
+// context window; 50 processes is plenty for a first look, and the response
+// reports truncated=true so agents know to raise limit (or pass 0 for all).
+const DEFAULT_LIMIT = 50;
+
 // Summary mode: drop the four tab bodies, report line metrics instead so
 // analysis agents can survey the process landscape without paying full token
 // cost (mirrors tm1_get_all_cube_rules summary mode).
@@ -34,7 +39,7 @@ function summarize(p: {
 export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_get_all_processes_code",
-    "Bulk-load source code (Prolog/Metadata/Data/Epilog) of every TI process in one call, plus each process's HasSecurityAccess elevation flag (hasSecurityAccess) for audit. Control objects (names starting with '}') excluded by default. Credential literals in the code are masked by default (maskSecrets). Set summary=true to drop the tab bodies and get per-process line metrics instead. For keyword surveys prefer tm1_search_code — it avoids dumping every process body into context.",
+    "Bulk-load source code (Prolog/Metadata/Data/Epilog) of every TI process in one call, plus each process's HasSecurityAccess elevation flag (hasSecurityAccess) for audit. Control objects (names starting with '}') excluded by default. Credential literals in the code are masked by default (maskSecrets). Full-code responses are capped at 50 processes by default (ordered by name; truncated=true when capped — raise limit or pass limit=0 for all). Set summary=true to drop the tab bodies and get per-process line metrics instead; summary mode surveys ALL processes by default. For keyword surveys prefer tm1_search_code — it avoids dumping every process body into context.",
     {
       includeControl: z
         .boolean()
@@ -44,9 +49,12 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
       limit: z
         .number()
         .int()
-        .positive()
+        .min(0)
+        .max(500)
         .optional()
-        .describe("Cap the number of returned processes. Omit for full bulk load (audit use-case)."),
+        .describe(
+          "Max processes returned (default 50, max 500, 0 = all). Summary mode defaults to 0 (full survey).",
+        ),
       maskSecrets: z
         .boolean()
         .optional()
@@ -65,9 +73,23 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
         ),
     },
     async ({ includeControl, limit, maskSecrets, summary }) => {
-      const all = await tm1Client.processes.getAllCode(includeControl);
-      const truncated = limit !== undefined && all.length > limit;
-      const kept = truncated ? all.slice(0, limit) : all;
+      // Full-code mode default-caps at DEFAULT_LIMIT; summary mode defaults to
+      // the whole model (metrics are cheap and a partial survey would be
+      // misleading). Explicit limit wins in both modes; 0 = no cap.
+      const cap = limit ?? (summary ? 0 : DEFAULT_LIMIT);
+      // Server-side cap: $top=cap+1 sentinel detects truncation even if the
+      // server omits @odata.count; $orderby=Name keeps the cut stable.
+      const fetched =
+        cap > 0
+          ? await tm1Client.processes.getAllCode(includeControl, cap + 1)
+          : { items: await tm1Client.processes.getAllCode(includeControl), total: undefined };
+      const truncated = cap > 0 && fetched.items.length > cap;
+      const kept = truncated ? fetched.items.slice(0, cap) : fetched.items;
+      // An uncapped fetch saw everything and @odata.count is authoritative,
+      // but a truncated capped fetch without @odata.count only proves "more
+      // than cap" — then count is a lower bound, flagged via countIsExact.
+      const countIsExact = !truncated || fetched.total !== undefined;
+      const count = fetched.total ?? fetched.items.length;
       // summary mode returns no code, so masking is moot — skip the work.
       const processes = summary
         ? kept.map(summarize)
@@ -81,7 +103,7 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
             }))
           : kept;
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ count: all.length, returned: processes.length, truncated, processes }) }],
+        content: [{ type: "text" as const, text: JSON.stringify({ count, countIsExact, returned: processes.length, truncated, processes }) }],
       };
     },
   );

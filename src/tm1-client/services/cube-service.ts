@@ -129,14 +129,32 @@ export class CubeService {
    * Bulk-fetch rules for every cube in a single round trip.
    * GET /api/v1/Cubes?$select=Name,Rules
    * Control cubes (Name starts with `}`) excluded unless includeControl=true.
+   *
+   * With `top` set the cap is pushed server-side ($top + $orderby=Name for
+   * stable ordering + $count=true) and the return carries the server-side
+   * total matching the filter so callers can report truncation honestly.
    */
-  async getAllRules(includeControl = false): Promise<CubeRules[]> {
+  async getAllRules(includeControl?: boolean): Promise<CubeRules[]>;
+  async getAllRules(
+    includeControl: boolean,
+    top: number,
+  ): Promise<{
+    items: CubeRules[];
+    /** Server-side total ($count=true); undefined when the server omitted @odata.count. */
+    total: number | undefined;
+  }>;
+  async getAllRules(
+    includeControl = false,
+    top?: number,
+  ): Promise<CubeRules[] | { items: CubeRules[]; total: number | undefined }> {
     const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const path = `/api/v1/Cubes?$select=Name,Rules${filter}`;
+    const cap = top !== undefined ? `&$orderby=Name&$top=${top}&$count=true` : "";
+    const path = `/api/v1/Cubes?$select=Name,Rules${filter}${cap}`;
     const response = await this.http.request<{
+      "@odata.count"?: number;
       value: Array<{ Name: string; Rules?: string | null }>;
     }>("GET", path);
-    return response.value.map((c) => {
+    const items = response.value.map((c) => {
       const rulesText = c.Rules ?? "";
       return {
         cubeName: c.Name,
@@ -144,6 +162,10 @@ export class CubeService {
         skipCheck: rulesText.toUpperCase().includes("SKIPCHECK"),
       };
     });
+    if (top !== undefined) {
+      return { items, total: response["@odata.count"] };
+    }
+    return items;
   }
 
   /**
