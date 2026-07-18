@@ -236,6 +236,13 @@ export function loadConfig(): TM1Config {
     iamUrl = process.env.TM1_IAM_URL || undefined;
 
     const missingV12: string[] = [];
+    // Every v12 mode — not just "basic" — sends `{ User: config.user }` in the
+    // session login body (profile.ts buildLoginRequest), so TM1_USER is required
+    // regardless of authMode. For authMode === "basic" the v11 `missing` check
+    // above (camPassport-gated) already pushed TM1_USER and threw before this
+    // block runs when it's absent, so this only actually fires for the
+    // non-basic modes — no duplicate report.
+    if (!user) missingV12.push("TM1_USER");
     if (authMode === "s2s") {
       if (!clientId) missingV12.push("TM1_CLIENT_ID");
       if (!clientSecret) missingV12.push("TM1_CLIENT_SECRET");
@@ -245,7 +252,6 @@ export function loadConfig(): TM1Config {
       if (!apiKey) missingV12.push("TM1_API_KEY");
       if (!iamUrl) missingV12.push("TM1_IAM_URL");
     }
-    // authMode === "basic" reuses TM1_USER/TM1_PASSWORD, already validated above.
     if (missingV12.length > 0) {
       throw new Error(
         `TM1_AUTH_MODE="${authMode}" requires: ${missingV12.join(", ")}. ` +

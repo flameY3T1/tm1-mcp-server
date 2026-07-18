@@ -332,6 +332,36 @@ describe("loadConfig", () => {
       expect(cfg.tm1Version).toBe("12.0");
     });
 
+    it("throws naming TM1_USER when v12 s2s config is missing TM1_USER", () => {
+      // Every v12 auth mode sends `{ User: config.user }` in the session login
+      // body (profile.ts buildLoginRequest), so TM1_USER is required even for
+      // credential modes (s2s/access_token/oidc/iam) that don't otherwise need
+      // a TM1 user/password pair.
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_PASSWORD = "x";
+      delete process.env.TM1_USER;
+      process.env.TM1_INSTANCE = "tm1";
+      process.env.TM1_DATABASE = "db1";
+      process.env.TM1_AUTH_MODE = "s2s";
+      process.env.TM1_CLIENT_ID = "cid";
+      process.env.TM1_CLIENT_SECRET = "csec";
+      expect(() => loadConfig()).toThrow(/TM1_USER/);
+    });
+
+    it("loads fine when a v12 s2s config sets TM1_USER alongside the mode creds", () => {
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "x";
+      process.env.TM1_INSTANCE = "tm1";
+      process.env.TM1_DATABASE = "db1";
+      process.env.TM1_AUTH_MODE = "s2s";
+      process.env.TM1_CLIENT_ID = "cid";
+      process.env.TM1_CLIENT_SECRET = "csec";
+      const cfg = loadConfig();
+      expect(cfg.version).toBe(12);
+      expect(cfg.authMode).toBe("s2s");
+    });
+
     it("throws on unknown auth mode", () => {
       process.env.TM1_BASE_URL = "http://host:4444";
       process.env.TM1_USER = "admin";
