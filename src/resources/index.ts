@@ -11,6 +11,7 @@ import {
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../tm1-client.js";
+import { maskCode } from "../lib/mask-secrets.js";
 import type { CatalogEntry, ResourceCatalog } from "./list-handler.js";
 
 interface ReadResult {
@@ -50,7 +51,22 @@ export function registerAllResources(
         "TM1 server configuration snapshot: name, version, data directory, timezone, integrated security mode.",
       mimeType: "application/json",
     },
-    async (uri) => asJsonContent(uri, await tm1.server.getInfo()),
+    async (uri) => {
+      // Project to the documented identity fields only. getInfo().extra
+      // carries the full merged /Configuration body, which can include
+      // sensitive settings — resources have no params, so unlike the
+      // curated tm1_get_server_info tool there is no place to opt in.
+      const info = await tm1.server.getInfo();
+      return asJsonContent(uri, {
+        serverName: info.serverName,
+        productVersion: info.productVersion,
+        productEdition: info.productEdition,
+        adminHost: info.adminHost,
+        dataDirectory: info.dataDirectory,
+        timeZoneId: info.timeZoneId,
+        integratedSecurityMode: info.integratedSecurityMode,
+      });
+    },
   );
   entries.push({
     kind: "static",
@@ -152,7 +168,16 @@ export function registerAllResources(
       const raw = vars.name;
       const name = decodeURIComponent(Array.isArray(raw) ? raw[0]! : raw ?? '');
       const code = await tm1.processes.getCode(name);
-      return asJsonContent(uri, code);
+      // Hard-mask credential literals unconditionally: resources take no
+      // parameters, so unlike tm1_get_process_code there is no maskSecrets
+      // opt-out — returning the code verbatim would bypass the tool-path
+      // redaction (ODBCOpen passwords, credential assignments).
+      return asJsonContent(uri, {
+        prolog: maskCode(code.prolog),
+        metadata: maskCode(code.metadata),
+        data: maskCode(code.data),
+        epilog: maskCode(code.epilog),
+      });
     },
   );
   entries.push({
