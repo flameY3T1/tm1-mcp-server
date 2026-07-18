@@ -119,6 +119,14 @@ declared there — otherwise the server value is preserved; also settable via
 `tm1_upsert_process`). `Caption` is intentionally not roundtripped: TM1 exposes
 no reliable write path for it.
 
+The `.ti` file holds the four code tabs in TM1's **native `#region <Tab>` /
+`#endregion` format** (the server `Code` property) — byte-identical to
+`GET /Processes('x')/Code/$value` (CRLF, empty tabs omitted); nested user folding
+regions inside a tab are preserved. A malformed/unbalanced blob is rejected on
+import with a clear error rather than deployed partially. **Breaking (since the
+previous `### TM1-TI-TAB:` format):** `.ti` files exported by earlier versions are
+no longer importable — re-export from the server to regenerate.
+
 ### TM1 v12 (Planning Analytics Engine)
 
 Setting `TM1_INSTANCE` + `TM1_DATABASE` auto-selects v12: requests are rerooted
@@ -289,6 +297,7 @@ Bulk-load + callgraph tools for code review and dependency tracking:
 - `tm1_search_code` — regex over all TI tabs with per-process / total caps; returns hit lines instead of full bulk
 - `tm1_analyze_callgraph` — ExecuteProcess/RunProcess tree (downstream/upstream) with parameter env propagation. `mode='summary'` returns flat per-process aggregates (occurrences, depthMin/Max) for triage before pulling a heavy tree. Omit `start` for a global ranking: every process ranked by `rankBy='outgoing'` (fan-out) or `'incoming'` (fan-in) call counts — answers "which process triggers / is triggered by the most others" without a per-process traversal.
 - `tm1_analyze_object_usage` — find cube/dim references across TI + rules
+- `tm1_trace_data_flow` — up/downstream data flow for a cube in one call (processes that read it + where they write, writers + their sources). Pass `element` + `dimension` to answer "which processes touch element X of dimension D": each touching process is classified `access = source | write | zero-out | indeterminate` (so a zero-out isn't mistaken for a read), resolved from in-code subset builds, stored view/subset datasources (native-title/static exact, MDX by literal member), and — with `resolveComputed=true` — live-evaluated computed axis selectors (`TM1FILTERBYLEVEL`/`DESCENDANTS`/…).
 - `tm1_analyze_chore_graph` — per-task downstream tree for a chore
 - `tm1_invalidate_callgraph_cache` — reset 60s TTL cache after deploy
 - `tm1_audit_naming` — bulk-scan all TM1 objects against IBM Planning Analytics naming conventions (PA 2.0 + 3.1)
