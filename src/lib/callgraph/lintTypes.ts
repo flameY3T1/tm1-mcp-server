@@ -1,10 +1,10 @@
-/** Schweregrad einer Lint-Diagnose */
+/** Severity of a lint diagnostic */
 export type LintSeverity = 'error' | 'warning' | 'hint';
 
-/** TM1 Prozessabschnitt */
+/** TM1 process section */
 export type TiSection = 'prolog' | 'metadata' | 'data' | 'epilog';
 
-/** Alle bekannten Regel-IDs des TI-Linters */
+/** All known rule IDs of the TI linter */
 export type LintRuleId =
   | 'endless-loop'
   | 'wrong-arg-count'
@@ -28,27 +28,27 @@ export type LintRuleId =
   | 'tm1-error-code'
   | 'performance-hint';
 
-/** Eine einzelne Lint-Diagnose */
+/** A single lint diagnostic */
 export interface LintDiagnose {
-  /** 1-basierte Zeilennummer */
+  /** 1-based line number */
   line: number;
-  /** Schweregrad */
+  /** Severity */
   severity: LintSeverity;
-  /** Regel-ID */
+  /** Rule ID */
   ruleId: LintRuleId;
-  /** Deutsche Fehlermeldung, mit Regel-ID-Präfix: [rule-id] Meldung */
+  /** Error message with rule-ID prefix: [rule-id] message */
   message: string;
 }
 
-/** Datentyp einer TI-Variable */
+/** Data type of a TI variable */
 export type VariableType = 'string' | 'numeric';
 
-/** Informationen über eine inferierte Variable */
+/** Information about an inferred variable */
 export interface VariableInfo {
   type: VariableType;
-  /** Zeile der ersten Zuweisung */
+  /** Line of the first assignment */
   firstAssignmentLine: number;
 }
 
-/** Key: Variablenname in Lowercase */
+/** Key: variable name in lowercase */
 export type VariableTypeMap = Map<string, VariableInfo>;

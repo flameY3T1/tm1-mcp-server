@@ -136,7 +136,7 @@ export function extractBracketRefs(line: string): string[] {
  */
 export function validateBracketRefSyntax(content: string): string | null {
   if (content.trim() === '') {
-    return '[invalid-cell-ref-syntax] Leere Zellreferenz [].';
+    return '[invalid-cell-ref-syntax] Empty cell reference [].';
   }
   // No quotes → likely a dynamic/variable reference (e.g. !Year) — skip validation
   if (!content.includes("'")) {
@@ -156,10 +156,10 @@ export function validateBracketRefSyntax(content: string): string | null {
   const partRe = new RegExp(`^\\s*${dimSpec}\\s*$`);
   for (const part of parts) {
     if (!partRe.test(part)) {
-      return `[invalid-cell-ref-syntax] '${part.trim()}' entspricht nicht dem Format 'Dimension':'Element' oder 'Dimension':{'E1','E2'}.`;
+      return `[invalid-cell-ref-syntax] '${part.trim()}' does not match the format 'Dimension':'Element' or 'Dimension':{'E1','E2'}.`;
     }
   }
-  return "[invalid-cell-ref-syntax] Zellreferenz entspricht nicht dem Format ['Dimension':'Element'] oder ['Dimension':{'E1','E2'}].";
+  return "[invalid-cell-ref-syntax] Cell reference does not match the format ['Dimension':'Element'] or ['Dimension':{'E1','E2'}].";
 }
 
 /** Splits a string by commas that are NOT inside `{...}` (brace-depth 0). */
@@ -284,7 +284,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
     if (hasContent) {
       diags.push({
         line: 0,
-        message: '[no-feeders-section] Kein FEEDERS;-Block gefunden. Ohne Feeder werden keine Regeln berechnet.',
+        message: '[no-feeders-section] No FEEDERS; block found. Without feeders no rules are calculated.',
         severity: 'warning',
         ruleId: 'no-feeders-section',
       });
@@ -299,7 +299,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (seen > 1) {
           diags.push({
             line: l.lineIndex,
-            message: '[multiple-feeders] Mehrere FEEDERS;-Marker gefunden. Nur der erste wird von TM1 erkannt.',
+            message: '[multiple-feeders] Multiple FEEDERS; markers found. Only the first is recognized by TM1.',
             severity: 'error',
             ruleId: 'multiple-feeders',
           });
@@ -374,7 +374,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
     if (hasUnclosedBracket(l.trimmed)) {
       diags.push({
         line: l.lineIndex,
-        message: '[unclosed-bracket] Nicht geschlossene eckige Klammer `[`.',
+        message: '[unclosed-bracket] Unclosed square bracket `[`.',
         severity: 'error',
         ruleId: 'unclosed-bracket',
       });
@@ -388,7 +388,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
       if (!hasSemi && !isContinuation && !hasOpenParens && !thisLineEndsRuleType && !thisLineEndsBackslash && !thisLineEndsContOp && !thisLineContinuedByNext) {
         diags.push({
           line: l.lineIndex,
-          message: '[missing-semicolon] Anweisung endet nicht mit Semikolon.',
+          message: '[missing-semicolon] Statement does not end with a semicolon.',
           severity: 'error',
           ruleId: 'missing-semicolon',
         });
@@ -409,7 +409,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (startsNewTarget) {
           diags.push({
             line: l.lineIndex,
-            message: '[feeder-missing-comma] Komma fehlt zwischen Feeder-Zielen.',
+            message: '[feeder-missing-comma] Missing comma between feeder targets.',
             severity: 'error',
             ruleId: 'feeder-missing-comma',
           });
@@ -427,7 +427,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (lhsCloseCount > 1) {
           diags.push({
             line: l.lineIndex,
-            message: '[feeder-multi-lhs] Linke Seite eines Feeders muss eine einzelne Zellreferenz sein, nicht mehrere.',
+            message: '[feeder-multi-lhs] Left-hand side of a feeder must be a single cell reference, not several.',
             severity: 'error',
             ruleId: 'feeder-multi-lhs',
           });
@@ -445,7 +445,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (arrowIdx >= 0 && m.index < arrowIdx) { continue; }
         diags.push({
           line: l.lineIndex,
-          message: '[feeder-missing-comma] Komma fehlt zwischen Feeder-Zielen.',
+          message: '[feeder-missing-comma] Missing comma between feeder targets.',
           severity: 'error',
           ruleId: 'feeder-missing-comma',
         });
@@ -479,7 +479,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
       if (!hasSemi && !isContinuation && !hasOpenParens && !thisLineEndsRuleType && !thisLineEndsBackslash && !thisLineEndsContOp && !thisLineContinuedByNext && !pendingFeedersArrow) {
         diags.push({
           line: l.lineIndex,
-          message: '[missing-semicolon] Anweisung endet nicht mit Semikolon.',
+          message: '[missing-semicolon] Statement does not end with a semicolon.',
           severity: 'error',
           ruleId: 'missing-semicolon',
         });
@@ -491,7 +491,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
           if (strippedFeed.includes('[')) {
             diags.push({
               line: l.lineIndex,
-              message: '[feeder-missing-arrow] Feeder-Zeile ohne `=>` Operator.',
+              message: '[feeder-missing-arrow] Feeder line without `=>` operator.',
               severity: 'warning',
               ruleId: 'feeder-missing-arrow',
             });
@@ -503,7 +503,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (dbIdx !== -1 && (arrowIdx === -1 || dbIdx < arrowIdx)) {
           diags.push({
             line: l.lineIndex,
-            message: '[feeder-db-on-lhs] DB() ist auf der linken Seite eines Feeders ungültig. Die Quell-Zellreferenz muss [...] sein, DB() nur auf der rechten Seite.',
+            message: '[feeder-db-on-lhs] DB() is invalid on the left-hand side of a feeder. The source cell reference must be [...]; DB() is only allowed on the right-hand side.',
             severity: 'error',
             ruleId: 'feeder-db-on-lhs',
           });
@@ -512,7 +512,7 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (/=\s*[CNS]\s*:/i.test(strippedFeed)) {
           diags.push({
             line: l.lineIndex,
-            message: '[rule-after-feeders] Regelzeile (C:/N:/S:) nach FEEDERS; — Regeln gehören vor den FEEDERS-Block.',
+            message: '[rule-after-feeders] Rule line (C:/N:/S:) after FEEDERS; — rules belong before the FEEDERS block.',
             severity: 'warning',
             ruleId: 'rule-after-feeders',
           });
@@ -538,14 +538,14 @@ export function lintRules(text: string): RulesLintDiagnose[] {
       if (call.args.length < 2) {
         diags.push({
           line: l.lineIndex,
-          message: '[db-too-few-args] DB() braucht mindestens 2 Argumente (Cube-Name + 1 Dimension).',
+          message: '[db-too-few-args] DB() needs at least 2 arguments (cube name + 1 dimension).',
           severity: 'error',
           ruleId: 'db-too-few-args',
         });
       } else if (call.cubeName === null) {
         diags.push({
           line: l.lineIndex,
-          message: '[db-invalid-cube-arg] Erstes DB()-Argument muss ein String-Literal sein (Cube-Name in Hochkommas).',
+          message: '[db-invalid-cube-arg] First DB() argument must be a string literal (cube name in single quotes).',
           severity: 'error',
           ruleId: 'db-invalid-cube-arg',
         });
@@ -691,7 +691,7 @@ export async function lintRulesServer(
       if (dims === 'not-found') {
         diags.push({
           line: lineIndex,
-          message: `[db-unknown-cube] Cube '${call.cubeName}' wurde auf dem Server nicht gefunden.`,
+          message: `[db-unknown-cube] Cube '${call.cubeName}' was not found on the server.`,
           severity: 'warning',
           ruleId: 'db-unknown-cube',
         });
@@ -700,7 +700,7 @@ export async function lintRulesServer(
         if (call.args.length !== expected) {
           diags.push({
             line: lineIndex,
-            message: `[db-arg-count-mismatch] DB('${call.cubeName}') erwartet ${expected} Argument${expected !== 1 ? 'e' : ''} (${dims.length} Dimension${dims.length !== 1 ? 'en' : ''}), hat aber ${call.args.length}.`,
+            message: `[db-arg-count-mismatch] DB('${call.cubeName}') expects ${expected} argument${expected !== 1 ? 's' : ''} (${dims.length} dimension${dims.length !== 1 ? 's' : ''}), but has ${call.args.length}.`,
             severity: 'error',
             ruleId: 'db-arg-count-mismatch',
           });
@@ -717,7 +717,7 @@ export async function lintRulesServer(
             if (elemSet instanceof Set && !elemSet.has(inner.toLowerCase())) {
               diags.push({
                 line: lineIndex,
-                message: `[db-element-not-found] Element '${inner}' in Dimension '${dim}' (DB()-Arg ${i + 1}) nicht gefunden.`,
+                message: `[db-element-not-found] Element '${inner}' not found in dimension '${dim}' (DB() arg ${i + 1}).`,
                 severity: 'warning',
                 ruleId: 'db-element-not-found',
               });
@@ -736,7 +736,7 @@ export async function lintRulesServer(
         if (elemSet === 'not-found') {
           diags.push({
             line: lineIndex,
-            message: `[dimension-not-found] Dimension '${dim}' wurde auf dem Server nicht gefunden.`,
+            message: `[dimension-not-found] Dimension '${dim}' was not found on the server.`,
             severity: 'error',
             ruleId: 'dimension-not-found',
           });
@@ -748,7 +748,7 @@ export async function lintRulesServer(
             if (!elemSet.has(elem.toLowerCase())) {
               diags.push({
                 line: lineIndex,
-                message: `[element-not-found] Element '${elem}' in Dimension '${dim}' nicht gefunden.`,
+                message: `[element-not-found] Element '${elem}' not found in dimension '${dim}'.`,
                 severity: 'warning',
                 ruleId: 'element-not-found',
               });

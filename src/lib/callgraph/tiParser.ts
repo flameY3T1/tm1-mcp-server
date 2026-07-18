@@ -160,7 +160,7 @@ function parseBlock(
 
     // Check for double semicolon (two semicolons on one line is always an error)
     if (trimmed.includes(';;')) {
-      throw new ParseError(lineNum, `Doppeltes Semikolon in Zeile ${lineNum}: Jedes Statement braucht genau ein Semikolon`);
+      throw new ParseError(lineNum, `Double semicolon in line ${lineNum}: each statement needs exactly one semicolon`);
     }
 
     // Check for block terminators
@@ -170,14 +170,14 @@ function parseBlock(
       if (terminator === 'endif') {
         return { statements, nextIndex: i };
       }
-      throw new ParseError(lineNum, `Unerwartetes ENDIF ohne zugehöriges IF in Zeile ${lineNum}`);
+      throw new ParseError(lineNum, `Unexpected ENDIF without matching IF in line ${lineNum}`);
     }
 
     if (upper === 'END;' || upper === 'END') {
       if (terminator === 'end') {
         return { statements, nextIndex: i };
       }
-      throw new ParseError(lineNum, `Unerwartetes END ohne zugehöriges WHILE in Zeile ${lineNum}`);
+      throw new ParseError(lineNum, `Unexpected END without matching WHILE in line ${lineNum}`);
     }
 
     // ELSEIF / ELSE are handled by the IF parser, not here
@@ -186,7 +186,7 @@ function parseBlock(
         // Return to the IF parser to handle ELSEIF/ELSE
         return { statements, nextIndex: i };
       }
-      throw new ParseError(lineNum, `Unerwartetes ${upper.startsWith('ELSEIF') ? 'ELSEIF' : 'ELSE'} ohne zugehöriges IF in Zeile ${lineNum}`);
+      throw new ParseError(lineNum, `Unexpected ${upper.startsWith('ELSEIF') ? 'ELSEIF' : 'ELSE'} without matching IF in line ${lineNum}`);
     }
 
     // Single-line IF/ENDIF: `IF(cond); stmt1; stmt2; ENDIF;`
@@ -219,13 +219,13 @@ function parseBlock(
     // Check for empty right-hand side: y =; or y = ;
     if (/^[A-Za-z_]\w*\s*=\s*;$/.test(trimmed)) {
       const varName = (trimmed.split(/\s*=/)[0] ?? '').trim();
-      throw new ParseError(lineNum, `Leere Zuweisung in Zeile ${lineNum}: "${varName}" hat keinen Wert (z.B. ${varName} = 1; oder ${varName} = 'text';)`);
+      throw new ParseError(lineNum, `Empty assignment in line ${lineNum}: "${varName}" has no value (e.g. ${varName} = 1; or ${varName} = 'text';)`);
     }
     // First check if line looks like an assignment but is missing semicolon
     if (/^[A-Za-z_]\w*\s*=\s*.+$/.test(trimmed) && !trimmed.endsWith(';')) {
       const upperFirst = (trimmed.split(/[\s=(]/)[0] ?? '').toUpperCase();
       if (!['IF', 'ELSEIF', 'ELSE', 'ENDIF', 'WHILE', 'END'].includes(upperFirst)) {
-        throw new ParseError(lineNum, `Fehlendes Semikolon am Ende der Zeile ${lineNum}`);
+        throw new ParseError(lineNum, `Missing semicolon at end of line ${lineNum}`);
       }
     }
     const assignment = tryParseAssignment(trimmed, lineNum);
@@ -240,7 +240,7 @@ function parseBlock(
     if (/^[A-Za-z_]\w*\s*\(/.test(trimmed) && !trimmed.endsWith(';')) {
       const upperFirst = (trimmed.split(/[\s(]/)[0] ?? '').toUpperCase();
       if (!['IF', 'ELSEIF', 'WHILE'].includes(upperFirst)) {
-        throw new ParseError(lineNum, `Fehlendes Semikolon am Ende der Zeile ${lineNum}`);
+        throw new ParseError(lineNum, `Missing semicolon at end of line ${lineNum}`);
       }
     }
     const funcCall = tryParseFunctionCall(trimmed, lineNum);
@@ -254,7 +254,7 @@ function parseBlock(
     // Check for missing semicolon on bare keywords
     const cleanedForBareCheck = trimmed.endsWith(';') ? trimmed.slice(0, -1).trim() : trimmed.trim();
     if (BARE_KEYWORDS.has(cleanedForBareCheck.toLowerCase()) && !trimmed.endsWith(';')) {
-      throw new ParseError(lineNum, `Fehlendes Semikolon am Ende der Zeile ${lineNum}`);
+      throw new ParseError(lineNum, `Missing semicolon at end of line ${lineNum}`);
     }
     const bareKeyword = tryParseBareKeyword(trimmed, lineNum);
     if (bareKeyword) {
@@ -264,15 +264,15 @@ function parseBlock(
     }
 
     // Unknown line — not valid TI syntax
-    throw new ParseError(lineNum, `Unbekannte Anweisung in Zeile ${lineNum}: "${trimmed.length > 60 ? trimmed.slice(0, 60) + '…' : trimmed}" — erwartet wird eine Zuweisung (var = expr;), ein Funktionsaufruf (Fn(...);) oder ein Schlüsselwort`);
+    throw new ParseError(lineNum, `Unknown statement in line ${lineNum}: "${trimmed.length > 60 ? trimmed.slice(0, 60) + '…' : trimmed}" — expected an assignment (var = expr;), a function call (Fn(...);), or a keyword`);
   }
 
   // If we expected a terminator but reached end of file
   if (terminator === 'endif') {
-    throw new ParseError(lines.length, `Fehlendes ENDIF — IF-Block wurde nicht geschlossen`);
+    throw new ParseError(lines.length, `Missing ENDIF — IF block was not closed`);
   }
   if (terminator === 'end') {
-    throw new ParseError(lines.length, `Fehlendes END — WHILE-Block wurde nicht geschlossen`);
+    throw new ParseError(lines.length, `Missing END — WHILE block was not closed`);
   }
 
   return { statements, nextIndex: i };
@@ -331,7 +331,7 @@ function parseIfBlock(lines: string[], startIndex: number): IfParseResult {
   }
 
   // If we get here, ENDIF was not found
-  throw new ParseError(lines.length, `Fehlendes ENDIF — IF-Block wurde nicht geschlossen`);
+  throw new ParseError(lines.length, `Missing ENDIF — IF block was not closed`);
 }
 
 interface WhileParseResult {

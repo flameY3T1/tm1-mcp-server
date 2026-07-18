@@ -3812,7 +3812,7 @@ export const KNOWN_SIGNATURES: Map<string, TiKnownSignature> = new Map([
     returnType: 'string',
     performanceNote: {
       recommended: 'prolog',
-      reason: 'NewDateFormatter erzeugt ein Formatter-Objekt und sollte nur einmal im Prolog erstellt werden, nicht pro Datensatz.',
+      reason: 'NewDateFormatter creates a formatter object and should be created only once in the prolog, not per record.',
     },
   }],
   ['swapaliaswithprincipalname', {
