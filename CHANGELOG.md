@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `indeterminate` (built but not classifiable — not evidence the element goes untouched). New
   `elementAccess` input filters roles (default source+write+zero-out); suppressed `indeterminate`
   processes are counted.
+- `tm1_trace_data_flow` element tracing now resolves **stored** view/subset datasources: native-view
+  title members and static subsets are matched exactly; MDX views and MDX subset expressions by
+  literal member reference. Each such process is tagged `access: source` with a `via` provenance tag.
+  Computed selectors (`TM1FILTERBYLEVEL`, `DESCENDANTS`, `TM1SUBSETALL`, …) are reported in
+  `computedInProcesses` as unresolved, not silently dropped. Set `resolveDatasourceMembership=false`
+  to skip the extra fetches.
 
 ### Fixed
 
