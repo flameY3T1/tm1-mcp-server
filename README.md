@@ -146,7 +146,7 @@ flow. For v12, `TM1_BASE_URL` is address:port only (no path) — e.g.
 TM1_INSTANCE=my-instance
 TM1_DATABASE=my-database
 TM1_AUTH_MODE=s2s                   # s2s (default) | basic | access_token | oidc | iam
-TM1_USER=admin                      # supplies the session login "User" in every mode
+TM1_USER=admin                      # REQUIRED in every v12 mode (incl. s2s) — the session login "User"
 
 # Per-mode credentials — set the ones your TM1_AUTH_MODE requires:
 TM1_CLIENT_ID=my-client-id          # s2s
