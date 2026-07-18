@@ -101,6 +101,29 @@ describe("traceDataFlow", () => {
   });
 });
 
+describe("traceDataFlow — per-row elements", () => {
+  it("carries a process's in-code subset-membership elements onto its downstream reader row", async () => {
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        {
+          name: "TransferP",
+          prolog: "SubsetElementInsert('Datenquellen','sTmp','SuDatenquellen_C',1);",
+          metadata: "",
+          data: "nV = CellGetN('Sales', 'E1');",
+          epilog: "",
+          parameters: [],
+        },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    const flow = traceDataFlow(index, [], "Sales", "downstream");
+    expect(flow.downstream).toEqual([
+      { process: "TransferP", targetCubes: [], readsVia: "code", elements: ["SuDatenquellen_C"] },
+    ]);
+  });
+});
+
 describe("traceDataFlow — element filter", () => {
   it("lists processes that touch a given element of a dimension", async () => {
     const index = await buildReferenceIndex({
