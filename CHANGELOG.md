@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Computed selectors (`TM1FILTERBYLEVEL`, `DESCENDANTS`, `TM1SUBSETALL`, …) are reported in
   `computedInProcesses` as unresolved, not silently dropped. Set `resolveDatasourceMembership=false`
   to skip the extra fetches.
+- `tm1_trace_data_flow` element tracing gains opt-in `resolveComputed`: when set, computed native-view
+  axis selectors (`TM1FILTERBYLEVEL`/`DESCENDANTS`/…) used as datasources are resolved to exact members
+  by live-evaluating just that dimension's set against the view's cube (read-only, `via:view-native-computed`).
+  Off by default; when off, such axes stay flagged in `computedInProcesses`. Stored subsets are already
+  resolved exactly and are unaffected.
 
 ### Fixed
 
