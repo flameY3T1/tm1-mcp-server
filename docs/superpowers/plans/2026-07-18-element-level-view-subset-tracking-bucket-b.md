@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **Depends on Phase 1 (Bucket A):** `docs/superpowers/plans/2026-07-18-element-level-view-subset-tracking.md` MUST be merged first. This plan reuses `elementKey`, `ReferenceIndex.byElement`, `DataFlowResult.element`, and the `element`+`dimension` tool filter it introduced.
+> **Depends on Phase 1 (Bucket A) AND Phase 1.5 (usage classification), both merged (`b3eeb8b`).** Reuses `elementKey`, `ReferenceIndex.byElement`, `DataFlowResult.element`, the `element`/`dimension`/`elementAccess` tool filter, and the Phase-1.5 `access: AccessKind[]` + `classifyElementAccess` + `suppressedIndeterminate`. Task 3 is RECONCILED with the post-1.5 element shape (see its note); Tasks 1-2 are independent pure modules unaffected by 1.5.
 
 **Goal:** Resolve element membership through **server-side** view/subset objects a process uses as
 its datasource — so "which processes touch element X of dimension D" also finds processes that
@@ -452,13 +452,21 @@ git commit -m "feat(callgraph): datasource membership adapter (view/subset defs 
 - Modify: `src/tools/schemas/items.ts` (`DataFlowResultSchema.element`)
 - Test: `tests/unit/data-flow.test.ts` (extend)
 
+**RECONCILED with Phase 1.5 (merged):** the current `element.processes[]` item is
+`{ process; funcNames; access: AccessKind[] }` and `traceDataFlow` opts is
+`{ element?; elementAccess? }` with a `classifyElementAccess` helper + `suppressedIndeterminate`.
+Read the CURRENT element block in `dataFlow.ts` (`if (opts?.element)`, ~`:259-303`) before editing —
+Bucket B is ADDITIVE on top of it, not a replacement of a pre-1.5 shape. A stored view/subset
+datasource hit IS a read, so a Bucket-B process gets `access` including `'source'` PLUS a `via` tag.
+
 **Interfaces:**
-- Consumes: `DatasourceMembership`, `buildDatasourceMembership` (Task 2); Phase-1 `element` filter.
+- Consumes: `DatasourceMembership`, `MembershipVia`, `buildDatasourceMembership` (Task 2); the
+  Phase-1.5 `element` block + `AccessKind`/`classifyElementAccess`.
 - Produces:
-  - `traceDataFlow(index, dsList, cubeName, direction, opts?)` — `opts` gains
-    `datasourceMembership?: DatasourceMembership`.
-  - `DataFlowResult.element.processes[]` items gain optional `via?: MembershipVia[]` (datasource
-    origins; `funcNames` stays the in-code A origins).
+  - `traceDataFlow(..., opts?)` — `opts` gains `datasourceMembership?: DatasourceMembership`
+    (keep the existing `element?` and `elementAccess?`).
+  - `DataFlowResult.element.processes[]` items gain optional `via?: MembershipVia[]` (kept alongside
+    the existing `access`/`funcNames`).
   - `DataFlowResult.element` gains optional `computedInProcesses?: string[]`.
 
 - [ ] **Step 1: Write the failing test**
@@ -491,8 +499,9 @@ describe("traceDataFlow — element filter incl. datasource membership", () => {
       element: { dimension: "Datenquellen", name: "SuDatenquellen_C" },
       datasourceMembership: membership,
     });
+    // A stored-subset datasource hit is a read → access ['source'] PLUS a via tag.
     expect(flow.element!.processes).toEqual([
-      { process: "Reader", funcNames: [], via: ["subset-static"] },
+      { process: "Reader", funcNames: [], access: ["source"], via: ["subset-static"] },
     ]);
   });
 });
@@ -511,42 +520,43 @@ In `dataFlow.ts`, import the membership types at the top:
 import type { DatasourceMembership, MembershipVia } from "./datasourceMembership.js";
 ```
 
-Change the `element.processes` item type and add `computedInProcesses` in `DataFlowResult`:
+Add `via?` to the EXISTING `element.processes` item type and add `computedInProcesses` in
+`DataFlowResult` (the item already has `process`/`funcNames`/`access` from Phase 1.5 — keep those):
 
 ```ts
-  element?: {
-    dimension: string;
-    name: string;
-    processes: Array<{ process: string; funcNames: string[]; via?: MembershipVia[] }>;
-    unresolvedInProcesses?: string[];
+    processes: Array<{ process: string; funcNames: string[]; access: AccessKind[]; via?: MembershipVia[] }>;
+    // ...existing unresolvedInProcesses?, suppressedIndeterminate?, resolution ...
     /** Processes whose datasource scopes elements via a computed selector (element identity not literally verifiable). */
     computedInProcesses?: string[];
-  };
 ```
 
-Extend the `opts` param:
+Extend the EXISTING `opts` param with `datasourceMembership` (keep `element` and `elementAccess`):
 
 ```ts
-  opts?: { element?: { dimension: string; name: string }; datasourceMembership?: DatasourceMembership },
+  opts?: { element?: { dimension: string; name: string }; elementAccess?: AccessKind[]; datasourceMembership?: DatasourceMembership },
 ```
 
-Replace the element-filter block (from Phase 1) so it merges code refs (`byElement`) AND
-datasource membership into one per-process map:
+Rework the CURRENT element-filter block (Phase 1.5) so it ALSO folds in datasource-membership hits.
+The in-code path (`perProc` from `index.byElement`, `classifyElementAccess`, `wanted`/`elementAccess`
+filter, `suppressedIndeterminate`) stays; add a `dsVia` map and a `'source'` access + `via` tag for
+Bucket-B hits, and union the process sets:
 
 ```ts
 if (opts?.element) {
   const { dimension, name } = opts.element;
   const key = elementKey(dimension, name);
+  const wanted = new Set<AccessKind>(opts.elementAccess ?? ["source", "write", "zero-out"]);
 
-  // Code origin (Bucket A): funcNames per process.
-  const codeFns = new Map<string, Set<string>>();
+  // in-code (Phase 1/1.5): funcNames + subsets per process
+  const perProc = new Map<string, { funcNames: Set<string>; subsets: Set<string> }>();
   for (const r of index.byElement.get(key) ?? []) {
-    const set = codeFns.get(r.sourceName) ?? new Set<string>();
-    if (r.funcName) set.add(r.funcName);
-    codeFns.set(r.sourceName, set);
+    const e = perProc.get(r.sourceName) ?? { funcNames: new Set<string>(), subsets: new Set<string>() };
+    if (r.funcName) e.funcNames.add(r.funcName);
+    if (r.subset) e.subsets.add(r.subset.toLowerCase());
+    perProc.set(r.sourceName, e);
   }
 
-  // Datasource origin (Bucket B): via tags per process.
+  // Bucket B: stored view/subset datasource membership → via tags per process (a datasource IS a read).
   const dsVia = new Map<string, Set<MembershipVia>>();
   for (const hit of opts.datasourceMembership?.byElement.get(key) ?? []) {
     const set = dsVia.get(hit.process) ?? new Set<MembershipVia>();
@@ -554,14 +564,30 @@ if (opts?.element) {
     dsVia.set(hit.process, set);
   }
 
-  const allProcs = new Set<string>([...codeFns.keys(), ...dsVia.keys()]);
-  const processes = [...allProcs]
-    .sort((a, b) => a.localeCompare(b))
-    .map((process) => {
-      const funcNames = [...(codeFns.get(process) ?? [])].sort((a, b) => a.localeCompare(b));
-      const via = [...(dsVia.get(process) ?? [])].sort((a, b) => a.localeCompare(b));
-      return via.length ? { process, funcNames, via } : { process, funcNames };
-    });
+  const dsByProc = new Map<string, DataSourceEntry>();
+  for (const d of dsList) dsByProc.set(d.name.toLowerCase(), d);
+
+  const allProcs = new Set<string>([...perProc.keys(), ...dsVia.keys()]);
+  let suppressedIndeterminate = 0;
+  const processes: Array<{ process: string; funcNames: string[]; access: AccessKind[]; via?: MembershipVia[] }> = [];
+  for (const process of allProcs) {
+    const e = perProc.get(process);
+    const usage = index.subsetUsageByProcess.get(process.toLowerCase());
+    const accessSet = new Set<AccessKind>(
+      e ? classifyElementAccess(usage, [...e.subsets], dsByProc.get(process.toLowerCase()), dimension) : [],
+    );
+    const via = [...(dsVia.get(process) ?? [])].sort((a, b) => a.localeCompare(b));
+    if (via.length) accessSet.add("source");           // stored view/subset datasource = read
+    if (accessSet.size === 0) accessSet.add("indeterminate");
+    const access = [...accessSet].sort((a, b) => a.localeCompare(b));
+    if (!access.some((a) => wanted.has(a))) {
+      if (access.length === 1 && access[0] === "indeterminate") suppressedIndeterminate++;
+      continue;
+    }
+    const funcNames = [...(e?.funcNames ?? [])].sort((a, b) => a.localeCompare(b));
+    processes.push(via.length ? { process, funcNames, access, via } : { process, funcNames, access });
+  }
+  processes.sort((a, b) => a.process.localeCompare(b.process));
 
   const unresolvedInProcesses = [...index.unresolvedElementRefsBySourceProcess.entries()]
     .filter(([, list]) => list.some((u) => (u.dimension ?? "").toLowerCase() === dimension.toLowerCase()))
@@ -576,14 +602,17 @@ if (opts?.element) {
     name,
     processes,
     ...(unresolvedInProcesses.length ? { unresolvedInProcesses } : {}),
+    ...(suppressedIndeterminate ? { suppressedIndeterminate } : {}),
     ...(computedInProcesses.length ? { computedInProcesses } : {}),
+    resolution:
+      "access from in-code subset usage (view-assign/zero-out/loop) + datasource; stored view/subset datasources resolved (native-title/static exact, MDX by literal member); computed selectors (TM1FILTERBY*/DESCENDANTS/…) flagged in computedInProcesses, not resolved; 'indeterminate' = built but not classifiable, not evidence the element goes untouched.",
   };
 }
 ```
 
-> `computedInProcesses` is dimension-agnostic here (any computed selector in the process's
-> datasource). If you want it scoped to the queried dimension, extend `DatasourceMembership` to key
-> computed selectors by dimension — a refinement, not required for the Bucket C flag to be honest.
+> `computedInProcesses` is dimension-agnostic (any computed selector in the process's datasource) —
+> a Bucket-C honesty flag, acceptable as-is. Note the `resolution` string is UPDATED: stored
+> view/subset datasources are now resolved, so it no longer says "Bucket B pending".
 
 - [ ] **Step 4: Run the dataFlow test**
 
@@ -624,8 +653,13 @@ when an element filter is active and resolution is on, BEFORE calling `traceData
       }
 
       const flow = traceDataFlow(index, dsList, cubeName, direction,
-        element && dimension ? { element: { dimension, name: element }, datasourceMembership } : undefined);
+        element && dimension
+          ? { element: { dimension, name: element }, ...(elementAccess ? { elementAccess } : {}), datasourceMembership }
+          : undefined);
 ```
+
+> Keep the existing `elementAccess` passthrough (Phase 1.5) — do NOT drop it. `datasourceMembership`
+> is `undefined` when the opt-out flag is off; `traceDataFlow` handles that (no Bucket-B hits).
 
 Append a sentence to the tool description `.join(" ")` array:
 
@@ -635,7 +669,9 @@ Append a sentence to the tool description `.join(" ")` array:
 
 - [ ] **Step 6: Extend `DataFlowResultSchema.element` (same task)**
 
-In `src/tools/schemas/items.ts`, update the `element` block added in Phase 1:
+In `src/tools/schemas/items.ts`, the `element` block already has `access` + `suppressedIndeterminate`
+(Phase 1.5). ADD `via` to the processes item and `computedInProcesses` at the element level — do not
+remove the existing fields:
 
 ```ts
   element: z
@@ -646,14 +682,21 @@ In `src/tools/schemas/items.ts`, update the `element` block added in Phase 1:
         z.object({
           process: z.string(),
           funcNames: z.array(z.string()),
-          via: z.array(z.string()).optional(),
+          access: z.array(z.enum(["source", "write", "zero-out", "indeterminate"])),   // existing (1.5)
+          via: z.array(z.string()).optional(),                                          // NEW (Bucket B)
         }),
       ),
-      unresolvedInProcesses: z.array(z.string()).optional(),
-      computedInProcesses: z.array(z.string()).optional(),
+      unresolvedInProcesses: z.array(z.string()).optional(),        // existing
+      suppressedIndeterminate: z.number().int().optional(),         // existing (1.5)
+      computedInProcesses: z.array(z.string()).optional(),          // NEW (Bucket B)
+      resolution: z.string(),                                       // existing
     })
     .optional(),
 ```
+
+> **output-schema-budget is at 96.9% of the 82000-byte cap.** `via` + `computedInProcesses` add a
+> little. If `lint:output-schema-budget` FAILS after this, STOP and report the byte count — do not
+> raise the cap without a decision.
 
 - [ ] **Step 7: Run tests + full verify**
 
