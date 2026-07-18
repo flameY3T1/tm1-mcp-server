@@ -80,19 +80,55 @@ describe("TM1Client – Process Execution Methods", () => {
   // ── executeProcess() ─────────────────────────────────────────────────────
 
   describe("executeProcess()", () => {
-    it("should return success when process completes with 204", async () => {
-      fetchSpy.mockResolvedValueOnce(mock204Response());
+    it("should POST tm1.ExecuteWithReturn and report success on CompletedSuccessfully", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ ProcessExecuteStatusCode: "CompletedSuccessfully", ErrorLogFile: null }),
+      );
 
       const result = await client.processes.execute("ImportData");
 
       expect(result).toEqual({
         success: true,
         processErrorStatus: "CompletedSuccessfully",
+        errorLogFile: undefined,
       });
 
       const [url, opts] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/Processes('ImportData')/tm1.Execute");
+      expect(url).toContain("/api/v1/Processes('ImportData')/tm1.ExecuteWithReturn");
       expect(opts.method).toBe("POST");
+    });
+
+    it("reports failure with status + error log on CompletedWithMinorErrors (HTTP 200)", async () => {
+      // ExecuteWithReturn answers HTTP 200 even for partial failures — the
+      // real outcome is only visible in ProcessExecuteStatusCode. The old
+      // tm1.Execute path reported these runs as success.
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ProcessExecuteStatusCode: "CompletedWithMinorErrors",
+          ErrorLogFile: { Filename: "TM1ProcessError_20260718_ImportData.log" },
+        }),
+      );
+
+      const result = await client.processes.execute("ImportData");
+
+      expect(result.success).toBe(false);
+      expect(result.processErrorStatus).toBe("CompletedWithMinorErrors");
+      expect(result.errorLogFile).toBe("TM1ProcessError_20260718_ImportData.log");
+    });
+
+    it("reports failure on an aborted run (HTTP 200 + Aborted status)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ProcessExecuteStatusCode: "Aborted",
+          ErrorLogFile: { Filename: "TM1ProcessError_20260718_Broken.log" },
+        }),
+      );
+
+      const result = await client.processes.execute("Broken");
+
+      expect(result.success).toBe(false);
+      expect(result.processErrorStatus).toBe("Aborted");
+      expect(result.errorLogFile).toBe("TM1ProcessError_20260718_Broken.log");
     });
 
     it("should return success when process completes with 200 empty body", async () => {

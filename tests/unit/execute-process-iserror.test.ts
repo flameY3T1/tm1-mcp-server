@@ -37,6 +37,22 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
     expect(result.content[0]?.text).toContain("DataSource error");
   });
 
+  it("flags isError when the TI run completes with minor errors", async () => {
+    // execute() now routes through tm1.ExecuteWithReturn, so partial failures
+    // surface as success:false with the real status + error log attached.
+    const cb = captureHandler(
+      async () => ({
+        success: false,
+        processErrorStatus: "CompletedWithMinorErrors",
+        errorLogFile: "TM1ProcessError_20260718_Partial.log",
+      })
+    );
+    const result = await cb({ processName: "Partial.Process" }, {});
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("CompletedWithMinorErrors");
+    expect(result.content[0]?.text).toContain("TM1ProcessError_20260718_Partial.log");
+  });
+
   it("does not flag isError on a successful run", async () => {
     const cb = captureHandler(
       async () => ({ success: true, processErrorStatus: "CompletedSuccessfully" })

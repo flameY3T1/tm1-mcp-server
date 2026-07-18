@@ -95,14 +95,14 @@ export class ProcessService {
   /**
    * Execute a TI process with optional parameters. opts.timeoutMs overrides
    * the 30s default for long-running TI runs.
-   * POST /api/v1/Processes('{name}')/tm1.Execute
+   * POST /api/v1/Processes('{name}')/tm1.ExecuteWithReturn
    */
   async execute(
     processName: string,
     params?: Record<string, string | number>,
     opts?: RequestOptions,
   ): Promise<ProcessResult> {
-    const path = `/api/v1/Processes('${enc(processName)}')/tm1.Execute`;
+    const path = `/api/v1/Processes('${enc(processName)}')/tm1.ExecuteWithReturn`;
     const body: { Parameters?: Array<{ Name: string; Value: string | number }> } = {};
     if (params && Object.keys(params).length > 0) {
       body.Parameters = Object.entries(params).map(([name, value]) => ({
@@ -112,10 +112,19 @@ export class ProcessService {
     }
 
     try {
-      await this.http.request<void>("POST", path, body, opts);
+      // ExecuteWithReturn returns HTTP 200 even when the process aborts; the
+      // real outcome is in ProcessExecuteStatusCode. The plain tm1.Execute
+      // action also 2xx-es on CompletedWithMinorErrors/HasMinorErrors, which
+      // made partial failures (bad records + error log) invisible.
+      const response = await this.http.request<{
+        ProcessExecuteStatusCode?: string;
+        ErrorLogFile?: { Filename?: string } | null;
+      }>("POST", path, body, opts);
+      const status = response?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
       return {
-        success: true,
-        processErrorStatus: "CompletedSuccessfully",
+        success: status === "CompletedSuccessfully",
+        processErrorStatus: status,
+        errorLogFile: response?.ErrorLogFile?.Filename,
       };
     } catch (error) {
       // Systemic transport/auth failures (LOCK_TIMEOUT, CONNECTION_FAILED,
