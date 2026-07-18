@@ -55,6 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tm1_get_server_info` now reports the correct product version on v12: v12
   omits `ProductVersion` from the `Configuration` body, so `getInfo()` falls
   back to the `/Configuration/ProductVersion` scalar.
+- `tm1_import_process_from_git` now **rejects** a malformed or nested `#region`/`#endregion` code
+  blob with a clear error instead of silently dropping a tab's code and deploying a partial process.
+  Note: a `.ti` whose tab code contains PAW/Arc folding-comment `#region <label>` lines (which the
+  previous parser silently corrupted) now errors loudly on import — re-export from the server to get a
+  clean blob.
+- v12: when `TM1_INSTANCE`/`TM1_DATABASE` select a v12 connection, the effective server version is now
+  coerced to 12 even if `TM1_VERSION` is left at a v11 value, so version-gated code paths no longer
+  misfire.
 
 ### Changed
 
