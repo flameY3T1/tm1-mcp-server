@@ -174,10 +174,20 @@ with its own env vars:
 
 ## Use with Claude Code
 
-Credentials live in `.env` (loaded at startup from the repo root — the directory
-containing `dist/` — so it is found no matter which working directory the MCP
-client launches the server from). The MCP client config only points at the
-binary — **do not put `TM1_PASSWORD` in `.mcp.json` or `settings.json`**.
+Credentials come from environment variables, resolved in this order (first hit
+wins per variable):
+
+1. real shell / MCP-client `env:` vars
+2. the `.env` file named by `DOTENV_CONFIG_PATH`
+3. `.env` in the working directory the MCP client launches the server from
+   (typically your project directory)
+4. `.env` in the package root — the directory containing `dist/`. Works for
+   clone+build installs; under `npx` this is the npm cache, so don't rely on it.
+
+For the recommended `npx` install, put a `.env` in the project directory you
+start your MCP client from, or point `DOTENV_CONFIG_PATH` at one via the MCP
+config's `env` block. **Do not put `TM1_PASSWORD` in `.mcp.json` or
+`settings.json`** — keep secrets in a `.env` that stays out of version control.
 
 Copy `mcp.json.example` to `.mcp.json` (project-local) or merge into
 `~/.claude/settings.json`.
