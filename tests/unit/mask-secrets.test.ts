@@ -99,6 +99,20 @@ describe("maskCode", () => {
     expect(out).toContain("\r\n");
     expect(out).not.toContain("'pw'");
   });
+
+  it("does not swallow the trailing \\r when masking a bare conn-string credential pair on a CRLF line", () => {
+    // Regression: the value capture in maskCodeLine's conn-string pass used to
+    // be an unbounded [^;'"]+, which greedily consumed the trailing \r of a
+    // CRLF-terminated line into the masked-away value, silently converting
+    // that line's ending from CRLF to LF (byte-identity break on .ti export).
+    const code = "sConn = PWD=hunter2\r\nb = 2;";
+    const out = maskCode(code);
+    expect(out).not.toContain("hunter2");
+    expect(out).toContain("\r\n");
+    // The masked line itself must still end in \r right before the split \n.
+    const maskedLine = out.split("\n")[0]!;
+    expect(maskedLine.endsWith("\r")).toBe(true);
+  });
 });
 
 describe("maskConnectionString", () => {

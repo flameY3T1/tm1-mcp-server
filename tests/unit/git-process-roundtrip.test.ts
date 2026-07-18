@@ -89,6 +89,43 @@ describe("git-process #region round-trip", () => {
     expect(() => parseProcessFromGit(json, legacy)).toThrow(/#region/);
   });
 
+  it("rejects a blob with a missing #endregion (next tab's #region follows directly) instead of silently swallowing the following tab", () => {
+    // Prolog's #endregion is missing/typo'd; Metadata's #region follows directly.
+    // The old non-greedy parser silently absorbed Metadata's content into Prolog
+    // and reported found:1 with no error — a silent partial-deploy hazard.
+    const ti =
+      "#region Prolog\r\nsP='p';\r\n#region Metadata\r\nsM='m';\r\n#endregion";
+    const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
+    expect(() => parseProcessFromGit(json, ti)).toThrow(/#region/);
+  });
+
+  it("rejects a blob with a nested #region/#endregion inside a tab's code (e.g. editor folding markers) instead of silently dropping trailing content", () => {
+    // A #region/#endregion pair nested inside Prolog's code (e.g. a PAW folding
+    // comment). The old non-greedy parser closed on the FIRST #endregion (the
+    // inner one) and silently dropped everything after it — up to and including
+    // the real #endregion — with no error.
+    const ti =
+      "#region Prolog\r\ncode before;\r\n#region MyFold\r\nfolded stuff;\r\n#endregion\r\ncode after;\r\n#endregion";
+    const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
+    expect(() => parseProcessFromGit(json, ti)).toThrow(/#region/);
+  });
+
+  it("rejects an unbalanced #region/#endregion count", () => {
+    const ti = "#region Prolog\r\nsP='p';\r\n#endregion\r\n#region Metadata\r\nsM='m';\r\n";
+    const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
+    expect(() => parseProcessFromGit(json, ti)).toThrow(/#region/);
+  });
+
+  it("still parses a valid multi-tab blob (with a tab omitted entirely) after structural validation is added", () => {
+    const ti = makeTi({ Prolog: "sP='p';", Data: "sD='d';", Epilog: "sE='e';" });
+    const json = JSON.stringify({ name: "P", parameters: [], variables: [], dataSource: { type: "None" } });
+    const parsed = parseProcessFromGit(json, ti);
+    expect(parsed.prolog).toBe("sP='p';");
+    expect(parsed.metadata).toBe("");
+    expect(parsed.data).toBe("sD='d';");
+    expect(parsed.epilog).toBe("sE='e';");
+  });
+
   it("parses git param 'value' (native) into internal defaultValue", () => {
     const ti = makeTi({ Prolog: "x=1;" });
     const json = JSON.stringify({

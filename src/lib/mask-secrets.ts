@@ -35,10 +35,13 @@ export function maskCodeLine(line: string): string {
   // These slip past the arg-position and keyword-before-'=' passes because the
   // credential lives inside another literal (ODBCOpen 1st arg, or a conn string
   // assigned to a non-credential-named var). Mask just the VALUE, keep the key.
-  // Value = bare token up to the next ';' or quote (unquoted conn-string syntax);
-  // the [^;'"]+ capture is a single linear quantifier — no nested backtracking.
+  // Value = bare token up to the next ';', quote, or line terminator (unquoted
+  // conn-string syntax); the [^;'"\r\n]+ capture is a single linear quantifier
+  // — no nested backtracking. Excluding \r\n keeps a trailing CR (CRLF line
+  // ending) out of the match so masking a conn-string line never converts
+  // CRLF→LF on the CRLF-sensitive .ti export.
   out = out.replace(
-    /\b(pwd|password|uid|user\s*id)(\s*=\s*)([^;'"]+)/gi,
+    /\b(pwd|password|uid|user\s*id)(\s*=\s*)([^;'"\r\n]+)/gi,
     (_m, key, eq) => `${key}${eq}${MASK}`,
   );
 
