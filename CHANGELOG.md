@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TM1 v12 (Planning Analytics Engine) Jobs/Activity monitoring: `tm1_list_jobs`
   and `tm1_cancel_job`. Monitoring tools are version-gated — v11 connections
   expose the thread tools, v12 connections expose the job tools.
+- Callgraph now tracks an **element** grain for subset-membership calls
+  (`SubsetElementInsert`/`SubsetElementAdd`/`SubsetElementDelete`): the element name + owning
+  dimension are indexed, and non-literal element args are surfaced as unresolved (not silently
+  dropped).
+- `tm1_trace_data_flow` accepts optional `element` + `dimension` inputs to answer
+  "which processes touch element X of dimension D" (via in-code subset-membership calls), and
+  each data-flow row now lists the in-code elements that process manipulates. Reads through
+  **stored** view/subset MDX remain cube-level only — see the Bucket B follow-up.
 
 ### Fixed
 
