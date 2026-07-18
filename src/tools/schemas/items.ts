@@ -858,6 +858,7 @@ export const DataFlowResultSchema = z.object({
         sourceCubes: z.array(z.string()),
         datasourceType: z.string(),
         externalSource: z.string().optional(),
+        elements: z.array(z.string()).optional(),
       }),
     )
     .optional(),
@@ -867,6 +868,7 @@ export const DataFlowResultSchema = z.object({
         process: z.string(),
         targetCubes: z.array(z.string()),
         readsVia: z.enum(["code", "datasource", "both"]),
+        elements: z.array(z.string()).optional(),
       }),
     )
     .optional(),
@@ -874,6 +876,14 @@ export const DataFlowResultSchema = z.object({
     upstream: z.number().int().optional(),
     downstream: z.number().int().optional(),
   }),
+  element: z
+    .object({
+      dimension: z.string(),
+      name: z.string(),
+      processes: z.array(z.object({ process: z.string(), funcNames: z.array(z.string()) })),
+      unresolvedInProcesses: z.array(z.string()).optional(),
+    })
+    .optional(),
   hint: z.string().optional(),
 });
 

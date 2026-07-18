@@ -7,7 +7,7 @@
 //   downstream — processes that READ it, and which cubes they WRITE to.
 //   upstream   — processes that WRITE it, and where they SOURCE their data.
 
-import type { ReferenceIndex } from "./referenceIndex.js";
+import { elementKey, type ReferenceIndex } from "./referenceIndex.js";
 import { classifyAccess } from "./callGraph.js";
 
 export interface DataSourceEntry {
@@ -28,6 +28,8 @@ export interface UpstreamWriter {
   datasourceType: string;
   /** For non-cube datasources (ASCII/ODBC/TM1Process/subset): a short source label. */
   externalSource?: string;
+  /** In-code subset-membership elements this process manipulates (SubsetElementInsert/Add/Delete). */
+  elements?: string[];
 }
 
 export interface DownstreamReader {
@@ -36,6 +38,8 @@ export interface DownstreamReader {
   targetCubes: string[];
   /** How the reader accesses the cube: code CellGet, a view datasource, or both. */
   readsVia: "code" | "datasource" | "both";
+  /** In-code subset-membership elements this process manipulates (SubsetElementInsert/Add/Delete). */
+  elements?: string[];
 }
 
 export interface DataFlowResult {
@@ -43,6 +47,14 @@ export interface DataFlowResult {
   direction: Direction;
   upstream?: UpstreamWriter[];
   downstream?: DownstreamReader[];
+  /** Present only when an element filter was supplied — processes that touch element (dimension, name). */
+  element?: {
+    dimension: string;
+    name: string;
+    processes: Array<{ process: string; funcNames: string[] }>;
+    /** Processes where this dimension has an UNRESOLVED element arg (element identity not statically known). */
+    unresolvedInProcesses?: string[];
+  };
   counts: { upstream?: number; downstream?: number };
 }
 
@@ -125,6 +137,14 @@ function buildProcessIO(
   return io;
 }
 
+/** In-code subset-membership element names a process manipulates, sorted & de-duped. */
+function elementsForProcess(index: ReferenceIndex, processOrig: string): string[] {
+  const refs = index.bySourceProcess.get(processOrig.toLowerCase()) ?? [];
+  const names = new Set<string>();
+  for (const r of refs) { if (r.targetKind === "element") names.add(r.targetName); }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
 /**
  * Trace data flow into/out of a cube. Case-insensitive cube matching; output
  * preserves original casing. Lists are sorted by process name.
@@ -134,6 +154,7 @@ export function traceDataFlow(
   dsList: DataSourceEntry[],
   cubeName: string,
   direction: Direction,
+  opts?: { element?: { dimension: string; name: string } },
 ): DataFlowResult {
   const cubeOrig = new Map<string, string>();
   const io = buildProcessIO(index, dsList, cubeOrig);
@@ -153,7 +174,8 @@ export function traceDataFlow(
         .sort((a, b) => a.localeCompare(b));
       const readsVia: DownstreamReader["readsVia"] =
         e.readsViaCode && e.readsViaDatasource ? "both" : e.readsViaCode ? "code" : "datasource";
-      readers.push({ process: e.orig, targetCubes, readsVia });
+      const elements = elementsForProcess(index, e.orig);
+      readers.push({ process: e.orig, targetCubes, readsVia, ...(elements.length ? { elements } : {}) });
     }
     readers.sort((a, b) => a.process.localeCompare(b.process));
     result.downstream = readers;
@@ -168,16 +190,42 @@ export function traceDataFlow(
         .filter((c) => c !== targetLc)
         .map(cubeLabel)
         .sort((a, b) => a.localeCompare(b));
+      const elements = elementsForProcess(index, e.orig);
       writers.push({
         process: e.orig,
         sourceCubes,
         datasourceType: e.dsType,
         ...(e.externalSource ? { externalSource: e.externalSource } : {}),
+        ...(elements.length ? { elements } : {}),
       });
     }
     writers.sort((a, b) => a.process.localeCompare(b.process));
     result.upstream = writers;
     result.counts.upstream = writers.length;
+  }
+
+  if (opts?.element) {
+    const { dimension, name } = opts.element;
+    const refs = index.byElement.get(elementKey(dimension, name)) ?? [];
+    const byProc = new Map<string, Set<string>>();
+    for (const r of refs) {
+      const set = byProc.get(r.sourceName) ?? new Set<string>();
+      if (r.funcName) set.add(r.funcName);
+      byProc.set(r.sourceName, set);
+    }
+    const processes = [...byProc.entries()]
+      .map(([process, fns]) => ({ process, funcNames: [...fns].sort((a, b) => a.localeCompare(b)) }))
+      .sort((a, b) => a.process.localeCompare(b.process));
+    const unresolvedInProcesses = [...index.unresolvedElementRefsBySourceProcess.entries()]
+      .filter(([, list]) => list.some((u) => (u.dimension ?? "").toLowerCase() === dimension.toLowerCase()))
+      .map(([proc]) => proc)
+      .sort((a, b) => a.localeCompare(b));
+    result.element = {
+      dimension,
+      name,
+      processes,
+      ...(unresolvedInProcesses.length ? { unresolvedInProcesses } : {}),
+    };
   }
 
   return result;

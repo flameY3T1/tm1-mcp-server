@@ -13,6 +13,7 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
       "upstream: processes that WRITE the cube and where they SOURCE data (read cubes + datasource).",
       "Combines code-level CellGet/CellPut/DB access with each process's datasource, so view-sourced reads",
       "(a TM1CubeView datasource with no CellGet in the code) are caught too. Read-only.",
+      "Pass element+dimension to also get which processes touch that element via in-code subset-membership calls.",
     ].join(" "),
     {
       cubeName: z.string().describe("Cube to trace (case-insensitive)"),
@@ -28,14 +29,25 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(false)
         .describe("Include control processes (names starting with '}') when building the index. Default: false."),
+      element: z
+        .string()
+        .optional()
+        .describe("Element name to trace. With 'dimension', results add which processes touch this element via in-code subset-membership calls (SubsetElementInsert/Add/Delete)."),
+      dimension: z
+        .string()
+        .optional()
+        .describe("Owning dimension of 'element' (required when 'element' is set)."),
     },
-    async ({ cubeName, direction, includeControl }) => {
+    async ({ cubeName, direction, includeControl, element, dimension }) => {
+      if (element && !dimension) {
+        return { isError: true, content: [{ type: "text" as const, text: "When 'element' is set, 'dimension' is required (element names are only unique within a dimension)." }] };
+      }
       const [index, dsList] = await Promise.all([
         buildIndexFromTM1(tm1Client, { includeControl }),
         tm1Client.processes.listDataSources(includeControl),
       ]);
 
-      const flow = traceDataFlow(index, dsList, cubeName, direction);
+      const flow = traceDataFlow(index, dsList, cubeName, direction, element && dimension ? { element: { dimension, name: element } } : undefined);
 
       const empty =
         (flow.counts.upstream ?? 0) === 0 && (flow.counts.downstream ?? 0) === 0;

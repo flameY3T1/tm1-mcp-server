@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { traceDataFlow, type DataSourceEntry } from "../../src/lib/callgraph/dataFlow.js";
+import { buildReferenceIndex } from "../../src/lib/callgraph/referenceIndex.js";
 import type { ReferenceIndex, TmReference } from "../../src/lib/callgraph/referenceIndex.js";
 
 function ref(sourceName: string, funcName: string, targetName: string): TmReference {
@@ -97,5 +98,25 @@ describe("traceDataFlow", () => {
     const idx = index([ref("P", "ViewExtractSkipZeroesSet", "Sales")]);
     const r = traceDataFlow(idx, [], "Sales", "both");
     expect(r.counts).toEqual({ upstream: 0, downstream: 0 });
+  });
+});
+
+describe("traceDataFlow — element filter", () => {
+  it("lists processes that touch a given element of a dimension", async () => {
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        { name: "Builder", prolog: "SubsetElementInsert('Datenquellen','sTmp','SuDatenquellen_C',1);", metadata: "", data: "", epilog: "", parameters: [] },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    const flow = traceDataFlow(index, [], "AnyCube", "both", {
+      element: { dimension: "Datenquellen", name: "SuDatenquellen_C" },
+    });
+    expect(flow.element).toEqual({
+      dimension: "Datenquellen",
+      name: "SuDatenquellen_C",
+      processes: [{ process: "Builder", funcNames: ["SubsetElementInsert"] }],
+    });
   });
 });
