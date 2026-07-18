@@ -32,4 +32,9 @@ describe("extractMdxMemberRefs", () => {
     const r = extractMdxMemberRefs("[D].[E] + [D].[E]");
     expect(r.members).toEqual([{ dimension: "D", element: "E" }]);
   });
+
+  it("dedupes members case-insensitively, keeping the first-seen casing", () => {
+    const r = extractMdxMemberRefs("[Kunde].[K100] + [KUNDE].[k100]");
+    expect(r.members).toEqual([{ dimension: "Kunde", element: "K100" }]);
+  });
 });

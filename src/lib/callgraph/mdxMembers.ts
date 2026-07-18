@@ -64,7 +64,7 @@ export function extractMdxMemberRefs(mdx: string): MdxExtractResult {
     // segs.length >= 2 is guaranteed by the check above, so both indices exist.
     const dimension = segs[0]!;
     const element = segs[segs.length - 1]!;
-    const key = `${dimension} ${element}`;
+    const key = `${dimension.toLowerCase()} ${element.toLowerCase()}`;
     if (!seen.has(key)) {
       seen.add(key);
       members.push({ dimension, element });
@@ -84,5 +84,5 @@ export function extractMdxMemberRefs(mdx: string): MdxExtractResult {
     }
   }
 
-  return { members, computedSelectors };
+  return { members, computedSelectors: [...computedSelectors].sort((a, b) => a.localeCompare(b)) };
 }
