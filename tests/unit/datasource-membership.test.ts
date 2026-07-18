@@ -36,7 +36,8 @@ describe("buildDatasourceMembership", () => {
     expect(m.byElement.get(elementKey("Datenquellen", "SuDatenquellen_C"))).toEqual([
       { process: "P", via: "view-mdx" },
     ]);
-    expect([...(m.computedByProcess.get("P") ?? [])].sort()).toEqual(["TM1FILTERBYLEVEL", "TM1SUBSETALL"]);
+    // Whole-MDX-VIEW datasource: not tied to a single axis → recorded under the "*" sentinel.
+    expect([...(m.computedByProcess.get("P")?.get("*") ?? [])].sort()).toEqual(["TM1FILTERBYLEVEL", "TM1SUBSETALL"]);
   });
 
   it("resolves a native view title's selectedElement exactly", async () => {
@@ -120,7 +121,7 @@ describe("buildDatasourceMembership — computed axis resolution (C1)", () => {
     expect(m.byElement.get(elementKey("Currency", "USD"))).toEqual([{ process: "P", via: "view-native-computed" }]);
     expect(calls).toEqual([{ cube: "Cube_Assumptions", dim: "Currency", set: "{TM1FILTERBYLEVEL({TM1SUBSETALL([Currency])},0)}" }]);
     // computed selector still recorded (honest provenance) even though resolved
-    expect([...(m.computedByProcess.get("P") ?? [])]).toContain("TM1FILTERBYLEVEL");
+    expect([...(m.computedByProcess.get("P")?.get("currency") ?? [])]).toContain("TM1FILTERBYLEVEL");
   });
 
   it("without evaluateSetExpression, a computed axis stays flagged (no members)", async () => {
@@ -136,7 +137,7 @@ describe("buildDatasourceMembership — computed axis resolution (C1)", () => {
       [{ name: "P", type: "TM1CubeView", sourceName: "C", view: "vC" }],
     );
     expect(m.byElement.get(elementKey("Currency", "USD"))).toBeUndefined();
-    expect([...(m.computedByProcess.get("P") ?? [])]).toContain("TM1FILTERBYLEVEL");
+    expect([...(m.computedByProcess.get("P")?.get("currency") ?? [])]).toContain("TM1FILTERBYLEVEL");
   });
 
   it("eval failure is recorded in fetchErrors and does not throw", async () => {

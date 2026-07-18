@@ -15,8 +15,13 @@ export type MembershipVia =
 export interface DatasourceMembership {
   /** elementKey(dim, element) → processes that reach it through a datasource object. */
   byElement: Map<string, Array<{ process: string; via: MembershipVia }>>;
-  /** process → computed MDX selectors encountered (Bucket C boundary; element identity not literal). */
-  computedByProcess: Map<string, Set<string>>;
+  /**
+   * process → dimension (lowercased) → computed MDX selectors encountered
+   * (Bucket C boundary; element identity not literal). The dimension key is
+   * "*" when a selector cannot be tied to one axis/subset dimension (a
+   * whole-MDX-VIEW datasource) — callers should treat "*" as unscoped/matches-any.
+   */
+  computedByProcess: Map<string, Map<string, Set<string>>>;
   /** per-object fetch failures (non-systemic); systemic errors are re-thrown. */
   fetchErrors: Array<{ process: string; object: string; message: string }>;
 }
@@ -33,9 +38,10 @@ export async function buildDatasourceMembership(
   dsList: DataSourceEntry[],
 ): Promise<DatasourceMembership> {
   const byElement = new Map<string, Array<{ process: string; via: MembershipVia }>>();
-  const computedByProcess = new Map<string, Set<string>>();
+  const computedByProcess = new Map<string, Map<string, Set<string>>>();
   const fetchErrors: DatasourceMembership["fetchErrors"] = [];
-  // C1: per-run cache keyed by (cube, expression) — avoids re-evaluating a shared axis.
+  // C1: per-run cache keyed by (cube, lowercased expression) — avoids re-evaluating a shared axis
+  // (cosmetically-different-cased identical sets share the cache; members still added with real casing).
   const evalCache = new Map<string, string[]>();
 
   const addMember = (process: string, dim: string, el: string, via: MembershipVia) => {
@@ -44,22 +50,26 @@ export async function buildDatasourceMembership(
     if (!arr.some((e) => e.process === process && e.via === via)) arr.push({ process, via });
     byElement.set(k, arr);
   };
-  const addComputed = (process: string, names: string[]) => {
+  /** dim: owning dimension of the computed selector, or "*" when it cannot be tied to one axis (whole-MDX-VIEW). */
+  const addComputed = (process: string, dim: string, names: string[]) => {
     if (names.length === 0) return;
-    const set = computedByProcess.get(process) ?? new Set<string>();
+    const dimLc = dim.toLowerCase();
+    const byDim = computedByProcess.get(process) ?? new Map<string, Set<string>>();
+    const set = byDim.get(dimLc) ?? new Set<string>();
     for (const n of names) set.add(n);
-    computedByProcess.set(process, set);
+    byDim.set(dimLc, set);
+    computedByProcess.set(process, byDim);
   };
-  const addMdx = (process: string, mdx: string, via: MembershipVia) => {
+  const addMdx = (process: string, mdx: string, via: MembershipVia, dim: string) => {
     const { members, computedSelectors } = extractMdxMemberRefs(mdx);
     for (const ref of members) addMember(process, ref.dimension, ref.element, via);
-    addComputed(process, computedSelectors);
+    addComputed(process, dim, computedSelectors);
   };
   const applySubset = (process: string, sub: Subset) => {
     if (sub.elements.length > 0) {
       for (const el of sub.elements) addMember(process, sub.dimensionName, el, "subset-static");
     } else if (sub.expression) {
-      addMdx(process, sub.expression, "subset-mdx");
+      addMdx(process, sub.expression, "subset-mdx", sub.dimensionName);
     }
   };
 
@@ -68,7 +78,8 @@ export async function buildDatasourceMembership(
       if (ds.type === "TM1CubeView" && ds.sourceName && ds.view) {
         const def = await deps.getViewDefinition(ds.sourceName, ds.view);
         if (def.type === "MDX" && def.mdx) {
-          addMdx(ds.name, def.mdx, "view-mdx");
+          // Whole-MDX-VIEW datasource: not tied to a single axis/dimension — unscoped sentinel.
+          addMdx(ds.name, def.mdx, "view-mdx", "*");
         } else if (def.type === "Native" && def.native) {
           // Titles are pinned to exactly ONE member (selectedElement). TM1's
           // getDefinition also populates a title's subsetName (the subset the
@@ -86,10 +97,10 @@ export async function buildDatasourceMembership(
             if (ax.expression) {
               const { members, computedSelectors } = extractMdxMemberRefs(ax.expression);
               for (const ref of members) addMember(ds.name, ref.dimension, ref.element, "view-native-expr");
-              addComputed(ds.name, computedSelectors);
+              addComputed(ds.name, ax.dimensionName ?? "*", computedSelectors);
               // C1: if this axis is computed and a resolver is provided, resolve it exactly.
               if (computedSelectors.length > 0 && deps.evaluateSetExpression && ax.dimensionName) {
-                const cacheKey = `${ds.sourceName.toLowerCase()} ${ax.expression}`;
+                const cacheKey = `${ds.sourceName.toLowerCase()} ${ax.expression.toLowerCase()}`;
                 let names = evalCache.get(cacheKey);
                 if (names === undefined) {
                   try {

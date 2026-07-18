@@ -288,4 +288,51 @@ describe("traceDataFlow — element filter incl. datasource membership", () => {
       "(1 datasource object(s) could not be fetched — results may be incomplete)",
     );
   });
+
+  it("scopes computedInProcesses to the traced dimension — cross-dimension computed selectors are excluded", async () => {
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        { name: "P", prolog: "", metadata: "", data: "", epilog: "", parameters: [] },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    // P's view has a computed selector on [Time] only — nothing computed on [Region].
+    const membership: DatasourceMembership = {
+      byElement: new Map(),
+      computedByProcess: new Map([["P", new Map([["time", new Set(["TM1FILTERBYLEVEL"])]])]]),
+      fetchErrors: [],
+    };
+    const flowRegion = traceDataFlow(index, [], "Sales", "both", {
+      element: { dimension: "Region", name: "EMEA" },
+      datasourceMembership: membership,
+    });
+    expect(flowRegion.element!.computedInProcesses).toBeUndefined();
+
+    const flowTime = traceDataFlow(index, [], "Sales", "both", {
+      element: { dimension: "Time", name: "2026" },
+      datasourceMembership: membership,
+    });
+    expect(flowTime.element!.computedInProcesses).toEqual(["P"]);
+  });
+
+  it("includes unscoped ('*') computed selectors (whole-MDX-view) regardless of traced dimension", async () => {
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        { name: "P", prolog: "", metadata: "", data: "", epilog: "", parameters: [] },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    const membership: DatasourceMembership = {
+      byElement: new Map(),
+      computedByProcess: new Map([["P", new Map([["*", new Set(["TM1FILTERBYLEVEL"])]])]]),
+      fetchErrors: [],
+    };
+    const flow = traceDataFlow(index, [], "Sales", "both", {
+      element: { dimension: "Region", name: "EMEA" },
+      datasourceMembership: membership,
+    });
+    expect(flow.element!.computedInProcesses).toEqual(["P"]);
+  });
 });

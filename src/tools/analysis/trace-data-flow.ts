@@ -78,7 +78,10 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
             ...(resolveComputed
               ? {
                   evaluateSetExpression: async (cube: string, dim: string, mdxSet: string): Promise<string[]> => {
-                    const res = await tm1Client.cells.executeMdx(`SELECT {${mdxSet}} ON 0 FROM [${cube}]`, 1);
+                    const res = await tm1Client.cells.executeMdx(
+                      `SELECT {${mdxSet}} ON 0 FROM [${cube.replace(/\]/g, "]]")}]`,
+                      1,
+                    );
                     const axis0 = res.axes[0];
                     if (!axis0) return [];
                     const wantHier = dim.toLowerCase();

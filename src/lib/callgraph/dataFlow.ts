@@ -315,7 +315,14 @@ export function traceDataFlow(
       .map(([proc]) => proc)
       .sort((a, b) => a.localeCompare(b));
 
-    const computedInProcesses = [...(opts.datasourceMembership?.computedByProcess.keys() ?? [])]
+    // Scope to the traced dimension: a process is only noise-flagged if it has a computed
+    // selector on THIS dimension, or an unscoped ("*") one (whole-MDX-VIEW datasource, not
+    // tied to a single axis). Excludes processes whose computed selectors are on other axes
+    // (e.g. a computed [Time] selector must not surface while tracing a [Region] element).
+    const dimLc = dimension.toLowerCase();
+    const computedInProcesses = [...(opts.datasourceMembership?.computedByProcess.entries() ?? [])]
+      .filter(([, byDim]) => byDim.has(dimLc) || byDim.has("*"))
+      .map(([proc]) => proc)
       .sort((a, b) => a.localeCompare(b));
 
     const fetchErrorCount = opts.datasourceMembership?.fetchErrors.length ?? 0;
