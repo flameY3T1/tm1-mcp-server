@@ -65,12 +65,19 @@ export async function buildDatasourceMembership(
         if (def.type === "MDX" && def.mdx) {
           addMdx(ds.name, def.mdx, "view-mdx");
         } else if (def.type === "Native" && def.native) {
-          const axes = [...def.native.titles, ...def.native.columns, ...def.native.rows];
-          for (const ax of axes) {
-            const selected = (ax as { selectedElement?: string }).selectedElement;
-            if (selected && ax.dimensionName) {
-              addMember(ds.name, ax.dimensionName, selected, "view-native-title");
+          // Titles are pinned to exactly ONE member (selectedElement). TM1's
+          // getDefinition also populates a title's subsetName (the subset the
+          // pin was chosen from), but enumerating that subset would falsely
+          // report every non-selected element as read. So titles contribute
+          // ONLY the selected member — never expression/subsetName enumeration.
+          for (const title of def.native.titles) {
+            if (title.selectedElement && title.dimensionName) {
+              addMember(ds.name, title.dimensionName, title.selectedElement, "view-native-title");
             }
+          }
+          // Columns/rows iterate their full axis — every member is read.
+          const axes = [...def.native.columns, ...def.native.rows];
+          for (const ax of axes) {
             if (ax.expression) {
               addMdx(ds.name, ax.expression, "view-native-expr");
             } else if (ax.subsetName && ax.dimensionName) {

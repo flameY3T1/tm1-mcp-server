@@ -58,6 +58,34 @@ describe("buildDatasourceMembership", () => {
     ]);
   });
 
+  it("does not enumerate a title's underlying subset — only the selected member is reported", async () => {
+    let getSubsetCalled = false;
+    const m = await buildDatasourceMembership(
+      {
+        getViewDefinition: async (cube: string, view: string) => ({
+          cubeName: cube, viewName: view, private: false, type: "Native" as const,
+          native: {
+            titles: [{ dimensionName: "Szenario", selectedElement: "Ist", subsetName: "sScenario" }],
+            columns: [], rows: [],
+          },
+        }),
+        getSubset: async (dim: string, _h: string, sub: string) => {
+          getSubsetCalled = true;
+          return {
+            name: sub, dimensionName: dim, hierarchyName: dim, private: false,
+            expression: undefined, elements: ["Ist", "Plan", "Forecast"], alias: undefined,
+          };
+        },
+      },
+      [{ name: "P", type: "TM1CubeView", sourceName: "C", view: "vT" }],
+    );
+    expect(m.byElement.get(elementKey("Szenario", "Ist"))).toEqual([
+      { process: "P", via: "view-native-title" },
+    ]);
+    expect(m.byElement.get(elementKey("Szenario", "Plan"))).toBeUndefined();
+    expect(getSubsetCalled).toBe(false);
+  });
+
   it("records a per-object fetch error without throwing", async () => {
     const m = await buildDatasourceMembership(
       { getViewDefinition: async () => { throw new Error("boom"); }, getSubset: noSubset as never },
