@@ -9,6 +9,10 @@
 
 import { elementKey, type ReferenceIndex } from "./referenceIndex.js";
 import { classifyAccess } from "./callGraph.js";
+import type { SubsetUsage } from "./subsetUsage.js";
+
+/** How a process touches a traced element (from in-code subset usage + datasource join). */
+export type AccessKind = "source" | "write" | "zero-out" | "indeterminate";
 
 export interface DataSourceEntry {
   name: string;
@@ -51,9 +55,11 @@ export interface DataFlowResult {
   element?: {
     dimension: string;
     name: string;
-    processes: Array<{ process: string; funcNames: string[] }>;
+    processes: Array<{ process: string; funcNames: string[]; access: AccessKind[] }>;
     /** Processes where this dimension has an UNRESOLVED element arg (element identity not statically known). */
     unresolvedInProcesses?: string[];
+    /** Count of touching processes hidden because their only access classification was 'indeterminate' (opts.elementAccess default excludes it). */
+    suppressedIndeterminate?: number;
     /** Honesty marker: what element resolution this result covers. */
     resolution: string;
   };
@@ -148,6 +154,37 @@ function elementsForProcess(index: ReferenceIndex, processOrig: string): string[
 }
 
 /**
+ * Classify how a process accesses a traced element, joining in-code subset usage
+ * (view-assign / zero-out / loop, from subsetUsageByProcess) with the process's own
+ * datasource (dsList). `subsetsForElement` are the lowercased subset handles the
+ * element was inserted into, within this one process. 'indeterminate' means the
+ * subset was built but no downstream use could be classified — NOT proof of no use
+ * (stored view/subset MDX outside this process is Bucket B, not resolved here).
+ */
+function classifyElementAccess(
+  usageForProcess: Map<string, SubsetUsage> | undefined,
+  subsetsForElement: string[],
+  ds: DataSourceEntry | undefined,
+): AccessKind[] {
+  const kinds = new Set<AccessKind>();
+  for (const subLc of subsetsForElement) {
+    const u = usageForProcess?.get(subLc);
+    if (ds?.type === "TM1DimensionSubset" && ds.subset?.toLowerCase() === subLc) kinds.add("source");
+    if (u) {
+      for (const v of u.views) {
+        if (v.zeroOut) kinds.add("zero-out");
+        if (ds?.type === "TM1CubeView" && v.view && ds.view?.toLowerCase() === v.view.toLowerCase()) kinds.add("source");
+      }
+      if (u.loopRead) kinds.add("source");
+      if (u.loopZero) kinds.add("zero-out");
+      else if (u.loopWrite) kinds.add("write");
+    }
+  }
+  if (kinds.size === 0) kinds.add("indeterminate");
+  return [...kinds].sort((a, b) => a.localeCompare(b));
+}
+
+/**
  * Trace data flow into/out of a cube. Case-insensitive cube matching; output
  * preserves original casing. Lists are sorted by process name.
  */
@@ -156,7 +193,7 @@ export function traceDataFlow(
   dsList: DataSourceEntry[],
   cubeName: string,
   direction: Direction,
-  opts?: { element?: { dimension: string; name: string } },
+  opts?: { element?: { dimension: string; name: string }; elementAccess?: AccessKind[] },
 ): DataFlowResult {
   const cubeOrig = new Map<string, string>();
   const io = buildProcessIO(index, dsList, cubeOrig);
@@ -208,27 +245,47 @@ export function traceDataFlow(
 
   if (opts?.element) {
     const { dimension, name } = opts.element;
-    const refs = index.byElement.get(elementKey(dimension, name)) ?? [];
-    const byProc = new Map<string, Set<string>>();
-    for (const r of refs) {
-      const set = byProc.get(r.sourceName) ?? new Set<string>();
-      if (r.funcName) set.add(r.funcName);
-      byProc.set(r.sourceName, set);
+    const key = elementKey(dimension, name);
+    const wanted = new Set<AccessKind>(opts.elementAccess ?? ["source", "write", "zero-out"]);
+
+    // process (orig case) -> { funcNames, subsets(lc) it was inserted into in this process }
+    const perProc = new Map<string, { funcNames: Set<string>; subsets: Set<string> }>();
+    for (const r of index.byElement.get(key) ?? []) {
+      const e = perProc.get(r.sourceName) ?? { funcNames: new Set<string>(), subsets: new Set<string>() };
+      if (r.funcName) e.funcNames.add(r.funcName);
+      if (r.subset) e.subsets.add(r.subset.toLowerCase());
+      perProc.set(r.sourceName, e);
     }
-    const processes = [...byProc.entries()]
-      .map(([process, fns]) => ({ process, funcNames: [...fns].sort((a, b) => a.localeCompare(b)) }))
-      .sort((a, b) => a.process.localeCompare(b.process));
+
+    const dsByProc = new Map<string, DataSourceEntry>();
+    for (const d of dsList) dsByProc.set(d.name.toLowerCase(), d);
+
+    let suppressedIndeterminate = 0;
+    const processes: Array<{ process: string; funcNames: string[]; access: AccessKind[] }> = [];
+    for (const [process, e] of perProc) {
+      const usage = index.subsetUsageByProcess.get(process.toLowerCase());
+      const access = classifyElementAccess(usage, [...e.subsets], dsByProc.get(process.toLowerCase()));
+      if (!access.some((a) => wanted.has(a))) {
+        if (access.length === 1 && access[0] === "indeterminate") suppressedIndeterminate++;
+        continue;
+      }
+      processes.push({ process, funcNames: [...e.funcNames].sort((a, b) => a.localeCompare(b)), access });
+    }
+    processes.sort((a, b) => a.process.localeCompare(b.process));
+
     const unresolvedInProcesses = [...index.unresolvedElementRefsBySourceProcess.entries()]
       .filter(([, list]) => list.some((u) => (u.dimension ?? "").toLowerCase() === dimension.toLowerCase()))
       .map(([proc]) => proc)
       .sort((a, b) => a.localeCompare(b));
+
     result.element = {
       dimension,
       name,
       processes,
       ...(unresolvedInProcesses.length ? { unresolvedInProcesses } : {}),
+      ...(suppressedIndeterminate ? { suppressedIndeterminate } : {}),
       resolution:
-        "in-code subset-membership calls only; elements reached through stored view/subset datasources are not resolved (Bucket B pending)",
+        "access classified from in-code subset usage (view-assign/zero-out/loop) + datasource; 'indeterminate' means built-but-not-classified, NOT unused; stored view/subset MDX not resolved (Bucket B).",
     };
   }
 

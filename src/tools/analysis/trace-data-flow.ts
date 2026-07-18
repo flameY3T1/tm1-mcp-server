@@ -14,6 +14,7 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
       "Combines code-level CellGet/CellPut/DB access with each process's datasource, so view-sourced reads",
       "(a TM1CubeView datasource with no CellGet in the code) are caught too. Read-only.",
       "Pass element+dimension to also get which processes touch that element via in-code subset-membership calls.",
+      "Each touching process is tagged access=source|write|zero-out|indeterminate so a zero-out is not mistaken for a read-source.",
     ].join(" "),
     {
       cubeName: z.string().describe("Cube to trace (case-insensitive)"),
@@ -37,8 +38,12 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
         .string()
         .optional()
         .describe("Owning dimension of 'element' (required when 'element' is set)."),
+      elementAccess: z
+        .array(z.enum(["source", "write", "zero-out", "indeterminate"]))
+        .optional()
+        .describe("Element roles to include (default source+write+zero-out). Add 'indeterminate' to also list processes that build the subset but whose use we could not classify (NOT proof of no use)."),
     },
-    async ({ cubeName, direction, includeControl, element, dimension }) => {
+    async ({ cubeName, direction, includeControl, element, dimension, elementAccess }) => {
       if (element && !dimension) {
         return { isError: true, content: [{ type: "text" as const, text: "When 'element' is set, 'dimension' is required (element names are only unique within a dimension)." }] };
       }
@@ -47,7 +52,13 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
         tm1Client.processes.listDataSources(includeControl),
       ]);
 
-      const flow = traceDataFlow(index, dsList, cubeName, direction, element && dimension ? { element: { dimension, name: element } } : undefined);
+      const flow = traceDataFlow(
+        index,
+        dsList,
+        cubeName,
+        direction,
+        element && dimension ? { element: { dimension, name: element }, ...(elementAccess ? { elementAccess } : {}) } : undefined,
+      );
 
       // An element filter that found hits is meaningful output on its own — don't let
       // a cube with no up/downstream flow overwrite it with a contradictory "not found" hint.

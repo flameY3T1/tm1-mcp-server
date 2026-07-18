@@ -133,15 +133,18 @@ describe("traceDataFlow — element filter", () => {
       fetchCubesWithRules: async () => [],
       fetchChores: async () => [],
     });
+    // sTmp is built but never assigned to a view / iterated → indeterminate, which is
+    // filtered out by default; opt in to see it.
     const flow = traceDataFlow(index, [], "AnyCube", "both", {
       element: { dimension: "Datenquellen", name: "SuDatenquellen_C" },
+      elementAccess: ["source", "write", "zero-out", "indeterminate"],
     });
     expect(flow.element).toEqual({
       dimension: "Datenquellen",
       name: "SuDatenquellen_C",
-      processes: [{ process: "Builder", funcNames: ["SubsetElementInsert"] }],
+      processes: [{ process: "Builder", funcNames: ["SubsetElementInsert"], access: ["indeterminate"] }],
       resolution:
-        "in-code subset-membership calls only; elements reached through stored view/subset datasources are not resolved (Bucket B pending)",
+        "access classified from in-code subset usage (view-assign/zero-out/loop) + datasource; 'indeterminate' means built-but-not-classified, NOT unused; stored view/subset MDX not resolved (Bucket B).",
     });
   });
 
@@ -165,5 +168,41 @@ describe("traceDataFlow — element filter", () => {
     });
     // unresolvedElementRefsBySourceProcess is keyed lowercased (existing referenceIndex behavior).
     expect(flow.element?.unresolvedInProcesses).toContain("dynamicelemproc");
+  });
+});
+
+describe("traceDataFlow — element access classification", () => {
+  async function idx(prolog: string) {
+    return buildReferenceIndex({
+      fetchProcesses: async () => [{ name: "P", prolog, metadata: "", data: "", epilog: "", parameters: [] }],
+      fetchCubesWithRules: async () => [], fetchChores: async () => [],
+    });
+  }
+  it("tags zero-out when the element's subset feeds a ViewZeroOut", async () => {
+    const index = await idx(
+      "SubsetElementInsert('Currency','sTmp','USD',1);\nViewSubsetAssign('Sales','vTmp','Currency','sTmp');\nViewZeroOut('Sales','vTmp');",
+    );
+    const flow = traceDataFlow(index, [], "Sales", "both",
+      { element: { dimension: "Currency", name: "USD" }, elementAccess: ["source","write","zero-out"] });
+    expect(flow.element!.processes).toEqual([{ process: "P", funcNames: ["SubsetElementInsert"], access: ["zero-out"] }]);
+  });
+  it("tags source when the element's subset feeds the process view datasource", async () => {
+    const index = await idx(
+      "SubsetElementInsert('Currency','sTmp','USD',1);\nViewSubsetAssign('Sales','vTmp','Currency','sTmp');",
+    );
+    const ds = [{ name: "P", type: "TM1CubeView", sourceName: "Sales", view: "vTmp" }];
+    const flow = traceDataFlow(index, ds, "Sales", "both",
+      { element: { dimension: "Currency", name: "USD" } });
+    expect(flow.element!.processes[0]!.access).toEqual(["source"]);
+  });
+  it("indeterminate is opt-in and counted when suppressed", async () => {
+    const index = await idx("SubsetElementInsert('Currency','sTmp','USD',1);"); // built, never used
+    const flow = traceDataFlow(index, [], "Sales", "both",
+      { element: { dimension: "Currency", name: "USD" } }); // default excludes indeterminate
+    expect(flow.element!.processes).toEqual([]);
+    expect(flow.element!.suppressedIndeterminate).toBe(1);
+    const flow2 = traceDataFlow(index, [], "Sales", "both",
+      { element: { dimension: "Currency", name: "USD" }, elementAccess: ["source","write","zero-out","indeterminate"] });
+    expect(flow2.element!.processes[0]!.access).toEqual(["indeterminate"]);
   });
 });

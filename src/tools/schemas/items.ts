@@ -880,8 +880,15 @@ export const DataFlowResultSchema = z.object({
     .object({
       dimension: z.string(),
       name: z.string(),
-      processes: z.array(z.object({ process: z.string(), funcNames: z.array(z.string()) })),
+      processes: z.array(
+        z.object({
+          process: z.string(),
+          funcNames: z.array(z.string()),
+          access: z.array(z.enum(["source", "write", "zero-out", "indeterminate"])),
+        }),
+      ),
       unresolvedInProcesses: z.array(z.string()).optional(),
+      suppressedIndeterminate: z.number().int().optional(),
       resolution: z.string(),
     })
     .optional(),
