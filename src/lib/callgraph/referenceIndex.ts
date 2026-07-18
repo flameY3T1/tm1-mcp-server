@@ -383,6 +383,16 @@ export function extractTiReferences(
             }
           }
           if (elemName !== null) {
+            // Known edge: elemName resolved but dimName did NOT (e.g. dimension is an
+            // unresolved param). The ref is still pushed here (and surfaces in this
+            // process's per-row `elements` list via elementsForProcess), but with
+            // dimension:undefined it is skipped by the byElement bucketing below
+            // (elementKey needs both dim+element) and is NOT recorded in
+            // unresolvedElementRefsBySourceProcess either (that bucket is for
+            // unresolved ELEMENT args, not unresolved DIMENSION args). So this element
+            // is reverse-queryable by name via bySourceProcess but not via the
+            // element/dimension filter. A future "unresolved dimension" bucket could
+            // close this gap.
             refs.push({ line: lineIdx, funcName: m[1]!, targetKind: 'element', targetName: elemName, dimension: dimName, snippet, params: undefined });
           }
         }

@@ -54,6 +54,8 @@ export interface DataFlowResult {
     processes: Array<{ process: string; funcNames: string[] }>;
     /** Processes where this dimension has an UNRESOLVED element arg (element identity not statically known). */
     unresolvedInProcesses?: string[];
+    /** Honesty marker: what element resolution this result covers. */
+    resolution: string;
   };
   counts: { upstream?: number; downstream?: number };
 }
@@ -225,6 +227,8 @@ export function traceDataFlow(
       name,
       processes,
       ...(unresolvedInProcesses.length ? { unresolvedInProcesses } : {}),
+      resolution:
+        "in-code subset-membership calls only; elements reached through stored view/subset datasources are not resolved (Bucket B pending)",
     };
   }
 

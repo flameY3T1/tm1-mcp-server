@@ -882,6 +882,7 @@ export const DataFlowResultSchema = z.object({
       name: z.string(),
       processes: z.array(z.object({ process: z.string(), funcNames: z.array(z.string()) })),
       unresolvedInProcesses: z.array(z.string()).optional(),
+      resolution: z.string(),
     })
     .optional(),
   hint: z.string().optional(),

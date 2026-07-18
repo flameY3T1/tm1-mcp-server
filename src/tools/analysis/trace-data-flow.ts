@@ -49,8 +49,13 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
 
       const flow = traceDataFlow(index, dsList, cubeName, direction, element && dimension ? { element: { dimension, name: element } } : undefined);
 
+      // An element filter that found hits is meaningful output on its own — don't let
+      // a cube with no up/downstream flow overwrite it with a contradictory "not found" hint.
+      const elementHasHits = (flow.element?.processes.length ?? 0) > 0;
       const empty =
-        (flow.counts.upstream ?? 0) === 0 && (flow.counts.downstream ?? 0) === 0;
+        !elementHasHits &&
+        (flow.counts.upstream ?? 0) === 0 &&
+        (flow.counts.downstream ?? 0) === 0;
       const hint = empty
         ? `No data flow found for '${cubeName}'. Check the cube name, or set includeControl=true if it is touched only by control (}) processes.`
         : undefined;

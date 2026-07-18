@@ -140,6 +140,30 @@ describe("traceDataFlow — element filter", () => {
       dimension: "Datenquellen",
       name: "SuDatenquellen_C",
       processes: [{ process: "Builder", funcNames: ["SubsetElementInsert"] }],
+      resolution:
+        "in-code subset-membership calls only; elements reached through stored view/subset datasources are not resolved (Bucket B pending)",
     });
+  });
+
+  it("surfaces a process with a non-literal element arg (known dimension) as unresolvedInProcesses", async () => {
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        {
+          name: "DynamicElemProc",
+          prolog: "SubsetElementInsert('Kunde','sTmp',CellGetS('C','x'),1);",
+          metadata: "",
+          data: "",
+          epilog: "",
+          parameters: [],
+        },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    const flow = traceDataFlow(index, [], "AnyCube", "both", {
+      element: { dimension: "Kunde", name: "Whatever" },
+    });
+    // unresolvedElementRefsBySourceProcess is keyed lowercased (existing referenceIndex behavior).
+    expect(flow.element?.unresolvedInProcesses).toContain("dynamicelemproc");
   });
 });
