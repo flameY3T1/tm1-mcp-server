@@ -3,6 +3,7 @@ import { traceDataFlow, type DataSourceEntry } from "../../src/lib/callgraph/dat
 import { buildReferenceIndex } from "../../src/lib/callgraph/referenceIndex.js";
 import { buildDatasourceMembership } from "../../src/lib/callgraph/datasourceMembership.js";
 import type { ReferenceIndex, TmReference } from "../../src/lib/callgraph/referenceIndex.js";
+import type { DatasourceMembership } from "../../src/lib/callgraph/datasourceMembership.js";
 
 function ref(sourceName: string, funcName: string, targetName: string): TmReference {
   return {
@@ -257,5 +258,34 @@ describe("traceDataFlow — element filter incl. datasource membership", () => {
     expect(flow.element!.processes).toEqual([
       { process: "Reader", funcNames: [], access: ["source"], via: ["subset-static"] },
     ]);
+  });
+
+  it("surfaces a fetchErrors note in element.resolution when a stored view/subset could not be fetched", async () => {
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        {
+          name: "P",
+          prolog: "SubsetElementInsert('Currency','sTmp','USD',1);",
+          metadata: "",
+          data: "",
+          epilog: "",
+          parameters: [],
+        },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    const membership: DatasourceMembership = {
+      byElement: new Map(),
+      computedByProcess: new Map(),
+      fetchErrors: [{ process: "P", object: "view C/vX", message: "boom" }],
+    };
+    const flow = traceDataFlow(index, [], "Sales", "both", {
+      element: { dimension: "Currency", name: "USD" },
+      datasourceMembership: membership,
+    });
+    expect(flow.element!.resolution).toContain(
+      "(1 datasource object(s) could not be fetched — results may be incomplete)",
+    );
   });
 });
