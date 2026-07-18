@@ -13,9 +13,7 @@ export const FORMAT_SCHEMA = {
     .enum(["json", "markdown"])
     .optional()
     .default("json")
-    .describe(
-      "Response format. 'json' (default) returns the structured payload — preferred for programmatic agent use, parsed into structuredContent. 'markdown' returns a human-readable table — use when piping to chat output.",
-    ),
+    .describe("Output format: 'json' (default, structured) or 'markdown' table for human display."),
 };
 
 export type ResponseFormat = "json" | "markdown";

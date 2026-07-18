@@ -17,21 +17,19 @@ export const PAGINATION_SCHEMA = {
     .max(500)
     .optional()
     .default(50)
-    .describe("Max items to return per page (default 50, max 500). Use 0 to return all items (equivalent to fetchAll=true). Ignored when fetchAll=true."),
+    .describe("Page size (default 50, max 500, 0 = all)."),
   offset: z
     .number()
     .int()
     .min(0)
     .optional()
     .default(0)
-    .describe("Number of items to skip from the start (default 0). Ignored when fetchAll=true."),
+    .describe("Items to skip (default 0)."),
   fetchAll: z
     .boolean()
     .optional()
     .default(false)
-    .describe(
-      "Return every item in one response, ignoring limit/offset. Use when you need the full set for an audit and want to avoid the multi-page agent loop that drops 'has_more: true'. Risk: large payloads — prefer projection/filters first.",
-    ),
+    .describe("Return all items, ignoring limit/offset. Large payload — prefer filters first."),
 };
 
 export interface Page<T> {
