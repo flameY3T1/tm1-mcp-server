@@ -44,7 +44,7 @@ const SKIP_VALIDATION_FUNCS = new Set([
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type RefTargetKind = 'cube' | 'dimension' | 'process';
+export type RefTargetKind = 'cube' | 'dimension' | 'process' | 'element';
 export type RefSourceKind = 'process' | 'rule';
 export type RefSection    = 'prolog' | 'metadata' | 'data' | 'epilog' | 'rules' | 'feeders';
 
@@ -78,6 +78,8 @@ export interface TmReference {
   targetName: string;
   /** Only set for ExecuteProcess/RunProcess references (targetKind = 'process'). */
   params?: CallParam[] | undefined;
+  /** Owning dimension — only set when targetKind === 'element'. */
+  dimension?: string | undefined;
 }
 
 /** One task inside a chore: the scheduled process plus its fixed call-site params. */
@@ -97,6 +99,17 @@ export interface UnresolvedCall {
   reason: 'dynamic' | 'param';         // param = callee target is itself a process parameter
 }
 
+/** A subset-membership element arg (SubsetElementInsert/Add/Delete) whose element name could not be resolved to a literal. */
+export interface UnresolvedElementRef {
+  section: RefSection;
+  line: number;
+  funcName: string;                    // SubsetElementInsert | SubsetElementAdd | SubsetElementDelete
+  dimension?: string | undefined;      // may still resolve even when the element does not
+  expr: string;                        // raw element-arg text, e.g. "sElem" or "CellGetS(...)"
+  snippet: string;
+  reason: 'dynamic' | 'param';
+}
+
 export interface ReferenceIndex {
   all: TmReference[];
   byCube:    Map<string, TmReference[]>;
@@ -106,6 +119,10 @@ export interface ReferenceIndex {
   bySourceProcess: Map<string, TmReference[]>;
   /** Process name (lowercased) → unresolved ExecuteProcess/RunProcess call sites (dynamic/param target). */
   unresolvedCallsBySourceProcess: Map<string, UnresolvedCall[]>;
+  /** elementKey(dim, element) → element references (subset-membership calls). */
+  byElement: Map<string, TmReference[]>;
+  /** Process name (lowercased) → element args that could not be resolved to a literal. */
+  unresolvedElementRefsBySourceProcess: Map<string, UnresolvedElementRef[]>;
   /** Process name (lowercased) → declared param names (original casing). */
   processParams: Map<string, string[]>;
   /** Process name (lowercased) → param-name → default value (string form), for root-env seeding. */
@@ -138,6 +155,11 @@ export function splitArgs(argsStr: string): string[] {
   }
   args.push(cur.trim());
   return args.filter(a => a !== '');
+}
+
+/** Composite key for the byElement index: dimension + element, both lowercased. */
+export function elementKey(dimension: string, element: string): string {
+  return `${dimension.toLowerCase()} ${element.toLowerCase()}`;
 }
 
 function extractStringLiteral(arg: string): string | null {
@@ -417,6 +439,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
 
   const all: TmReference[] = [];
   const unresolvedCallsBySourceProcess = new Map<string, UnresolvedCall[]>();
+  const unresolvedElementRefsBySourceProcess = new Map<string, UnresolvedElementRef[]>();
 
   const pushTi = (
     sourceName: string,
@@ -484,6 +507,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
   const byCube          = new Map<string, TmReference[]>();
   const byDim           = new Map<string, TmReference[]>();
   const byProcess       = new Map<string, TmReference[]>();
+  const byElement       = new Map<string, TmReference[]>();
   const bySourceProcess = new Map<string, TmReference[]>();
 
   const bucket = (m: Map<string, TmReference[]>, key: string, ref: TmReference) => {
@@ -498,6 +522,14 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
       case 'cube':      bucket(byCube,    ref.targetName, ref); break;
       case 'dimension': bucket(byDim,     ref.targetName, ref); break;
       case 'process':   bucket(byProcess, ref.targetName, ref); break;
+      case 'element':
+        if (ref.dimension) {
+          const k = elementKey(ref.dimension, ref.targetName);
+          const arr = byElement.get(k) ?? [];
+          arr.push(ref);
+          byElement.set(k, arr);
+        }
+        break;
     }
     if (ref.sourceKind === 'process') {
       bucket(bySourceProcess, ref.sourceName, ref);
@@ -521,7 +553,19 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
     choreTasks.set(c.name.toLowerCase(), c.tasks);
   }
 
-  return { all, byCube, byDim, byProcess, bySourceProcess, unresolvedCallsBySourceProcess, processParams, processDefaults, choreTasks };
+  return {
+    all,
+    byCube,
+    byDim,
+    byProcess,
+    byElement,
+    bySourceProcess,
+    unresolvedCallsBySourceProcess,
+    unresolvedElementRefsBySourceProcess,
+    processParams,
+    processDefaults,
+    choreTasks,
+  };
 }
 
 /** Convenience lookup — returns [] if target is not indexed. */
@@ -535,5 +579,8 @@ export function lookupReferences(
     case 'cube':      return idx.byCube.get(lc)    ?? [];
     case 'dimension': return idx.byDim.get(lc)     ?? [];
     case 'process':   return idx.byProcess.get(lc) ?? [];
+    // byElement is keyed by elementKey(dim, element), a composite key this single-name
+    // lookup can't build — callers needing element refs use idx.byElement directly.
+    case 'element':   return [];
   }
 }
