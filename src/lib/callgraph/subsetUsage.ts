@@ -93,12 +93,11 @@ export function extractSubsetUsage(text: string, env?: ProcessEnv): Map<string, 
         const sub = resolveArg(args[0], baseEnv);
         if (sub.resolved) iteratedSubsets.add(sub.value!.toLowerCase());
       } else {
-        const access = classifyAccess(m[1], "process");
+        const access = classifyAccess(fn, "process");
         if (access === "read") hasCellRead = true;
         else if (access === "write") {
           hasCellWrite = true;
           if ((fn === "cellputn" || fn === "cellincrementn") && isLiteralZero(args[0])) hasZeroWrite = true;
-          if (fn === "viewzeroout") hasZeroWrite = true;
         }
       }
     }
