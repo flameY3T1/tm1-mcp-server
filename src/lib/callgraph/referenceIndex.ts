@@ -24,6 +24,10 @@ function buildArgIdxMap(paramName: string): ArgIdxMap {
 const CUBE_ARG_IDX    = buildArgIdxMap('cubename');
 const DIM_ARG_IDX     = buildArgIdxMap('dimensionname');
 const PROCESS_ARG_IDX = buildArgIdxMap('processname');
+const ELEM_ARG_IDX    = buildArgIdxMap('elementname');
+
+/** Subset-membership calls whose ElementName arg is a real element-data-flow reference. */
+const SUBSET_ELEM_FUNCS = new Set(['subsetelementinsert', 'subsetelementadd', 'subsetelementdelete']);
 
 const TRACKED_FUNCS = [...new Set([
   ...CUBE_ARG_IDX.keys(),
@@ -187,11 +191,22 @@ interface RawTiRef {
   targetName: string;
   snippet: string;
   params?: CallParam[] | undefined;
+  dimension?: string | undefined;   // set for element refs (owning dimension)
 }
 
 interface RawUnresolvedCall {
   line: number;
   funcName: string;
+  expr: string;
+  snippet: string;
+  reason: 'dynamic' | 'param';
+}
+
+/** A subset-membership element arg that could not be resolved to a literal (raw, pre-section). */
+interface RawUnresolvedElementRef {
+  line: number;
+  funcName: string;
+  dimension?: string | undefined;
   expr: string;
   snippet: string;
   reason: 'dynamic' | 'param';
@@ -241,6 +256,7 @@ export function extractTiReferences(
   env?: ProcessEnv,
   sharedLiveVars?: Map<string, VarBinding>,
   unresolvedOut?: RawUnresolvedCall[],
+  unresolvedElemOut?: RawUnresolvedElementRef[],
 ): RawTiRef[] {
   const baseEnv: ProcessEnv = env ?? {
     paramsLc: new Set(),
@@ -329,6 +345,48 @@ export function extractTiReferences(
       pushRef('cube',      CUBE_ARG_IDX.get(funcLower));
       pushRef('dimension', DIM_ARG_IDX.get(funcLower));
       pushRef('process',   PROCESS_ARG_IDX.get(funcLower));
+
+      // Element refs need BOTH the element name and its owning dimension resolved
+      // together, so use a dedicated block instead of the single-arg pushRef.
+      if (SUBSET_ELEM_FUNCS.has(funcLower)) {
+        const elemIdx = ELEM_ARG_IDX.get(funcLower);
+        const dimIdx = DIM_ARG_IDX.get(funcLower);
+        if (elemIdx !== undefined && elemIdx < args.length) {
+          const elemArg = args[elemIdx]!;
+          // Resolve the owning dimension (literal or var); undefined if unresolvable.
+          let dimName: string | undefined;
+          if (dimIdx !== undefined && dimIdx < args.length) {
+            const dimArg = args[dimIdx]!;
+            dimName = extractStringLiteral(dimArg) ?? undefined;
+            if (dimName === undefined) {
+              const db = resolveExpression(dimArg, callerEnv);
+              if (db.kind === 'literal') { dimName = db.value; }
+            }
+          }
+          let elemName = extractStringLiteral(elemArg);
+          if (elemName === null) {
+            const eb = resolveExpression(elemArg, callerEnv);
+            if (eb.kind === 'literal') {
+              elemName = eb.value;
+            } else {
+              if (unresolvedElemOut) {
+                unresolvedElemOut.push({
+                  line: lineIdx,
+                  funcName: m[1]!,
+                  dimension: dimName,
+                  expr: elemArg.trim(),
+                  snippet,
+                  reason: eb.kind === 'param' ? 'param' : 'dynamic',
+                });
+              }
+              elemName = null;
+            }
+          }
+          if (elemName !== null) {
+            refs.push({ line: lineIdx, funcName: m[1]!, targetKind: 'element', targetName: elemName, dimension: dimName, snippet, params: undefined });
+          }
+        }
+      }
     }
   }
   return refs;
@@ -450,7 +508,8 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
   ) => {
     if (!text) { return; }
     const unresolvedOut: RawUnresolvedCall[] = [];
-    for (const r of extractTiReferences(text, env, sharedLiveVars, unresolvedOut)) {
+    const unresolvedElemOut: RawUnresolvedElementRef[] = [];
+    for (const r of extractTiReferences(text, env, sharedLiveVars, unresolvedOut, unresolvedElemOut)) {
       all.push({
         sourceKind: 'process',
         sourceName,
@@ -460,6 +519,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
         funcName: r.funcName,
         targetKind: r.targetKind,
         targetName: r.targetName,
+        dimension: r.dimension,          // ← forward element owner
         params: r.params,
       });
     }
@@ -470,6 +530,14 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
         bucket.push({ section, line: u.line, funcName: u.funcName, expr: u.expr, snippet: u.snippet, reason: u.reason });
       }
       unresolvedCallsBySourceProcess.set(key, bucket);
+    }
+    if (unresolvedElemOut.length > 0) {
+      const key = sourceName.toLowerCase();
+      const arr = unresolvedElementRefsBySourceProcess.get(key) ?? [];
+      for (const u of unresolvedElemOut) {
+        arr.push({ section, line: u.line, funcName: u.funcName, dimension: u.dimension, expr: u.expr, snippet: u.snippet, reason: u.reason });
+      }
+      unresolvedElementRefsBySourceProcess.set(key, arr);
     }
   };
 
