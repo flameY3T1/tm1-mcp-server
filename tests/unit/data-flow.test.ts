@@ -144,7 +144,7 @@ describe("traceDataFlow — element filter", () => {
       name: "SuDatenquellen_C",
       processes: [{ process: "Builder", funcNames: ["SubsetElementInsert"], access: ["indeterminate"] }],
       resolution:
-        "access classified from in-code subset usage (view-assign/zero-out/loop) + datasource; 'indeterminate' means built-but-not-classified, NOT unused; stored view/subset MDX not resolved (Bucket B).",
+        "access classified from in-code subset usage (view-assign/zero-out/loop) + datasource; 'indeterminate' = built but not classifiable, not evidence the element goes untouched; stored view/subset MDX not resolved (Bucket B).",
     });
   });
 
@@ -204,5 +204,27 @@ describe("traceDataFlow — element access classification", () => {
     const flow2 = traceDataFlow(index, [], "Sales", "both",
       { element: { dimension: "Currency", name: "USD" }, elementAccess: ["source","write","zero-out","indeterminate"] });
     expect(flow2.element!.processes[0]!.access).toEqual(["indeterminate"]);
+  });
+  it("does not tag source when a same-named subset handle belongs to a different dimension's datasource", async () => {
+    // Generic temp-subset name "sTmp" is reused across dimensions in one process; the datasource's
+    // subset happens to share the name but lives on a different dimension (Other, not Currency).
+    const index = await idx("SubsetElementInsert('Currency','sTmp','USD',1);");
+    const ds = [{ name: "P", type: "TM1DimensionSubset", sourceName: "Other", subset: "sTmp" }];
+    const flow = traceDataFlow(index, ds, "Sales", "both",
+      { element: { dimension: "Currency", name: "USD" }, elementAccess: ["source","write","zero-out","indeterminate"] });
+    expect(flow.element!.processes[0]!.access).not.toContain("source");
+    expect(flow.element!.processes[0]!.access).toEqual(["indeterminate"]);
+  });
+  it("does not tag source when a same-named view belongs to a different cube's datasource", async () => {
+    // View name "Default" is reused across cubes; the process assigns the element's subset to
+    // view "Default" of cube Sales, but the process datasource is view "Default" of cube Other.
+    const index = await idx(
+      "SubsetElementInsert('Currency','sTmp','USD',1);\nViewSubsetAssign('Sales','Default','Currency','sTmp');",
+    );
+    const ds = [{ name: "P", type: "TM1CubeView", sourceName: "Other", view: "Default" }];
+    const flow = traceDataFlow(index, ds, "Sales", "both",
+      { element: { dimension: "Currency", name: "USD" }, elementAccess: ["source","write","zero-out","indeterminate"] });
+    expect(flow.element!.processes[0]!.access).not.toContain("source");
+    expect(flow.element!.processes[0]!.access).toEqual(["indeterminate"]);
   });
 });

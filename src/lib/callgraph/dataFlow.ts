@@ -165,15 +165,28 @@ function classifyElementAccess(
   usageForProcess: Map<string, SubsetUsage> | undefined,
   subsetsForElement: string[],
   ds: DataSourceEntry | undefined,
+  tracedDimension: string,
 ): AccessKind[] {
   const kinds = new Set<AccessKind>();
   for (const subLc of subsetsForElement) {
     const u = usageForProcess?.get(subLc);
-    if (ds?.type === "TM1DimensionSubset" && ds.subset?.toLowerCase() === subLc) kinds.add("source");
+    if (
+      ds?.type === "TM1DimensionSubset" &&
+      ds.subset?.toLowerCase() === subLc &&
+      ds.sourceName?.toLowerCase() === tracedDimension.toLowerCase()
+    )
+      kinds.add("source");
     if (u) {
       for (const v of u.views) {
         if (v.zeroOut) kinds.add("zero-out");
-        if (ds?.type === "TM1CubeView" && v.view && ds.view?.toLowerCase() === v.view.toLowerCase()) kinds.add("source");
+        if (
+          ds?.type === "TM1CubeView" &&
+          v.view &&
+          v.cube &&
+          ds.view?.toLowerCase() === v.view.toLowerCase() &&
+          ds.sourceName?.toLowerCase() === v.cube.toLowerCase()
+        )
+          kinds.add("source");
       }
       if (u.loopRead) kinds.add("source");
       if (u.loopZero) kinds.add("zero-out");
@@ -264,7 +277,7 @@ export function traceDataFlow(
     const processes: Array<{ process: string; funcNames: string[]; access: AccessKind[] }> = [];
     for (const [process, e] of perProc) {
       const usage = index.subsetUsageByProcess.get(process.toLowerCase());
-      const access = classifyElementAccess(usage, [...e.subsets], dsByProc.get(process.toLowerCase()));
+      const access = classifyElementAccess(usage, [...e.subsets], dsByProc.get(process.toLowerCase()), dimension);
       if (!access.some((a) => wanted.has(a))) {
         if (access.length === 1 && access[0] === "indeterminate") suppressedIndeterminate++;
         continue;
@@ -285,7 +298,7 @@ export function traceDataFlow(
       ...(unresolvedInProcesses.length ? { unresolvedInProcesses } : {}),
       ...(suppressedIndeterminate ? { suppressedIndeterminate } : {}),
       resolution:
-        "access classified from in-code subset usage (view-assign/zero-out/loop) + datasource; 'indeterminate' means built-but-not-classified, NOT unused; stored view/subset MDX not resolved (Bucket B).",
+        "access classified from in-code subset usage (view-assign/zero-out/loop) + datasource; 'indeterminate' = built but not classifiable, not evidence the element goes untouched; stored view/subset MDX not resolved (Bucket B).",
     };
   }
 
