@@ -182,6 +182,81 @@ describe("TM1Client – Metadata Methods", () => {
   // ── getHierarchy() ─────────────────────────────────────────────────────────
 
   describe("getHierarchy()", () => {
+    beforeEach(() => {
+      // get() fetches /Edges alongside the element expand (real weight join).
+      // Serve an empty edge list as the fallback response so each test only
+      // needs to mock the main hierarchy response via mockResolvedValueOnce.
+      fetchSpy.mockResolvedValue(mockResponse({ value: [] }));
+    });
+
+    it("joins real edge weights from the Edges collection (P&L -1 weights)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          Name: "Account",
+          Elements: [
+            { Name: "Profit", Type: "Consolidated", Level: 1, Parents: [] },
+            { Name: "Revenue", Type: "Numeric", Level: 0, Parents: [{ Name: "Profit" }] },
+            { Name: "Costs", Type: "Numeric", Level: 0, Parents: [{ Name: "Profit" }] },
+          ],
+        }),
+      );
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          value: [
+            { ParentName: "Profit", ComponentName: "Revenue", Weight: 1 },
+            { ParentName: "Profit", ComponentName: "Costs", Weight: -1 },
+          ],
+        }),
+      );
+
+      const hierarchy = await client.hierarchies.get("Account", "Account");
+
+      expect(hierarchy.elements[0].children).toEqual([
+        { name: "Revenue", weight: 1 },
+        { name: "Costs", weight: -1 },
+      ]);
+
+      const edgesUrl = String(fetchSpy.mock.calls[1][0]);
+      expect(edgesUrl).toContain("/Edges?$select=ParentName,ComponentName,Weight");
+    });
+
+    it("falls back to the TM1 default weight 1 for edges missing from the lookup", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          Name: "Region",
+          Elements: [
+            { Name: "Europe", Type: "Consolidated", Level: 1, Parents: [] },
+            { Name: "Germany", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+          ],
+        }),
+      );
+      // Edges endpoint answers, but without a row for this parent/child pair.
+      fetchSpy.mockResolvedValueOnce(mockResponse({ value: [] }));
+
+      const hierarchy = await client.hierarchies.get("Region", "Region");
+
+      expect(hierarchy.elements[0].children).toEqual([{ name: "Germany", weight: 1 }]);
+    });
+
+    it("skips the Edges request entirely when no kept parent/child pair exists (leaf-only query)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          Name: "Region",
+          Elements: [
+            // level=0 narrow query: parents reference elements outside the result.
+            { Name: "Germany", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+            { Name: "France", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+          ],
+        }),
+      );
+
+      const hierarchy = await client.hierarchies.get("Region", "Region", { level: 0 });
+
+      expect(hierarchy.elements.map((e) => e.children)).toEqual([[], []]);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(String(fetchSpy.mock.calls[0][0])).not.toContain("/Edges");
+    });
+
     it("should return hierarchy with elements, parents and children", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
@@ -345,6 +420,11 @@ describe("TM1Client – Metadata Methods", () => {
   // ── getDescendants() ───────────────────────────────────────────────────────
 
   describe("getDescendants()", () => {
+    beforeEach(() => {
+      // Fallback for the /Edges request get() issues alongside the expand.
+      fetchSpy.mockResolvedValue(mockResponse({ value: [] }));
+    });
+
     const sampleHierarchy = {
       Name: "Region",
       Elements: [
@@ -393,6 +473,11 @@ describe("TM1Client – Metadata Methods", () => {
   // ── getAncestors() ─────────────────────────────────────────────────────────
 
   describe("getAncestors()", () => {
+    beforeEach(() => {
+      // Fallback for the /Edges request get() issues alongside the expand.
+      fetchSpy.mockResolvedValue(mockResponse({ value: [] }));
+    });
+
     it("should walk single-parent path to root", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({

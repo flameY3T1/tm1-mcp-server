@@ -66,7 +66,6 @@ export class HierarchyService {
         Parents?: Array<{ Name: string }>;
       }>;
     }>("GET", path);
-
     let filteredElements = rawResponse.Elements;
     if (filterByType) filteredElements = filteredElements.filter((e) => e.Type === opts.elementType);
     if (regex !== undefined) filteredElements = filteredElements.filter((e) => regex.test(e.Name));
@@ -76,12 +75,41 @@ export class HierarchyService {
     const response = { Name: rawResponse.Name, Elements: filteredElements };
 
     const keptNames = new Set(response.Elements.map((e) => e.Name));
+
+    // Real edge weights live on the Edges collection, not on the Parents
+    // expand — join them client-side. Without this every child weight was
+    // fabricated as 1, which mislabels e.g. P&L dims that consolidate costs
+    // with -1. Weights only surface in children lists, and children only
+    // exist when a kept element's parent is also kept — so the (unbounded)
+    // Edges scan is skipped when the narrowed result contains no such pair
+    // (leaf-only / level=0 queries on huge dims stay cheap). An edge missing
+    // from the lookup falls back to 1 (the TM1 default); a failed Edges
+    // request propagates like every other request in this service.
+    const weightByEdge = new Map<string, Map<string, number>>();
+    const hasKeptChildEdge = response.Elements.some((e) =>
+      (e.Parents ?? []).some((p) => keptNames.has(p.Name)),
+    );
+    if (hasKeptChildEdge) {
+      const edgesPath = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Edges?$select=ParentName,ComponentName,Weight`;
+      const edgesResponse = await this.http.request<{
+        value?: Array<{ ParentName: string; ComponentName: string; Weight: number }>;
+      }>("GET", edgesPath);
+      for (const edge of edgesResponse.value ?? []) {
+        let byChild = weightByEdge.get(edge.ParentName);
+        if (!byChild) {
+          byChild = new Map<string, number>();
+          weightByEdge.set(edge.ParentName, byChild);
+        }
+        byChild.set(edge.ComponentName, edge.Weight);
+      }
+    }
+
     const childrenByParent = new Map<string, Array<{ name: string; weight: number }>>();
     for (const e of response.Elements) {
       for (const p of e.Parents ?? []) {
         if (!keptNames.has(p.Name)) continue;
         const list = childrenByParent.get(p.Name) ?? [];
-        list.push({ name: e.Name, weight: 1 });
+        list.push({ name: e.Name, weight: weightByEdge.get(p.Name)?.get(e.Name) ?? 1 });
         childrenByParent.set(p.Name, list);
       }
     }
