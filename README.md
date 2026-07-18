@@ -5,7 +5,14 @@ Exposes the full TM1 model lifecycle — metadata, dimensions, cubes, cell I/O,
 TI processes, chores, security, and code-graph analysis — to any MCP-compatible
 LLM client (Claude Code, Claude Desktop, etc.).
 
-Tested against TM1 11.8 via REST API (Basic Auth).
+Tested against TM1 11.8 (REST, Basic/CAM auth) and TM1 12.5 / Planning Analytics
+Engine (rerooted REST, `s2s` auth live-validated).
+
+> **Companion — TM1 IDE for VS Code.** Pair this server with the
+> [**flameY3T1.vscode-tm1-ide**](https://marketplace.visualstudio.com/items?itemName=flameY3T1.vscode-tm1-ide)
+> extension: after the MCP creates or changes a process, rule, or cube on the TM1
+> system, use the extension to browse and inspect the **live** data, cubes, and TI
+> code on the server — an ideal way to see, in-place, what the MCP just changed.
 
 ## Features
 
