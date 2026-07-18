@@ -25,6 +25,7 @@ const CUBE_ARG_IDX    = buildArgIdxMap('cubename');
 const DIM_ARG_IDX     = buildArgIdxMap('dimensionname');
 const PROCESS_ARG_IDX = buildArgIdxMap('processname');
 const ELEM_ARG_IDX    = buildArgIdxMap('elementname');
+const SUBSET_ARG_IDX  = buildArgIdxMap('subsetname');
 
 /** Subset-membership calls whose ElementName arg is a real element-data-flow reference. */
 const SUBSET_ELEM_FUNCS = new Set(['subsetelementinsert', 'subsetelementadd', 'subsetelementdelete']);
@@ -84,6 +85,8 @@ export interface TmReference {
   params?: CallParam[] | undefined;
   /** Owning dimension — only set when targetKind === 'element'. */
   dimension?: string | undefined;
+  /** Subset the element was inserted into — only set when targetKind === 'element'. */
+  subset?: string | undefined;
 }
 
 /** One task inside a chore: the scheduled process plus its fixed call-site params. */
@@ -192,6 +195,7 @@ interface RawTiRef {
   snippet: string;
   params?: CallParam[] | undefined;
   dimension?: string | undefined;   // set for element refs (owning dimension)
+  subset?: string | undefined;      // set for element refs (subset the element was inserted into)
 }
 
 interface RawUnresolvedCall {
@@ -363,6 +367,18 @@ export function extractTiReferences(
               if (db.kind === 'literal') { dimName = db.value; }
             }
           }
+          // Resolve the subset the element was inserted into (literal or var);
+          // arg position varies per func (Insert@1, Add/Delete@0) — SUBSET_ARG_IDX handles that.
+          let subName: string | undefined;
+          const subIdx = SUBSET_ARG_IDX.get(funcLower);
+          if (subIdx !== undefined && subIdx < args.length) {
+            const subArg = args[subIdx]!;
+            subName = extractStringLiteral(subArg) ?? undefined;
+            if (subName === undefined) {
+              const sb = resolveExpression(subArg, callerEnv);
+              if (sb.kind === 'literal') { subName = sb.value; }
+            }
+          }
           let elemName = extractStringLiteral(elemArg);
           if (elemName === null) {
             const eb = resolveExpression(elemArg, callerEnv);
@@ -393,7 +409,7 @@ export function extractTiReferences(
             // is reverse-queryable by name via bySourceProcess but not via the
             // element/dimension filter. A future "unresolved dimension" bucket could
             // close this gap.
-            refs.push({ line: lineIdx, funcName: m[1]!, targetKind: 'element', targetName: elemName, dimension: dimName, snippet, params: undefined });
+            refs.push({ line: lineIdx, funcName: m[1]!, targetKind: 'element', targetName: elemName, dimension: dimName, subset: subName, snippet, params: undefined });
           }
         }
       }
@@ -530,6 +546,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
         targetKind: r.targetKind,
         targetName: r.targetName,
         dimension: r.dimension,          // ← forward element owner
+        subset: r.subset,                // ← forward subset the element was inserted into
         params: r.params,
       });
     }

@@ -33,7 +33,7 @@ describe("extractTiReferences — element refs from subset-membership calls", ()
     );
     const el = refs.filter((r) => r.targetKind === "element");
     expect(el).toEqual([
-      { line: 0, funcName: "SubsetElementInsert", targetKind: "element", targetName: "SuDatenquellen_C", dimension: "Datenquellen", snippet: "SubsetElementInsert('Datenquellen','sTmp','SuDatenquellen_C',1);", params: undefined },
+      { line: 0, funcName: "SubsetElementInsert", targetKind: "element", targetName: "SuDatenquellen_C", dimension: "Datenquellen", subset: "sTmp", snippet: "SubsetElementInsert('Datenquellen','sTmp','SuDatenquellen_C',1);", params: undefined },
     ]);
   });
 
@@ -75,5 +75,20 @@ describe("buildReferenceIndex — unresolvedElementRefsBySourceProcess", () => {
     expect(index.unresolvedElementRefsBySourceProcess.get("p")).toEqual([
       { section: "prolog", line: 0, funcName: "SubsetElementInsert", dimension: "Kunde", expr: "CellGetS('C','x')", snippet: "SubsetElementInsert('Kunde','sTmp',CellGetS('C','x'),1);", reason: "dynamic" },
     ]);
+  });
+});
+
+describe("element ref carries subset handle", () => {
+  it("attaches resolved subset name SubsetElementInsert", () => {
+    const refs = extractTiReferences("SubsetElementInsert('Currency','sTmp','USD',1);");
+    const el = refs.filter((r) => r.targetKind === "element");
+    expect(el.map((r) => ({ dim: r.dimension, name: r.targetName, subset: r.subset }))).toEqual([
+      { dim: "Currency", name: "USD", subset: "sTmp" },
+    ]);
+  });
+  it("resolves subset handle from variable", () => {
+    const refs = extractTiReferences("csSub='sTmp';\nSubsetElementAdd(csSub,'Currency','USD');");
+    const el = refs.filter((r) => r.targetKind === "element");
+    expect(el[0]!.subset).toBe("sTmp");
   });
 });
