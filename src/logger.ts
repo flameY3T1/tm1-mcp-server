@@ -13,6 +13,7 @@ const SENSITIVE_FIELDS = [
   "clientSecret",
   "accessToken",
   "apiKey",
+  "camPassport",
 ];
 const MASK_VALUE = "***";
 

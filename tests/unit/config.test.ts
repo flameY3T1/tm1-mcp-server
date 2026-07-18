@@ -299,10 +299,10 @@ describe("loadConfig", () => {
       delete process.env.TM1_VERSION;
       const cfg = loadConfig();
       expect(cfg.version).toBe(12);
-      expect(cfg.tm1Version.startsWith("11")).toBe(false);
+      expect(cfg.tm1Version).toBe("12.0");
     });
 
-    it("keeps an explicitly-set TM1_VERSION unchanged", () => {
+    it("keeps an explicitly-set TM1_VERSION unchanged when it already says 12", () => {
       process.env.TM1_BASE_URL = "http://host:4444";
       process.env.TM1_USER = "admin";
       process.env.TM1_PASSWORD = "x";
@@ -315,6 +315,21 @@ describe("loadConfig", () => {
       const cfg = loadConfig();
       expect(cfg.version).toBe(12);
       expect(cfg.tm1Version).toBe("12");
+    });
+
+    it("coerces tm1Version to 12.0 when TM1_INSTANCE/TM1_DATABASE are set but TM1_VERSION is explicitly a v11 string (split-brain)", () => {
+      process.env.TM1_BASE_URL = "http://host:4444";
+      process.env.TM1_USER = "admin";
+      process.env.TM1_PASSWORD = "x";
+      process.env.TM1_INSTANCE = "tm1";
+      process.env.TM1_DATABASE = "db1";
+      process.env.TM1_AUTH_MODE = "s2s";
+      process.env.TM1_CLIENT_ID = "cid";
+      process.env.TM1_CLIENT_SECRET = "csec";
+      process.env.TM1_VERSION = "11.8";
+      const cfg = loadConfig();
+      expect(cfg.version).toBe(12);
+      expect(cfg.tm1Version).toBe("12.0");
     });
 
     it("throws on unknown auth mode", () => {

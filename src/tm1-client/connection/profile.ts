@@ -115,7 +115,7 @@ function createV12Profile(config: TM1Config): ConnectionProfile {
     // or database contained a literal "$". A function return is used verbatim.
     resolveApiPath: (path) => path.replace(/^\/api\/v1/, () => dbRoot),
     buildLoginRequest: async () => ({
-      url: `${config.baseUrl}/${instance}/auth/v1/session`,
+      url: `${config.baseUrl}/${encodeURIComponent(instance)}/auth/v1/session`,
       method: "POST",
       headers: {
         Authorization: await buildV12Authorization(config),

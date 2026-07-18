@@ -32,7 +32,7 @@ export class MonitoringService {
       }>;
     }>("GET", "/api/v1/Threads?$select=ID,Type,Name,Context,State,Function,ObjectName,ElapsedTime");
     const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
-    return response.value.map((t) => ({
+    return (response.value ?? []).map((t) => ({
       id: t.ID,
       type: typeNames[t.Type] ?? `Type${t.Type}`,
       name: t.Name,
@@ -80,7 +80,7 @@ export class MonitoringService {
       }>;
     }>("GET", "/api/v1/Sessions?$expand=Threads,User($select=Name)");
     const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
-    return response.value.map((s) => ({
+    return (response.value ?? []).map((s) => ({
       id: String(s.ID),
       user: s.User?.Name ?? "",
       ...(s.Active !== undefined ? { active: s.Active } : {}),
@@ -130,7 +130,7 @@ export class MonitoringService {
       "GET",
       "/api/v1/Jobs?$select=ID,Description,State,ElapsedTime,WaitTime&$expand=Session($select=ID,Context;$expand=User($select=Name)),WaitingOn($select=ID,Description,State)",
     );
-    return response.value.map((j) => ({
+    return (response.value ?? []).map((j) => ({
       id: String(j.ID),
       description: j.Description ?? "",
       state: j.State ?? "",
