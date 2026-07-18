@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { traceDataFlow, type DataSourceEntry } from "../../src/lib/callgraph/dataFlow.js";
 import { buildReferenceIndex } from "../../src/lib/callgraph/referenceIndex.js";
+import { buildDatasourceMembership } from "../../src/lib/callgraph/datasourceMembership.js";
 import type { ReferenceIndex, TmReference } from "../../src/lib/callgraph/referenceIndex.js";
 
 function ref(sourceName: string, funcName: string, targetName: string): TmReference {
@@ -144,7 +145,7 @@ describe("traceDataFlow — element filter", () => {
       name: "SuDatenquellen_C",
       processes: [{ process: "Builder", funcNames: ["SubsetElementInsert"], access: ["indeterminate"] }],
       resolution:
-        "access classified from in-code subset usage (view-assign/zero-out/loop) + datasource; 'indeterminate' = built but not classifiable, not evidence the element goes untouched; stored view/subset MDX not resolved (Bucket B).",
+        "access from in-code subset usage (view-assign/zero-out/loop) + datasource; stored view/subset datasources resolved (native-title/static exact, MDX by literal member); computed selectors (TM1FILTERBY*/DESCENDANTS/…) flagged in computedInProcesses, not resolved; 'indeterminate' = built but not classifiable, not evidence the element goes untouched.",
     });
   });
 
@@ -226,5 +227,35 @@ describe("traceDataFlow — element access classification", () => {
       { element: { dimension: "Currency", name: "USD" }, elementAccess: ["source","write","zero-out","indeterminate"] });
     expect(flow.element!.processes[0]!.access).not.toContain("source");
     expect(flow.element!.processes[0]!.access).toEqual(["indeterminate"]);
+  });
+});
+
+describe("traceDataFlow — element filter incl. datasource membership", () => {
+  it("merges a static-subset datasource reader into element.processes with a via tag", async () => {
+    const index = await buildReferenceIndex({
+      fetchProcesses: async () => [
+        { name: "Reader", prolog: "", metadata: "", data: "", epilog: "", parameters: [] },
+      ],
+      fetchCubesWithRules: async () => [],
+      fetchChores: async () => [],
+    });
+    const membership = await buildDatasourceMembership(
+      {
+        getViewDefinition: async () => { throw new Error("n/a"); },
+        getSubset: async (dim: string, _h: string, sub: string) => ({
+          name: sub, dimensionName: dim, hierarchyName: dim, private: false,
+          expression: undefined, elements: ["SuDatenquellen_C"], alias: undefined,
+        }),
+      },
+      [{ name: "Reader", type: "TM1DimensionSubset", sourceName: "Datenquellen", subset: "sMy" }],
+    );
+    const flow = traceDataFlow(index, [], "AnyCube", "both", {
+      element: { dimension: "Datenquellen", name: "SuDatenquellen_C" },
+      datasourceMembership: membership,
+    });
+    // A stored-subset datasource hit is a read → access ['source'] PLUS a via tag.
+    expect(flow.element!.processes).toEqual([
+      { process: "Reader", funcNames: [], access: ["source"], via: ["subset-static"] },
+    ]);
   });
 });

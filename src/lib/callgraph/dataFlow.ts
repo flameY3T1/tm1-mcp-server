@@ -10,6 +10,7 @@
 import { elementKey, type ReferenceIndex } from "./referenceIndex.js";
 import { classifyAccess } from "./callGraph.js";
 import type { SubsetUsage } from "./subsetUsage.js";
+import type { DatasourceMembership, MembershipVia } from "./datasourceMembership.js";
 
 /** How a process touches a traced element (from in-code subset usage + datasource join). */
 export type AccessKind = "source" | "write" | "zero-out" | "indeterminate";
@@ -55,11 +56,13 @@ export interface DataFlowResult {
   element?: {
     dimension: string;
     name: string;
-    processes: Array<{ process: string; funcNames: string[]; access: AccessKind[] }>;
+    processes: Array<{ process: string; funcNames: string[]; access: AccessKind[]; via?: MembershipVia[] }>;
     /** Processes where this dimension has an UNRESOLVED element arg (element identity not statically known). */
     unresolvedInProcesses?: string[];
     /** Count of touching processes hidden because their only access classification was 'indeterminate' (opts.elementAccess default excludes it). */
     suppressedIndeterminate?: number;
+    /** Processes whose datasource scopes elements via a computed selector (element identity not literally verifiable). */
+    computedInProcesses?: string[];
     /** Honesty marker: what element resolution this result covers. */
     resolution: string;
   };
@@ -206,7 +209,11 @@ export function traceDataFlow(
   dsList: DataSourceEntry[],
   cubeName: string,
   direction: Direction,
-  opts?: { element?: { dimension: string; name: string }; elementAccess?: AccessKind[] },
+  opts?: {
+    element?: { dimension: string; name: string };
+    elementAccess?: AccessKind[];
+    datasourceMembership?: DatasourceMembership;
+  },
 ): DataFlowResult {
   const cubeOrig = new Map<string, string>();
   const io = buildProcessIO(index, dsList, cubeOrig);
@@ -261,7 +268,7 @@ export function traceDataFlow(
     const key = elementKey(dimension, name);
     const wanted = new Set<AccessKind>(opts.elementAccess ?? ["source", "write", "zero-out"]);
 
-    // process (orig case) -> { funcNames, subsets(lc) it was inserted into in this process }
+    // in-code (Phase 1/1.5): funcNames + subsets per process
     const perProc = new Map<string, { funcNames: Set<string>; subsets: Set<string> }>();
     for (const r of index.byElement.get(key) ?? []) {
       const e = perProc.get(r.sourceName) ?? { funcNames: new Set<string>(), subsets: new Set<string>() };
@@ -270,19 +277,36 @@ export function traceDataFlow(
       perProc.set(r.sourceName, e);
     }
 
+    // Bucket B: stored view/subset datasource membership → via tags per process (a datasource IS a read).
+    const dsVia = new Map<string, Set<MembershipVia>>();
+    for (const hit of opts.datasourceMembership?.byElement.get(key) ?? []) {
+      const set = dsVia.get(hit.process) ?? new Set<MembershipVia>();
+      set.add(hit.via);
+      dsVia.set(hit.process, set);
+    }
+
     const dsByProc = new Map<string, DataSourceEntry>();
     for (const d of dsList) dsByProc.set(d.name.toLowerCase(), d);
 
+    const allProcs = new Set<string>([...perProc.keys(), ...dsVia.keys()]);
     let suppressedIndeterminate = 0;
-    const processes: Array<{ process: string; funcNames: string[]; access: AccessKind[] }> = [];
-    for (const [process, e] of perProc) {
+    const processes: Array<{ process: string; funcNames: string[]; access: AccessKind[]; via?: MembershipVia[] }> = [];
+    for (const process of allProcs) {
+      const e = perProc.get(process);
       const usage = index.subsetUsageByProcess.get(process.toLowerCase());
-      const access = classifyElementAccess(usage, [...e.subsets], dsByProc.get(process.toLowerCase()), dimension);
+      const accessSet = new Set<AccessKind>(
+        e ? classifyElementAccess(usage, [...e.subsets], dsByProc.get(process.toLowerCase()), dimension) : [],
+      );
+      const via = [...(dsVia.get(process) ?? [])].sort((a, b) => a.localeCompare(b));
+      if (via.length) accessSet.add("source"); // stored view/subset datasource = read
+      if (accessSet.size === 0) accessSet.add("indeterminate");
+      const access = [...accessSet].sort((a, b) => a.localeCompare(b));
       if (!access.some((a) => wanted.has(a))) {
         if (access.length === 1 && access[0] === "indeterminate") suppressedIndeterminate++;
         continue;
       }
-      processes.push({ process, funcNames: [...e.funcNames].sort((a, b) => a.localeCompare(b)), access });
+      const funcNames = [...(e?.funcNames ?? [])].sort((a, b) => a.localeCompare(b));
+      processes.push(via.length ? { process, funcNames, access, via } : { process, funcNames, access });
     }
     processes.sort((a, b) => a.process.localeCompare(b.process));
 
@@ -291,14 +315,23 @@ export function traceDataFlow(
       .map(([proc]) => proc)
       .sort((a, b) => a.localeCompare(b));
 
+    const computedInProcesses = [...(opts.datasourceMembership?.computedByProcess.keys() ?? [])]
+      .sort((a, b) => a.localeCompare(b));
+
+    const fetchErrorCount = opts.datasourceMembership?.fetchErrors.length ?? 0;
+
     result.element = {
       dimension,
       name,
       processes,
       ...(unresolvedInProcesses.length ? { unresolvedInProcesses } : {}),
       ...(suppressedIndeterminate ? { suppressedIndeterminate } : {}),
+      ...(computedInProcesses.length ? { computedInProcesses } : {}),
       resolution:
-        "access classified from in-code subset usage (view-assign/zero-out/loop) + datasource; 'indeterminate' = built but not classifiable, not evidence the element goes untouched; stored view/subset MDX not resolved (Bucket B).",
+        "access from in-code subset usage (view-assign/zero-out/loop) + datasource; stored view/subset datasources resolved (native-title/static exact, MDX by literal member); computed selectors (TM1FILTERBY*/DESCENDANTS/…) flagged in computedInProcesses, not resolved; 'indeterminate' = built but not classifiable, not evidence the element goes untouched." +
+        (fetchErrorCount
+          ? ` (${fetchErrorCount} datasource object(s) could not be fetched — results may be incomplete)`
+          : ""),
     };
   }
 

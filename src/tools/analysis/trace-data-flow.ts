@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { traceDataFlow } from "../../lib/callgraph/dataFlow.js";
+import { buildDatasourceMembership, type DatasourceMembership } from "../../lib/callgraph/datasourceMembership.js";
 
 export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -15,6 +16,7 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
       "(a TM1CubeView datasource with no CellGet in the code) are caught too. Read-only.",
       "Pass element+dimension to also get which processes touch that element via in-code subset-membership calls.",
       "Each touching process is tagged access=source|write|zero-out|indeterminate so a zero-out is not mistaken for a read-source.",
+      "Element tracing also resolves stored view/subset datasources (native-view titles + static subsets exactly; MDX views/subsets by literal member; computed selectors are flagged, not resolved).",
     ].join(" "),
     {
       cubeName: z.string().describe("Cube to trace (case-insensitive)"),
@@ -38,12 +40,19 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
         .string()
         .optional()
         .describe("Owning dimension of 'element' (required when 'element' is set)."),
+      resolveDatasourceMembership: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "When tracing an element, also resolve server-side view/subset datasources (extra fetches). Default true; set false to skip for speed.",
+        ),
       elementAccess: z
         .array(z.enum(["source", "write", "zero-out", "indeterminate"]))
         .optional()
         .describe("Element roles to include (default source+write+zero-out). Add 'indeterminate' to also list processes that build the subset but whose use we could not classify (NOT proof of no use)."),
     },
-    async ({ cubeName, direction, includeControl, element, dimension, elementAccess }) => {
+    async ({ cubeName, direction, includeControl, element, dimension, resolveDatasourceMembership, elementAccess }) => {
       if (element && !dimension) {
         return { isError: true, content: [{ type: "text" as const, text: "When 'element' is set, 'dimension' is required (element names are only unique within a dimension)." }] };
       }
@@ -52,12 +61,29 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
         tm1Client.processes.listDataSources(includeControl),
       ]);
 
+      let datasourceMembership: DatasourceMembership | undefined;
+      if (element && dimension && resolveDatasourceMembership) {
+        datasourceMembership = await buildDatasourceMembership(
+          {
+            getViewDefinition: (cube, view) => tm1Client.views.getDefinition(cube, view),
+            getSubset: (dim, hier, sub) => tm1Client.subsets.get(dim, hier, sub),
+          },
+          dsList,
+        );
+      }
+
       const flow = traceDataFlow(
         index,
         dsList,
         cubeName,
         direction,
-        element && dimension ? { element: { dimension, name: element }, ...(elementAccess ? { elementAccess } : {}) } : undefined,
+        element && dimension
+          ? {
+              element: { dimension, name: element },
+              ...(elementAccess ? { elementAccess } : {}),
+              ...(datasourceMembership ? { datasourceMembership } : {}),
+            }
+          : undefined,
       );
 
       // An element filter that found hits is meaningful output on its own — don't let
