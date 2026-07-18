@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "which processes touch element X of dimension D" (via in-code subset-membership calls), and
   each data-flow row now lists the in-code elements that process manipulates. Reads through
   **stored** view/subset MDX remain cube-level only — see the Bucket B follow-up.
+- `tm1_trace_data_flow` element tracing now classifies each touching process by how it uses the
+  element's subset: `source` (read/datasource), `write`, `zero-out` (e.g. `ViewZeroOut`), or
+  `indeterminate` (built but not classifiable — not evidence the element goes untouched). New
+  `elementAccess` input filters roles (default source+write+zero-out); suppressed `indeterminate`
+  processes are counted.
 
 ### Fixed
 
