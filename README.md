@@ -187,30 +187,9 @@ Copy `mcp.json.example` to `.mcp.json` (project-local) or merge into
 }
 ```
 
-If you installed globally (`npm install -g tm1-mcp-server`), use the CLI name:
-
-```json
-{
-  "mcpServers": {
-    "tm1": {
-      "command": "tm1-mcp-server"
-    }
-  }
-}
-```
-
-For a source build (Option B), point at the built entrypoint:
-
-```json
-{
-  "mcpServers": {
-    "tm1": {
-      "command": "node",
-      "args": ["/absolute/path/to/tm1-mcp-server/dist/index.js"]
-    }
-  }
-}
-```
+Alternatives to the `command`/`args` above: a **global** install uses
+`"command": "tm1-mcp-server"` (no `args`); a **source build** (Option B) uses
+`"command": "node"`, `"args": ["/absolute/path/to/tm1-mcp-server/dist/index.js"]`.
 
 Restart Claude Code → server name `tm1` available.
 
