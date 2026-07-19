@@ -35,13 +35,13 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
     // Clean any leftovers from a crashed prior run so create() calls don't 400.
     await h.call("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW, confirm: NATIVE_VIEW });
     await h.call("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW, confirm: MDX_VIEW });
-    await h.call("tm1_delete_cube", { name: C1, confirm: C1 });
-    await h.call("tm1_delete_dimension", { name: D1, confirm: D1 });
-    await h.call("tm1_delete_dimension", { name: D2, confirm: D2 });
+    await h.call("tm1_delete_cube", { cubeName: C1, confirm: C1 });
+    await h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 });
+    await h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 });
 
     // Scaffold: dims + elements + cube.
-    await h.ok("tm1_create_dimension", { name: D1 });
-    await h.ok("tm1_create_dimension", { name: D2 });
+    await h.ok("tm1_create_dimension", { dimensionName: D1 });
+    await h.ok("tm1_create_dimension", { dimensionName: D2 });
     for (const name of D1_ELEMENTS) {
       await h.ok("tm1_create_element", {
         dimensionName: D1,
@@ -56,7 +56,7 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
         element: { name, type: "Numeric" },
       });
     }
-    await h.ok("tm1_create_cube", { name: C1, dimensions: [D1, D2] });
+    await h.ok("tm1_create_cube", { cubeName: C1, dimensions: [D1, D2] });
   });
 
   afterAll(async () => {
@@ -72,9 +72,9 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
     await swallow(
       h.call("tm1_delete_subset", { dimensionName: D1, hierarchyName: D1, subsetName: SUBSET, confirm: SUBSET }),
     );
-    await swallow(h.call("tm1_delete_cube", { name: C1, confirm: C1 }));
-    await swallow(h.call("tm1_delete_dimension", { name: D1, confirm: D1 }));
-    await swallow(h.call("tm1_delete_dimension", { name: D2, confirm: D2 }));
+    await swallow(h.call("tm1_delete_cube", { cubeName: C1, confirm: C1 }));
+    await swallow(h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 }));
+    await swallow(h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 }));
   });
 
   // ---- Subset lifecycle (static element-based) ----

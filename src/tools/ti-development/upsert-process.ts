@@ -42,7 +42,7 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
     "tm1_upsert_process",
     "Atomic-style create-or-update for a TI process. Bundles createProcess (if missing) + updateProcessCode + updateProcessParameters + updateProcessVariables + updateProcessDataSource into a single MCP call. NOTE: TM1 itself does not support a real transaction — on partial failure, the steps that already succeeded are not rolled back. The tool reports which step failed.",
     {
-      name: z.string(),
+      processName: z.string(),
       prolog: z.string().optional(),
       metadata: z.string().optional(),
       data: z.string().optional(),
@@ -63,29 +63,29 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
           "After deploy, run tm1.Compile and include the result in the response (compile: {ok, errorCount, errors}). Off by default — compile holds a brief lock on the process and serializes badly under bulk-deploy.",
         ),
     },
-    async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, hasSecurityAccess, mode, autoCompile }) => {
+    async ({ processName, prolog, metadata, data, epilog, parameters, variables, dataSource, hasSecurityAccess, mode, autoCompile }) => {
       const trail: string[] = [];
-      const exists = await tm1Client.processes.exists(name);
+      const exists = await tm1Client.processes.exists(processName);
       if (mode === "create" && exists) {
         throw new TM1Error({
           code: TM1ErrorCode.CONFLICT,
-          message: `Process '${name}' already exists; mode=create`,
+          message: `Process '${processName}' already exists; mode=create`,
         });
       }
       if (mode === "update" && !exists) {
         throw new TM1Error({
           code: TM1ErrorCode.NOT_FOUND,
-          message: `Process '${name}' does not exist; mode=update`,
+          message: `Process '${processName}' does not exist; mode=update`,
         });
       }
 
       if (!exists) {
-        await tm1Client.processes.create(name);
+        await tm1Client.processes.create(processName);
         trail.push("createProcess");
       }
 
       if (prolog !== undefined || metadata !== undefined || data !== undefined || epilog !== undefined) {
-        await tm1Client.processes.updateCode(name, {
+        await tm1Client.processes.updateCode(processName, {
           ...(prolog !== undefined ? { prolog } : {}),
           ...(metadata !== undefined ? { metadata } : {}),
           ...(data !== undefined ? { data } : {}),
@@ -94,19 +94,19 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
         trail.push("updateProcessCode");
       }
       if (parameters !== undefined) {
-        await tm1Client.processes.updateParameters(name, parameters);
+        await tm1Client.processes.updateParameters(processName, parameters);
         trail.push("updateProcessParameters");
       }
       if (variables !== undefined && variables.length > 0) {
-        await tm1Client.processes.updateVariables(name, variables);
+        await tm1Client.processes.updateVariables(processName, variables);
         trail.push("updateProcessVariables");
       }
       if (dataSource !== undefined) {
-        await tm1Client.processes.updateDataSource(name, dataSource);
+        await tm1Client.processes.updateDataSource(processName, dataSource);
         trail.push("updateProcessDataSource");
       }
       if (hasSecurityAccess !== undefined) {
-        await tm1Client.processes.updateSecurityAccess(name, hasSecurityAccess);
+        await tm1Client.processes.updateSecurityAccess(processName, hasSecurityAccess);
         trail.push("updateSecurityAccess");
       }
 
@@ -116,7 +116,7 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
 
       let compile: { ok: boolean; errorCount: number; errors: unknown[] } | undefined;
       if (autoCompile) {
-        const result = await tm1Client.processes.compile(name);
+        const result = await tm1Client.processes.compile(processName);
         compile = {
           ok: result.success,
           errorCount: result.errors.length,
@@ -131,7 +131,7 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
             type: "text" as const,
             text: JSON.stringify(
               {
-                processName: name,
+                processName,
                 action: exists ? "updated" : "created",
                 appliedSteps: trail,
                 callgraphEntriesCleared,

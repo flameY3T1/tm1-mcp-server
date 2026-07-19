@@ -13,18 +13,18 @@ export function registerCreateCube(server: McpServer, tm1Client: TM1Client): voi
       "After: tm1_set_cube_rules for calculations, tm1_create_mdx_view for default slices.",
     ].join(" "),
     {
-      name: z.string().describe("Cube name"),
+      cubeName: z.string().describe("Cube name"),
       dimensions: z.array(z.string()).min(2)
         .describe("Ordered list of dimension names. Order affects query performance."),
     },
-    async ({ name, dimensions }) => {
-      await tm1Client.cubes.create(name, dimensions);
+    async ({ cubeName, dimensions }) => {
+      await tm1Client.cubes.create(cubeName, dimensions);
       return {
         content: [{
           type: "text" as const,
           text: JSON.stringify({
             success: true,
-            cubeName: name,
+            cubeName,
             dimensionCount: dimensions.length,
             dimensions,
           }),

@@ -26,7 +26,7 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         .string()
         .optional()
         .describe("Absolute host path to the .ti file. Disabled unless TM1_LOCAL_FILE_ROOT is set; must resolve within that directory."),
-      name: z.string().optional().describe("Override process name. Default: name from the JSON."),
+      processName: z.string().optional().describe("Override process name. Default: name from the JSON."),
       mode: z
         .enum(["create", "update", "upsert"])
         .optional()
@@ -42,7 +42,7 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         .default(true)
         .describe("Run tm1_check_process_code before applying. Abort on syntax errors. Default true."),
     },
-    async ({ jsonContent, tiContent, jsonPath, tiPath, name, mode, dataSourcePassword, preflight }) => {
+    async ({ jsonContent, tiContent, jsonPath, tiPath, processName: nameOverride, mode, dataSourcePassword, preflight }) => {
       let json = jsonContent ?? "";
       let ti = tiContent ?? "";
       if (!json && jsonPath) json = await fs.readFile(resolveLocalPath(jsonPath, "jsonPath"), "utf8");
@@ -65,7 +65,7 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         });
       }
 
-      const processName = name ?? parsed.name;
+      const processName = nameOverride ?? parsed.name;
       if (!processName) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,

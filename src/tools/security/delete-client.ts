@@ -7,16 +7,16 @@ export function registerDeleteClient(server: McpServer, tm1Client: TM1Client) {
     "tm1_delete_client",
     "Delete a TM1 client (user). Irreversible - the client must not have active sessions. Pass confirm=<client name verbatim>.",
     {
-      name: z.string().describe("Client (user) name"),
+      clientName: z.string().describe("Client (user) name"),
       ...CONFIRM_SCHEMA,
     },
-    async ({ name, confirm }) => {
-      requireConfirm(confirm, name, "client");
-      await tm1Client.security.deleteClient(name);
+    async ({ clientName, confirm }) => {
+      requireConfirm(confirm, clientName, "client");
+      await tm1Client.security.deleteClient(clientName);
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, clientName: name }),
+          text: JSON.stringify({ success: true, clientName }),
         }],
       };
     },

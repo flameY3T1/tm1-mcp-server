@@ -27,13 +27,13 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
     h = await getHarness();
 
     // Clean any leftovers from a crashed prior run (idempotent).
-    await h.call("tm1_delete_cube", { name: C1, confirm: C1 });
-    await h.call("tm1_delete_dimension", { name: D1, confirm: D1 });
-    await h.call("tm1_delete_dimension", { name: D2, confirm: D2 });
+    await h.call("tm1_delete_cube", { cubeName: C1, confirm: C1 });
+    await h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 });
+    await h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 });
 
     // Dimensions first — a cube cannot be created without them.
-    await h.ok("tm1_create_dimension", { name: D1 });
-    await h.ok("tm1_create_dimension", { name: D2 });
+    await h.ok("tm1_create_dimension", { dimensionName: D1 });
+    await h.ok("tm1_create_dimension", { dimensionName: D2 });
 
     // Populate. create_dimension makes a default hierarchy of the same name.
     for (const name of [D1_PLAIN, D1_QUOTE]) {
@@ -52,7 +52,7 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
     }
 
     // Cube over the two dimensions. Order matters for perf, not for the test.
-    await h.ok("tm1_create_cube", { name: C1, dimensions: [D1, D2] });
+    await h.ok("tm1_create_cube", { cubeName: C1, dimensions: [D1, D2] });
   });
 
   afterAll(async () => {
@@ -66,9 +66,9 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
         /* best-effort cleanup */
       }
     };
-    await swallow(h.call("tm1_delete_cube", { name: C1, confirm: C1 }));
-    await swallow(h.call("tm1_delete_dimension", { name: D1, confirm: D1 }));
-    await swallow(h.call("tm1_delete_dimension", { name: D2, confirm: D2 }));
+    await swallow(h.call("tm1_delete_cube", { cubeName: C1, confirm: C1 }));
+    await swallow(h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 }));
+    await swallow(h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 }));
   });
 
   it("create_cube produced a cube over the two sandbox dimensions", async () => {

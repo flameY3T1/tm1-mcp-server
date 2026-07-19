@@ -8,7 +8,7 @@ import { registerCheckProcessCode } from "../../src/tools/ti-development/check-p
 // stamp a generic TM1_ERROR envelope (with the whole payload duplicated into
 // `message`) over it — observed in the 2026-07-04 prod live sweep.
 type ToolCb = (
-  args: { name?: string; prolog?: string },
+  args: { processName?: string; prolog?: string },
   extra: Record<string, unknown>
 ) => Promise<{ isError?: boolean; content: Array<{ type: string; text: string }> }>;
 
@@ -31,7 +31,7 @@ describe("tm1_check_process_code failure payload", () => {
       success: false,
       errors: [{ lineNumber: 2, procedure: "Prolog", message: "missing bracket" }],
     }));
-    const result = await cb({ name: "_probe", prolog: "nX = (" }, {});
+    const result = await cb({ processName: "_probe", prolog: "nX = (" }, {});
     const payload = JSON.parse(result.content[0].text);
 
     expect(result.isError).toBe(true);
@@ -45,7 +45,7 @@ describe("tm1_check_process_code failure payload", () => {
 
   it("keeps the success payload free of error envelope fields", async () => {
     const cb = captureHandler(async () => ({ success: true, errors: [] }));
-    const result = await cb({ name: "_probe", prolog: "nX = 1;" }, {});
+    const result = await cb({ processName: "_probe", prolog: "nX = 1;" }, {});
     const payload = JSON.parse(result.content[0].text);
 
     expect(result.isError).toBeUndefined();

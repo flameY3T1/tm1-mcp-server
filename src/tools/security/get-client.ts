@@ -8,13 +8,13 @@ export function registerGetClient(server: McpServer, tm1Client: TM1Client) {
     "tm1_get_client",
     "Get details for a single TM1 client (user) including group memberships.",
     {
-      name: z.string().describe("Client (user) name"),
+      clientName: z.string().describe("Client (user) name"),
       ...FORMAT_SCHEMA,
     },
-    async ({ name, format }) => {
-      const client = await tm1Client.security.getClient(name);
+    async ({ clientName, format }) => {
+      const client = await tm1Client.security.getClient(clientName);
       return payloadResponse(client, format, (c) =>
-        renderKV(c as unknown as Record<string, unknown>, `Client ${name}`),
+        renderKV(c as unknown as Record<string, unknown>, `Client ${clientName}`),
       );
     },
   );

@@ -203,7 +203,7 @@ export async function sweepSandbox(h: LiveHarness): Promise<void> {
   });
   for (const c of cubes.json?.items ?? []) {
     if (typeof c?.name === "string" && c.name.includes(SANDBOX)) {
-      await swallow(h.call("tm1_delete_cube", { name: c.name, confirm: c.name }));
+      await swallow(h.call("tm1_delete_cube", { cubeName: c.name, confirm: c.name }));
     }
   }
 
@@ -219,9 +219,9 @@ export async function sweepSandbox(h: LiveHarness): Promise<void> {
     .map((d: unknown) => (typeof d === "string" ? d : (d as { name?: string })?.name))
     .filter((n: unknown): n is string => typeof n === "string" && n.includes(SANDBOX));
   for (const name of dimNames.filter((n: string) => !n.startsWith("}"))) {
-    await swallow(h.call("tm1_delete_dimension", { name, confirm: name }));
+    await swallow(h.call("tm1_delete_dimension", { dimensionName: name, confirm: name }));
   }
   for (const name of dimNames.filter((n: string) => n.startsWith("}"))) {
-    await swallow(h.call("tm1_delete_dimension", { name, confirm: name }));
+    await swallow(h.call("tm1_delete_dimension", { dimensionName: name, confirm: name }));
   }
 }

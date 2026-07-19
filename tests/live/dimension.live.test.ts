@@ -28,20 +28,20 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
   beforeAll(async () => {
     h = await getHarness();
     // Defensive: drop a stale sandbox dim from a crashed prior run.
-    await h.call("tm1_delete_dimension", { name: DIM, confirm: DIM });
+    await h.call("tm1_delete_dimension", { dimensionName: DIM, confirm: DIM });
   });
 
   afterAll(async () => {
     // delete_dimension cascades all hierarchies + elements + attributes.
     try {
-      await h.call("tm1_delete_dimension", { name: DIM, confirm: DIM });
+      await h.call("tm1_delete_dimension", { dimensionName: DIM, confirm: DIM });
     } catch {
       /* best-effort teardown */
     }
   });
 
   it("creates a dimension", async () => {
-    const r = await h.ok("tm1_create_dimension", { name: DIM });
+    const r = await h.ok("tm1_create_dimension", { dimensionName: DIM });
     expect(r.json).toMatchObject({ success: true, dimensionName: DIM });
   });
 
@@ -313,7 +313,7 @@ describe.skipIf(!LIVE_ENABLED)("live: dimension / element / attribute lifecycle"
   });
 
   it("deletes the dimension (cascade)", async () => {
-    const r = await h.ok("tm1_delete_dimension", { name: DIM, confirm: DIM });
+    const r = await h.ok("tm1_delete_dimension", { dimensionName: DIM, confirm: DIM });
     expect(r.json).toMatchObject({ success: true, dimensionName: DIM });
   });
 });

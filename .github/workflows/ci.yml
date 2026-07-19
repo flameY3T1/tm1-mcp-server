@@ -50,6 +50,9 @@ jobs:
       - name: Lint (tool registration)
         run: npm run lint:tool-registration
 
+      - name: Lint (input naming — no bare top-level name)
+        run: npm run lint:input-naming
+
       - name: Coverage (enforces vitest thresholds)
         run: npm run test:coverage
 

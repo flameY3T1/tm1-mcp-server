@@ -36,7 +36,8 @@
     "lint:output-schema": "node scripts/check-output-schema-coverage.mjs",
     "lint:output-schema-budget": "node scripts/check-output-schema-budget.mjs",
     "lint:tool-registration": "node scripts/check-tool-registration.mjs",
-    "verify": "npm run typecheck && npm run lint:no-flat-api && npm run lint:annotations && npm run lint:output-schema && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:eslint && npm test",
+    "lint:input-naming": "node scripts/check-no-bare-name-input.mjs",
+    "verify": "npm run typecheck && npm run lint:no-flat-api && npm run lint:annotations && npm run lint:output-schema && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:input-naming && npm run lint:eslint && npm test",
     "tools:list": "node scripts/gen-tool-list.mjs",
     "tools:update-readme": "node scripts/gen-tool-list.mjs --write-readme",
     "lint:eslint": "eslint ."

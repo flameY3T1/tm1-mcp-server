@@ -27,7 +27,7 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
     h = await getHarness();
     // Prerequisite: a harmless process for the chore to reference.
     await h.ok("tm1_upsert_process", {
-      name: PROC,
+      processName: PROC,
       prolog: "nX = 1;",
       mode: "upsert",
     });

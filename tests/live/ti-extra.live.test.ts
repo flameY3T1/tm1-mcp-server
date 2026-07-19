@@ -38,7 +38,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ti-extra (.pro roundtrip + ops gap)", () =
       await h.call("tm1_delete_process", { processName: name, confirm: name });
     }
     await h.ok("tm1_upsert_process", {
-      name: PROC_SRC,
+      processName: PROC_SRC,
       prolog: PROLOG,
       parameters: [
         { name: "pAmount", type: "Numeric", defaultValue: 0, prompt: "Amount" },
@@ -90,7 +90,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ti-extra (.pro roundtrip + ops gap)", () =
     expect(proContent).not.toBe("");
     const r = await h.ok("tm1_import_pro_file", {
       content: proContent,
-      name: PROC_IMPORT,
+      processName: PROC_IMPORT,
       mode: "create",
     });
     expect(JSON.stringify(r.json)).toContain(PROC_IMPORT);

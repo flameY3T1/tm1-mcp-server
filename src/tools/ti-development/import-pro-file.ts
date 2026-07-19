@@ -20,7 +20,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         .string()
         .optional()
         .describe("Raw .pro file content as string (alternative to filePath)"),
-      name: z
+      processName: z
         .string()
         .optional()
         .describe("Override process name. Default: name parsed from .pro (602,'Name')."),
@@ -35,7 +35,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         .default(true)
         .describe("Run tm1_check_process_code before applying. Abort on syntax errors. Default true."),
     },
-    async ({ filePath, content, name, mode, preflight }) => {
+    async ({ filePath, content, processName: nameOverride, mode, preflight }) => {
       if (!filePath && !content) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
@@ -49,7 +49,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       }
 
       const parsed = parseProFile(body);
-      const processName = name ?? parsed.name;
+      const processName = nameOverride ?? parsed.name;
       if (!processName) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,

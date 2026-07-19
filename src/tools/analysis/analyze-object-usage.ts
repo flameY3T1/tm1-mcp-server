@@ -13,7 +13,7 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
     ].join(" "),
     {
       kind: z.enum(["cube", "dimension"]).describe("Object kind to look up"),
-      name: z.string().describe("Cube or dimension name (case-insensitive)"),
+      objectName: z.string().describe("Cube or dimension name (case-insensitive)"),
       accessMode: z
         .enum(["all", "read", "write"])
         .optional()
@@ -48,9 +48,9 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
           "snippets dropped. Use summary for compact data-flow overviews on heavily-referenced objects.",
         ),
     },
-    async ({ kind, name, accessMode, includeSystem, includeControl, limit, mode }) => {
+    async ({ kind, objectName, accessMode, includeSystem, includeControl, limit, mode }) => {
       const index = await buildIndexFromTM1(tm1Client, { includeControl });
-      const all = buildCubeOrDimUsages(index, kind, name, { includeSystem, accessMode });
+      const all = buildCubeOrDimUsages(index, kind, objectName, { includeSystem, accessMode });
 
       if (mode === "summary") {
         // Aggregate per source (process or rule). Key by kind+name so a process
@@ -103,7 +103,7 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
               type: "text" as const,
               text: JSON.stringify({
                 kind,
-                name,
+                name: objectName,
                 accessMode,
                 mode,
                 count: all.length,
@@ -122,7 +122,7 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ kind, name, accessMode, count: all.length, returned: usages.length, truncated, usages }),
+            text: JSON.stringify({ kind, name: objectName, accessMode, count: all.length, returned: usages.length, truncated, usages }),
           },
         ],
       };

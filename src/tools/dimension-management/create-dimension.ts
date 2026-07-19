@@ -10,14 +10,14 @@ export function registerCreateDimension(server: McpServer, tm1Client: TM1Client)
       "Fails if the dimension already exists. After: tm1_create_element / tm1_bulk_upsert_elements to populate, tm1_create_hierarchy for alternate hierarchies.",
     ].join(" "),
     {
-      name: z.string().describe("Dimension name"),
+      dimensionName: z.string().describe("Dimension name"),
     },
-    async ({ name }) => {
-      await tm1Client.dimensions.create(name);
+    async ({ dimensionName }) => {
+      await tm1Client.dimensions.create(dimensionName);
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, dimensionName: name }),
+          text: JSON.stringify({ success: true, dimensionName }),
         }],
       };
     },

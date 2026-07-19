@@ -104,7 +104,7 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
     expect(cubeNames.length).toBeGreaterThan(0);
     const r = await h.ok("tm1_analyze_object_usage", {
       kind: "cube",
-      name: cubeNames[0],
+      objectName: cubeNames[0],
       limit: 50,
     });
     expect(r.isError).toBe(false);
@@ -116,7 +116,7 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
 
     const s = await h.ok("tm1_analyze_object_usage", {
       kind: "cube",
-      name: cubeNames[0],
+      objectName: cubeNames[0],
       mode: "summary",
       limit: 50,
     });

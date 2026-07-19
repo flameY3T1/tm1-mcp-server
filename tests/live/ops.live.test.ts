@@ -54,7 +54,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
         }
       }
       try {
-        await h.call("tm1_delete_client", { name: CLIENT_NAME, confirm: CLIENT_NAME });
+        await h.call("tm1_delete_client", { clientName: CLIENT_NAME, confirm: CLIENT_NAME });
       } catch {
         /* already gone */
       }
@@ -161,7 +161,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
     expect(names.length).toBeGreaterThan(0);
     // Prefer 'admin' if present, else first listed.
     const target = names.find((n) => n.toLowerCase() === "admin") ?? names[0];
-    const r = await h.ok("tm1_get_client", { name: target });
+    const r = await h.ok("tm1_get_client", { clientName: target });
     expect(r.json).toHaveProperty("Name");
     expect(r.json.Name).toBe(target);
   });
@@ -225,7 +225,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
   it("CLIENT lifecycle: create -> update -> get -> assign/remove group -> delete", async () => {
     // Create a sandbox client (no groups, with a throwaway password).
     const create = await h.call("tm1_create_client", {
-      name: CLIENT_NAME,
+      clientName: CLIENT_NAME,
       password: "ZzMcpLive!2026",
       friendlyName: `${PREFIX} live test`,
     });
@@ -239,12 +239,12 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
     expect(create.json).toMatchObject({ success: true, name: CLIENT_NAME });
 
     // get_client sees it.
-    const got = await h.ok("tm1_get_client", { name: CLIENT_NAME });
+    const got = await h.ok("tm1_get_client", { clientName: CLIENT_NAME });
     expect(got.json.Name).toBe(CLIENT_NAME);
 
     // update_client: flip enabled + change friendly name.
     const upd = await h.ok("tm1_update_client", {
-      name: CLIENT_NAME,
+      clientName: CLIENT_NAME,
       friendlyName: `${PREFIX} updated`,
       enabled: true,
     });
@@ -278,7 +278,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ops / monitoring / security / files", () =
     }
 
     // delete_client removes it.
-    const del = await h.ok("tm1_delete_client", { name: CLIENT_NAME, confirm: CLIENT_NAME });
+    const del = await h.ok("tm1_delete_client", { clientName: CLIENT_NAME, confirm: CLIENT_NAME });
     expect(del.json).toMatchObject({ success: true, clientName: CLIENT_NAME });
     createdClient = false; // gone; teardown no-op
   });

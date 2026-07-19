@@ -7,13 +7,13 @@ export function registerCompileProcess(server: McpServer, tm1Client: TM1Client):
     "tm1_compile_process",
     "Compile a TI process to validate its syntax without executing it. Returns compile errors with line numbers and procedure (Prolog/Metadata/Data/Epilog) when present.",
     {
-      name: z.string().describe("TI process name to compile"),
+      processName: z.string().describe("TI process name to compile"),
     },
-    async ({ name }) => {
-      const result = await tm1Client.processes.compile(name);
+    async ({ processName }) => {
+      const result = await tm1Client.processes.compile(processName);
       const payload = {
         ok: result.success,
-        processName: name,
+        processName,
         errorCount: result.errors.length,
         errors: result.errors,
       };

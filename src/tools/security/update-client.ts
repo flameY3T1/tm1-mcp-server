@@ -6,17 +6,17 @@ export function registerUpdateClient(server: McpServer, tm1Client: TM1Client) {
     "tm1_update_client",
     "Update a TM1 client. Allowed fields: password, friendlyName, enabled (true=active, false=disabled).",
     {
-      name: z.string().describe("Client (user) name"),
+      clientName: z.string().describe("Client (user) name"),
       password: z.string().optional().describe("New password"),
       friendlyName: z.string().optional().describe("New display name"),
       enabled: z.boolean().optional().describe("Enable/disable the client"),
     },
-    async ({ name, ...payload }) => {
-      await tm1Client.security.updateClient(name, payload);
+    async ({ clientName, ...payload }) => {
+      await tm1Client.security.updateClient(clientName, payload);
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ success: true, clientName: name }),
+          text: JSON.stringify({ success: true, clientName }),
         }],
       };
     },

@@ -45,7 +45,7 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
 
   it("check_process_code validates a harmless body without saving", async () => {
     const r = await h.ok("tm1_check_process_code", {
-      name: PROC_A,
+      processName: PROC_A,
       prolog: PROLOG_A,
       parameters: [{ name: "pAmount", type: "Numeric", defaultValue: 0 }],
       dataSource: { type: "None" },
@@ -56,7 +56,7 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
 
   it("upsert_process creates PROC_A with prolog + parameter", async () => {
     const r = await h.ok("tm1_upsert_process", {
-      name: PROC_A,
+      processName: PROC_A,
       prolog: PROLOG_A,
       parameters: [
         { name: "pAmount", type: "Numeric", defaultValue: 0, prompt: "Amount" },
@@ -73,7 +73,7 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
   });
 
   it("compile_process reports success for PROC_A", async () => {
-    const r = await h.ok("tm1_compile_process", { name: PROC_A });
+    const r = await h.ok("tm1_compile_process", { processName: PROC_A });
     expect(r.json).toMatchObject({ ok: true, processName: PROC_A, errorCount: 0 });
   });
 
@@ -181,11 +181,11 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
     // Upsert a process with a real syntax error (unterminated statement /
     // undefined function call), compile it → expect an error envelope.
     await h.ok("tm1_upsert_process", {
-      name: PROC_BAD,
+      processName: PROC_BAD,
       prolog: "nX = ThisFunctionDoesNotExist( ;",
       mode: "upsert",
     });
-    const compiled = await h.call("tm1_compile_process", { name: PROC_BAD });
+    const compiled = await h.call("tm1_compile_process", { processName: PROC_BAD });
     expect(compiled.isError).toBe(true);
     expect(compiled.json).toMatchObject({ ok: false });
     expect(compiled.json.errorCount).toBeGreaterThan(0);
@@ -226,7 +226,7 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
       // 1. Seed a source process with HasSecurityAccess=true (upsert_process
       // hasSecurityAccess passthrough under test).
       await h.ok("tm1_upsert_process", {
-        name: PROC_GIT_SRC,
+        processName: PROC_GIT_SRC,
         prolog: "# harmless git-roundtrip source\nnX = 1;",
         hasSecurityAccess: true,
         mode: "upsert",
@@ -274,7 +274,7 @@ describe.skipIf(!LIVE_ENABLED)("HasSecurityAccess read paths (live)", () => {
     // its own processes (including PROC_A) in its afterAll, which runs before
     // this sibling describe starts, so an independent process is needed here.
     await h.ok("tm1_upsert_process", {
-      name: PROC_SEC,
+      processName: PROC_SEC,
       prolog: "# harmless fixture for HasSecurityAccess read paths\nnX = 1;",
       mode: "upsert",
     });

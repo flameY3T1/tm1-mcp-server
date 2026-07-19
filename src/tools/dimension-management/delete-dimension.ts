@@ -12,13 +12,13 @@ export function registerDeleteDimension(server: McpServer, tm1Client: TM1Client)
       "Before: tm1_find_orphan_dimensions to confirm the dimension is unused, or tm1_analyze_object_usage for a targeted check.",
     ].join(" "),
     {
-      name: z.string().describe("Dimension name (case-sensitive)"),
+      dimensionName: z.string().describe("Dimension name (case-sensitive)"),
       ...CONFIRM_SCHEMA,
     },
-    async ({ name, confirm }) => {
-      requireConfirm(confirm, name, "dimension");
-      await tm1Client.dimensions.delete(name);
-      return actionResponse({ success: true, dimensionName: name });
+    async ({ dimensionName, confirm }) => {
+      requireConfirm(confirm, dimensionName, "dimension");
+      await tm1Client.dimensions.delete(dimensionName);
+      return actionResponse({ success: true, dimensionName });
     },
   );
 }

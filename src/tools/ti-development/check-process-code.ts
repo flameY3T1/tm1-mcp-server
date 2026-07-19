@@ -19,7 +19,7 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
       "All procedure tabs default to empty strings if omitted; pass only the tabs you want to validate.",
     ].join(" "),
     {
-      name: z.string().optional().describe("Process name used in the synthetic body (no save). Default '_compile_check'."),
+      processName: z.string().optional().describe("Process name used in the synthetic body (no save). Default '_compile_check'."),
       prolog: z.string().optional().describe("Prolog tab TI code"),
       metadata: z.string().optional().describe("Metadata tab TI code"),
       data: z.string().optional().describe("Data tab TI code"),
@@ -29,7 +29,7 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
       dataSource: dataSourceSchema.optional().describe("DataSource config — defaults to { type: 'None' } when omitted"),
       baseProcess: z.string().optional().describe("Existing process name to inherit parameters and variables from. Prevents 'undefined parameter' compile errors when validating code that references params defined on the saved process. Explicit parameters/variables override the inherited values."),
     },
-    async ({ name, prolog, metadata, data, epilog, parameters, variables, dataSource, baseProcess }) => {
+    async ({ processName, prolog, metadata, data, epilog, parameters, variables, dataSource, baseProcess }) => {
       let resolvedParams = parameters as ProcessParameter[] | undefined;
       let resolvedVars = variables as ProcessVariable[] | undefined;
       if (baseProcess) {
@@ -37,7 +37,7 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
         if (!resolvedVars) resolvedVars = await tm1Client.processes.getVariables(baseProcess);
       }
       const result = await tm1Client.processes.check({
-        ...(name !== undefined ? { name } : {}),
+        ...(processName !== undefined ? { name: processName } : {}),
         ...(prolog !== undefined ? { prolog } : {}),
         ...(metadata !== undefined ? { metadata } : {}),
         ...(data !== undefined ? { data } : {}),
@@ -51,7 +51,7 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
       // normalizer stamps a generic TM1_ERROR envelope over it.
       const payload = {
         ok: result.success,
-        processName: name ?? "_compile_check",
+        processName: processName ?? "_compile_check",
         errorCount: result.errors.length,
         errors: result.errors,
         ...(result.success

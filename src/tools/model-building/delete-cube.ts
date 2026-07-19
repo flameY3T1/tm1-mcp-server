@@ -14,16 +14,16 @@ export function registerDeleteCube(server: McpServer, tm1Client: TM1Client): voi
       "Before: tm1_analyze_object_usage to find rules or processes referencing the cube; tm1_get_cube_stats to size the data loss.",
     ].join(" "),
     {
-      name: z.string().describe("Cube name (case-sensitive)"),
+      cubeName: z.string().describe("Cube name (case-sensitive)"),
       ...CONFIRM_SCHEMA,
     },
-    async ({ name, confirm }) => {
-      requireConfirm(confirm, name, "cube");
+    async ({ cubeName, confirm }) => {
+      requireConfirm(confirm, cubeName, "cube");
       await withToolHint(
-        tm1Client.cubes.delete(name),
+        tm1Client.cubes.delete(cubeName),
         "Cube delete failed. Common causes: cube still referenced by TI processes / chores / rules (run tm1_analyze_object_usage to inspect), insufficient permissions, or cube does not exist (tm1_list_cubes to verify name + casing).",
       );
-      return actionResponse({ success: true, cubeName: name });
+      return actionResponse({ success: true, cubeName });
     },
   );
 }
