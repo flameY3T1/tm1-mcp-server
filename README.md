@@ -34,6 +34,14 @@ Engine (rerooted REST, `s2s` auth live-validated).
 | Operations | server info, message log, transaction log, threads, sessions, file ops |
 | Analysis | callgraph (full + summary mode + global ranking), object usage, chore graph, cache invalidation |
 
+> **Token tip:** every registered tool's name + input schema counts against the
+> model's context budget on *each* turn, so exposing all 114 tools is wasteful
+> if a session only needs a slice. Enable just the tools relevant to your
+> use-case via your MCP client's tool filter / allow-list (e.g. only the
+> read + Analysis tools for a model audit, or only TI Development for process
+> work). `TM1_MODE=readonly` already trims the surface to read-only tools;
+> narrow further client-side when you can.
+
 ## Install
 
 **Option A — from npm (recommended).** No clone, no build. Run on demand with
