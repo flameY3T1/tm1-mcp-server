@@ -90,7 +90,7 @@ describe("TM1Client – getTransactionLog()", () => {
       .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
       .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A"), ENTRY("B")] })); // window 1 has >= top
 
-    const entries = await client.server.getTransactionLog({ top: 2 });
+    const { entries } = await client.server.getTransactionLog({ top: 2 });
 
     expect(entries).toHaveLength(2);
     expect(fetchSpy).toHaveBeenCalledTimes(2); // probe + 1 window only
@@ -106,10 +106,45 @@ describe("TM1Client – getTransactionLog()", () => {
       .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A")] })) // window 1 short (<top)
       .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A"), ENTRY("B")] })); // window 2 enough
 
-    const entries = await client.server.getTransactionLog({ top: 2 });
+    const { entries } = await client.server.getTransactionLog({ top: 2 });
 
     expect(entries).toHaveLength(2);
     expect(fetchSpy).toHaveBeenCalledTimes(3); // probe + 2 windows
+  });
+
+  it("no `since`: hitting `top` marks coverage partial with an earliest-scanned floor", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
+      .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A"), ENTRY("B")] })); // window 1 >= top
+
+    const res = await client.server.getTransactionLog({ top: 2 });
+
+    expect(res.entries).toHaveLength(2);
+    expect(res.coverage).toBe("partial");
+    expect(res.scannedFrom).toMatch(/Z$/); // floor of the scanned window, UTC literal
+  });
+
+  it("no `since`: exhausting windows marks coverage complete", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
+      .mockResolvedValue(mockResponse({ value: [ENTRY("A")] })); // every window short (<top)
+
+    const res = await client.server.getTransactionLog({ top: 5 });
+
+    expect(res.entries).toHaveLength(1);
+    expect(res.coverage).toBe("complete");
+    expect(res.scannedFrom).toMatch(/Z$/);
+  });
+
+  it("explicit `since`: coverage is complete within the bound", async () => {
+    fetchSpy
+      .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
+      .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A")] })); // single query
+
+    const res = await client.server.getTransactionLog({ since: "2026-06-01", top: 10 });
+
+    expect(res.coverage).toBe("complete");
+    expect(res.scannedFrom).toContain("2026-06-01");
   });
 
   it("explicit `since` runs a single bounded query (no windowing) with a Z literal", async () => {
@@ -168,7 +203,7 @@ describe("TM1Client – getTransactionLog()", () => {
       .mockResolvedValueOnce(mockResponse({ value: [] })) // probe ok
       .mockResolvedValue(mockResponse({ error: { message: "boom" } }, 500)); // every window fails
 
-    const entries = await client.server.getTransactionLog({ top: 5 });
+    const { entries } = await client.server.getTransactionLog({ top: 5 });
     expect(entries).toEqual([]); // degraded, not thrown
   });
 

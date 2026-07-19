@@ -12,6 +12,7 @@ import type {
   MessageLogEntry,
   ServerInfo,
   TransactionLogEntry,
+  TransactionLogResult,
 } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 import { rethrowIfSystemicOrDenied } from "./fallback.js";
@@ -317,39 +318,45 @@ export class ServerService {
     user?: string | undefined;
     since?: string | undefined; // ISO timestamp (lower bound)
     until?: string | undefined; // ISO timestamp (upper bound)
-  }): Promise<TransactionLogEntry[]> {
+  }): Promise<TransactionLogResult> {
     const top = opts.top ?? 100;
 
     // Preflight: bare $top=1 (no orderby/filter) — cheap reachability/permission
     // gate that fails fast instead of hanging.
     await this.probeTransactionLog();
 
-    // Explicit lower bound → a single bounded query [since, until].
+    // Explicit lower bound → a single bounded query [since, until]. Coverage is
+    // well-defined by the bound: everything in the span is returned.
     if (opts.since !== undefined) {
-      return this.queryTransactionLog({
+      const entries = await this.queryTransactionLog({
         top,
         cubeName: opts.cubeName,
         user: opts.user,
         since: opts.since,
         until: opts.until,
       });
+      return { entries, coverage: "complete", scannedFrom: toOdataDateTime(opts.since) };
     }
 
     // No lower bound → adaptive backward windowing from `until` (or now). An
     // unbounded TransactionLogEntries scan takes minutes-to-hours; instead we
     // probe expanding windows and stop as soon as we have `top` rows. If a wide
     // window times out we keep the rows already collected rather than failing.
+    // Coverage: "partial" if we stopped because `top` filled or a window failed
+    // (older matching rows may exist earlier); "complete" if windows exhausted.
     const anchorMs =
       opts.until !== undefined ? Date.parse(toOdataDateTime(opts.until)) : Date.now();
     let collected: TransactionLogEntry[] = [];
+    let scannedFromMs = anchorMs;
     for (const windowMs of TXLOG_BACKFILL_WINDOWS_MS) {
+      const floorMs = anchorMs - windowMs;
       let entries: TransactionLogEntry[];
       try {
         entries = await this.queryTransactionLog({
           top,
           cubeName: opts.cubeName,
           user: opts.user,
-          since: epochToOData(anchorMs - windowMs),
+          since: epochToOData(floorMs),
           until: opts.until,
         });
       } catch (err) {
@@ -357,14 +364,18 @@ export class ServerService {
         // LOCK_TIMEOUT) AND permission denials must surface — swallowing them
         // would return an empty or partial window as if the range simply held no
         // data (or as if a denied cube were empty). A window timeout (TM1_ERROR
-        // from queryTransactionLog) is expected and just stops widening.
+        // from queryTransactionLog) is expected and just stops widening — but we
+        // stopped short of exhausting the span, so coverage is partial.
         rethrowIfSystemicOrDenied(err);
-        break;
+        return { entries: collected, coverage: "partial", scannedFrom: epochToOData(scannedFromMs) };
       }
-      if (entries.length >= top) return entries;
+      scannedFromMs = floorMs;
       collected = entries;
+      if (entries.length >= top) {
+        return { entries, coverage: "partial", scannedFrom: epochToOData(floorMs) };
+      }
     }
-    return collected;
+    return { entries: collected, coverage: "complete", scannedFrom: epochToOData(scannedFromMs) };
   }
 
   /**

@@ -492,6 +492,8 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     },
     tm1_get_transaction_log: {
       count: 1,
+      coverage: "partial",
+      scannedFrom: "2026-05-02T00:00:00Z",
       entries: [
         {
           timestamp: "2026-05-02T10:00:00",

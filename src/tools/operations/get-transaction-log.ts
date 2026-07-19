@@ -19,8 +19,8 @@ export function registerGetTransactionLog(server: McpServer, tm1Client: TM1Clien
       ...FORMAT_SCHEMA,
     },
     async ({ top, cubeName, user, since, until, format }) => {
-      const entries = await tm1Client.server.getTransactionLog({ top, cubeName, user, since, until });
-      const payload = { count: entries.length, entries };
+      const { entries, coverage, scannedFrom } = await tm1Client.server.getTransactionLog({ top, cubeName, user, since, until });
+      const payload = { count: entries.length, coverage, scannedFrom, entries };
       type Row = (typeof entries)[number];
       const columns: Column<Row>[] = [
         { header: "timestamp", get: (e) => e.timestamp },
@@ -31,7 +31,7 @@ export function registerGetTransactionLog(server: McpServer, tm1Client: TM1Clien
         { header: "new", get: (e) => e.newValue },
       ];
       return payloadResponse(payload, format, (p) =>
-        `## Transaction log\n\n${p.count} entries\n\n${renderTable(p.entries, columns)}`,
+        `## Transaction log\n\n${p.count} entries (coverage: ${p.coverage}, scanned back to ${p.scannedFrom})\n\n${renderTable(p.entries, columns)}`,
       );
     },
   );

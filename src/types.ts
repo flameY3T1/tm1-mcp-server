@@ -481,6 +481,14 @@ export interface TransactionLogEntry {
   newValue: CellValue;
 }
 
+export interface TransactionLogResult {
+  entries: TransactionLogEntry[];
+  /** partial = stopped because `top` filled (older rows may exist); complete = span exhausted. */
+  coverage: "complete" | "partial";
+  /** Earliest timestamp actually scanned (floor of the walk / the `since` bound). */
+  scannedFrom: string;
+}
+
 export interface ErrorLogFile {
   filename: string;
   lastUpdated?: string;

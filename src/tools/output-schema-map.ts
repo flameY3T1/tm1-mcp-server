@@ -234,6 +234,8 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   },
   tm1_get_transaction_log: {
     count: z.number().int(),
+    coverage: z.enum(["complete", "partial"]).describe("partial=hit top, more may exist earlier"),
+    scannedFrom: z.string().describe("earliest timestamp scanned"),
     entries: z.array(TransactionLogEntrySchema),
   },
   tm1_get_audit_log: {
