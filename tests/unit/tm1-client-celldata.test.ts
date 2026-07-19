@@ -172,6 +172,21 @@ describe("TM1Client – Cell Data Methods", () => {
       );
     });
 
+    it("D1: doubles `]` in bracketed identifiers (MDX injection / mis-addressing)", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(salesCubeMeta))
+        .mockResolvedValueOnce(
+          mockResponse({ ID: "cellset-d1", Cells: [{ Value: 1, FormattedValue: "1" }] }),
+        );
+
+      await client.cells.getValue("SalesCube", ["Q4]Adj", "Germany", "Actual"]);
+
+      const body = JSON.parse(fetchSpy.mock.calls[1][1].body);
+      // `]` inside a name must be doubled so it can't terminate the identifier.
+      expect(body.MDX).toContain("[Time].[Q4]]Adj]");
+      expect(body.MDX).not.toContain("[Time].[Q4]Adj]");
+    });
+
     it("should throw on dimension/element count mismatch", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(salesCubeMeta));
 
@@ -481,6 +496,58 @@ describe("TM1Client – Cell Data Methods", () => {
         .map(([, o]) => (o as { body?: string }).body ?? "");
       expect(mdxBodies.some((b) => b.includes("[E10]"))).toBe(false);
       expect(mdxBodies.some((b) => b.includes("[E11]"))).toBe(false);
+    });
+  });
+
+  // ── writeCells() coordinate MDX (D1 escaping / D2 alt-hierarchy) ────────────
+
+  describe("writeCells() coordinate MDX", () => {
+    // Accept every write cell; capture the ExecuteMDX slice bodies.
+    function routeOk(): void {
+      fetchSpy.mockImplementation((url: unknown) => {
+        if (String(url).includes("/ExecuteMDX")) {
+          return Promise.resolve(mockResponse({ ID: "cs" }));
+        }
+        return Promise.resolve(mockResponse({}));
+      });
+    }
+
+    function firstMdx(): string {
+      const call = fetchSpy.mock.calls.find(([u]) => String(u).includes("/ExecuteMDX"));
+      return JSON.parse((call![1] as { body: string }).body).MDX as string;
+    }
+
+    it("D1: doubles `]` in write-coordinate identifiers", async () => {
+      routeOk();
+      await client.cells.writeCells("Sales", ["Time", "Region"], [
+        { elements: ["Q4]Adj", "EU"], value: 5 },
+      ]);
+      const mdx = firstMdx();
+      expect(mdx).toContain("[Time].[Time].[Q4]]Adj]");
+      expect(mdx).not.toContain("[Time].[Time].[Q4]Adj]");
+    });
+
+    it("D2: honors an explicit alternate hierarchy in a pre-qualified ref", async () => {
+      routeOk();
+      await client.cells.writeCells("Sales", ["Time", "Region"], [
+        { elements: ["[Time].[FiscalCal].[Q4]", "EU"], value: 5 },
+      ]);
+      const mdx = firstMdx();
+      // Alt hierarchy preserved on COLUMNS — NOT rewritten to the default [Time].[Time].[…].
+      expect(mdx).toContain("{[Time].[FiscalCal].[Q4]}");
+      expect(mdx).not.toContain("[Time].[Time].[Time]");
+      // Bare element still defaults hierarchy to the dimension name.
+      expect(mdx).toContain("[Region].[Region].[EU]");
+    });
+
+    it("defaults hierarchy to the dimension name for bare elements (unchanged behavior)", async () => {
+      routeOk();
+      await client.cells.writeCells("Sales", ["Time", "Region"], [
+        { elements: ["Jan", "EU"], value: 5 },
+      ]);
+      const mdx = firstMdx();
+      expect(mdx).toContain("{[Time].[Time].[Jan]}");
+      expect(mdx).toContain("([Region].[Region].[EU])");
     });
   });
 

@@ -13,10 +13,24 @@ import type {
   MdxResult,
 } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
+import { escapeMdxName } from "../../lib/mdx.js";
 import { freeCellset, transformCellsetResponse } from "./cellset-transform.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+
+// Build a fully-qualified MDX member reference for a write coordinate.
+// A caller may pass a pre-qualified ref to target an ALTERNATE hierarchy
+// (`[Dim].[AltHier].[Elem]`, or `[Dim].[Elem]` for the default) — passed
+// through unchanged (caller owns escaping). A bare element defaults the
+// hierarchy to the dimension name (`[Dim].[Dim].[Elem]`); every bare name
+// component is `]`-escaped so a `]` in a name cannot mis-address the cell.
+function qualifyWriteMember(dim: string, element: string): string {
+  const d = escapeMdxName(dim);
+  if (element.startsWith("[") && element.includes("].[")) return element;
+  if (element.startsWith("[") && element.endsWith("]")) return `[${d}].[${d}].${element}`;
+  return `[${d}].[${d}].[${escapeMdxName(element)}]`;
+}
 
 export class CellService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -46,20 +60,22 @@ export class CellService {
       );
     }
     const qualify = (dim: string, element: string): string => {
-      // Pre-qualified MDX member reference — pass through.
+      const d = escapeMdxName(dim);
+      // Pre-qualified MDX member reference — pass through (caller owns escaping).
       if (element.startsWith("[") && element.includes("].[")) return element;
       // Single bracketed member like `[Foo]` — prepend dimension.
-      if (element.startsWith("[") && element.endsWith("]")) return `[${dim}].${element}`;
-      return `[${dim}].[${element}]`;
+      if (element.startsWith("[") && element.endsWith("]")) return `[${d}].${element}`;
+      return `[${d}].[${escapeMdxName(element)}]`;
     };
     const qualified = dims.map((d, i) => qualify(d, elements[i]!));
+    const cube = escapeMdxName(cubeName);
 
     const colMember = qualified[0]!;
     const whereParts = qualified.slice(1);
     const mdx =
       whereParts.length === 0
-        ? `SELECT {${colMember}} ON COLUMNS FROM [${cubeName}]`
-        : `SELECT {${colMember}} ON COLUMNS FROM [${cubeName}] WHERE (${whereParts.join(",")})`;
+        ? `SELECT {${colMember}} ON COLUMNS FROM [${cube}]`
+        : `SELECT {${colMember}} ON COLUMNS FROM [${cube}] WHERE (${whereParts.join(",")})`;
 
     const cellsetResponse = await this.http.request<{
       ID: string;
@@ -158,16 +174,15 @@ export class CellService {
       }
     }
 
+    const cube = escapeMdxName(cubeName);
     const writeOne = async (c: { elements: string[]; value: number | string }) => {
-      const memberRefs = c.elements.map(
-        (e, idx) => `[${dimensions[idx]}].[${dimensions[idx]}].[${e}]`,
-      );
+      const memberRefs = c.elements.map((e, idx) => qualifyWriteMember(dimensions[idx]!, e));
       const colMember = memberRefs[0];
       const rowTuple = memberRefs.slice(1).join(",");
       const mdx =
         memberRefs.length === 1
-          ? `SELECT {${colMember}} ON COLUMNS FROM [${cubeName}]`
-          : `SELECT {${colMember}} ON COLUMNS, {(${rowTuple})} ON ROWS FROM [${cubeName}]`;
+          ? `SELECT {${colMember}} ON COLUMNS FROM [${cube}]`
+          : `SELECT {${colMember}} ON COLUMNS, {(${rowTuple})} ON ROWS FROM [${cube}]`;
 
       const cellset = await this.http.request<{ ID: string }>(
         "POST",

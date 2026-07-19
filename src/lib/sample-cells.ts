@@ -2,6 +2,7 @@
 // No I/O — kept pure for unit-testability.
 
 import type { MdxResult, CellValue } from "../types.js";
+import { escapeMdxName } from "./mdx.js";
 
 export type SampleCellFilter = string | string[];
 
@@ -43,13 +44,10 @@ export interface SampleCell {
   formattedValue: string;
 }
 
-/** Escape `]` in MDX bracketed identifiers per OLAP convention. */
-const escapeMdxName = (s: string): string => s.replace(/]/g, "]]");
-
 const memberRef = (dim: string, elem: string): string => {
   // Pre-qualified pass-through (e.g. caller passes "[Dim].[Elem]").
   if (elem.startsWith("[") && elem.includes("].[")) return elem;
-  return `[${dim}].[${escapeMdxName(elem)}]`;
+  return `[${escapeMdxName(dim)}].[${escapeMdxName(elem)}]`;
 };
 
 export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuildResult {
@@ -98,8 +96,8 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
     // must scan all members (incl. C), overriding the leaf-only restriction.
     rowSets.push(
       leavesOnly && !includeStrings
-        ? `TM1FILTERBYLEVEL({TM1SUBSETALL([${dim}])},0)`
-        : `{TM1SUBSETALL([${dim}])}`,
+        ? `TM1FILTERBYLEVEL({TM1SUBSETALL([${escapeMdxName(dim)}])},0)`
+        : `{TM1SUBSETALL([${escapeMdxName(dim)}])}`,
     );
   }
 
@@ -110,13 +108,13 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
   } else if (Array.isArray(colFilter) && colFilter.length > 0) {
     columnMembers = colFilter.map((e) => memberRef(columnDim, e));
   } else {
-    columnMembers = [`[${columnDim}].DefaultMember`];
+    columnMembers = [`[${escapeMdxName(columnDim)}].DefaultMember`];
   }
   const columnSet = `{${columnMembers.join(",")}}`;
 
   let rowExpr: string;
   if (rowSets.length === 0) {
-    rowExpr = `{[${columnDim}].DefaultMember}`;
+    rowExpr = `{[${escapeMdxName(columnDim)}].DefaultMember}`;
   } else if (rowSets.length === 1) {
     rowExpr = rowSets[0]!;
   } else {
@@ -134,7 +132,7 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
           `pin it via filters['${columnDim}']='<element>' or axisDimension (got ${columnMembers.length} members).`,
       );
     }
-    const filterExpr = `FILTER(${rowExpr},[${cubeName}].(${columnMembers[0]})<>"")`;
+    const filterExpr = `FILTER(${rowExpr},[${escapeMdxName(cubeName)}].(${columnMembers[0]})<>"")`;
     rowAxisExpr = maxCells > 0 ? `HEAD(${filterExpr},${maxCells})` : filterExpr;
   } else {
     // TM1's NONEMPTY(set, filterSet) is a set function. Plain "NON EMPTY <set>"
@@ -144,7 +142,7 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
   }
 
   const whereClause = whereParts.length > 0 ? ` WHERE (${whereParts.join(",")})` : "";
-  const mdx = `SELECT ${columnSet} ON COLUMNS, ${rowAxisExpr} ON ROWS FROM [${cubeName}]${whereClause}`;
+  const mdx = `SELECT ${columnSet} ON COLUMNS, ${rowAxisExpr} ON ROWS FROM [${escapeMdxName(cubeName)}]${whereClause}`;
 
   return { mdx, whereDims, rowDims, columnDim };
 }
