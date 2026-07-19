@@ -6,11 +6,17 @@
 // through CellService for the underlying MDX read and cellset PATCH.
 //
 // See docs/ARCHITECTURE.md for the layering.
+import { mapSettledWithConcurrency } from "../../lib/concurrency.js";
 import { TM1Error } from "../../types.js";
 import type { ElementAttributeValue, ElementCreate, ElementUpdate } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 import type { CellService } from "./cell-service.js";
 import { rethrowIfSystemic } from "./fallback.js";
+
+// Max in-flight per-element REST calls within a single bulkUpsert pass. Bounds
+// pressure on TM1's worker pool (mirrors the cap the feeder-audit fan-out uses)
+// while removing the serialized 2-3N round-trips on an explicitly-bulk op.
+const BULK_UPSERT_CONCURRENCY = 8;
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
@@ -205,42 +211,63 @@ export class ElementService {
     elements: ElementCreate[],
   ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
     const baseUrl = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements`;
-    const typeChanges: Array<{ name: string; from: string; to: string }> = [];
 
-    // Pass 1: Create/upsert all elements without components.
-    for (const el of elements) {
-      const body: Record<string, unknown> = { Name: el.name, Type: el.type };
-      try {
-        await this.http.request<void>("POST", baseUrl, body);
-      } catch (err) {
-        if (err instanceof TM1Error && isAlreadyExists(err)) {
-          // Element already exists. Patch the type only when it actually
-          // differs (avoids a pointless write), and surface the change: a
-          // Numeric->Consolidated / Numeric->String conversion discards the
-          // element's leaf cell values, so the caller must be told it happened
-          // rather than have it occur silently.
-          const existing = await this.http
-            .request<{ Type: number | string }>("GET", `${baseUrl}('${enc(el.name)}')?$select=Type`)
-            .catch((e: unknown): null => {
-              // A transport/auth outage here must NOT collapse into the
-              // unconditional-PATCH branch below: that would silently change the
-              // element type (discarding leaf values) on a network blip. Only a
-              // genuine "type unreadable" (e.g. NOT_FOUND) may fall through to null.
-              rethrowIfSystemic(e);
-              return null;
-            });
-          const from = existing ? normalizeElementType(existing.Type) : null;
-          if (from && from !== el.type) {
-            await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
-            typeChanges.push({ name: el.name, from, to: el.type });
-          } else if (!from) {
-            // Type unreadable — preserve prior behaviour and patch unconditionally.
-            await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
+    // Pass 1: Create/upsert all elements without components. Same-type element
+    // writes are independent, so fan them out with bounded concurrency instead
+    // of one serialized round-trip each (was 2-3N sequential calls). The cap
+    // keeps constant pressure on TM1's worker pool. Each unit returns its
+    // type-change (or null); we collect them index-aligned AFTER settle so
+    // typeChanges stays in stable element order regardless of completion order.
+    const pass1 = await mapSettledWithConcurrency(
+      elements,
+      BULK_UPSERT_CONCURRENCY,
+      async (el): Promise<{ name: string; from: string; to: string } | null> => {
+        const body: Record<string, unknown> = { Name: el.name, Type: el.type };
+        try {
+          await this.http.request<void>("POST", baseUrl, body);
+          return null;
+        } catch (err) {
+          if (err instanceof TM1Error && isAlreadyExists(err)) {
+            // Element already exists. Patch the type only when it actually
+            // differs (avoids a pointless write), and surface the change: a
+            // Numeric->Consolidated / Numeric->String conversion discards the
+            // element's leaf cell values, so the caller must be told it happened
+            // rather than have it occur silently.
+            const existing = await this.http
+              .request<{ Type: number | string }>("GET", `${baseUrl}('${enc(el.name)}')?$select=Type`)
+              .catch((e: unknown): null => {
+                // A transport/auth outage here must NOT collapse into the
+                // unconditional-PATCH branch below: that would silently change the
+                // element type (discarding leaf values) on a network blip. Only a
+                // genuine "type unreadable" (e.g. NOT_FOUND) may fall through to null.
+                rethrowIfSystemic(e);
+                return null;
+              });
+            const from = existing ? normalizeElementType(existing.Type) : null;
+            if (from && from !== el.type) {
+              await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
+              return { name: el.name, from, to: el.type };
+            }
+            if (!from) {
+              // Type unreadable — preserve prior behaviour and patch unconditionally.
+              await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
+            }
+            return null;
           }
-        } else {
           throw err;
         }
-      }
+      },
+    );
+
+    // Pass barrier: surface the first pass-1 failure (in element order) BEFORE
+    // any consolidation write. Pass 2 references leaves via Components, so it
+    // must not start until every leaf has settled — concurrency is safe within
+    // a pass but NOT across this barrier. Rejecting here preserves the prior
+    // "bulkUpsert throws if any element failed" contract.
+    const typeChanges: Array<{ name: string; from: string; to: string }> = [];
+    for (const r of pass1) {
+      if (r.status === "rejected") throw r.reason;
+      if (r.value) typeChanges.push(r.value);
     }
 
     // Pass 2: Set components for consolidated elements.
@@ -249,19 +276,28 @@ export class ElementService {
     // exactly {L3,L4}). Consolidations with no/empty components are skipped
     // here, so an upsert that omits components leaves existing children intact
     // — only a non-empty list rewrites the child set. Documented on the tool's
-    // `components` input so callers don't silently drop children.
+    // `components` input so callers don't silently drop children. These writes
+    // are mutually independent (each targets a distinct element), so they fan
+    // out with the same bounded concurrency.
     const consolidated = elements.filter(
       (el) => el.type === "Consolidated" && el.components && el.components.length > 0,
     );
-    for (const el of consolidated) {
-      const path = `${baseUrl}('${enc(el.name)}')`;
-      const body = {
-        Components: el.components!.map((c) => ({
-          "@odata.id": `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(c.name)}')`,
-          Weight: c.weight,
-        })),
-      };
-      await this.http.request<void>("PATCH", path, body);
+    const pass2 = await mapSettledWithConcurrency(
+      consolidated,
+      BULK_UPSERT_CONCURRENCY,
+      async (el): Promise<void> => {
+        const path = `${baseUrl}('${enc(el.name)}')`;
+        const body = {
+          Components: el.components!.map((c) => ({
+            "@odata.id": `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(c.name)}')`,
+            Weight: c.weight,
+          })),
+        };
+        await this.http.request<void>("PATCH", path, body);
+      },
+    );
+    for (const r of pass2) {
+      if (r.status === "rejected") throw r.reason;
     }
 
     return { typeChanges };
