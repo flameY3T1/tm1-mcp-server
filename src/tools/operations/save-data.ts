@@ -4,6 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { withToolHint } from "../error-format.js";
 
 export function registerSaveData(server: McpServer, tm1Client: TM1Client): void {
+  // v11 only — v12 (PA Engine) removed SaveDataAll/CubeSaveData (cloud engine
+  // persists automatically). Hide the tool on v12 rather than surfacing it and
+  // failing at call time (mirrors the threads-vs-jobs registration gate).
+  if (tm1Client.version !== 11) return;
   server.tool(
     "tm1_save_data",
     [
