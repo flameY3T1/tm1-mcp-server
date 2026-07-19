@@ -87,7 +87,9 @@ describe("TM1Client – Metadata Methods", () => {
       ]);
 
       const [url] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/Cubes?$expand=Dimensions($select=Name)");
+      // Light path pins $select=Name so TM1 doesn't ship every cube's Rules blob.
+      expect(url).toContain("/api/v1/Cubes?$select=Name&$expand=Dimensions($select=Name)");
+      expect(String(url)).toContain("$select=Name");
     });
 
     it("should return empty array when no cubes exist", async () => {
@@ -95,6 +97,27 @@ describe("TM1Client – Metadata Methods", () => {
 
       const cubes = await client.cubes.list();
       expect(cubes).toEqual([]);
+    });
+
+    it("should still request Rules when includeRules=true (hasRules derivation)", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          value: [
+            { Name: "SalesCube", Rules: "SKIPCHECK;\nFEEDERS;", Dimensions: [{ Name: "Region" }] },
+            { Name: "PlanCube", Rules: "", Dimensions: [{ Name: "Time" }] },
+          ],
+        }),
+      );
+
+      const cubes = await client.cubes.list({ includeRules: true });
+
+      expect(cubes).toEqual([
+        { name: "SalesCube", dimensions: ["Region"], hasRules: true },
+        { name: "PlanCube", dimensions: ["Time"], hasRules: false },
+      ]);
+
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("/api/v1/Cubes?$select=Name,Rules&$expand=Dimensions($select=Name)");
     });
   });
 

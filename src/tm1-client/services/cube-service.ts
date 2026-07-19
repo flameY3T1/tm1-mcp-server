@@ -22,9 +22,13 @@ export class CubeService {
    * hasRules per cube in a single round-trip (no N+1).
    */
   async list(opts: { includeRules?: boolean } = {}): Promise<Cube[]> {
+    // Without a top-level $select TM1 returns every cube property — including
+    // the full Rules text — even on the light path. Pin $select=Name so
+    // list_cubes (and the other name/dimension-only callers) don't drag every
+    // cube's Rules blob over the wire. Only the includeRules path opts Rules in.
     const path = opts.includeRules
       ? "/api/v1/Cubes?$select=Name,Rules&$expand=Dimensions($select=Name)"
-      : "/api/v1/Cubes?$expand=Dimensions($select=Name)";
+      : "/api/v1/Cubes?$select=Name&$expand=Dimensions($select=Name)";
     const response = await this.http.request<{
       value: Array<{ Name: string; Rules?: string; Dimensions: Array<{ Name: string }> }>;
     }>("GET", path);
