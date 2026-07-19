@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-19
+
 ### Added
 
 - **TM1 v12 (Planning Analytics Engine) support** — rerooted REST + `/{instance}/auth/v1/session` login (`s2s` live-validated; `basic`/`access_token`/`oidc`/`iam` unit-validated).
@@ -389,7 +391,8 @@ Initial public release.
 - Quality gates: strict typecheck, ESLint, `lint:no-flat-api`,
   annotation-coverage, and tool-registration wiring.
 
-[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.4...v2.0.0
 [1.0.4]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.1...v1.0.2
