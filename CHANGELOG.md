@@ -13,8 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **v12 Jobs/Activity monitoring** — `tm1_list_jobs`, `tm1_cancel_job`; monitoring tools version-gated (v11 → thread tools, v12 → job tools).
 - **Element-level data flow** — `tm1_trace_data_flow` gains `element`+`dimension` inputs answering "which processes touch element X of dimension D". Each process is classified `access = source | write | zero-out | indeterminate`, resolved from in-code subset builds, stored view/subset datasources (native-title/static exact, MDX by literal member), and — opt-in `resolveComputed` — live-evaluated computed axis selectors. Unresolved/computed cases are flagged, never silently dropped.
 - `tm1_analyze_callgraph` surfaces dynamic/parameter `ExecuteProcess` targets as `unresolvedCalls`, and folds constant string-concat targets (`'zA'|'zB'` → `zAzB`) into real edges.
+- `tm1_get_message_log` accepts `level` / `since` / `until` inputs and pushes the text/level/time filter server-side, so a match older than the fetched window is still found (was a silent "no error found").
+- `tm1_get_transaction_log` reports `coverage` (`complete` / `partial`) and `scannedFrom` — a capped adaptive backfill is no longer mistaken for a full scan.
+- `tm1_execute_mdx` / `tm1_get_view` set `axes_clipped` when a paginated read clips axis tuples to the returned cell window.
 
 ### Changed
+
+- **Breaking:** 14 tools that took a bare top-level `name` input now require an entity-qualified key (`cubeName`, `dimensionName`, `clientName`, `processName`, `objectName`): `tm1_create_cube`/`tm1_delete_cube`, `tm1_create_dimension`/`tm1_delete_dimension`, `tm1_create_client`/`tm1_delete_client`/`tm1_get_client`/`tm1_update_client`, `tm1_analyze_object_usage`, `tm1_upsert_process`/`tm1_compile_process`/`tm1_check_process_code`, `tm1_import_process_from_git`, `tm1_import_pro_file`. Response fields are unchanged.
+- `tm1_execute_mdx` / `tm1_get_view` no longer return the full axis tuple list when the cell count is capped — axes are clipped to the returned window, so a `limit` read of a large view stays small (cell↔tuple mapping preserved).
+- `tm1_list_cubes` no longer pulls full cube `Rules` text on the default list path (`$select=Name`).
+- `tm1_save_data` is hidden on TM1 v12 — Planning Analytics Engine removed `SaveDataAll`/`CubeSaveData`; the cloud engine persists automatically.
+- `tm1_resolve_default_members` reports `confidence: "medium"` for a server-derived (single-root) default; `"high"` is reserved for an explicitly maintained default member.
+- `tm1_bulk_upsert_elements` runs element writes concurrently, and its consolidation `components` list is documented as a full replace of the child set (omit it to leave existing children unchanged).
 
 - **Breaking:** git tools use TM1's native `#region <Tab>` / `#endregion` code format (byte-identical to the server `Code` blob; nested user folds preserved). `.ti` files from earlier versions are no longer importable — re-export.
 - `tm1_analyze_callgraph` output is now a typed, recursive schema.
@@ -28,10 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README documents the actual `.env` resolution order (shell/MCP env > `DOTENV_CONFIG_PATH` > cwd > package root) — the old instructions could not work under `npx`.
 - git import rejects malformed/unbalanced `#region` blobs instead of silently deploying partial code.
 - v12: correct product version (`ProductVersion` scalar fallback); version coerced to 12 when instance-configured; rerooting hardened (instance URL-encode, `$`-injection guard, bounded IAM token exchange); `tm1_list_jobs` null-safe.
+- MDX cell reads/writes escape `]` in cube/dimension/element names, so an element like `Q4]Adj` is addressed correctly instead of breaking or mis-targeting the cell.
+- `tm1_write_cells` honors an explicit alternate hierarchy in a coordinate instead of always addressing the default hierarchy — previously a silent write to a same-named default-hierarchy member.
 
 ### Security
 
 - MCP **resources** now mask secrets like the tool surface: `tm1://process/{name}/code` masks credential literals unconditionally; `tm1://server/info` no longer exposes the raw server configuration dump.
+- `tm1_get_server_info` masks credentials in its `_raw` configuration dump.
+- The HTTP transport matches the `/mcp` route exactly — a path like `/mcpFoo` no longer routes as MCP.
 - v12 credentials (`clientSecret`/`accessToken`/`apiKey`/`camPassport`) redacted in logs.
 
 ## [1.0.4] - 2026-07-12

@@ -14,7 +14,9 @@
   },
   "files": [
     "dist",
-    "!dist/**/*.map"
+    "!dist/**/*.map",
+    "NOTICE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc",
