@@ -244,6 +244,12 @@ export class ElementService {
     }
 
     // Pass 2: Set components for consolidated elements.
+    // PATCH {Components:[...]} is FULL-REPLACE, not append (verified live vs
+    // TM1 v11: upserting [L3,L4] over existing [L1,L2] leaves the element with
+    // exactly {L3,L4}). Consolidations with no/empty components are skipped
+    // here, so an upsert that omits components leaves existing children intact
+    // — only a non-empty list rewrites the child set. Documented on the tool's
+    // `components` input so callers don't silently drop children.
     const consolidated = elements.filter(
       (el) => el.type === "Consolidated" && el.components && el.components.length > 0,
     );

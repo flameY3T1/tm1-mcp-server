@@ -9,7 +9,7 @@ const ElementSchema = z.object({
   components: z.array(z.object({
     name: z.string().describe("Child element name"),
     weight: z.number().default(1).describe("Consolidation weight (default: 1)"),
-  })).optional().describe("Child elements for Consolidated type"),
+  })).optional().describe("Child elements for a Consolidated element. REPLACES the full existing child set (verified live: passing [X,Y] drops any current children not in the list — it does not append). Omit or pass an empty array to leave existing children unchanged. To add one child, list the complete intended set."),
 });
 
 export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Client): void {
@@ -19,6 +19,7 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
       "Create or update multiple elements in a TM1 hierarchy in bulk (two-pass: leafs first, then consolidations).",
       "Existing elements are updated; new elements are created.",
       "IMPORTANT: List all Numeric/String leaf elements BEFORE Consolidated elements to avoid reference errors.",
+      "For a Consolidated element, a non-empty components list REPLACES its full child set (existing children not listed are dropped); omit components to leave children unchanged.",
     ].join(" "),
     {
       dimensionName: z.string().describe("Dimension name"),
