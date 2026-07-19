@@ -629,7 +629,10 @@ describe("TM1Client – Cell Data Methods", () => {
 
   describe("clearCube()", () => {
     function newClient(version: string): TM1Client {
-      const cfg = { ...makeConfig(), tm1Version: version } as TM1Config;
+      // Service version-gating branches on the NUMERIC config.version (source of
+      // truth); tm1Version is display-only. Derive the numeric from the string.
+      const numericVersion: 11 | 12 = version.startsWith("11") ? 11 : 12;
+      const cfg = { ...makeConfig(), version: numericVersion, tm1Version: version } as TM1Config;
       const sm = new SessionManager(cfg, mockLogger);
       vi.spyOn(sm, "ensureSession").mockResolvedValue("s");
       vi.spyOn(sm, "authenticate").mockResolvedValue("s");
@@ -654,7 +657,9 @@ describe("TM1Client – Cell Data Methods", () => {
       await c.cubes.clear("Sales", ["Time", "Region"], [["Jan"], []]);
 
       const [url, opts] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/Cubes('Sales')/tm1.Clear");
+      // Reroot-tolerant: a v12 client rewrites the `/api/v1` prefix to the
+      // database-rooted path, so assert on the cube+action segment only.
+      expect(url).toContain("Cubes('Sales')/tm1.Clear");
       expect(opts.method).toBe("POST");
       const body = JSON.parse(opts.body);
       expect(body.Tuples).toHaveLength(2);

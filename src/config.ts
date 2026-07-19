@@ -196,14 +196,12 @@ export function loadConfig(): TM1Config {
   const versionMajor = Number.parseInt(tm1Version, 10);
   const isV12 = Boolean(instance || database) || versionMajor === 12;
   const version: 11 | 12 = isV12 ? 12 : 11;
-  // A v12 connection (isV12, via TM1_INSTANCE/TM1_DATABASE) must never leave the
-  // returned tm1Version string at a non-12 value — service branches key off the
-  // STRING (e.g. cube-service's tm1Version.startsWith("11"), process-service's
-  // usesUnicode gating), so a stale "11.8" would make those treat a real v12
-  // server as v11. This coercion applies even when TM1_VERSION was explicitly
-  // set to a v11-looking value (split-brain: TM1_INSTANCE set alongside
-  // TM1_VERSION="11.8") — the instance/database vars are the authoritative v12
-  // signal, not the version string, so they win.
+  // Keep the DISPLAY string (server_info, logs) consistent with the numeric
+  // `version`: a v12 connection (isV12, via TM1_INSTANCE/TM1_DATABASE) declared
+  // with a v11-looking TM1_VERSION="11.8" would otherwise report "11.8" to users
+  // while behaving as v12. Service branching keys off the numeric `version`
+  // (the authoritative source of truth), so this coercion is cosmetic-only — it
+  // stops the user-facing string from contradicting the real connection version.
   const effectiveTm1Version = isV12 && versionMajor !== 12 ? "12.0" : tm1Version;
 
   let authMode: TM1Config["authMode"];

@@ -393,7 +393,7 @@ describe("TM1Client – TI Development Methods", () => {
     });
 
     it("should drop usesUnicode on TM1 11.x", async () => {
-      const cfg = { ...makeConfig(), tm1Version: "11.8" } as TM1Config;
+      const cfg = { ...makeConfig(), version: 11, tm1Version: "11.8" } as TM1Config;
       const sm = new SessionManager(cfg, mockLogger);
       vi.spyOn(sm, "ensureSession").mockResolvedValue("sess");
       vi.spyOn(sm, "authenticate").mockResolvedValue("sess");
@@ -412,7 +412,7 @@ describe("TM1Client – TI Development Methods", () => {
     });
 
     it("should send usesUnicode on TM1 12.x", async () => {
-      const cfg = { ...makeConfig(), tm1Version: "12.0" } as TM1Config;
+      const cfg = { ...makeConfig(), version: 12, tm1Version: "12.0" } as TM1Config;
       const sm = new SessionManager(cfg, mockLogger);
       vi.spyOn(sm, "ensureSession").mockResolvedValue("sess");
       vi.spyOn(sm, "authenticate").mockResolvedValue("sess");

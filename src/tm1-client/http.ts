@@ -7,8 +7,6 @@ import { createConnectionProfile, type ConnectionProfile } from "./connection/pr
 import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
 import { getTm1Dispatcher, tm1Fetch } from "./dispatcher.js";
-// Side-effect import: registers tm1Events mutation listener in tm1-adapter.
-import "../lib/callgraph/tm1-adapter.js";
 import { tm1Events } from "../lib/tm1-events.js";
 
 const MAX_NETWORK_RETRIES = 3;
@@ -58,7 +56,7 @@ export class TM1HttpClient {
   // config is private: it carries credentials (TM1Config.password), so it must
   // not be reachable as `client.config` from the service layer or leak into the
   // compiled .d.ts public surface. Services get only what they need —
-  // `tm1Version` (read-only getter) for version-conditional paths and `logger`
+  // `version` (numeric getter) for version-conditional paths and `logger`
   // for structured logs.
   private readonly config: TM1Config;
   public readonly logger: pino.Logger;
@@ -78,7 +76,21 @@ export class TM1HttpClient {
     this.profile = createConnectionProfile(config);
   }
 
-  /** TM1 server version (e.g. "11.8.…") for version-conditional service code. */
+  /**
+   * TM1 major version (11 | 12) — the single numeric source of truth for
+   * version-conditional service code. Branch on this, never on the display
+   * string (`tm1Version`): a v12 connection can carry a "11.x"-looking
+   * TM1_VERSION string, but `version` is always authoritative.
+   */
+  get version(): 11 | 12 {
+    return this.config.version;
+  }
+
+  /**
+   * TM1 server version STRING (e.g. "11.8.…") — DISPLAY ONLY (server_info
+   * output, log fields, user-facing error messages). Do NOT branch on this;
+   * use the numeric `version` getter instead.
+   */
   get tm1Version(): string {
     return this.config.tm1Version;
   }

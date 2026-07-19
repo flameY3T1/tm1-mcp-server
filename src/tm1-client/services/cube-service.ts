@@ -205,7 +205,7 @@ export class CubeService {
    * POST /api/v1/Cubes('{cube}')/tm1.Clear
    */
   async clear(cubeName: string, dimensions: string[], tuples: string[][]): Promise<void> {
-    if (this.http.tm1Version.startsWith("11")) {
+    if (this.http.version === 11) {
       const isFullClear = dimensions.every((_, i) => (tuples[i] ?? []).length === 0);
       if (!isFullClear) {
         throw new TM1Error({

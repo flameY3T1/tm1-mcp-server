@@ -3,9 +3,25 @@ import { buildReferenceIndex, type ReferenceIndex, type ProcessFetchResult, type
 import { tm1Events } from "../tm1-events.js";
 import { rethrowIfSystemic } from "../../tm1-client/services/fallback.js";
 
-// Self-register: invalidate cache on any mutation so the HTTP layer
-// does not need a direct import of callgraph internals.
-tm1Events.on("mutation", () => { invalidateCallgraphCache(); });
+// Cache-invalidation listener. Wired EXPLICITLY via
+// registerCallgraphCacheInvalidation() at client construction — no import-time
+// side-effect. Keeping this a named, stable function reference lets the wiring
+// be idempotent (the registrar checks for it before re-adding).
+const invalidateOnMutation = (): void => { invalidateCallgraphCache(); };
+
+/**
+ * Wire the callgraph reference-index cache to tm1Events "mutation" notifications:
+ * any successful mutating HTTP call clears the cache so the next callgraph read
+ * rebuilds from fresh server state. The HTTP layer stays decoupled — it only
+ * emits the event; it holds no direct import of callgraph internals.
+ *
+ * Idempotent: safe to call once per TM1Client construction (or repeatedly)
+ * without stacking duplicate listeners on the process-global emitter.
+ */
+export function registerCallgraphCacheInvalidation(): void {
+  if (tm1Events.listeners("mutation").includes(invalidateOnMutation)) return;
+  tm1Events.on("mutation", invalidateOnMutation);
+}
 
 export interface BuildIndexOpts {
   includeControl?: boolean;

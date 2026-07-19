@@ -19,6 +19,7 @@ import { SecurityService } from "./tm1-client/services/security-service.js";
 import { ServerService } from "./tm1-client/services/server-service.js";
 import { MonitoringService } from "./tm1-client/services/monitoring-service.js";
 import { FileService } from "./tm1-client/services/file-service.js";
+import { registerCallgraphCacheInvalidation } from "./lib/callgraph/tm1-adapter.js";
 
 export class TM1Client {
   private connected = false;
@@ -55,6 +56,10 @@ export class TM1Client {
     this.http = new TM1HttpClient(config, sessionManager, logger);
     this.sessionManager = sessionManager;
     this.logger = logger;
+    // Explicitly wire the callgraph cache-invalidation listener to tm1Events
+    // "mutation" notifications. Replaces the former import-time side-effect in
+    // http.ts — now the coupling is a visible, idempotent call at construction.
+    registerCallgraphCacheInvalidation();
     this.cubes = new CubeService(this.http);
     this.dimensions = new DimensionService(this.http);
     this.hierarchies = new HierarchyService(this.http);

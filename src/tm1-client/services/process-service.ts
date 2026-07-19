@@ -576,7 +576,7 @@ export class ProcessService {
     if (dataSource.asciiDecimalSeparator !== undefined) dsBody.asciiDecimalSeparator = dataSource.asciiDecimalSeparator;
     if (dataSource.asciiThousandSeparator !== undefined) dsBody.asciiThousandSeparator = dataSource.asciiThousandSeparator;
     if (dataSource.usesUnicode !== undefined) {
-      if (this.http.tm1Version.startsWith("11")) {
+      if (this.http.version === 11) {
         this.http.logger.warn(
           { processName, tm1Version: this.http.tm1Version },
           "DataSource.usesUnicode is v12-only and is being dropped from the PATCH (TM1 11.x rejects it as 'unprocessed properties')",
@@ -733,7 +733,7 @@ export class ProcessService {
       if (ds.asciiDecimalSeparator !== undefined) dsBody.asciiDecimalSeparator = ds.asciiDecimalSeparator;
       if (ds.asciiThousandSeparator !== undefined) dsBody.asciiThousandSeparator = ds.asciiThousandSeparator;
       // usesUnicode: same v11 quirk as updateDataSource — drop on TM1 11.x.
-      if (ds.usesUnicode !== undefined && !this.http.tm1Version.startsWith("11")) {
+      if (ds.usesUnicode !== undefined && this.http.version !== 11) {
         dsBody.usesUnicode = ds.usesUnicode;
       }
       if (ds.userName !== undefined) dsBody.userName = ds.userName;
