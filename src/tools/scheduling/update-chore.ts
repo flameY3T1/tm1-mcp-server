@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 
 export function registerUpdateChore(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -41,7 +42,7 @@ export function registerUpdateChore(server: McpServer, tm1Client: TM1Client): vo
           warning: `startTime had no timezone offset; auto-appended 'Z' → '${updates.startTime}'. Pass an explicit offset to silence this.`,
         } : {}),
       };
-      return { content: [{ type: "text" as const, text: JSON.stringify(payload) }] };
+      return actionResponse(payload);
     },
   );
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { withToolHint } from "../error-format.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
+import { actionResponse } from "../format.js";
 
 export function registerDeleteFile(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -26,11 +27,7 @@ export function registerDeleteFile(server: McpServer, tm1Client: TM1Client): voi
         tm1Client.files.delete(fileName),
         "Verify exact name with tm1_list_files or tm1_search_files. Names are case-sensitive.",
       );
-      const payload = { success: true, fileName, deleted: true };
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(payload) }],
-        structuredContent: payload,
-      };
+      return actionResponse({ success: true, fileName, deleted: true });
     },
   );
 }

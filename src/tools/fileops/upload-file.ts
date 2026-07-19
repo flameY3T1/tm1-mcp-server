@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { withToolHint } from "../error-format.js";
+import { actionResponse } from "../format.js";
 
 const HARD_MAX_BYTES = 32 * 1024 * 1024;
 
@@ -57,18 +58,14 @@ export function registerUploadFile(server: McpServer, tm1Client: TM1Client): voi
         "If parent folder is missing, create it on TM1 v12 before retrying. v11 supports root only.",
       );
 
-      const payload = {
+      return actionResponse({
         success: true,
         fileName,
         bytesUploaded: bytes.byteLength,
         created: result.created,
         updated: !result.created,
         container: result.root,
-      };
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(payload) }],
-        structuredContent: payload,
-      };
+      });
     },
   );
 }

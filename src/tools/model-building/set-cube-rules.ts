@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 import { withToolHint } from "../error-format.js";
+import { actionResponse } from "../format.js";
 
 export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -27,18 +28,13 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
       const lineCount = rules.split("\n").length;
       // Rule changes shift call edges (DB(), feeders) — drop callgraph TTL early.
       const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({
-            success: true,
-            cubeName,
-            lineCount,
-            skipCheck,
-            callgraphEntriesCleared,
-          }),
-        }],
-      };
+      return actionResponse({
+        success: true,
+        cubeName,
+        lineCount,
+        skipCheck,
+        callgraphEntriesCleared,
+      });
     },
   );
 }

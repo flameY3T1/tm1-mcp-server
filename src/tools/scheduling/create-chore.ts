@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 
 // TM1's chore endpoint rejects DateTimeOffset strings without a UTC marker. If the caller
 // omits the offset we append 'Z' and report it back so they can fix the input upstream.
@@ -47,21 +48,16 @@ export function registerCreateChore(server: McpServer, tm1Client: TM1Client): vo
     async ({ choreName, startTime, active, dstSensitive, executionMode, frequency, steps }) => {
       const { value: normalizedStartTime, coerced } = coerceUtc(startTime);
       await tm1Client.chores.create({ name: choreName, startTime: normalizedStartTime, active, dstSensitive, executionMode, frequency, steps });
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({
-            success: true,
-            name: choreName,
-            stepCount: steps.length,
-            active,
-            startTime: normalizedStartTime,
-            ...(coerced ? {
-              warning: `startTime had no timezone offset; auto-appended 'Z' → '${normalizedStartTime}'. Pass an explicit offset to silence this.`,
-            } : {}),
-          }),
-        }],
-      };
+      return actionResponse({
+        success: true,
+        name: choreName,
+        stepCount: steps.length,
+        active,
+        startTime: normalizedStartTime,
+        ...(coerced ? {
+          warning: `startTime had no timezone offset; auto-appended 'Z' → '${normalizedStartTime}'. Pass an explicit offset to silence this.`,
+        } : {}),
+      });
     },
   );
 }

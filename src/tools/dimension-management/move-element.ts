@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 export function registerMoveElement(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_move_element",
@@ -14,9 +15,7 @@ export function registerMoveElement(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ dimensionName, hierarchyName, elementName, newParent, weight }) => {
       await tm1Client.elements.move(dimensionName, hierarchyName, elementName, newParent, weight);
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify({ success: true, elementName, newParent }) }],
-      };
+      return actionResponse({ success: true, elementName, newParent });
     },
   );
 }

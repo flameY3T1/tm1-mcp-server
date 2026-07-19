@@ -53,6 +53,9 @@ jobs:
       - name: Lint (input naming — no bare top-level name)
         run: npm run lint:input-naming
 
+      - name: Lint (mutation envelope — actionResponse over hand-rolled)
+        run: npm run lint:mutation-envelope
+
       - name: Coverage (enforces vitest thresholds)
         run: npm run test:coverage
 

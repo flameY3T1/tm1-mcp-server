@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
+import { actionResponse } from "../format.js";
 export function registerDeleteElement(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_delete_element",
@@ -15,9 +16,7 @@ export function registerDeleteElement(server: McpServer, tm1Client: TM1Client) {
     async ({ dimensionName, hierarchyName, elementName, confirm }) => {
       requireConfirm(confirm, elementName, "element");
       await tm1Client.elements.delete(dimensionName, hierarchyName, elementName);
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify({ success: true, elementName }) }],
-      };
+      return actionResponse({ success: true, elementName });
     },
   );
 }

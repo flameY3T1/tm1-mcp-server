@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 
 export function registerCreateCube(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -19,17 +20,12 @@ export function registerCreateCube(server: McpServer, tm1Client: TM1Client): voi
     },
     async ({ cubeName, dimensions }) => {
       await tm1Client.cubes.create(cubeName, dimensions);
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({
-            success: true,
-            cubeName,
-            dimensionCount: dimensions.length,
-            dimensions,
-          }),
-        }],
-      };
+      return actionResponse({
+        success: true,
+        cubeName,
+        dimensionCount: dimensions.length,
+        dimensions,
+      });
     },
   );
 }

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 
 export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -22,12 +23,7 @@ export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): v
     },
     async ({ choreName, timeoutMs }, extra) => {
       await tm1Client.chores.execute(choreName, { signal: extra?.signal, ...(timeoutMs ? { timeoutMs } : {}) });
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({ success: true, choreName }),
-        }],
-      };
+      return actionResponse({ success: true, choreName });
     },
   );
 }

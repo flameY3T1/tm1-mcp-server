@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 const elementSchema = z.object({
   name: z.string().describe("Element name"),
   type: z.enum(["Numeric", "String", "Consolidated"]).describe("Element type"),
@@ -21,9 +22,7 @@ export function registerCreateElement(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ dimensionName, hierarchyName, element }) => {
       await tm1Client.elements.create(dimensionName, hierarchyName, element);
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify({ success: true, elementName: element.name }) }],
-      };
+      return actionResponse({ success: true, elementName: element.name });
     },
   );
 }

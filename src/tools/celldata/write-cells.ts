@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
+import { actionResponse } from "../format.js";
 
 export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -43,9 +44,7 @@ export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
       // propagate to the index.ts Proxy unwrapped — wrapping it here would
       // clobber that hint with a generic one.
       await tm1Client.cells.writeCells(cubeName, dimensions, cells);
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify({ success: true, cellsWritten: cells.length }) }],
-      };
+      return actionResponse({ success: true, cellsWritten: cells.length });
     },
   );
 }

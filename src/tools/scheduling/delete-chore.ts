@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
+import { actionResponse } from "../format.js";
 
 export function registerDeleteChore(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -14,12 +15,7 @@ export function registerDeleteChore(server: McpServer, tm1Client: TM1Client): vo
     async ({ choreName, confirm }) => {
       requireConfirm(confirm, choreName, "chore");
       await tm1Client.chores.delete(choreName);
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({ success: true, choreName }),
-        }],
-      };
+      return actionResponse({ success: true, choreName });
     },
   );
 }

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 
 export function registerCreateHierarchy(server: McpServer, tm1Client: TM1Client): void {
   server.tool(
@@ -12,12 +13,7 @@ export function registerCreateHierarchy(server: McpServer, tm1Client: TM1Client)
     },
     async ({ dimensionName, hierarchyName }) => {
       await tm1Client.hierarchies.create(dimensionName, hierarchyName);
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({ success: true, dimensionName, hierarchyName }),
-        }],
-      };
+      return actionResponse({ success: true, dimensionName, hierarchyName });
     },
   );
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 export function registerCreateClient(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_create_client",
@@ -13,7 +14,7 @@ export function registerCreateClient(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ clientName, ...rest }) => {
       await tm1Client.security.createClient({ name: clientName, ...rest });
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, name: clientName }) }] };
+      return actionResponse({ success: true, name: clientName });
     },
   );
 }

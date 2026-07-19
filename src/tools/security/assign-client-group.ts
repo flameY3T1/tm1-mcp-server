@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
+import { actionResponse } from "../format.js";
 export function registerAssignClientGroup(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_assign_client_group",
@@ -11,7 +12,7 @@ export function registerAssignClientGroup(server: McpServer, tm1Client: TM1Clien
     },
     async ({ clientName, groupName }) => {
       await tm1Client.security.assignClientGroup(clientName, groupName);
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, clientName, groupName }) }] };
+      return actionResponse({ success: true, clientName, groupName });
     },
   );
 }

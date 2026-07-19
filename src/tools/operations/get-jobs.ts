@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
-import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
+import { actionResponse, FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
 // v12-only: Jobs replace v11 Threads as the "what is running" surface. On a v11
 // connection these tools are not registered (thread tools are instead).
@@ -39,7 +39,7 @@ export function registerGetJobs(server: McpServer, tm1Client: TM1Client): void {
     },
     async ({ jobId }) => {
       await tm1Client.monitoring.cancelJob(jobId);
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, jobId }) }] };
+      return actionResponse({ success: true, jobId });
     },
   );
 }

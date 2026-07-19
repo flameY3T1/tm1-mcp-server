@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { withToolHint } from "../error-format.js";
+import { actionResponse } from "../format.js";
 
 const ElementSchema = z.object({
   name: z.string().describe("Element name"),
@@ -37,26 +38,21 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
         C: elements.filter((e) => e.type === "Consolidated").length,
         S: elements.filter((e) => e.type === "String").length,
       };
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({
-            success: true,
-            dimensionName,
-            hierarchyName: hier,
-            total: elements.length,
-            counts,
-            // Existing elements whose Type was changed in place. A
-            // Numeric->Consolidated/String conversion discards the element's
-            // leaf cell values, so surface it instead of letting it happen
-            // silently.
-            typeChanges,
-            ...(typeChanges.length > 0 && {
-              warning: `${typeChanges.length} element(s) had their type changed in place; any existing leaf cell values for those elements were discarded.`,
-            }),
-          }),
-        }],
-      };
+      return actionResponse({
+        success: true,
+        dimensionName,
+        hierarchyName: hier,
+        total: elements.length,
+        counts,
+        // Existing elements whose Type was changed in place. A
+        // Numeric->Consolidated/String conversion discards the element's
+        // leaf cell values, so surface it instead of letting it happen
+        // silently.
+        typeChanges,
+        ...(typeChanges.length > 0 && {
+          warning: `${typeChanges.length} element(s) had their type changed in place; any existing leaf cell values for those elements were discarded.`,
+        }),
+      });
     },
   );
 }
