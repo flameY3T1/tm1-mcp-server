@@ -135,23 +135,117 @@ export class ServerService {
 
   /**
    * Get recent TM1 server message log entries (newest first).
-   * GET /api/v1/MessageLogEntries?$orderby=TimeStamp desc&$top={top}
+   *
+   * The text/level/time filters are pushed to the server via `$filter` so a
+   * match OLDER than the `top`-row window is still found — filtering only the
+   * newest `top` rows client-side produced false negatives ("no error found")
+   * whenever the matching entry had scrolled past that window. TM1 v11 supports
+   * OData `contains`/`tolower`/`eq`/`ge`/`le` on the MessageLogEntries set.
+   *
+   * Text match is case-insensitive (tolower on both sides) to preserve the prior
+   * client-side `.toLowerCase().includes()` contract. If the server rejects the
+   * filtered query (older/limited builds without full string-function support),
+   * we fall back to fetching the newest `top` rows and filtering in-process —
+   * the same best-effort path as before, so the tool degrades rather than errors.
+   *
+   * GET /api/v1/MessageLogEntries?$orderby=TimeStamp desc&$top={top}[&$filter=…]
    */
-  async getMessageLog(top = 100): Promise<MessageLogEntry[]> {
-    const path = `/api/v1/MessageLogEntries?$orderby=TimeStamp desc&$top=${top}`;
-    const response = await this.http.request<{
-      value: Array<{ TimeStamp?: string; Timestamp?: string; Level?: string; Message?: string; Text?: string }>;
-    }>("GET", path);
-    return response.value.map((e) => {
-      const message = e.Message ?? e.Text ?? "";
-      const errorFile = extractErrorFile(message);
-      return {
-        timestamp: e.TimeStamp ?? e.Timestamp ?? "",
-        level: (e.Level ?? "").toUpperCase(),
-        message,
-        ...(errorFile ? { errorFile } : {}),
-      };
-    });
+  async getMessageLog(
+    opts: {
+      top?: number | undefined;
+      filter?: string | undefined; // case-insensitive substring on message text
+      level?: string | undefined; // exact Level match (e.g. ERROR/WARN/INFO)
+      logger?: string | undefined; // exact Logger match
+      since?: string | undefined; // TimeStamp ge (ISO)
+      until?: string | undefined; // TimeStamp le (ISO)
+    } = {},
+  ): Promise<MessageLogEntry[]> {
+    const top = opts.top ?? 100;
+    // Inner-literal single-quote escaping per OData; the whole clause is then
+    // URL-encoded with enc() below (mirrors getAuditLog()'s esc()+enc() pattern).
+    const esc = (s: string): string => s.replace(/'/g, "''");
+    const filters: string[] = [];
+    if (opts.filter) filters.push(`contains(tolower(Message),'${esc(opts.filter.toLowerCase())}')`);
+    if (opts.level) filters.push(`toupper(Level) eq '${esc(opts.level.toUpperCase())}'`);
+    if (opts.logger) filters.push(`Logger eq '${esc(opts.logger)}'`);
+    if (opts.since) filters.push(`TimeStamp ge ${toOdataDateTime(opts.since)}`);
+    if (opts.until) filters.push(`TimeStamp le ${toOdataDateTime(opts.until)}`);
+
+    const qs: string[] = [`$orderby=${enc("TimeStamp desc")}`, `$top=${top}`];
+    if (filters.length > 0) qs.push(`$filter=${enc(filters.join(" and "))}`);
+
+    type RawEntry = { TimeStamp?: string; Timestamp?: string; Level?: string; Message?: string; Text?: string; Logger?: string };
+    const map = (rows: RawEntry[]): MessageLogEntry[] =>
+      rows.map((e) => {
+        const message = e.Message ?? e.Text ?? "";
+        const errorFile = extractErrorFile(message);
+        return {
+          timestamp: e.TimeStamp ?? e.Timestamp ?? "",
+          level: (e.Level ?? "").toUpperCase(),
+          message,
+          ...(errorFile ? { errorFile } : {}),
+        };
+      });
+
+    if (filters.length === 0) {
+      const response = await this.http.request<{ value: RawEntry[] }>(
+        "GET",
+        `/api/v1/MessageLogEntries?${qs.join("&")}`,
+      );
+      return map(response.value);
+    }
+
+    try {
+      const response = await this.http.request<{ value: RawEntry[] }>(
+        "GET",
+        `/api/v1/MessageLogEntries?${qs.join("&")}`,
+      );
+      return map(response.value);
+    } catch (err) {
+      // Systemic transport/auth failures and permission denials must surface —
+      // only a server-side rejection of the filter expression itself should
+      // trigger the degraded client-side fallback.
+      rethrowIfSystemicOrDenied(err);
+      const response = await this.http.request<{ value: RawEntry[] }>(
+        "GET",
+        `/api/v1/MessageLogEntries?$orderby=${enc("TimeStamp desc")}&$top=${top}`,
+      );
+      // Degraded path: re-apply the FULL filter set client-side over the
+      // newest-`top` window. Filtering raw rows (pre-map) so Logger/TimeStamp
+      // are available — otherwise since/until/logger would be silently dropped
+      // and out-of-range rows returned mislabeled as matches.
+      let rows = response.value;
+      if (opts.filter) {
+        const needle = opts.filter.toLowerCase();
+        rows = rows.filter((e) => (e.Message ?? e.Text ?? "").toLowerCase().includes(needle));
+      }
+      if (opts.level) {
+        const want = opts.level.toUpperCase();
+        rows = rows.filter((e) => (e.Level ?? "").toUpperCase() === want);
+      }
+      if (opts.logger) {
+        rows = rows.filter((e) => e.Logger === opts.logger);
+      }
+      if (opts.since) {
+        const from = Date.parse(opts.since);
+        if (!Number.isNaN(from)) {
+          rows = rows.filter((e) => {
+            const ts = Date.parse(e.TimeStamp ?? e.Timestamp ?? "");
+            return !Number.isNaN(ts) && ts >= from;
+          });
+        }
+      }
+      if (opts.until) {
+        const to = Date.parse(opts.until);
+        if (!Number.isNaN(to)) {
+          rows = rows.filter((e) => {
+            const ts = Date.parse(e.TimeStamp ?? e.Timestamp ?? "");
+            return !Number.isNaN(ts) && ts <= to;
+          });
+        }
+      }
+      return map(rows);
+    }
   }
 
   /**
