@@ -105,7 +105,7 @@ describe("DimensionService.resolveDefaultMember", () => {
     expect(url).toContain("Hierarchies('Reporting')/DefaultMember");
   });
 
-  it("Tier 2 (single root): falls through 404 DefaultMember, returns unique parentless root, high confidence", async () => {
+  it("Tier 2 (single root): falls through 404 DefaultMember, returns unique parentless root, medium confidence (derived, not maintained)", async () => {
     fetchSpy.mockResolvedValueOnce(notFound());
     fetchSpy.mockResolvedValueOnce(
       ok({
@@ -120,9 +120,28 @@ describe("DimensionService.resolveDefaultMember", () => {
     const res = await client.dimensions.resolveDefaultMember("Region");
 
     expect(res.source).toBe("single_root");
-    expect(res.confidence).toBe("high");
+    // D6: a server-derived fallback must NOT claim tier-1 (high) confidence;
+    // high is reserved for the explicitly maintained DefaultMember attribute.
+    expect(res.confidence).toBe("medium");
     expect(res.resolved).toEqual({ name: "Total", level: 3 });
     expect(res.warning).toMatch(/not maintained/);
+  });
+
+  it("D6: only the maintained DefaultMember attribute (source=defined) earns high confidence", async () => {
+    // Maintained default → high.
+    fetchSpy.mockResolvedValueOnce(ok({ Name: "All Periods", Level: 4 }));
+    const maintained = await client.dimensions.resolveDefaultMember("Period");
+    expect(maintained.source).toBe("defined");
+    expect(maintained.confidence).toBe("high");
+
+    // Server-fallback default (unique root) → downgraded, never high.
+    fetchSpy.mockResolvedValueOnce(notFound());
+    fetchSpy.mockResolvedValueOnce(
+      ok({ value: [{ Name: "Total", Level: 3, Parents: [] }] }),
+    );
+    const fallback = await client.dimensions.resolveDefaultMember("Region");
+    expect(fallback.source).toBe("single_root");
+    expect(fallback.confidence).not.toBe("high");
   });
 
   it("Tier 2 (single root): also falls through 204 empty DefaultMember", async () => {

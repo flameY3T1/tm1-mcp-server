@@ -212,7 +212,7 @@ export class DimensionService {
    * across levels costs 3-8 round-trips per dimension.
    *
    * Tier 1: DefaultMember attribute (high confidence — explicitly maintained).
-   * Tier 2: parentless roots — single root = high, multiple = medium with alternatives.
+   * Tier 2: parentless roots (derived, not maintained) — single or multiple = medium.
    * Tier 3: insertion-order index 1 fallback (low confidence — flat/cyclic hierarchies).
    *
    * The `source` field tells callers whether the value is authoritative or inferred.
@@ -275,7 +275,9 @@ export class DimensionService {
         hierarchy: hier,
         resolved: { name: roots[0]!.Name, level: roots[0]!.Level },
         source: "single_root",
-        confidence: "high",
+        // Derived server-fallback, not an explicitly maintained default → medium,
+        // never tier-1 high. High is reserved for source "defined".
+        confidence: "medium",
         warning:
           "DefaultMember attribute not maintained — resolved via unique parentless root.",
       };
