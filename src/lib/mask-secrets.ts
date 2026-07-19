@@ -64,6 +64,26 @@ export function maskConnectionString(conn: string): string {
   return maskCodeLine(conn);
 }
 
+// Deep-mask an arbitrary JSON-ish value: any object entry whose KEY name looks
+// like a credential (isSecretName) has its value replaced with MASK; primitives
+// stay as-is and nested objects/arrays are walked recursively. Used to sanitize
+// raw config dumps (e.g. the full TM1 /Configuration object surfaced under
+// `_raw`) before they leave the server, so a password sitting under
+// Access.LDAP.Password or Access.Authentication.* never leaks unmasked.
+export function maskSecretsDeep(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((v) => maskSecretsDeep(v));
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = isSecretName(k) ? MASK : maskSecretsDeep(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 // Copy of a TI datasource with the ODBC connection string's credential pairs
 // masked. Structural generic so tool code can pass its own DataSource type
 // without an import cycle. The password field is already redacted at the

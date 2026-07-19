@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { FORMAT_SCHEMA, payloadResponse, renderKV } from "../format.js";
+import { maskSecretsDeep } from "../../lib/mask-secrets.js";
 
 // Pull a nested key path from the raw merged configuration. Returns undefined if any
 // segment is missing — TM1 versions vary in which sections they expose.
@@ -85,7 +86,9 @@ export function registerGetServerInfo(server: McpServer, tm1Client: TM1Client): 
           integratedSecurityMode: pick(x, ["Access", "Authentication", "IntegratedSecurityMode"]),
           ldapEnabled: pick(x, ["Access", "LDAP", "Enable"]),
         },
-        _raw: x,
+        // Mask credential-named values (e.g. Access.LDAP.Password) before the
+        // full raw config leaves the server — always on, no opt-out.
+        _raw: maskSecretsDeep(x) as Record<string, unknown>,
       };
 
       return payloadResponse(payload, format, (p) =>
