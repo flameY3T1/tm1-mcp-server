@@ -36,7 +36,11 @@ export async function startHttpTransport(
 
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- async request handler intentional; errors are caught internally
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    if (!req.url || !req.url.startsWith("/mcp")) {
+    // Match the exact /mcp endpoint (optionally with a query string) or a real
+    // subpath under /mcp/. A loose startsWith("/mcp") would also accept
+    // /mcpFoo, routing an unrelated path into the MCP transport.
+    const path = (req.url ?? "").split(/[?#]/, 1)[0] ?? "";
+    if (path !== "/mcp" && !path.startsWith("/mcp/")) {
       res.statusCode = 404;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ error: "Not found. Use POST /mcp." }));

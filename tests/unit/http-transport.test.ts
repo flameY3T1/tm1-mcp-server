@@ -119,4 +119,31 @@ describe("startHttpTransport (stateless, per-request)", () => {
     const res = await fetch(`http://127.0.0.1:${port}/nope`, { method: "POST", body: "{}" });
     expect(res.status).toBe(404);
   });
+
+  it("does not route /mcp-prefixed siblings like /mcpFoo (M3: exact-path match)", async () => {
+    const port = await freePort();
+    close = await startHttpTransport(buildServer, makeConfig(port), silentLogger);
+
+    // Loose startsWith("/mcp") would have routed these into the transport.
+    const foo = await fetch(`http://127.0.0.1:${port}/mcpFoo`, { method: "POST", body: "{}" });
+    expect(foo.status).toBe(404);
+
+    const bar = await fetch(`http://127.0.0.1:${port}/mcp-extra`, { method: "POST", body: "{}" });
+    expect(bar.status).toBe(404);
+  });
+
+  it("still routes exact /mcp with a query string", async () => {
+    const port = await freePort();
+    close = await startHttpTransport(buildServer, makeConfig(port), silentLogger);
+
+    const res = await fetch(`http://127.0.0.1:${port}/mcp?x=1`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify(INIT),
+    });
+    expect(res.status).toBe(200);
+  });
 });
