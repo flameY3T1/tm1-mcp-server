@@ -40,6 +40,48 @@ interface RawCellsetResponse {
   }>;
 }
 
+// Clip each axis to just the tuples the returned cell window actually
+// addresses, so a paginated read over a huge view doesn't ship the whole
+// (e.g. 200k-row) tuple list alongside its capped cells.
+//
+// TM1 orders cells so axis 0 varies fastest: cell ordinal `ord` decomposes as
+// idx_k = floor(ord / stride_k) mod L_k, stride_0 = 1, stride_k = product of
+// lower axis lengths. The returned cells span the contiguous ordinal range
+// [skip, skip+count). An axis is safe to shrink to `maxIdx+1` tuples ONLY when
+// its quotient never wraps past its length within that range
+// (qmax = floor(maxOrd/stride) < L) — that holds exactly for the slowest
+// partially-referenced axis and every axis above it, never for a fully-cycled
+// fast axis whose stride the higher axes decode through. Because those fast
+// axes stay at full length, stride_k is preserved for every clipped axis and
+// the consumer's positional decode (offset+i over the returned tuple counts)
+// stays valid; axes above the pivot collapse to a single tuple (idx always 0,
+// decoded via `mod 1`). totalCellCount is computed from the FULL axes, so the
+// caller still sees the true cell total.
+export function clipAxesToWindow(
+  axes: MdxAxis[],
+  cellCount: number,
+  skip: number,
+): { axes: MdxAxis[]; clipped: boolean } {
+  if (axes.length === 0 || cellCount === 0) return { axes, clipped: false };
+  const maxOrd = skip + cellCount - 1;
+  let stride = 1;
+  let clipped = false;
+  const out = axes.map((axis) => {
+    const len = axis.tuples.length;
+    const qmax = len > 0 ? Math.floor(maxOrd / stride) : 0;
+    stride *= len; // next axis's stride uses this axis's ORIGINAL length
+    if (len > 0 && qmax < len) {
+      const keep = qmax + 1;
+      if (keep < len) {
+        clipped = true;
+        return { tuples: axis.tuples.slice(0, keep) };
+      }
+    }
+    return axis;
+  });
+  return { axes: out, clipped };
+}
+
 export function transformCellsetResponse(response: RawCellsetResponse): MdxResult {
   const cells = (response.Cells ?? []).map((c) => ({
     value: c.Value,
@@ -55,7 +97,9 @@ export function transformCellsetResponse(response: RawCellsetResponse): MdxResul
     })),
   }));
 
-  // totalCellCount: product of tuple counts across all axes, or cell count if no axes.
+  // totalCellCount: product of tuple counts across all axes, or cell count if
+  // no axes. Always the FULL count; axis clipping (clipAxesToWindow) is applied
+  // by the paginating tool layer, which keeps totalCellCount intact.
   const totalCellCount =
     axes.length > 0
       ? axes.reduce((acc, axis) => acc * axis.tuples.length, 1)

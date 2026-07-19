@@ -5,6 +5,7 @@ import type { MdxAxis, CellValue } from "../../types.js";
 import { PAGINATION_SCHEMA } from "../pagination.js";
 import { FORMAT_SCHEMA, payloadResponse } from "../format.js";
 import { withToolHint } from "../error-format.js";
+import { clipAxesToWindow } from "../../tm1-client/services/cellset-transform.js";
 
 export interface MdxEnvelope {
   axes: MdxAxis[];
@@ -13,6 +14,10 @@ export interface MdxEnvelope {
   offset: number;
   has_more: boolean;
   next_offset: number | null;
+  // Present (true) only when `axes` were clipped to this page's cell window;
+  // the omitted tuples address cells outside the page. `total` stays the full
+  // cell count. Absent for full/small results so their output is unchanged.
+  axes_clipped?: boolean;
   items: Array<{ value: CellValue; formattedValue: string }>;
 }
 
@@ -128,13 +133,19 @@ export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
       const count = result.cells.length;
       const off = all ? 0 : offset;
       const has_more = !all && off + count < total;
+      // Clip axes to the returned cell page so a capped read over a huge view
+      // doesn't ship the full tuple list. fetchAll keeps the whole cellset.
+      const { axes, clipped } = all
+        ? { axes: result.axes, clipped: false }
+        : clipAxesToWindow(result.axes, count, off);
       const envelope: MdxEnvelope = {
-        axes: result.axes,
+        axes,
         total,
         count,
         offset: off,
         has_more,
         next_offset: has_more ? off + count : null,
+        ...(clipped ? { axes_clipped: true } : {}),
         items: result.cells,
       };
       return payloadResponse(envelope, format, renderMdxMarkdown);

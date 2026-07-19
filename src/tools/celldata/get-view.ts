@@ -4,6 +4,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA } from "../pagination.js";
 import { FORMAT_SCHEMA, payloadResponse } from "../format.js";
 import { renderMdxMarkdown, type MdxEnvelope } from "./execute-mdx.js";
+import { clipAxesToWindow } from "../../tm1-client/services/cellset-transform.js";
 
 interface ViewEnvelope extends MdxEnvelope {
   cubeName: string;
@@ -36,15 +37,21 @@ export function registerGetView(server: McpServer, tm1Client: TM1Client) {
       const count = result.cells.length;
       const off = all ? 0 : offset;
       const has_more = !all && off + count < total;
+      // Clip axes to the returned cell page so a capped read over a tall view
+      // doesn't ship the full tuple list. fetchAll keeps the whole cellset.
+      const { axes, clipped } = all
+        ? { axes: result.axes, clipped: false }
+        : clipAxesToWindow(result.axes, count, off);
       const envelope: ViewEnvelope = {
         cubeName,
         viewName,
-        axes: result.axes,
+        axes,
         total,
         count,
         offset: off,
         has_more,
         next_offset: has_more ? off + count : null,
+        ...(clipped ? { axes_clipped: true } : {}),
         items: result.cells,
       };
       return payloadResponse(envelope, format, renderMdxMarkdown);

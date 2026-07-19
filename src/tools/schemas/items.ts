@@ -443,6 +443,8 @@ export const ViewResultSchema = z.object({
   offset: z.number().int(),
   has_more: z.boolean(),
   next_offset: z.number().int().nullable(),
+  // Set only when axes were clipped to the returned cell page (see MdxResultSchema).
+  axes_clipped: z.boolean().optional(),
   items: z.array(
     z.object({ value: CellValueSchema, formattedValue: z.string() }),
   ),
@@ -525,6 +527,8 @@ export const MdxResultSchema = z.object({
   offset: z.number().int(),
   has_more: z.boolean(),
   next_offset: z.number().int().nullable(),
+  // True only when `axes` were clipped to this page's cells; `total` stays full.
+  axes_clipped: z.boolean().optional(),
   items: z.array(
     z.object({ value: CellValueSchema, formattedValue: z.string() }),
   ),
