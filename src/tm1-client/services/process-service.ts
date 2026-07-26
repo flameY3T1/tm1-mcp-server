@@ -16,9 +16,23 @@ import type {
 } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
 import { rethrowIfSystemic } from "./fallback.js";
+import {
+  filterClause,
+  nameFilterPredicates,
+  pageClauses,
+  readCount,
+  type NameFilterOpts,
+  type Paged,
+  type PageOpts,
+} from "./odata-page.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+
+export interface ProcessListOpts extends NameFilterOpts {
+  /** Set to slice server-side. Only legal when every active filter is in NameFilterOpts. */
+  page?: PageOpts;
+}
 
 // Encode a TI parameter for the OData write body.
 //
@@ -52,13 +66,34 @@ export class ProcessService {
    * Name-only when v11 rejects the inline Parameters select.
    * GET /api/v1/Processes?$select=Name,Parameters
    */
-  async list(): Promise<Process[]> {
+  // Unpaged form takes no options: filters only exist to make a server-side
+  // page honest, and every non-paged caller wants the whole collection.
+  async list(): Promise<Process[]>;
+  /**
+   * Paged variant: with `page` set the slice happens server-side
+   * (`$orderby=Name&$top&$skip&$count=true`) and the return carries the
+   * post-`$filter` total. `total` is undefined if the server omitted
+   * `@odata.count` — fall back to an unpaged fetch then.
+   */
+  async list(opts: ProcessListOpts & { page: PageOpts }): Promise<Paged<Process>>;
+  async list(opts: ProcessListOpts = {}): Promise<Process[] | Paged<Process>> {
+    // Filters are only emitted on the paged path; unpaged callers keep getting
+    // the whole collection and filter in-process. The degraded Name-only
+    // retry below reuses the same query — dropping it there would turn a
+    // paged request into a silent full, unfiltered fetch.
+    const query =
+      opts.page === undefined
+        ? ""
+        : `${filterClause(nameFilterPredicates(opts))}${pageClauses(opts.page)}`;
+    const wrap = (items: Process[], total: number | undefined): Process[] | Paged<Process> =>
+      opts.page === undefined ? items : { items, total };
     // Parameters is a structural (complex) property, not a navigation property
     // — TM1 v11 rejects $expand=Parameters with a syntax error. Use $select
     // instead, which returns Parameters inline. Param.Type comes back as the
     // already-decoded string "Numeric" / "String" (not the legacy int code).
     try {
       const response = await this.http.request<{
+        "@odata.count"?: number;
         value: Array<{
           Name: string;
           Parameters?: Array<{
@@ -68,27 +103,34 @@ export class ProcessService {
             Prompt?: string;
           }>;
         }>;
-      }>("GET", "/api/v1/Processes?$select=Name,Parameters");
+      }>("GET", `/api/v1/Processes?$select=Name,Parameters${query}`);
 
-      return response.value.map((p) => ({
-        name: p.Name,
-        parameters: (p.Parameters ?? []).map((param): ProcessParameter => ({
-          name: param.Name,
-          type: param.Type === "Numeric" ? "Numeric" : "String",
-          defaultValue: param.Value,
-          ...(param.Prompt ? { prompt: param.Prompt } : {}),
+      return wrap(
+        response.value.map((p) => ({
+          name: p.Name,
+          parameters: (p.Parameters ?? []).map((param): ProcessParameter => ({
+            name: param.Name,
+            type: param.Type === "Numeric" ? "Numeric" : "String",
+            defaultValue: param.Value,
+            ...(param.Prompt ? { prompt: param.Prompt } : {}),
+          })),
         })),
-      }));
+        readCount(response),
+      );
     } catch (e) {
       rethrowIfSystemic(e);
       const response = await this.http.request<{
+        "@odata.count"?: number;
         value: Array<{ Name: string }>;
-      }>("GET", "/api/v1/Processes?$select=Name");
+      }>("GET", `/api/v1/Processes?$select=Name${query}`);
 
-      return response.value.map((p) => ({
-        name: p.Name,
-        parameters: [],
-      }));
+      return wrap(
+        response.value.map((p) => ({
+          name: p.Name,
+          parameters: [],
+        })),
+        readCount(response),
+      );
     }
   }
 

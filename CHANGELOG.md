@@ -20,7 +20,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   targets 75/75/70/62. Coverage reporters switched to `text-summary` + `json-summary` + `html`,
   and `**/*.d.ts` is excluded from the measured set. See "Coverage Policy" in the README.
 
+- **`tm1_get_hierarchy` is now pageable — `offset`, plus `total`/`has_more` in the response.**
+  Large dimensions were unreachable past `topN`: the tool capped at 1000 elements with no way to
+  ask for the next 1000, so the only route to element 1001 was raising `topN` and pulling the
+  whole set into the context window. `offset` walks the dimension in pages of any size, and
+  `total` reports the filtered element count so a client knows when to stop. Measured on a live
+  211,852-element dimension: 46.7KB per 50-element page against 915.9KB for the old `topN=1000`
+  default and 67MB for the uncapped fetch. `truncated` keeps its meaning but is now exact — it
+  was derived from `elements.length === topN`, which cried truncation whenever the last page
+  happened to be exactly `topN` long.
+
 ### Changed
+
+- **`list_*` tools push `$top`/`$skip` down to TM1 instead of fetching the whole collection and
+  slicing it in-process.** This does not change what an agent sees — the `Page<T>` envelope, the
+  `limit=50` default and every field are identical — it changes what crosses the TM1→MCP hop.
+  Measured live at `limit=50`: `tm1_list_dimensions` with `includeElementStats` 213MB → 98MB
+  (340-dimension model; the pathological single JSON string that response used to be is the point
+  of the change, not the milliseconds), `tm1_list_processes` 180.6KB → 15.4KB, `tm1_list_cubes`
+  49.3KB → 13.5KB.
+  - Push-down happens automatically, but only where it is *correct*: `@odata.count` counts rows
+    after `$filter`, so a filter that cannot be expressed in OData (`nameRegex`, `excludePattern`,
+    `changedSince`) would make `total` count rows the caller can never reach and `has_more`
+    promise pages that come back empty. Those requests — plus `fetchAll` and `limit=0` — fall back
+    to the previous full-scan behaviour. Server-expressible filters (`includeControl`, `nameExact`,
+    `nameContains`, `nameNotContains`) move into `$filter`.
+  - Every pushed-down request carries `$orderby=Name`. `$skip` without a sort is undefined in
+    OData and TM1 answers in internal index order, which shifts whenever an object is created or
+    deleted — a page walk would silently duplicate or drop rows.
+  - **Ordering change:** `tm1_list_cubes`, `tm1_list_dimensions` and `tm1_list_processes` now
+    return rows sorted by name on *both* paths (the fallback sorts client-side to match TM1's
+    collation). They previously echoed TM1's internal index order, so a given `offset` can land
+    on a different row than before.
+  - Not included: `tm1_list_views`, `tm1_list_subsets`, `tm1_list_clients`, `tm1_list_error_logs`.
+    Live probing confirmed `$top`/`$skip`/`$orderby`/`$count=true` all work on their endpoints
+    (`/Cubes('c')/Views`, `/PrivateViews`, `.../Subsets`, `/PrivateSubsets`, `/Users`,
+    `/ErrorLogFiles`), so they stay viable follow-ups; views and subsets additionally need a
+    two-scope (public + private) merge, which is why they were not bundled here.
 
 - **Smaller `tools/list` payload — ~28.6KB (12%) off every session's context budget**, with no change to
   input validation, output validation, or any tool's behaviour:

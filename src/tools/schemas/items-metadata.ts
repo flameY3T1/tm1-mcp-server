@@ -65,10 +65,17 @@ export const HierarchyElementSchema = z.object({
   children: z.array(z.object({ name: z.string(), weight: z.number() })).optional(),
 });
 
+// tm1_get_hierarchy returns a bare hierarchy, not a Page<T>, so its paging
+// fields live here. `total` is the filtered element count (exact: server-side
+// @odata.count when the window was pushed down, post-filter length otherwise);
+// `truncated` is the pre-paging spelling of `has_more`.
 export const HierarchySchema = z.object({
   name: z.string(),
   dimensionName: z.string(),
   elements: z.array(HierarchyElementSchema),
+  total: z.number().int(),
+  offset: z.number().int(),
+  has_more: z.boolean(),
   // true when the topN cap clipped the (post-filter) element set — raise topN.
   truncated: z.boolean(),
 });

@@ -1,12 +1,17 @@
-// Client-side pagination helper for list_* MCP tools. Slices an in-memory
-// array and returns a structured response with metadata so agents know
-// how to fetch the next page without flooding the context window.
+// Pagination helpers for list_* MCP tools. Two shapes of one envelope:
 //
-// We slice in-process rather than push $top/$skip to TM1 because most
-// list endpoints already round-trip the full set in one cheap query;
-// the bottleneck is the JSON payload returned to the LLM, not the
-// TM1 fetch. Future work: push pagination into the REST query for
-// truly large collections (transaction log, message log).
+//   paginate()       — slices an in-memory array. Used when the handler had to
+//                      fetch the whole collection anyway (a filter TM1 cannot
+//                      express, fetchAll, limit=0).
+//   pageFromServer() — wraps a page TM1 already sliced via $top/$skip, with
+//                      `total` taken from `@odata.count`.
+//
+// Both produce a byte-identical `Page<T>`, so the push-down decision is
+// invisible to callers and needs no output-schema change. Which one a handler
+// may use is a correctness question, not a performance one: `@odata.count` is
+// computed after `$filter`, so it equals the true total only when *every*
+// active filter was pushed down. Any filter that stays client-side must force
+// the paginate() path.
 import { z } from "zod";
 
 // Descriptions are deliberately terse: this block is inlined into 19 tool input
@@ -66,5 +71,39 @@ export function paginate<T>(
     has_more,
     next_offset: has_more ? safeOffset + slice.length : null,
     items: slice,
+  };
+}
+
+/**
+ * Wrap an already-server-sliced page (`$top`/`$skip`) in the same `Page<T>`
+ * envelope `paginate()` produces, using the server's `@odata.count` as `total`.
+ *
+ * `has_more` is derived from `offset + count < total`, never from
+ * `count === limit` — the latter is off by one whenever the last page happens
+ * to be exactly `limit` long.
+ *
+ * Only call this when every active filter was expressed in `$filter`.
+ * `@odata.count` counts post-filter rows; if a filter ran client-side, `total`
+ * would exceed what the caller can actually reach and `has_more` would promise
+ * pages that come back empty. Fall back to `paginate()` over a full fetch in
+ * that case.
+ */
+export function pageFromServer<T>(
+  items: readonly T[],
+  total: number,
+  offset: number,
+): Page<T> {
+  const safeOffset = Math.max(0, offset);
+  // A server total below what we already hold means the collection shrank
+  // between the count and the slice; trust the rows we actually have.
+  const safeTotal = Math.max(total, safeOffset + items.length);
+  const has_more = safeOffset + items.length < safeTotal;
+  return {
+    total: safeTotal,
+    count: items.length,
+    offset: safeOffset,
+    has_more,
+    next_offset: has_more ? safeOffset + items.length : null,
+    items: [...items],
   };
 }

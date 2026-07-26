@@ -214,6 +214,9 @@ describe("OUTPUT_SCHEMA_MAP", () => {
         },
       ],
       truncated: false,
+      total: 1,
+      offset: 0,
+      has_more: false,
     },
     tm1_get_descendants: {
       element: "EU",

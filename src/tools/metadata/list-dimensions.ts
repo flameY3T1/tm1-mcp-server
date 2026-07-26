@@ -5,7 +5,8 @@ import {
   decodeTm1Timestamp,
   normalizeChangedSince,
 } from "../../tm1-client/services/dimension-service.js";
-import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+import { compareByName } from "../../tm1-client/services/odata-page.js";
+import { PAGINATION_SCHEMA, paginate, pageFromServer } from "../pagination.js";
 import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
 export function registerListDimensions(server: McpServer, tm1Client: TM1Client) {
@@ -45,8 +46,30 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
         .describe("Return only dimensions modified at/after this date or datetime (server-local, e.g. '2026-04-01' or '2026-04-01T08:30:00'). Implies includeLastUpdated. Needs at least a full date."),
     },
     async ({ limit, offset, fetchAll, format, includeControl, includeElementCount, includeElementStats, includeLastUpdated, changedSince }) => {
-      let dimensions = await tm1Client.dimensions.list({ includeElementCount, includeElementStats });
-      if (!includeControl) dimensions = dimensions.filter((d) => !d.name.startsWith("}"));
+      // changedSince filters against }DimensionProperties client-side, so with
+      // it active @odata.count would count dimensions the caller never sees.
+      // includeLastUpdated alone only enriches rows and drops none, so it stays
+      // eligible — the stamp lookup is by name and works on a page just as well.
+      const canPushDown = !fetchAll && limit > 0 && changedSince === undefined;
+      const paged = canPushDown
+        ? await tm1Client.dimensions.list({
+            includeElementCount,
+            includeElementStats,
+            includeControl,
+            page: { top: limit, skip: offset },
+          })
+        : undefined;
+      const serverTotal = paged?.total;
+      // Ineligible, or the server omitted @odata.count: fall back to the full
+      // scan rather than report a total we cannot stand behind.
+      let dimensions =
+        paged !== undefined && serverTotal !== undefined
+          ? paged.items
+          : (await tm1Client.dimensions.list({ includeElementCount, includeElementStats }))
+              .filter((d) => includeControl || !d.name.startsWith("}"))
+              // Match the pushed-down path's $orderby=Name so a given offset
+              // means the same row whichever path served it.
+              .sort(compareByName);
 
       const wantLastUpdated = includeLastUpdated || changedSince !== undefined;
       if (wantLastUpdated) {
@@ -76,7 +99,10 @@ export function registerListDimensions(server: McpServer, tm1Client: TM1Client) 
         }
       }
 
-      const page = paginate(dimensions, limit, offset, fetchAll);
+      const page =
+        serverTotal !== undefined
+          ? pageFromServer(dimensions, serverTotal, offset)
+          : paginate(dimensions, limit, offset, fetchAll);
       type Row = (typeof dimensions)[number];
       const columns: Column<Row>[] = [
         { header: "name", get: (d) => d.name },

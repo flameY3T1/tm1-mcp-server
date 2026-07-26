@@ -7,9 +7,24 @@
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import type { Cube, CubeRules, RuleSyntaxError } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
+import {
+  filterClause,
+  nameFilterPredicates,
+  pageClauses,
+  readCount,
+  type NameFilterOpts,
+  type Paged,
+  type PageOpts,
+} from "./odata-page.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+
+export interface CubeListOpts extends NameFilterOpts {
+  includeRules?: boolean;
+  /** Set to slice server-side. Only legal when every active filter is in NameFilterOpts. */
+  page?: PageOpts;
+}
 
 export class CubeService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -21,18 +36,32 @@ export class CubeService {
    * opts.includeRules adds Rules text to the OData $select so we can derive
    * hasRules per cube in a single round-trip (no N+1).
    */
-  async list(opts: { includeRules?: boolean } = {}): Promise<Cube[]> {
+  async list(opts?: { includeRules?: boolean }): Promise<Cube[]>;
+  /**
+   * Paged variant: with `page` set the slice happens server-side
+   * (`$orderby=Name&$top&$skip&$count=true`) and the return carries the
+   * post-`$filter` total so the caller can build an honest `Page<T>`.
+   * `total` is undefined if the server omitted `@odata.count` — fall back to
+   * an unpaged fetch then.
+   */
+  async list(opts: CubeListOpts & { page: PageOpts }): Promise<Paged<Cube>>;
+  async list(opts: CubeListOpts = {}): Promise<Cube[] | Paged<Cube>> {
     // Without a top-level $select TM1 returns every cube property — including
     // the full Rules text — even on the light path. Pin $select=Name so
     // list_cubes (and the other name/dimension-only callers) don't drag every
     // cube's Rules blob over the wire. Only the includeRules path opts Rules in.
-    const path = opts.includeRules
-      ? "/api/v1/Cubes?$select=Name,Rules&$expand=Dimensions($select=Name)"
-      : "/api/v1/Cubes?$select=Name&$expand=Dimensions($select=Name)";
+    const select = opts.includeRules ? "Name,Rules" : "Name";
+    // Filters are only emitted on the paged path. Unpaged callers still get the
+    // whole collection and filter in-process, so their behaviour is unchanged.
+    const filter = opts.page === undefined ? "" : filterClause(nameFilterPredicates(opts));
+    const path =
+      `/api/v1/Cubes?$select=${select}&$expand=Dimensions($select=Name)` +
+      `${filter}${pageClauses(opts.page)}`;
     const response = await this.http.request<{
+      "@odata.count"?: number;
       value: Array<{ Name: string; Rules?: string; Dimensions: Array<{ Name: string }> }>;
     }>("GET", path);
-    return response.value.map((c) => {
+    const items = response.value.map((c) => {
       const cube: Cube = {
         name: c.Name,
         dimensions: c.Dimensions.map((d) => d.Name),
@@ -42,6 +71,7 @@ export class CubeService {
       }
       return cube;
     });
+    return opts.page === undefined ? items : { items, total: readCount(response) };
   }
 
   /**

@@ -6,9 +6,20 @@ import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { compileUserRegex } from "../../lib/safe-regex.js";
 import type { Hierarchy, HierarchyElement } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
+import { pageClauseList, readNestedCount } from "./odata-page.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+
+/**
+ * A hierarchy plus the size of the element set the request selected, so
+ * callers can page without guessing. `totalElements` counts elements that
+ * survived *every* filter — the server-side `$filter` ones via
+ * `Elements@odata.count`, the client-side ones (elementType, nameRegex) by
+ * counting what is left after filtering. It is therefore always exact, and
+ * always ≥ `elements.length`.
+ */
+export type HierarchyPage = Hierarchy & { totalElements: number };
 
 export class HierarchyService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -21,6 +32,13 @@ export class HierarchyService {
    * dangling references.
    *
    * GET /api/v1/Dimensions('{d}')/Hierarchies('{h}')?$expand=Elements(...)
+   *
+   * Paging: when no client-side post-filter is needed, `topN`/`skip` are
+   * pushed into the nested Elements expand together with `$orderby=Name` and
+   * `$count=true`. On a live 211k-element dimension that is 48 KB/page against
+   * 67 MB for the unbounded fetch. `$orderby` is not optional — without it
+   * `$skip` walks TM1's internal index order, which shifts on every element
+   * create/delete and would duplicate or drop elements between pages.
    */
   async get(
     dimensionName: string,
@@ -30,11 +48,17 @@ export class HierarchyService {
       levelMax?: number;
       elementType?: "Numeric" | "String" | "Consolidated" | "All";
       topN?: number;
+      /**
+       * Elements to skip before `topN`. Applied server-side when possible and
+       * after client-side filtering otherwise, so the caller sees the same
+       * pagination semantics either way.
+       */
+      skip?: number;
       nameContains?: string;
       nameStartsWith?: string;
       nameRegex?: string;
     },
-  ): Promise<Hierarchy> {
+  ): Promise<HierarchyPage> {
     const elementClauses: string[] = ["$select=Name,Type,Level", "$expand=Parents($select=Name)"];
     const filters: string[] = [];
     if (opts?.level !== undefined) filters.push(`Level eq ${opts.level}`);
@@ -54,11 +78,19 @@ export class HierarchyService {
     }
     const needsClientPostFilter = filterByType || regex !== undefined;
     if (filters.length > 0) elementClauses.push(`$filter=${filters.join(" and ")}`);
-    if (opts?.topN !== undefined && !needsClientPostFilter) elementClauses.push(`$top=${opts.topN}`);
+    const skip = opts?.skip ?? 0;
+    const topN = opts?.topN;
+    // Push the window down only when nothing is filtered afterwards. With a
+    // client post-filter active, `Elements@odata.count` would count rows the
+    // caller never sees, so both the window and the total have to be computed
+    // here, on the filtered set.
+    const pushDown = topN !== undefined && !needsClientPostFilter;
+    if (pushDown) elementClauses.push(...pageClauseList({ top: topN, skip }));
 
     const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')?$expand=Elements(${elementClauses.join(";")})`;
     const rawResponse = await this.http.request<{
       Name: string;
+      "Elements@odata.count"?: number;
       Elements: Array<{
         Name: string;
         Type: string;
@@ -69,9 +101,18 @@ export class HierarchyService {
     let filteredElements = rawResponse.Elements;
     if (filterByType) filteredElements = filteredElements.filter((e) => e.Type === opts.elementType);
     if (regex !== undefined) filteredElements = filteredElements.filter((e) => regex.test(e.Name));
-    if (needsClientPostFilter && opts?.topN !== undefined) {
-      filteredElements = filteredElements.slice(0, opts.topN);
+    // Total of everything the filters kept, before the window is applied.
+    // Server-side count when it was pushed down; otherwise the post-filter
+    // length, which is exact because we hold the whole filtered set.
+    let totalElements = pushDown
+      ? (readNestedCount(rawResponse, "Elements") ?? skip + filteredElements.length)
+      : filteredElements.length;
+    if (!pushDown && (skip > 0 || topN !== undefined)) {
+      filteredElements = filteredElements.slice(skip, skip + (topN ?? filteredElements.length));
     }
+    // A count below what we already hold means the hierarchy shrank between
+    // count and slice — trust the rows in hand.
+    totalElements = Math.max(totalElements, skip + filteredElements.length);
     const response = { Name: rawResponse.Name, Elements: filteredElements };
 
     const keptNames = new Set(response.Elements.map((e) => e.Name));
@@ -126,6 +167,7 @@ export class HierarchyService {
       name: response.Name,
       dimensionName,
       elements,
+      totalElements,
     };
   }
 

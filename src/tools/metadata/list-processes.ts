@@ -3,7 +3,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import type { Process } from "../../types.js";
 import { compileUserRegex } from "../../lib/safe-regex.js";
-import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
+import { compareByName } from "../../tm1-client/services/odata-page.js";
+import { PAGINATION_SCHEMA, paginate, pageFromServer, type Page } from "../pagination.js";
 import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
 export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
@@ -31,34 +32,57 @@ export function registerListProcesses(server: McpServer, tm1Client: TM1Client) {
         .describe("Projection. Default: all fields. Use ['name'] to skip parameters[] and shrink payload ~10x."),
     },
     async ({ limit, offset, fetchAll, format, includeControl, nameContains, nameRegex, nameNotContains, excludePattern, fields }) => {
-      let processes: Process[] = await tm1Client.processes.list();
+      type Row = Process | { name: string };
+      const project = (list: Process[]): Row[] =>
+        fields && !fields.includes("parameters") ? list.map((p) => ({ name: p.name })) : list;
 
-      if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
+      const fullScan = async (): Promise<Row[]> => {
+        let processes: Process[] = await tm1Client.processes.list();
 
-      if (nameContains) {
-        const needle = nameContains.toLowerCase();
-        processes = processes.filter((p) => p.name.toLowerCase().includes(needle));
-      }
-      if (nameRegex) {
-        const re = compileUserRegex(nameRegex, "i", "nameRegex");
-        processes = processes.filter((p) => re.test(p.name));
-      }
-      if (nameNotContains) {
-        const needle = nameNotContains.toLowerCase();
-        processes = processes.filter((p) => !p.name.toLowerCase().includes(needle));
-      }
-      if (excludePattern) {
-        const re = compileUserRegex(excludePattern, "i", "excludePattern");
-        processes = processes.filter((p) => !re.test(p.name));
+        if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
+
+        if (nameContains) {
+          const needle = nameContains.toLowerCase();
+          processes = processes.filter((p) => p.name.toLowerCase().includes(needle));
+        }
+        if (nameRegex) {
+          const re = compileUserRegex(nameRegex, "i", "nameRegex");
+          processes = processes.filter((p) => re.test(p.name));
+        }
+        if (nameNotContains) {
+          const needle = nameNotContains.toLowerCase();
+          processes = processes.filter((p) => !p.name.toLowerCase().includes(needle));
+        }
+        if (excludePattern) {
+          const re = compileUserRegex(excludePattern, "i", "excludePattern");
+          processes = processes.filter((p) => !re.test(p.name));
+        }
+        // Match the pushed-down path's $orderby=Name so a given offset means
+        // the same row whichever path served it.
+        return project(processes.sort(compareByName));
+      };
+
+      // Regex filters have no OData equivalent and must run client-side, which
+      // would make @odata.count count rows the caller can never reach.
+      const canPushDown = !fetchAll && limit > 0 && !nameRegex && !excludePattern;
+
+      let page: Page<Row>;
+      if (canPushDown) {
+        const { items, total } = await tm1Client.processes.list({
+          includeControl,
+          ...(nameContains ? { nameContains } : {}),
+          ...(nameNotContains ? { nameNotContains } : {}),
+          page: { top: limit, skip: offset },
+        });
+        // No @odata.count means no honest total, so redo it as a full scan.
+        page =
+          total === undefined
+            ? paginate(await fullScan(), limit, offset, fetchAll)
+            : pageFromServer(project(items), total, offset);
+      } else {
+        page = paginate(await fullScan(), limit, offset, fetchAll);
       }
 
-      const projected: Array<Process | { name: string }> =
-        fields && !fields.includes("parameters")
-          ? processes.map((p) => ({ name: p.name }))
-          : processes;
-
-      const page = paginate(projected, limit, offset, fetchAll);
-      type Row = (typeof projected)[number];
       const columns: Column<Row>[] = [
         { header: "name", get: (p) => p.name },
         { header: "parameters", get: (p) => ("parameters" in p ? (p.parameters?.map((x) => x.name).join(", ") ?? "") : "—") },
