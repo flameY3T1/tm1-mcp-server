@@ -162,9 +162,16 @@ const FullNodeBase = z.object({
   unresolvedCalls: z.array(UnresolvedFullSchema).optional(),
 });
 type FullNode = z.infer<typeof FullNodeBase> & { children: FullNode[] };
+// `.strict()` is load-bearing, not cosmetic: `tree` below is a union of this and
+// CompactNodeSchema, and a non-strict Zod object STRIPS unknown keys instead of
+// rejecting them. Without it a full-mode node carrying a corrupt `incomingEdge`
+// or `env` simply matched the compact variant with those keys thrown away, so
+// the drift guard this schema exists for never fired. Safe because serializeNode
+// / serializeCompact build fixed object literals (analyze-callgraph.ts) and
+// undefined-valued keys are dropped before structuredContent is parsed.
 const FullNodeSchema: z.ZodType<FullNode> = FullNodeBase.extend({
   children: z.lazy(() => z.array(FullNodeSchema)),
-});
+}).strict();
 
 // Compact-mode node (serializeCompact). Recursive via z.lazy on `children`.
 const CompactNodeBase = z.object({
@@ -174,9 +181,11 @@ const CompactNodeBase = z.object({
   unresolvedCalls: z.array(UnresolvedCompactSchema).optional(),
 });
 type CompactNode = z.infer<typeof CompactNodeBase> & { children: CompactNode[] };
+// Strict for the same reason as FullNodeSchema above — this is the variant that
+// used to swallow every stray key in the union.
 const CompactNodeSchema: z.ZodType<CompactNode> = CompactNodeBase.extend({
   children: z.lazy(() => z.array(CompactNodeSchema)),
-});
+}).strict();
 
 // summarize() result.
 const SummaryEntrySchema = z.object({

@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `tm1_analyze_callgraph`'s output schema factors its repeated `EffectiveValue` sub-schema into
     `definitions` + `$ref` (6.3KB → 4.8KB), keeping the typed drift guard intact.
 
+### Fixed
+
+- `tm1_analyze_callgraph`'s output drift guard now actually bites on the node tree. `tree` is a union
+  of the full and compact node shapes, and a non-strict Zod object strips unknown keys instead of
+  rejecting them — so a full-mode node with a corrupt `incomingEdge` or `env` quietly matched the
+  compact variant with the corrupt keys thrown away. Both variants are strict now, which aligns the
+  runtime check with the `additionalProperties: false` the published schema already advertised. No
+  response data was ever lost by this (the validator's parsed output is discarded; the original
+  payload is what ships).
+
 ## [2.0.0] - 2026-07-19
 
 ### Added

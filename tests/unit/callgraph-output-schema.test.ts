@@ -352,17 +352,67 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
   });
 
   it("REJECTS a wrongly-typed node field that both tree shapes declare", () => {
-    // NOTE (pre-existing, not introduced by the $ref factoring): `tree` is a
-    // union of FullNode | CompactNode, and Zod objects STRIP unknown keys, so a
-    // full-mode node with a corrupt `incomingEdge`/`env` still parses — it just
-    // matches CompactNode with those keys stripped. Only fields CompactNode
-    // itself declares are actually enforced for `tree`; the FullNode detail is
-    // documentation for the client. This asserts the part that does bite.
     const bad = {
       mode: "full",
       tree: { process: "Parent", cycle: "yes", incomingEdge: null, children: [] },
     };
     expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
+  });
+
+  // `tree` is a union of FullNode | CompactNode. A non-strict Zod object STRIPS
+  // unknown keys rather than rejecting them, which used to let a corrupt
+  // full-mode node slip through by matching the compact variant with the corrupt
+  // keys thrown away — the FullNode detail was client documentation, not a
+  // guard. Both variants are `.strict()` now; these four cases are the ones that
+  // were silently accepted before.
+  it.each([
+    [
+      "a stray key on a compact-shaped node",
+      { mode: "compact", tree: { process: "P", children: [], bogus: 1 } },
+    ],
+    [
+      "a stray key nested in children",
+      { mode: "compact", tree: { process: "P", children: [{ process: "C", children: [], junk: true }] } },
+    ],
+    [
+      "a corrupt env value kind",
+      {
+        mode: "full",
+        tree: { process: "P", cycle: false, incomingEdge: null, env: { v: { kind: "nope" } }, children: [] },
+      },
+    ],
+    [
+      "a non-numeric incomingEdge line",
+      {
+        mode: "full",
+        tree: {
+          process: "P",
+          cycle: false,
+          incomingEdge: {
+            caller: "a",
+            callee: "b",
+            section: "s",
+            line: "NOT-A-NUMBER",
+            funcName: "f",
+            snippet: "x",
+            params: [],
+          },
+          children: [],
+        },
+      },
+    ],
+  ])("REJECTS %s instead of stripping it into the other union variant", (_label, bad) => {
+    expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("still ACCEPTS well-formed nodes in both modes", () => {
+    const full = {
+      mode: "full",
+      tree: { process: "P", cycle: false, depthLimitReached: false, incomingEdge: null, children: [] },
+    };
+    const compact = { mode: "compact", tree: { process: "P", children: [{ process: "C", children: [] }] } };
+    expect(CallgraphResultSchema.safeParse(full).success).toBe(true);
+    expect(CallgraphResultSchema.safeParse(compact).success).toBe(true);
   });
 });
 
