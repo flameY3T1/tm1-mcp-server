@@ -1,0 +1,6 @@
+dist/
+coverage/
+node_modules/
+.claude/worktrees/
+CHANGELOG.md
+README.md
