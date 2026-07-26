@@ -3,7 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { withToolHint } from "../error-format.js";
 
-export function registerSaveData(server: McpServer, tm1Client: TM1Client): void {
+export function registerSaveData(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   // v11 only — v12 (PA Engine) removed SaveDataAll/CubeSaveData (cloud engine
   // persists automatically). Hide the tool on v12 rather than surfacing it and
   // failing at call time (mirrors the threads-vs-jobs registration gate).
@@ -21,14 +24,18 @@ export function registerSaveData(server: McpServer, tm1Client: TM1Client): void 
       cube: z
         .string()
         .optional()
-        .describe("Save only this cube (CubeSaveData). Omit to save all cubes (SaveDataAll)."),
+        .describe(
+          "Save only this cube (CubeSaveData). Omit to save all cubes (SaveDataAll).",
+        ),
       timeoutMs: z
         .number()
         .int()
         .min(1000)
         .max(3600000)
         .optional()
-        .describe("Override the default request timeout (ms, 1000–3600000). SaveDataAll on large models can take minutes."),
+        .describe(
+          "Override the default request timeout (ms, 1000–3600000). SaveDataAll on large models can take minutes.",
+        ),
     },
     async ({ cube, timeoutMs }, extra) => {
       const result = await withToolHint(

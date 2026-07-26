@@ -11,7 +11,9 @@ export function registerGetCellValue(server: McpServer, tm1Client: TM1Client) {
     ].join(" "),
     {
       cubeName: z.string().describe("Name of the TM1 cube"),
-      elements: z.array(z.string()).describe("Element names for each dimension of the cube"),
+      elements: z
+        .array(z.string())
+        .describe("Element names for each dimension of the cube"),
     },
     async ({ cubeName, elements }) => {
       const value = await tm1Client.cells.getValue(cubeName, elements);

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { extractTiReferences, buildReferenceIndex } from "../../src/lib/callgraph/referenceIndex.js";
+import {
+  extractTiReferences,
+  buildReferenceIndex,
+} from "../../src/lib/callgraph/referenceIndex.js";
 
 // extractTiReferences(text, env?, sharedLiveVars?, unresolvedOut?) — 4th out-param collects
 // process-call call-sites whose target could not be resolved to a literal.
@@ -59,7 +62,7 @@ describe("extractTiReferences unresolved process calls", () => {
       undefined,
       unresolved as never,
     );
-    expect(refs.filter(r => r.targetName === "Sub")).toHaveLength(1);
+    expect(refs.filter((r) => r.targetName === "Sub")).toHaveLength(1);
     expect(unresolved).toEqual([]);
   });
 
@@ -79,13 +82,27 @@ describe("buildReferenceIndex — unresolvedCallsBySourceProcess", () => {
   it("buckets unresolved calls per source process section", async () => {
     const index = await buildReferenceIndex({
       fetchProcesses: async () => [
-        { name: "P", prolog: "sDyn = sOther;\nExecuteProcess(sDyn);", metadata: "", data: "", epilog: "", parameters: [] },
+        {
+          name: "P",
+          prolog: "sDyn = sOther;\nExecuteProcess(sDyn);",
+          metadata: "",
+          data: "",
+          epilog: "",
+          parameters: [],
+        },
       ],
       fetchCubesWithRules: async () => [],
       fetchChores: async () => [],
     });
     expect(index.unresolvedCallsBySourceProcess.get("p")).toEqual([
-      { section: "prolog", line: 1, funcName: "ExecuteProcess", expr: "sDyn", snippet: "ExecuteProcess(sDyn);", reason: "dynamic" },
+      {
+        section: "prolog",
+        line: 1,
+        funcName: "ExecuteProcess",
+        expr: "sDyn",
+        snippet: "ExecuteProcess(sDyn);",
+        reason: "dynamic",
+      },
     ]);
   });
 });

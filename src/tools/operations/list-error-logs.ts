@@ -1,7 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
-import { FORMAT_SCHEMA, pageResponse, wrappedPageResponse, type Column } from "../format.js";
+import {
+  FORMAT_SCHEMA,
+  pageResponse,
+  wrappedPageResponse,
+  type Column,
+} from "../format.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 
 // Best-effort extraction of {process, ts} from an error-log filename.
@@ -11,7 +16,10 @@ import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 // Process names may contain underscores, so the modern parse greedily captures
 // the tail and strips a trailing session-hash token (_<hex6+>). This is a
 // heuristic — good enough for audit triage, not a guaranteed exact split.
-export function parseLogName(filename: string): { process: string | null; ts: string | null } {
+export function parseLogName(filename: string): {
+  process: string | null;
+  ts: string | null;
+} {
   const modern = filename.match(/^TM1ProcessError_(\d{14})_\d+_(.+)\.log$/i);
   if (modern) {
     // Strip the trailing TM1 session-hash token. Real-world v11 hashes are
@@ -49,7 +57,8 @@ export function spanDays(firstTs: string, lastTs: string): number {
   };
   const a = toDate(firstTs);
   const b = toDate(lastTs);
-  if (!a || !b || Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 1;
+  if (!a || !b || Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()))
+    return 1;
   const diffDays = Math.floor((b.getTime() - a.getTime()) / 86_400_000);
   return Math.max(1, diffDays + 1);
 }
@@ -63,7 +72,10 @@ interface ErrorGroup {
   perDay: number;
 }
 
-export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): void {
+export function registerListErrorLogs(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_list_error_logs",
     [
@@ -72,29 +84,52 @@ export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): 
       "groupBy='process' returns a per-process audit summary instead of individual files.",
     ].join(" "),
     {
-      processName: z.string().optional()
-        .describe("Optional process-name filter — matches both modern v11 'TM1ProcessError_<ts>_<id>_<processName>_<hash>.log' and legacy '<processName>_<ts>.log' filename patterns."),
-      since: z.string().optional()
-        .describe("Only logs with LastUpdated >= this ISO timestamp, e.g. '2026-05-01T00:00:00'"),
+      processName: z
+        .string()
+        .optional()
+        .describe(
+          "Optional process-name filter — matches both modern v11 'TM1ProcessError_<ts>_<id>_<processName>_<hash>.log' and legacy '<processName>_<ts>.log' filename patterns.",
+        ),
+      since: z
+        .string()
+        .optional()
+        .describe(
+          "Only logs with LastUpdated >= this ISO timestamp, e.g. '2026-05-01T00:00:00'",
+        ),
       groupBy: z
         .literal("process")
         .optional()
         .describe(
           "Set to 'process' for an aggregated audit summary instead of individual files: " +
-          "per process {count, firstSeen, lastSeen, spanDays, perDay}, sorted by count desc. " +
-          "Answers 'which processes fail regularly' in one call. Process name is extracted from the " +
-          "filename heuristically; unparseable names bucket under '(unparsed)'.",
+            "per process {count, firstSeen, lastSeen, spanDays, perDay}, sorted by count desc. " +
+            "Answers 'which processes fail regularly' in one call. Process name is extracted from the " +
+            "filename heuristically; unparseable names bucket under '(unparsed)'.",
         ),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
     },
-    async ({ processName, since, groupBy, limit, offset, fetchAll, format }) => {
+    async ({
+      processName,
+      since,
+      groupBy,
+      limit,
+      offset,
+      fetchAll,
+      format,
+    }) => {
       // Pull a generous slice from the server (top=500); pagination is applied client-side
       // so callers always see total + has_more even if they limit to a small page.
-      const files = await tm1Client.server.listErrorLogFiles({ processName, since, top: 500 });
+      const files = await tm1Client.server.listErrorLogFiles({
+        processName,
+        since,
+        top: 500,
+      });
 
       if (groupBy === "process") {
-        const acc = new Map<string, { count: number; first: string | null; last: string | null }>();
+        const acc = new Map<
+          string,
+          { count: number; first: string | null; last: string | null }
+        >();
         for (const f of files) {
           const { process, ts } = parseLogName(f.filename);
           const key = process ?? "(unparsed)";
@@ -121,7 +156,9 @@ export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): 
               perDay: Math.round((g.count / span) * 100) / 100,
             };
           })
-          .sort((a, b) => b.count - a.count || a.process.localeCompare(b.process));
+          .sort(
+            (a, b) => b.count - a.count || a.process.localeCompare(b.process),
+          );
         const groupPage = paginate(allGroups, limit, offset, fetchAll);
         const wrapper = {
           groupBy: "process",
@@ -151,7 +188,11 @@ export function registerListErrorLogs(server: McpServer, tm1Client: TM1Client): 
         { header: "filename", get: (f) => f.filename },
         // v11 OData exposes no LastUpdated on this entity; derive it from the
         // timestamp embedded in the filename so the column is not always empty.
-        { header: "lastUpdated", get: (f) => f.lastUpdated ?? formatTs(parseLogName(f.filename).ts) ?? "" },
+        {
+          header: "lastUpdated",
+          get: (f) =>
+            f.lastUpdated ?? formatTs(parseLogName(f.filename).ts) ?? "",
+        },
       ];
       return pageResponse(page, format, { title: "Error logs", columns });
     },

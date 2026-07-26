@@ -8,7 +8,11 @@
 // See docs/ARCHITECTURE.md for the layering.
 import { mapSettledWithConcurrency } from "../../lib/concurrency.js";
 import { TM1Error } from "../../types.js";
-import type { ElementAttributeValue, ElementCreate, ElementUpdate } from "../../types.js";
+import type {
+  ElementAttributeValue,
+  ElementCreate,
+  ElementUpdate,
+} from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 import type { CellService } from "./cell-service.js";
 import { rethrowIfSystemic } from "./fallback.js";
@@ -19,7 +23,8 @@ import { rethrowIfSystemic } from "./fallback.js";
 const BULK_UPSERT_CONCURRENCY = 8;
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 // TM1 signals "element already exists" with different HTTP statuses across
 // versions: some return 409 Conflict, but v11.x (REST 11.8) returns 400 with
@@ -74,7 +79,11 @@ export class ElementService {
       Name: element.name,
       Type: element.type,
     };
-    if (element.type === "Consolidated" && element.components && element.components.length > 0) {
+    if (
+      element.type === "Consolidated" &&
+      element.components &&
+      element.components.length > 0
+    ) {
       body.Components = element.components.map((c) => ({
         "@odata.id": `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(c.name)}')`,
         Weight: c.weight,
@@ -139,7 +148,12 @@ export class ElementService {
     dimensionName: string,
     hierarchyName: string,
     opts: { pageSize: number; maxScan: number },
-  ): Promise<{ names: string[]; total: number; scanned: number; truncated: boolean }> {
+  ): Promise<{
+    names: string[];
+    total: number;
+    scanned: number;
+    truncated: boolean;
+  }> {
     const { pageSize, maxScan } = opts;
     const basePath =
       `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')` +
@@ -209,7 +223,9 @@ export class ElementService {
     dimensionName: string,
     hierarchyName: string,
     elements: ElementCreate[],
-  ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
+  ): Promise<{
+    typeChanges: Array<{ name: string; from: string; to: string }>;
+  }> {
     const baseUrl = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements`;
 
     // Pass 1: Create/upsert all elements without components. Same-type element
@@ -221,7 +237,9 @@ export class ElementService {
     const pass1 = await mapSettledWithConcurrency(
       elements,
       BULK_UPSERT_CONCURRENCY,
-      async (el): Promise<{ name: string; from: string; to: string } | null> => {
+      async (
+        el,
+      ): Promise<{ name: string; from: string; to: string } | null> => {
         const body: Record<string, unknown> = { Name: el.name, Type: el.type };
         try {
           await this.http.request<void>("POST", baseUrl, body);
@@ -234,7 +252,10 @@ export class ElementService {
             // element's leaf cell values, so the caller must be told it happened
             // rather than have it occur silently.
             const existing = await this.http
-              .request<{ Type: number | string }>("GET", `${baseUrl}('${enc(el.name)}')?$select=Type`)
+              .request<{ Type: number | string }>(
+                "GET",
+                `${baseUrl}('${enc(el.name)}')?$select=Type`,
+              )
               .catch((e: unknown): null => {
                 // A transport/auth outage here must NOT collapse into the
                 // unconditional-PATCH branch below: that would silently change the
@@ -245,12 +266,20 @@ export class ElementService {
               });
             const from = existing ? normalizeElementType(existing.Type) : null;
             if (from && from !== el.type) {
-              await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
+              await this.http.request<void>(
+                "PATCH",
+                `${baseUrl}('${enc(el.name)}')`,
+                { Type: el.type },
+              );
               return { name: el.name, from, to: el.type };
             }
             if (!from) {
               // Type unreadable — preserve prior behaviour and patch unconditionally.
-              await this.http.request<void>("PATCH", `${baseUrl}('${enc(el.name)}')`, { Type: el.type });
+              await this.http.request<void>(
+                "PATCH",
+                `${baseUrl}('${enc(el.name)}')`,
+                { Type: el.type },
+              );
             }
             return null;
           }
@@ -280,7 +309,8 @@ export class ElementService {
     // are mutually independent (each targets a distinct element), so they fan
     // out with the same bounded concurrency.
     const consolidated = elements.filter(
-      (el) => el.type === "Consolidated" && el.components && el.components.length > 0,
+      (el) =>
+        el.type === "Consolidated" && el.components && el.components.length > 0,
     );
     const pass2 = await mapSettledWithConcurrency(
       consolidated,

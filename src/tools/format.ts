@@ -68,7 +68,10 @@ export function renderKV(obj: Record<string, unknown>, title?: string): string {
   return lines.join("\n");
 }
 
-export function renderTable<T>(rows: readonly T[], columns: Column<T>[]): string {
+export function renderTable<T>(
+  rows: readonly T[],
+  columns: Column<T>[],
+): string {
   if (rows.length === 0) return "_(no rows)_";
   const headers = columns.map((c) => c.header);
   const lines = [

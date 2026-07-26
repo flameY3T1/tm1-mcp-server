@@ -3,7 +3,10 @@ import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { actionResponse } from "../format.js";
 
-export function registerCreateCube(server: McpServer, tm1Client: TM1Client): void {
+export function registerCreateCube(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_create_cube",
     [
@@ -15,8 +18,12 @@ export function registerCreateCube(server: McpServer, tm1Client: TM1Client): voi
     ].join(" "),
     {
       cubeName: z.string().describe("Cube name"),
-      dimensions: z.array(z.string()).min(2)
-        .describe("Ordered list of dimension names. Order affects query performance."),
+      dimensions: z
+        .array(z.string())
+        .min(2)
+        .describe(
+          "Ordered list of dimension names. Order affects query performance.",
+        ),
     },
     async ({ cubeName, dimensions }) => {
       await tm1Client.cubes.create(cubeName, dimensions);

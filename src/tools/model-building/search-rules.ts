@@ -24,7 +24,9 @@ export function registerSearchRules(server: McpServer, tm1Client: TM1Client) {
     {
       pattern: z
         .string()
-        .describe("Regex pattern (JavaScript flavor). Anchors and groups supported."),
+        .describe(
+          "Regex pattern (JavaScript flavor). Anchors and groups supported.",
+        ),
       cubes: z
         .array(z.string())
         .optional()

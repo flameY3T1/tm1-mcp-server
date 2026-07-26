@@ -6,10 +6,20 @@ import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 
 const dataSourceSchema = z
   .object({
-    type: z.enum(["None", "TM1CubeView", "TM1DimensionSubset", "ASCII", "ODBC", "TM1Process"]),
+    type: z.enum([
+      "None",
+      "TM1CubeView",
+      "TM1DimensionSubset",
+      "ASCII",
+      "ODBC",
+      "TM1Process",
+    ]),
     dataSourceNameForServer: z.string().optional(),
     dataSourceNameForClient: z.string().optional(),
-    asciiDelimiterType: z.string().optional().describe("ASCII delimiter type (e.g. 'Character' or 'FixedWidth')"),
+    asciiDelimiterType: z
+      .string()
+      .optional()
+      .describe("ASCII delimiter type (e.g. 'Character' or 'FixedWidth')"),
     asciiDelimiterChar: z.string().optional(),
     asciiQuoteCharacter: z.string().optional(),
     asciiHeaderRecords: z.number().optional(),
@@ -53,7 +63,9 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
       hasSecurityAccess: z
         .boolean()
         .optional()
-        .describe("When set, applies the process's HasSecurityAccess flag via a dedicated PATCH after the other steps."),
+        .describe(
+          "When set, applies the process's HasSecurityAccess flag via a dedicated PATCH after the other steps.",
+        ),
       mode: z.enum(["create", "update", "upsert"]).optional().default("upsert"),
       autoCompile: z
         .boolean()
@@ -63,7 +75,19 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
           "After deploy, run tm1.Compile and include the result in the response (compile: {ok, errorCount, errors}). Off by default — compile holds a brief lock on the process and serializes badly under bulk-deploy.",
         ),
     },
-    async ({ processName, prolog, metadata, data, epilog, parameters, variables, dataSource, hasSecurityAccess, mode, autoCompile }) => {
+    async ({
+      processName,
+      prolog,
+      metadata,
+      data,
+      epilog,
+      parameters,
+      variables,
+      dataSource,
+      hasSecurityAccess,
+      mode,
+      autoCompile,
+    }) => {
       const trail: string[] = [];
       const exists = await tm1Client.processes.exists(processName);
       if (mode === "create" && exists) {
@@ -84,7 +108,12 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
         trail.push("createProcess");
       }
 
-      if (prolog !== undefined || metadata !== undefined || data !== undefined || epilog !== undefined) {
+      if (
+        prolog !== undefined ||
+        metadata !== undefined ||
+        data !== undefined ||
+        epilog !== undefined
+      ) {
         await tm1Client.processes.updateCode(processName, {
           ...(prolog !== undefined ? { prolog } : {}),
           ...(metadata !== undefined ? { metadata } : {}),
@@ -106,7 +135,10 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
         trail.push("updateProcessDataSource");
       }
       if (hasSecurityAccess !== undefined) {
-        await tm1Client.processes.updateSecurityAccess(processName, hasSecurityAccess);
+        await tm1Client.processes.updateSecurityAccess(
+          processName,
+          hasSecurityAccess,
+        );
         trail.push("updateSecurityAccess");
       }
 
@@ -114,7 +146,8 @@ export function registerUpsertProcess(server: McpServer, tm1Client: TM1Client) {
       // 60s callgraph TTL so the next analysis sees fresh references instead of stale graph.
       const { cleared: callgraphEntriesCleared } = invalidateCallgraphCache();
 
-      let compile: { ok: boolean; errorCount: number; errors: unknown[] } | undefined;
+      let compile:
+        { ok: boolean; errorCount: number; errors: unknown[] } | undefined;
       if (autoCompile) {
         const result = await tm1Client.processes.compile(processName);
         compile = {

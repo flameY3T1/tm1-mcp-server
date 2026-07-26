@@ -23,7 +23,9 @@ describe("checkName — cube/dim/process (server-reserved kinds)", () => {
     ["a,b", ","],
   ])("flags server-reserved char in '%s' (%s)", (name, ch) => {
     const v = checkName(name, "cube");
-    expect(v.some((x) => x.rule === "server_reserved_char" && x.char === ch)).toBe(true);
+    expect(
+      v.some((x) => x.rule === "server_reserved_char" && x.char === ch),
+    ).toBe(true);
   });
 
   it("flags control prefix '}'", () => {
@@ -32,12 +34,16 @@ describe("checkName — cube/dim/process (server-reserved kinds)", () => {
   });
 
   it("flags leading/trailing whitespace", () => {
-    expect(checkName(" Sales", "cube").some((x) => x.rule === "leading_trailing_whitespace")).toBe(
-      true,
-    );
-    expect(checkName("Sales ", "cube").some((x) => x.rule === "leading_trailing_whitespace")).toBe(
-      true,
-    );
+    expect(
+      checkName(" Sales", "cube").some(
+        (x) => x.rule === "leading_trailing_whitespace",
+      ),
+    ).toBe(true);
+    expect(
+      checkName("Sales ", "cube").some(
+        (x) => x.rule === "leading_trailing_whitespace",
+      ),
+    ).toBe(true);
   });
 
   it("flags empty / whitespace-only names", () => {
@@ -47,7 +53,9 @@ describe("checkName — cube/dim/process (server-reserved kinds)", () => {
 
   it("flags length > 256", () => {
     const long = "x".repeat(257);
-    expect(checkName(long, "cube").some((x) => x.rule === "length_exceeds")).toBe(true);
+    expect(
+      checkName(long, "cube").some((x) => x.rule === "length_exceeds"),
+    ).toBe(true);
   });
 });
 
@@ -57,8 +65,12 @@ describe("checkName — element (PA 2.0 v11)", () => {
   });
 
   it("flags leading '+' or '-'", () => {
-    expect(checkName("+Special", "element", 11)[0]?.rule).toBe("element_leading_arithmetic");
-    expect(checkName("-Special", "element", 11)[0]?.rule).toBe("element_leading_arithmetic");
+    expect(checkName("+Special", "element", 11)[0]?.rule).toBe(
+      "element_leading_arithmetic",
+    );
+    expect(checkName("-Special", "element", 11)[0]?.rule).toBe(
+      "element_leading_arithmetic",
+    );
   });
 
   it("does NOT flag TAB in v11", () => {
@@ -96,17 +108,27 @@ describe("checkName — processVariable", () => {
   });
 
   it("rejects leading digit", () => {
-    expect(checkName("1var", "processVariable")[0]?.rule).toBe("process_var_leading_non_letter");
+    expect(checkName("1var", "processVariable")[0]?.rule).toBe(
+      "process_var_leading_non_letter",
+    );
   });
 
   it("rejects leading underscore", () => {
-    expect(checkName("_v", "processVariable")[0]?.rule).toBe("process_var_leading_non_letter");
+    expect(checkName("_v", "processVariable")[0]?.rule).toBe(
+      "process_var_leading_non_letter",
+    );
   });
 
   it("rejects disallowed special characters", () => {
-    expect(checkName("v-name", "processVariable")[0]?.rule).toBe("process_var_invalid_char");
-    expect(checkName("v name", "processVariable")[0]?.rule).toBe("process_var_invalid_char");
-    expect(checkName("v@name", "processVariable")[0]?.rule).toBe("process_var_invalid_char");
+    expect(checkName("v-name", "processVariable")[0]?.rule).toBe(
+      "process_var_invalid_char",
+    );
+    expect(checkName("v name", "processVariable")[0]?.rule).toBe(
+      "process_var_invalid_char",
+    );
+    expect(checkName("v@name", "processVariable")[0]?.rule).toBe(
+      "process_var_invalid_char",
+    );
   });
 
   it("rejects empty variable", () => {

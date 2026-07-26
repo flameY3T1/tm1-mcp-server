@@ -10,7 +10,12 @@
 //
 // Everything created is SANDBOX-prefixed; afterAll tears it down idempotently.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getHarness, LIVE_ENABLED, SANDBOX, type LiveHarness } from "./harness.js";
+import {
+  getHarness,
+  LIVE_ENABLED,
+  SANDBOX,
+  type LiveHarness,
+} from "./harness.js";
 
 const PFX = `${SANDBOX}_VIEW`;
 const D1 = `${PFX}_D1`;
@@ -33,8 +38,16 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
     h = await getHarness();
 
     // Clean any leftovers from a crashed prior run so create() calls don't 400.
-    await h.call("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW, confirm: NATIVE_VIEW });
-    await h.call("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW, confirm: MDX_VIEW });
+    await h.call("tm1_delete_view", {
+      cubeName: C1,
+      viewName: NATIVE_VIEW,
+      confirm: NATIVE_VIEW,
+    });
+    await h.call("tm1_delete_view", {
+      cubeName: C1,
+      viewName: MDX_VIEW,
+      confirm: MDX_VIEW,
+    });
     await h.call("tm1_delete_cube", { cubeName: C1, confirm: C1 });
     await h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 });
     await h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 });
@@ -67,14 +80,35 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
         /* already gone */
       }
     };
-    await swallow(h.call("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW, confirm: NATIVE_VIEW }));
-    await swallow(h.call("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW, confirm: MDX_VIEW }));
     await swallow(
-      h.call("tm1_delete_subset", { dimensionName: D1, hierarchyName: D1, subsetName: SUBSET, confirm: SUBSET }),
+      h.call("tm1_delete_view", {
+        cubeName: C1,
+        viewName: NATIVE_VIEW,
+        confirm: NATIVE_VIEW,
+      }),
+    );
+    await swallow(
+      h.call("tm1_delete_view", {
+        cubeName: C1,
+        viewName: MDX_VIEW,
+        confirm: MDX_VIEW,
+      }),
+    );
+    await swallow(
+      h.call("tm1_delete_subset", {
+        dimensionName: D1,
+        hierarchyName: D1,
+        subsetName: SUBSET,
+        confirm: SUBSET,
+      }),
     );
     await swallow(h.call("tm1_delete_cube", { cubeName: C1, confirm: C1 }));
-    await swallow(h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 }));
-    await swallow(h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 }));
+    await swallow(
+      h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 }),
+    );
+    await swallow(
+      h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 }),
+    );
   });
 
   // ---- Subset lifecycle (static element-based) ----
@@ -130,7 +164,9 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
     });
     expect(r.json.expression).toBeTruthy();
     // The dynamic set now resolves every D1 element, including the quote one.
-    expect(r.json.elements).toEqual(expect.arrayContaining(["E1", "E2", QUOTE_EL]));
+    expect(r.json.elements).toEqual(
+      expect.arrayContaining(["E1", "E2", QUOTE_EL]),
+    );
   });
 
   it("delete_subset removes it", async () => {
@@ -154,11 +190,18 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
       rows: [{ dimension: D1, elements: [QUOTE_EL, "E1"] }],
       columns: [{ dimension: D2, elements: ["M1", "M2"] }],
     });
-    expect(r.json).toMatchObject({ success: true, cubeName: C1, viewName: NATIVE_VIEW });
+    expect(r.json).toMatchObject({
+      success: true,
+      cubeName: C1,
+      viewName: NATIVE_VIEW,
+    });
   });
 
   it("get_view executes the native view and returns cells + axes", async () => {
-    const r = await h.ok("tm1_get_view", { cubeName: C1, viewName: NATIVE_VIEW });
+    const r = await h.ok("tm1_get_view", {
+      cubeName: C1,
+      viewName: NATIVE_VIEW,
+    });
     expect(r.json.cubeName).toBe(C1);
     expect(r.json.viewName).toBe(NATIVE_VIEW);
     // get_view returns a page-envelope: cells live under `items` (renamed from
@@ -197,15 +240,18 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
   });
 
   it("delete_view removes the native view", async () => {
-    const r = await h.ok("tm1_delete_view", { cubeName: C1, viewName: NATIVE_VIEW, confirm: NATIVE_VIEW });
+    const r = await h.ok("tm1_delete_view", {
+      cubeName: C1,
+      viewName: NATIVE_VIEW,
+      confirm: NATIVE_VIEW,
+    });
     expect(r.json).toMatchObject({ success: true });
   });
 
   // ---- MDX view ----
 
   it("create_mdx_view + get_view_definition reports type MDX, then delete", async () => {
-    const mdx =
-      `SELECT {[${D2}].[M1]} ON COLUMNS, {[${D1}].[E1]} ON ROWS FROM [${C1}]`;
+    const mdx = `SELECT {[${D2}].[M1]} ON COLUMNS, {[${D1}].[E1]} ON ROWS FROM [${C1}]`;
     const c = await h.ok("tm1_create_mdx_view", {
       cubeName: C1,
       viewName: MDX_VIEW,
@@ -221,7 +267,11 @@ describe.skipIf(!LIVE_ENABLED)("live: view + subset lifecycle", () => {
     expect(typeof def.json.mdx).toBe("string");
     expect(def.json.mdx.length).toBeGreaterThan(0);
 
-    const d = await h.ok("tm1_delete_view", { cubeName: C1, viewName: MDX_VIEW, confirm: MDX_VIEW });
+    const d = await h.ok("tm1_delete_view", {
+      cubeName: C1,
+      viewName: MDX_VIEW,
+      confirm: MDX_VIEW,
+    });
     expect(d.json).toMatchObject({ success: true });
   });
 

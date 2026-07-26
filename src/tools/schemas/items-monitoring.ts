@@ -127,7 +127,9 @@ export const JobItemSchema = z.object({
     })
     .optional(),
   waitingOn: z
-    .array(z.object({ id: z.string(), description: z.string(), state: z.string() }))
+    .array(
+      z.object({ id: z.string(), description: z.string(), state: z.string() }),
+    )
     .optional(),
 });
 

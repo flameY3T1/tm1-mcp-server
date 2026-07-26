@@ -60,7 +60,14 @@ const ODBC = (pw: string) => `ODBCOpen('SalesDSN', 'svc_user', '${pw}');`;
 // Bulk-code stub mirroring the ProcessService.getAllCode overload: plain array
 // without a cap, { items, total } when the tool pushes $top server-side.
 function bulkCodeClient(
-  rows: Array<{ name: string; prolog: string; metadata: string; data: string; epilog: string; hasSecurityAccess: boolean }>,
+  rows: Array<{
+    name: string;
+    prolog: string;
+    metadata: string;
+    data: string;
+    epilog: string;
+    hasSecurityAccess: boolean;
+  }>,
   opts?: { omitCount?: boolean },
 ): TM1Client {
   return {
@@ -68,23 +75,38 @@ function bulkCodeClient(
       getAllCode: async (_includeControl?: boolean, top?: number) =>
         top === undefined
           ? rows
-          : { items: rows.slice(0, top), total: opts?.omitCount ? undefined : rows.length },
+          : {
+              items: rows.slice(0, top),
+              total: opts?.omitCount ? undefined : rows.length,
+            },
     },
   } as unknown as TM1Client;
 }
 
 // A processes stub whose getCode returns per-process code maps.
-function clientWith(codeByProcess: Record<string, Record<string, string>>): TM1Client {
+function clientWith(
+  codeByProcess: Record<string, Record<string, string>>,
+): TM1Client {
   return {
     processes: {
       getCode: async (name: string) => {
         const c = codeByProcess[name] ?? {};
-        return { prolog: c.prolog ?? "", metadata: c.metadata ?? "", data: c.data ?? "", epilog: c.epilog ?? "" };
+        return {
+          prolog: c.prolog ?? "",
+          metadata: c.metadata ?? "",
+          data: c.data ?? "",
+          epilog: c.epilog ?? "",
+        };
       },
       getCodeBlob: async (name: string) => {
         const c = codeByProcess[name] ?? {};
         // Reconstruct the blob from structured code: prolog + metadata + data + epilog
-        return (c.prolog ?? "") + (c.metadata ?? "") + (c.data ?? "") + (c.epilog ?? "");
+        return (
+          (c.prolog ?? "") +
+          (c.metadata ?? "") +
+          (c.data ?? "") +
+          (c.epilog ?? "")
+        );
       },
       getParameters: async () => [],
       getVariables: async () => [],
@@ -98,13 +120,18 @@ describe("tm1_get_process_code masks inline ODBC credentials", () => {
   const client = clientWith({ "Load.Sales": { prolog: ODBC("S3cr3t_Pw!") } });
 
   it("masks the password by default", async () => {
-    const text = await run(registerGetProcessCode, client, { processName: "Load.Sales" });
+    const text = await run(registerGetProcessCode, client, {
+      processName: "Load.Sales",
+    });
     expect(text).not.toContain("S3cr3t_Pw!");
     expect(text).toContain("***");
   });
 
   it("returns raw code when maskSecrets=false", async () => {
-    const text = await run(registerGetProcessCode, client, { processName: "Load.Sales", maskSecrets: false });
+    const text = await run(registerGetProcessCode, client, {
+      processName: "Load.Sales",
+      maskSecrets: false,
+    });
     expect(text).toContain("S3cr3t_Pw!");
   });
 });
@@ -113,13 +140,18 @@ describe("tm1_export_process_to_pro masks inline ODBC credentials", () => {
   const client = clientWith({ "Load.Sales": { prolog: ODBC("S3cr3t_Pw!") } });
 
   it("masks the password in the returned .pro content by default", async () => {
-    const text = await run(registerExportProcessToPro, client, { processName: "Load.Sales" });
+    const text = await run(registerExportProcessToPro, client, {
+      processName: "Load.Sales",
+    });
     expect(text).not.toContain("S3cr3t_Pw!");
     expect(text).toContain("***");
   });
 
   it("returns raw content when maskSecrets=false", async () => {
-    const text = await run(registerExportProcessToPro, client, { processName: "Load.Sales", maskSecrets: false });
+    const text = await run(registerExportProcessToPro, client, {
+      processName: "Load.Sales",
+      maskSecrets: false,
+    });
     expect(text).toContain("S3cr3t_Pw!");
   });
 });
@@ -128,13 +160,18 @@ describe("tm1_export_process_to_git masks inline ODBC credentials", () => {
   const client = clientWith({ "Load.Sales": { prolog: ODBC("S3cr3t_Pw!") } });
 
   it("masks the password in the returned .ti by default", async () => {
-    const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales" });
+    const text = await run(registerExportProcessToGit, client, {
+      processName: "Load.Sales",
+    });
     expect(text).not.toContain("S3cr3t_Pw!");
     expect(text).toContain("***");
   });
 
   it("returns raw .ti when maskSecrets=false", async () => {
-    const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales", maskSecrets: false });
+    const text = await run(registerExportProcessToGit, client, {
+      processName: "Load.Sales",
+      maskSecrets: false,
+    });
     expect(text).toContain("S3cr3t_Pw!");
   });
 
@@ -154,8 +191,14 @@ describe("tm1_export_process_to_git masks inline ODBC credentials", () => {
     });
 
     it("writes masked .ti content to disk by default", async () => {
-      await run(registerExportProcessToGit, client, { processName: "Load.Sales", writeToDir: root });
-      const onDisk = await fs.readFile(path.join(root, "Load.Sales.ti"), "utf8");
+      await run(registerExportProcessToGit, client, {
+        processName: "Load.Sales",
+        writeToDir: root,
+      });
+      const onDisk = await fs.readFile(
+        path.join(root, "Load.Sales.ti"),
+        "utf8",
+      );
       expect(onDisk).not.toContain("S3cr3t_Pw!");
       expect(onDisk).toContain("***");
     });
@@ -164,7 +207,10 @@ describe("tm1_export_process_to_git masks inline ODBC credentials", () => {
     // must NOT be echoed back — otherwise every export doubles into the context
     // window. Metadata (filenames, counts, writtenTo paths) still comes back.
     it("omits json/ti from the response when writeToDir is set", async () => {
-      const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales", writeToDir: root });
+      const text = await run(registerExportProcessToGit, client, {
+        processName: "Load.Sales",
+        writeToDir: root,
+      });
       const res = JSON.parse(text) as Record<string, unknown>;
       expect(res.json).toBeUndefined();
       expect(res.ti).toBeUndefined();
@@ -180,20 +226,29 @@ describe("tm1_export_process_to_git masks inline ODBC credentials", () => {
     // confinement instead of surfacing a raw ENOENT.
     it("creates a missing subdirectory below the root before writing", async () => {
       const nested = path.join(root, "exports", "sales");
-      const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales", writeToDir: nested });
+      const text = await run(registerExportProcessToGit, client, {
+        processName: "Load.Sales",
+        writeToDir: nested,
+      });
       const res = JSON.parse(text) as Record<string, unknown>;
       expect(res.writtenTo).toMatchObject({
         json: path.join(nested, "Load.Sales.json"),
         ti: path.join(nested, "Load.Sales.ti"),
       });
-      const onDisk = await fs.readFile(path.join(nested, "Load.Sales.ti"), "utf8");
+      const onDisk = await fs.readFile(
+        path.join(nested, "Load.Sales.ti"),
+        "utf8",
+      );
       expect(onDisk).toContain("***");
     });
 
     // Same ENOENT gap existed on tm1_export_process_to_pro's writeToFile.
     it("tm1_export_process_to_pro creates missing parent dirs for writeToFile", async () => {
       const target = path.join(root, "pro", "deep", "Load.Sales.pro");
-      const text = await run(registerExportProcessToPro, client, { processName: "Load.Sales", writeToFile: target });
+      const text = await run(registerExportProcessToPro, client, {
+        processName: "Load.Sales",
+        writeToFile: target,
+      });
       const res = JSON.parse(text) as Record<string, unknown>;
       expect(res.writtenTo).toBe(target);
       const onDisk = await fs.readFile(target, "utf8");
@@ -201,7 +256,9 @@ describe("tm1_export_process_to_git masks inline ODBC credentials", () => {
     });
 
     it("echoes json/ti inline when writeToDir is omitted", async () => {
-      const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales" });
+      const text = await run(registerExportProcessToGit, client, {
+        processName: "Load.Sales",
+      });
       const res = JSON.parse(text) as Record<string, unknown>;
       expect(typeof res.json).toBe("string");
       expect(typeof res.ti).toBe("string");
@@ -219,13 +276,20 @@ describe("tm1_diff_processes masks credentials in diff hunks", () => {
   });
 
   it("masks the password in emitted hunk lines by default", async () => {
-    const text = await run(registerDiffProcesses, client, { processA: "A", processB: "B" });
+    const text = await run(registerDiffProcesses, client, {
+      processA: "A",
+      processB: "B",
+    });
     expect(text).not.toContain("S3cr3t_Pw!");
     expect(text).toContain("***");
   });
 
   it("emits the raw password when maskSecrets=false", async () => {
-    const text = await run(registerDiffProcesses, client, { processA: "A", processB: "B", maskSecrets: false });
+    const text = await run(registerDiffProcesses, client, {
+      processA: "A",
+      processB: "B",
+      maskSecrets: false,
+    });
     expect(text).toContain("S3cr3t_Pw!");
   });
 });
@@ -246,8 +310,12 @@ describe("tm1_diff_process_with_file masks both sides before diffing", () => {
   });
 
   it("reports the prolog tab identical when only the password differs (default mask)", async () => {
-    const text = await run(registerDiffProcessWithFile, client, { content: fileContent });
-    const parsed = JSON.parse(text) as { tabs: Array<{ tab: string; identical: boolean }> };
+    const text = await run(registerDiffProcessWithFile, client, {
+      content: fileContent,
+    });
+    const parsed = JSON.parse(text) as {
+      tabs: Array<{ tab: string; identical: boolean }>;
+    };
     const prolog = parsed.tabs.find((t) => t.tab === "prolog")!;
     expect(prolog.identical).toBe(true);
     expect(text).not.toContain("INSTALLED_Pw");
@@ -255,8 +323,13 @@ describe("tm1_diff_process_with_file masks both sides before diffing", () => {
   });
 
   it("reports the prolog tab differing when maskSecrets=false", async () => {
-    const text = await run(registerDiffProcessWithFile, client, { content: fileContent, maskSecrets: false });
-    const parsed = JSON.parse(text) as { tabs: Array<{ tab: string; identical: boolean }> };
+    const text = await run(registerDiffProcessWithFile, client, {
+      content: fileContent,
+      maskSecrets: false,
+    });
+    const parsed = JSON.parse(text) as {
+      tabs: Array<{ tab: string; identical: boolean }>;
+    };
     const prolog = parsed.tabs.find((t) => t.tab === "prolog")!;
     expect(prolog.identical).toBe(false);
   });
@@ -266,7 +339,14 @@ describe("tm1_diff_process_with_file masks both sides before diffing", () => {
 // that skipped masking.
 describe("tm1_get_all_processes_code masks inline ODBC credentials", () => {
   const client = bulkCodeClient([
-    { name: "Load.Sales", prolog: ODBC("Bulk_Pw!"), metadata: "", data: "", epilog: "", hasSecurityAccess: false },
+    {
+      name: "Load.Sales",
+      prolog: ODBC("Bulk_Pw!"),
+      metadata: "",
+      data: "",
+      epilog: "",
+      hasSecurityAccess: false,
+    },
   ]);
 
   it("masks passwords in every returned tab by default", async () => {
@@ -276,7 +356,9 @@ describe("tm1_get_all_processes_code masks inline ODBC credentials", () => {
   });
 
   it("returns raw code when maskSecrets=false", async () => {
-    const text = await run(registerGetAllProcessesCode, client, { maskSecrets: false });
+    const text = await run(registerGetAllProcessesCode, client, {
+      maskSecrets: false,
+    });
     expect(text).toContain("Bulk_Pw!");
   });
 });
@@ -284,13 +366,24 @@ describe("tm1_get_all_processes_code masks inline ODBC credentials", () => {
 // L5: summary mode drops the tab bodies and reports line metrics instead
 // (mirrors tm1_get_all_cube_rules summary mode).
 describe("tm1_get_all_processes_code summary mode", () => {
-  const prolog = ["# header", "# more header", ODBC("Sum_Pw!"), "x = 1;"].join("\n");
+  const prolog = ["# header", "# more header", ODBC("Sum_Pw!"), "x = 1;"].join(
+    "\n",
+  );
   const client = bulkCodeClient([
-    { name: "Load.Sales", prolog, metadata: "# meta only", data: "", epilog: "y = 2;", hasSecurityAccess: true },
+    {
+      name: "Load.Sales",
+      prolog,
+      metadata: "# meta only",
+      data: "",
+      epilog: "y = 2;",
+      hasSecurityAccess: true,
+    },
   ]);
 
   it("returns per-process line metrics and no code bodies", async () => {
-    const text = await run(registerGetAllProcessesCode, client, { summary: true });
+    const text = await run(registerGetAllProcessesCode, client, {
+      summary: true,
+    });
     const parsed = JSON.parse(text) as {
       count: number;
       returned: number;
@@ -314,14 +407,19 @@ describe("tm1_get_all_processes_code summary mode", () => {
   });
 
   it("leaks no credentials even with maskSecrets=false (no code returned)", async () => {
-    const text = await run(registerGetAllProcessesCode, client, { summary: true, maskSecrets: false });
+    const text = await run(registerGetAllProcessesCode, client, {
+      summary: true,
+      maskSecrets: false,
+    });
     expect(text).not.toContain("Sum_Pw!");
     expect(text).not.toContain("ODBCOpen");
   });
 
   it("default mode is unchanged: tab bodies present, no metric fields", async () => {
     const text = await run(registerGetAllProcessesCode, client, {});
-    const parsed = JSON.parse(text) as { processes: Array<Record<string, unknown>> };
+    const parsed = JSON.parse(text) as {
+      processes: Array<Record<string, unknown>>;
+    };
     expect(parsed.processes[0]!.prolog).toContain("ODBCOpen");
     expect(parsed.processes[0]!.totalLines).toBeUndefined();
   });
@@ -358,7 +456,9 @@ describe("tm1_get_all_processes_code default cap", () => {
 
   it("flags count as inexact lower bound when truncated and @odata.count is absent", async () => {
     const noCountClient = bulkCodeClient(rows, { omitCount: true });
-    const parsed = JSON.parse(await run(registerGetAllProcessesCode, noCountClient, {})) as {
+    const parsed = JSON.parse(
+      await run(registerGetAllProcessesCode, noCountClient, {}),
+    ) as {
       count: number;
       countIsExact: boolean;
       truncated: boolean;
@@ -370,7 +470,9 @@ describe("tm1_get_all_processes_code default cap", () => {
   });
 
   it("explicit limit overrides the default cap", async () => {
-    const parsed = JSON.parse(await run(registerGetAllProcessesCode, client, { limit: 10 })) as {
+    const parsed = JSON.parse(
+      await run(registerGetAllProcessesCode, client, { limit: 10 }),
+    ) as {
       count: number;
       returned: number;
       truncated: boolean;
@@ -381,7 +483,9 @@ describe("tm1_get_all_processes_code default cap", () => {
   });
 
   it("limit=0 returns everything uncapped", async () => {
-    const parsed = JSON.parse(await run(registerGetAllProcessesCode, client, { limit: 0 })) as {
+    const parsed = JSON.parse(
+      await run(registerGetAllProcessesCode, client, { limit: 0 }),
+    ) as {
       returned: number;
       truncated: boolean;
     };
@@ -390,7 +494,9 @@ describe("tm1_get_all_processes_code default cap", () => {
   });
 
   it("summary mode surveys all processes by default (no cap)", async () => {
-    const parsed = JSON.parse(await run(registerGetAllProcessesCode, client, { summary: true })) as {
+    const parsed = JSON.parse(
+      await run(registerGetAllProcessesCode, client, { summary: true }),
+    ) as {
       returned: number;
       truncated: boolean;
     };
@@ -400,7 +506,10 @@ describe("tm1_get_all_processes_code default cap", () => {
 
   it("explicit limit also caps summary mode", async () => {
     const parsed = JSON.parse(
-      await run(registerGetAllProcessesCode, client, { summary: true, limit: 5 }),
+      await run(registerGetAllProcessesCode, client, {
+        summary: true,
+        limit: 5,
+      }),
     ) as { returned: number; truncated: boolean; count: number };
     expect(parsed.returned).toBe(5);
     expect(parsed.truncated).toBe(true);
@@ -414,7 +523,8 @@ const ODBC_DS: DataSource = {
   type: "ODBC",
   dataSourceNameForServer: "SalesDSN",
   userName: "svc_user",
-  oDBCConnection: "Driver={SQL Server};Server=srv01;UID=conn_admin;PWD=Conn_Pw!;",
+  oDBCConnection:
+    "Driver={SQL Server};Server=srv01;UID=conn_admin;PWD=Conn_Pw!;",
 };
 
 function clientWithDs(ds: DataSource): TM1Client {
@@ -434,14 +544,19 @@ describe("tm1_get_process_datasource masks conn-string credentials", () => {
   const client = clientWithDs(ODBC_DS);
 
   it("masks PWD/UID pairs by default", async () => {
-    const text = await run(registerGetProcessDatasource, client, { processName: "Load.Sales" });
+    const text = await run(registerGetProcessDatasource, client, {
+      processName: "Load.Sales",
+    });
     expect(text).not.toContain("Conn_Pw!");
     expect(text).not.toContain("conn_admin");
     expect(text).toContain("Driver={SQL Server}");
   });
 
   it("returns the raw connection string when maskSecrets=false", async () => {
-    const text = await run(registerGetProcessDatasource, client, { processName: "Load.Sales", maskSecrets: false });
+    const text = await run(registerGetProcessDatasource, client, {
+      processName: "Load.Sales",
+      maskSecrets: false,
+    });
     expect(text).toContain("Conn_Pw!");
   });
 });
@@ -450,13 +565,18 @@ describe("tm1_export_process_to_git masks the datasource conn-string in .json", 
   const client = clientWithDs(ODBC_DS);
 
   it("masks PWD/UID pairs in the emitted json by default", async () => {
-    const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales" });
+    const text = await run(registerExportProcessToGit, client, {
+      processName: "Load.Sales",
+    });
     expect(text).not.toContain("Conn_Pw!");
     expect(text).not.toContain("conn_admin");
   });
 
   it("emits the raw connection string when maskSecrets=false", async () => {
-    const text = await run(registerExportProcessToGit, client, { processName: "Load.Sales", maskSecrets: false });
+    const text = await run(registerExportProcessToGit, client, {
+      processName: "Load.Sales",
+      maskSecrets: false,
+    });
     expect(text).toContain("Conn_Pw!");
   });
 });

@@ -117,10 +117,14 @@ describe("maskCode", () => {
 
 describe("maskConnectionString", () => {
   it("masks PWD and UID values, keeps non-credential pairs", () => {
-    const out = maskConnectionString("Driver={SQL Server};Server=srv01;UID=admin;PWD=hunter2;Database=Sales");
+    const out = maskConnectionString(
+      "Driver={SQL Server};Server=srv01;UID=admin;PWD=hunter2;Database=Sales",
+    );
     expect(out).not.toContain("hunter2");
     expect(out).not.toContain("admin");
-    expect(out).toBe(`Driver={SQL Server};Server=srv01;UID=${MASK};PWD=${MASK};Database=Sales`);
+    expect(out).toBe(
+      `Driver={SQL Server};Server=srv01;UID=${MASK};PWD=${MASK};Database=Sales`,
+    );
   });
 
   it("masks Password= and User Id= variants case-insensitively", () => {
@@ -130,14 +134,19 @@ describe("maskConnectionString", () => {
   });
 
   it("leaves credential-free connection strings unchanged", () => {
-    const conn = "Driver={SQL Server};Server=srv01;Database=Sales;Trusted_Connection=yes";
+    const conn =
+      "Driver={SQL Server};Server=srv01;Database=Sales;Trusted_Connection=yes";
     expect(maskConnectionString(conn)).toBe(conn);
   });
 });
 
 describe("maskDataSourceSecrets", () => {
   it("masks oDBCConnection and preserves the other fields", () => {
-    const ds = { type: "ODBC", userName: "svc", oDBCConnection: "DSN=Sales;UID=admin;PWD=hunter2;" };
+    const ds = {
+      type: "ODBC",
+      userName: "svc",
+      oDBCConnection: "DSN=Sales;UID=admin;PWD=hunter2;",
+    };
     const out = maskDataSourceSecrets(ds);
     expect(out.oDBCConnection).not.toContain("hunter2");
     expect(out.oDBCConnection).toContain(MASK);

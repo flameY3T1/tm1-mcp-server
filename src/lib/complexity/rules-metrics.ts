@@ -47,7 +47,10 @@ function stripQuotes(s: string): string {
   return s.replace(/^(['"])(.*)\1$/, "$2");
 }
 
-export function computeRulesMetrics(cube: string, rulesText: string): RulesMetrics {
+export function computeRulesMetrics(
+  cube: string,
+  rulesText: string,
+): RulesMetrics {
   if (!rulesText || rulesText.trim() === "") {
     return {
       cube,

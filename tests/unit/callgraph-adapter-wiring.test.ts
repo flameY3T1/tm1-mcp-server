@@ -48,7 +48,10 @@ describe("A4 — callgraph cache-invalidation wiring is explicit", () => {
     await buildIndexFromTM1(stubClient);
     expect(getCallgraphCacheStats()).toHaveLength(1);
 
-    tm1Events.emit("mutation", { method: "POST", path: "/Cubes('c')/tm1.Update" });
+    tm1Events.emit("mutation", {
+      method: "POST",
+      path: "/Cubes('c')/tm1.Update",
+    });
     expect(getCallgraphCacheStats()).toHaveLength(0);
   });
 });

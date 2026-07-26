@@ -70,7 +70,7 @@ describe("SessionManager", () => {
           ok: true,
           status: 200,
           setCookie: `TM1SessionId=${sessionId}; Path=/; HttpOnly`,
-        })
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
@@ -80,7 +80,9 @@ describe("SessionManager", () => {
       expect(fetchSpy).toHaveBeenCalledOnce();
 
       const [url, opts] = fetchSpy.mock.calls[0];
-      expect(url).toBe("https://tm1server:8010/api/v1/Configuration/ProductVersion");
+      expect(url).toBe(
+        "https://tm1server:8010/api/v1/Configuration/ProductVersion",
+      );
       expect(opts.method).toBe("GET");
 
       const expectedAuth = `Basic ${Buffer.from("admin:secret").toString("base64")}`;
@@ -89,7 +91,10 @@ describe("SessionManager", () => {
 
     it("short-circuits to the current cookie when staleCookie was already rotated (no re-login)", async () => {
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=fresh; Path=/" })
+        mockFetchResponse({
+          ok: true,
+          setCookie: "TM1SessionId=fresh; Path=/",
+        }),
       );
       const sm = new SessionManager(makeConfig(), mockLogger);
       const first = await sm.authenticate();
@@ -107,11 +112,11 @@ describe("SessionManager", () => {
     it("performs a full re-auth when staleCookie matches the current session (genuine expiry)", async () => {
       fetchSpy
         .mockResolvedValueOnce(
-          mockFetchResponse({ ok: true, setCookie: "TM1SessionId=c1; Path=/" })
+          mockFetchResponse({ ok: true, setCookie: "TM1SessionId=c1; Path=/" }),
         )
         .mockResolvedValueOnce(mockFetchResponse({ ok: true })) // logout DELETE of c1
         .mockResolvedValueOnce(
-          mockFetchResponse({ ok: true, setCookie: "TM1SessionId=c2; Path=/" })
+          mockFetchResponse({ ok: true, setCookie: "TM1SessionId=c2; Path=/" }),
         );
       const sm = new SessionManager(makeConfig(), mockLogger);
       const first = await sm.authenticate();
@@ -128,7 +133,7 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=sess1; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
@@ -140,24 +145,28 @@ describe("SessionManager", () => {
 
     it("should throw when authentication returns non-OK status", async () => {
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: false, status: 401, statusText: "Unauthorized" })
+        mockFetchResponse({
+          ok: false,
+          status: 401,
+          statusText: "Unauthorized",
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
       await expect(sm.authenticate()).rejects.toThrow(
-        "Authentication failed with status 401: Unauthorized"
+        "Authentication failed with status 401: Unauthorized",
       );
       expect(sm.isSessionActive()).toBe(false);
     });
 
     it("should throw when no TM1SessionId cookie in response", async () => {
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: true, setCookie: null })
+        mockFetchResponse({ ok: true, setCookie: null }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
       await expect(sm.authenticate()).rejects.toThrow(
-        "no TM1SessionId cookie found"
+        "no TM1SessionId cookie found",
       );
     });
 
@@ -166,15 +175,18 @@ describe("SessionManager", () => {
         (_url: string, opts: { signal: AbortSignal }) =>
           new Promise((_resolve, reject) => {
             opts.signal.addEventListener("abort", () => {
-              const err = new DOMException("The operation was aborted.", "AbortError");
+              const err = new DOMException(
+                "The operation was aborted.",
+                "AbortError",
+              );
               reject(err);
             });
-          })
+          }),
       );
 
       const sm = new SessionManager(
         makeConfig({ requestTimeoutMs: 50 }),
-        mockLogger
+        mockLogger,
       );
       await expect(sm.authenticate()).rejects.toThrow("timed out");
     });
@@ -184,12 +196,12 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=tok; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(
         makeConfig({ user: "user@domain", password: "p@ss:word!" }),
-        mockLogger
+        mockLogger,
       );
       await sm.authenticate();
 
@@ -200,12 +212,12 @@ describe("SessionManager", () => {
 
     it("should send CAMNamespace auth when namespace is configured", async () => {
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" })
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" }),
       );
 
       const sm = new SessionManager(
         makeConfig({ user: "alice", password: "pw", namespace: "LDAP" }),
-        mockLogger
+        mockLogger,
       );
       await sm.authenticate();
 
@@ -217,13 +229,13 @@ describe("SessionManager", () => {
 
     it("should send CAMPassport auth when a passport is configured", async () => {
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" })
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" }),
       );
 
       const sm = new SessionManager(
         // Passport mode ignores user/password and namespace.
         makeConfig({ user: "", password: "", camPassport: "PASSPORT_TOKEN" }),
-        mockLogger
+        mockLogger,
       );
       await sm.authenticate();
 
@@ -233,12 +245,12 @@ describe("SessionManager", () => {
 
     it("should prefer passport over namespace when both are set", async () => {
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" })
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" }),
       );
 
       const sm = new SessionManager(
         makeConfig({ namespace: "LDAP", camPassport: "PT" }),
-        mockLogger
+        mockLogger,
       );
       await sm.authenticate();
 
@@ -259,7 +271,10 @@ describe("SessionManager", () => {
       });
       const sm = new SessionManager(config, mockLogger);
       fetchSpy.mockResolvedValue(
-        mockFetchResponse({ status: 201, setCookie: "TM1SessionId=jwt-abc; Path=/; HttpOnly" }),
+        mockFetchResponse({
+          status: 201,
+          setCookie: "TM1SessionId=jwt-abc; Path=/; HttpOnly",
+        }),
       );
 
       const cookie = await sm.authenticate();
@@ -269,7 +284,9 @@ describe("SessionManager", () => {
       expect(url).toBe("http://host:4444/tm1/auth/v1/session");
       expect(init.method).toBe("POST");
       expect(init.body).toBe(JSON.stringify({ User: "admin" }));
-      expect(init.headers.Authorization).toBe("Basic " + Buffer.from("cid:csec").toString("base64"));
+      expect(init.headers.Authorization).toBe(
+        "Basic " + Buffer.from("cid:csec").toString("base64"),
+      );
     });
 
     it("v12 keepAlive targets the database-rooted ActiveSession", async () => {
@@ -284,13 +301,18 @@ describe("SessionManager", () => {
       });
       const sm = new SessionManager(config, mockLogger);
       fetchSpy.mockResolvedValue(
-        mockFetchResponse({ status: 201, setCookie: "TM1SessionId=jwt; Path=/" }),
+        mockFetchResponse({
+          status: 201,
+          setCookie: "TM1SessionId=jwt; Path=/",
+        }),
       );
       await sm.authenticate();
       fetchSpy.mockResolvedValue(mockFetchResponse({ ok: true, status: 200 }));
       await sm.keepAlive();
       const lastUrl = fetchSpy.mock.calls.at(-1)![0];
-      expect(lastUrl).toBe("http://host:4444/tm1/api/v1/Databases('db1')/ActiveSession");
+      expect(lastUrl).toBe(
+        "http://host:4444/tm1/api/v1/Databases('db1')/ActiveSession",
+      );
     });
   });
 
@@ -300,7 +322,7 @@ describe("SessionManager", () => {
       // 401 handler. They must share one login, not open two sessions and
       // clobber each other's cookie.
       fetchSpy.mockResolvedValue(
-        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" })
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=tok; Path=/" }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
@@ -315,7 +337,10 @@ describe("SessionManager", () => {
     it("clears the session cookie on keep-alive timeout to force re-auth", async () => {
       // Initial auth succeeds.
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=sess1; Path=/" })
+        mockFetchResponse({
+          ok: true,
+          setCookie: "TM1SessionId=sess1; Path=/",
+        }),
       );
       // Keep-alive hangs until its timeout aborts the request.
       fetchSpy.mockImplementationOnce(
@@ -324,12 +349,12 @@ describe("SessionManager", () => {
             opts.signal.addEventListener("abort", () => {
               reject(new DOMException("The operation aborted.", "AbortError"));
             });
-          })
+          }),
       );
 
       const sm = new SessionManager(
         makeConfig({ requestTimeoutMs: 50 }),
-        mockLogger
+        mockLogger,
       );
       await sm.authenticate();
       expect(sm.isSessionActive()).toBe(true);
@@ -345,11 +370,11 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=sess1; Path=/",
-        })
+        }),
       );
       // Then keep-alive
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: true, status: 200 })
+        mockFetchResponse({ ok: true, status: 200 }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
@@ -369,11 +394,15 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=old; Path=/",
-        })
+        }),
       );
       // Keep-alive returns 401
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: false, status: 401, statusText: "Unauthorized" })
+        mockFetchResponse({
+          ok: false,
+          status: 401,
+          statusText: "Unauthorized",
+        }),
       );
       // Re-auth flow: doAuthenticate logs out the (now-dead) "old" session
       // first — a best-effort DELETE — then performs the fresh login. The
@@ -381,13 +410,13 @@ describe("SessionManager", () => {
       // concurrent rotation isn't clobbered (staggered-401 churn fix), which is
       // why the logout round-trip is now observable here.
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: true }) // logout DELETE
+        mockFetchResponse({ ok: true }), // logout DELETE
       );
       fetchSpy.mockResolvedValueOnce(
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=new; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
@@ -403,7 +432,7 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=fresh; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
@@ -418,15 +447,21 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=sess1; Path=/",
-        })
+        }),
       );
       fetchSpy.mockResolvedValueOnce(
-        mockFetchResponse({ ok: false, status: 500, statusText: "Internal Server Error" })
+        mockFetchResponse({
+          ok: false,
+          status: 500,
+          statusText: "Internal Server Error",
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
       await sm.authenticate();
-      await expect(sm.keepAlive()).rejects.toThrow("Keep-alive failed with status 500");
+      await expect(sm.keepAlive()).rejects.toThrow(
+        "Keep-alive failed with status 500",
+      );
     });
   });
 
@@ -436,7 +471,7 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=existing; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
@@ -453,7 +488,7 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=new; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);
@@ -479,12 +514,12 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=sess1; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(
         makeConfig({ keepAliveIntervalMs: 1000 }),
-        mockLogger
+        mockLogger,
       );
       await sm.authenticate();
 
@@ -503,12 +538,12 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=sess1; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(
         makeConfig({ keepAliveIntervalMs: 1000 }),
-        mockLogger
+        mockLogger,
       );
       await sm.authenticate();
 
@@ -526,12 +561,12 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=sess1; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(
         makeConfig({ keepAliveIntervalMs: 1000 }),
-        mockLogger
+        mockLogger,
       );
       await sm.authenticate();
 
@@ -557,7 +592,7 @@ describe("SessionManager", () => {
         mockFetchResponse({
           ok: true,
           setCookie: "TM1SessionId=sess1; Path=/",
-        })
+        }),
       );
 
       const sm = new SessionManager(makeConfig(), mockLogger);

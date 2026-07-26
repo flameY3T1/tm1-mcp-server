@@ -9,7 +9,10 @@ interface Orphan {
   hierarchies: string[];
 }
 
-export function registerFindOrphanDimensions(server: McpServer, tm1Client: TM1Client) {
+export function registerFindOrphanDimensions(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_find_orphan_dimensions",
     [
@@ -21,7 +24,9 @@ export function registerFindOrphanDimensions(server: McpServer, tm1Client: TM1Cl
         .boolean()
         .optional()
         .default(false)
-        .describe("Include control dimensions whose names start with '}' (default: false)."),
+        .describe(
+          "Include control dimensions whose names start with '}' (default: false).",
+        ),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
     },
@@ -56,7 +61,10 @@ export function registerFindOrphanDimensions(server: McpServer, tm1Client: TM1Cl
         { header: "name", get: (o) => o.name },
         { header: "hierarchies", get: (o) => o.hierarchies },
       ];
-      return wrappedPageResponse(wrapper, page, format, { title: "Orphan dimensions", columns });
+      return wrappedPageResponse(wrapper, page, format, {
+        title: "Orphan dimensions",
+        columns,
+      });
     },
   );
 }

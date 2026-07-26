@@ -88,8 +88,11 @@ describe("Property 17: Log-Eintrags-Struktur", () => {
     const endpointArb = fc.stringMatching(/^\/api\/v1\/[A-Za-z]+$/);
     const statusArb = fc.integer({ min: 400, max: 599 });
     const codeArb = fc.constantFrom(
-      "CONNECTION_FAILED", "AUTH_FAILED", "PERMISSION_DENIED",
-      "NOT_FOUND", "TM1_ERROR",
+      "CONNECTION_FAILED",
+      "AUTH_FAILED",
+      "PERMISSION_DENIED",
+      "NOT_FOUND",
+      "TM1_ERROR",
     );
 
     fc.assert(

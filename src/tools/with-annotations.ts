@@ -50,7 +50,9 @@ function slimToolsListResult(result: unknown): unknown {
     ...listing,
     tools: listing.tools.map((entry) => {
       if (!entry || typeof entry !== "object") return entry;
-      const tool: Record<string, unknown> = { ...(entry as Record<string, unknown>) };
+      const tool: Record<string, unknown> = {
+        ...(entry as Record<string, unknown>),
+      };
       if (tool.inputSchema !== undefined) {
         tool.inputSchema = slimJsonSchema(tool.inputSchema);
       }

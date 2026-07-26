@@ -7,7 +7,10 @@ import { resolveLocalPath } from "../local-file.js";
 import { serializeToPro } from "../../lib/pro-serializer.js";
 import { maskCode } from "../../lib/mask-secrets.js";
 
-export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Client) {
+export function registerExportProcessToPro(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_export_process_to_pro",
     [
@@ -21,7 +24,9 @@ export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Clie
       writeToFile: z
         .string()
         .optional()
-        .describe("Optional absolute host path to write the .pro file to. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. If omitted, content is only returned inline."),
+        .describe(
+          "Optional absolute host path to write the .pro file to. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. If omitted, content is only returned inline.",
+        ),
       maskSecrets: z
         .boolean()
         .optional()
@@ -62,18 +67,20 @@ export function registerExportProcessToPro(server: McpServer, tm1Client: TM1Clie
       }
 
       return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({
-            processName,
-            byteLength: Buffer.byteLength(proContent, "utf8"),
-            writtenTo,
-            parameterCount: parameters.length,
-            variableCount: variables.length,
-            dataSourceType: dataSource.type,
-            content: proContent,
-          }),
-        }],
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              processName,
+              byteLength: Buffer.byteLength(proContent, "utf8"),
+              writtenTo,
+              parameterCount: parameters.length,
+              variableCount: variables.length,
+              dataSourceType: dataSource.type,
+              content: proContent,
+            }),
+          },
+        ],
       };
     },
   );

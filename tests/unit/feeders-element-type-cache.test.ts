@@ -5,7 +5,9 @@ interface HierarchyMock {
   get: ReturnType<typeof vi.fn>;
 }
 
-function makeHierarchyMock(map: Record<string, Array<{ name: string; type: string }>>): HierarchyMock {
+function makeHierarchyMock(
+  map: Record<string, Array<{ name: string; type: string }>>,
+): HierarchyMock {
   return {
     get: vi.fn(async (dim: string, hier: string) => {
       const key = `${dim}|${hier}`;
@@ -35,7 +37,9 @@ describe("ElementTypeCache", () => {
     });
     const cache = new ElementTypeCache(hier as never);
 
-    expect(await cache.getType("Region", "Region", "Total")).toBe("Consolidated");
+    expect(await cache.getType("Region", "Region", "Total")).toBe(
+      "Consolidated",
+    );
     expect(await cache.getType("Region", "Region", "DE")).toBe("Numeric");
   });
 

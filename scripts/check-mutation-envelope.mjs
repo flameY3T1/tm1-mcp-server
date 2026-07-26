@@ -55,13 +55,19 @@ for (const file of walk(toolsDir)) {
   const src = readFileSync(file, "utf8");
 
   if (DIRECT_RE.test(src)) {
-    offenders.push({ file: rel, kind: "JSON.stringify({ success: true, ... })" });
+    offenders.push({
+      file: rel,
+      kind: "JSON.stringify({ success: true, ... })",
+    });
     continue;
   }
   for (const m of src.matchAll(VAR_DECL_RE)) {
     const name = m[1];
     if (new RegExp(`JSON\\.stringify\\(\\s*${name}\\s*\\)`).test(src)) {
-      offenders.push({ file: rel, kind: `JSON.stringify(${name}) where ${name} = { success: true, ... }` });
+      offenders.push({
+        file: rel,
+        kind: `JSON.stringify(${name}) where ${name} = { success: true, ... }`,
+      });
       break;
     }
   }

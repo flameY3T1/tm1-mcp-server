@@ -75,7 +75,9 @@ describe("TM1Client – createNative()", () => {
     });
 
     const [url, opts] = fetchSpy.mock.calls[0];
-    expect(decodeURIComponent(String(url))).toContain("/api/v1/Cubes('Sales')/Views");
+    expect(decodeURIComponent(String(url))).toContain(
+      "/api/v1/Cubes('Sales')/Views",
+    );
     expect(opts.method).toBe("POST");
 
     const body = JSON.parse(opts.body);
@@ -136,7 +138,9 @@ describe("TM1Client – createNative()", () => {
     await client.views.createNative("Sales", "MyView", {
       columns: [{ dimension: "Time", subset: "All Months" }],
       rows: [{ dimension: "Region", subset: "All Regions" }],
-      titles: [{ dimension: "Version", elements: ["Actual"], selected: "Actual" }],
+      titles: [
+        { dimension: "Version", elements: ["Actual"], selected: "Actual" },
+      ],
       suppressEmptyColumns: true,
       suppressEmptyRows: true,
       formatString: "0.#########",
@@ -162,15 +166,29 @@ describe("TM1Client – createNative()", () => {
         mockResponse({
           Titles: [
             {
-              Subset: { Name: "", Expression: "{TM1SUBSETALL([Version])}", Hierarchy: { Name: "Version", Dimension: { Name: "Version" } } },
+              Subset: {
+                Name: "",
+                Expression: "{TM1SUBSETALL([Version])}",
+                Hierarchy: { Name: "Version", Dimension: { Name: "Version" } },
+              },
               Selected: { Name: "Actual" },
             },
           ],
           Columns: [
-            { Subset: { Name: "All Months", Hierarchy: { Name: "Time", Dimension: { Name: "Time" } } } },
+            {
+              Subset: {
+                Name: "All Months",
+                Hierarchy: { Name: "Time", Dimension: { Name: "Time" } },
+              },
+            },
           ],
           Rows: [
-            { Subset: { Name: "All Regions", Hierarchy: { Name: "Region", Dimension: { Name: "Region" } } } },
+            {
+              Subset: {
+                Name: "All Regions",
+                Hierarchy: { Name: "Region", Dimension: { Name: "Region" } },
+              },
+            },
           ],
         }),
       );
@@ -184,10 +202,16 @@ describe("TM1Client – createNative()", () => {
     expect(nativeUrl).not.toContain("Titles($expand");
     expect(nativeUrl).not.toContain("Columns($expand");
     expect(nativeUrl).not.toContain("Rows($expand");
-    expect(nativeUrl).toContain("Titles/Subset($expand=Hierarchy($expand=Dimension))");
+    expect(nativeUrl).toContain(
+      "Titles/Subset($expand=Hierarchy($expand=Dimension))",
+    );
     expect(nativeUrl).toContain("Titles/Selected");
-    expect(nativeUrl).toContain("Columns/Subset($expand=Hierarchy($expand=Dimension))");
-    expect(nativeUrl).toContain("Rows/Subset($expand=Hierarchy($expand=Dimension))");
+    expect(nativeUrl).toContain(
+      "Columns/Subset($expand=Hierarchy($expand=Dimension))",
+    );
+    expect(nativeUrl).toContain(
+      "Rows/Subset($expand=Hierarchy($expand=Dimension))",
+    );
 
     expect(def.type).toBe("Native");
     expect(def.native?.columns[0]).toEqual({
@@ -226,7 +250,9 @@ describe("TM1Client – createNative()", () => {
 
     await expect(
       client.views.createNative("Sales", "Bad", {
-        columns: [{ dimension: "Time", subset: "S", expression: "{[Time].[Jan]}" }],
+        columns: [
+          { dimension: "Time", subset: "S", expression: "{[Time].[Jan]}" },
+        ],
         rows: [{ dimension: "Region", subset: "All Regions" }],
       }),
     ).rejects.toThrow(/exactly one of/i);
@@ -240,7 +266,9 @@ describe("TM1Client – createNative()", () => {
     await client.views.createNative("Sales", "MyView", {
       columns: [{ dimension: "Dim'One", elements: ["Elem'A", "Elem'B"] }],
       rows: [{ dimension: "Dim'Two", subset: "Sub'Set" }],
-      titles: [{ dimension: "Dim'Three", elements: ["Val'X"], selected: "Val'X" }],
+      titles: [
+        { dimension: "Dim'Three", elements: ["Val'X"], selected: "Val'X" },
+      ],
     });
 
     const body = JSON.parse(fetchSpy.mock.calls[0][1].body);

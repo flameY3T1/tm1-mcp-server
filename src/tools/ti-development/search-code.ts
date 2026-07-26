@@ -34,31 +34,43 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         .string()
         .min(1)
         .max(2000)
-        .describe("Regex pattern (JavaScript flavor). Anchors and groups supported."),
+        .describe(
+          "Regex pattern (JavaScript flavor). Anchors and groups supported.",
+        ),
       tabs: z
         .array(z.enum(["prolog", "metadata", "data", "epilog"]))
         .optional()
         .describe("Tabs to search (default: all four)"),
-      caseSensitive: z.boolean().optional().default(false).describe("Case-sensitive match (default false)"),
+      caseSensitive: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Case-sensitive match (default false)"),
       includeControl: z
         .boolean()
         .optional()
         .default(false)
-        .describe("Include TM1 control processes ('}'-prefixed). Default false."),
+        .describe(
+          "Include TM1 control processes ('}'-prefixed). Default false.",
+        ),
       maxMatchesPerProcess: z
         .number()
         .int()
         .positive()
         .optional()
         .default(20)
-        .describe("Cap matches per process to avoid runaway output (default 20)"),
+        .describe(
+          "Cap matches per process to avoid runaway output (default 20)",
+        ),
       maxTotalMatches: z
         .number()
         .int()
         .positive()
         .optional()
         .default(500)
-        .describe("Hard cap on total matches across all processes (default 500)"),
+        .describe(
+          "Hard cap on total matches across all processes (default 500)",
+        ),
       maskSecrets: z
         .boolean()
         .optional()
@@ -70,24 +82,26 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         .boolean()
         .optional()
         .default(false)
-        .describe("Skip lines beginning with '#' or '//' (TI comment markers). Default: false."),
+        .describe(
+          "Skip lines beginning with '#' or '//' (TI comment markers). Default: false.",
+        ),
       deduplicateByLine: z
         .boolean()
         .optional()
         .default(false)
         .describe(
           "Collapse matches with identical (tab, line-text) across processes into one result. " +
-          "The first-seen process is kept; others go into alsoFoundIn[]. " +
-          "Drastically reduces output on servers with many process variants. Default: false.",
+            "The first-seen process is kept; others go into alsoFoundIn[]. " +
+            "Drastically reduces output on servers with many process variants. Default: false.",
         ),
       groupBy: z
         .enum(["process", "tab"])
         .optional()
         .describe(
           "Aggregate mode. Instead of individual match lines, return counts grouped by process or tab, " +
-          "sorted by matchCount desc. Answers 'which process has the most X calls' in a tiny payload " +
-          "instead of dumping every matching line. Counts are complete: maxMatchesPerProcess/maxTotalMatches " +
-          "and maskSecrets do not apply in this mode.",
+            "sorted by matchCount desc. Answers 'which process has the most X calls' in a tiny payload " +
+            "instead of dumping every matching line. Counts are complete: maxMatchesPerProcess/maxTotalMatches " +
+            "and maskSecrets do not apply in this mode.",
         ),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
@@ -175,7 +189,9 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
             const raw = lines[i]!;
             if (excludeCommented && COMMENT_RE.test(raw)) continue;
             if (regex.test(raw)) {
-              const text = (maskSecrets ? maskCodeLine(raw) : raw).trim().slice(0, 240);
+              const text = (maskSecrets ? maskCodeLine(raw) : raw)
+                .trim()
+                .slice(0, 240);
               matches.push({ process: proc.name, tab, line: i + 1, text });
               perProcess++;
               if (matches.length >= maxTotalMatches) {
@@ -227,7 +243,10 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
         { header: "line", get: (m) => m.line },
         { header: "text", get: (m) => m.text },
       ];
-      return wrappedPageResponse(wrapper, page, format, { title: `Search: ${pattern}`, columns });
+      return wrappedPageResponse(wrapper, page, format, {
+        title: `Search: ${pattern}`,
+        columns,
+      });
     },
   );
 }

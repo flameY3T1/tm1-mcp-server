@@ -9,7 +9,12 @@ function makeFakeServer() {
   let toolName = "";
   let parser: z.ZodObject<ZodRawShape> | null = null;
   const server = {
-    tool: (name: string, _d: string, schema: ZodRawShape, handler: ToolHandler) => {
+    tool: (
+      name: string,
+      _d: string,
+      schema: ZodRawShape,
+      handler: ToolHandler,
+    ) => {
       toolName = name;
       parser = z.object(schema);
       captured = handler;
@@ -73,13 +78,19 @@ function parseResult(raw: unknown) {
 describe("tm1_audit_complexity tool", () => {
   it("registers under the expected name", () => {
     const fake = makeFakeServer();
-    registerAuditComplexity(fake.server, makeFakeTM1Client({ productVersion: "11.8" }));
+    registerAuditComplexity(
+      fake.server,
+      makeFakeTM1Client({ productVersion: "11.8" }),
+    );
     expect(fake.getName()).toBe("tm1_audit_complexity");
   });
 
   it("returns pass when no objects exist", async () => {
     const fake = makeFakeServer();
-    registerAuditComplexity(fake.server, makeFakeTM1Client({ productVersion: "11.8" }));
+    registerAuditComplexity(
+      fake.server,
+      makeFakeTM1Client({ productVersion: "11.8" }),
+    );
     const out = parseResult(await fake.getHandler()({}));
     expect(out.status).toBe("pass");
     expect(out.scanned.processes).toBe(0);
@@ -113,7 +124,13 @@ describe("tm1_audit_complexity tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
       processes: [
-        { name: "}Stats_Process", prolog: "x=1;", metadata: "", data: "", epilog: "" },
+        {
+          name: "}Stats_Process",
+          prolog: "x=1;",
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
         { name: "Real", prolog: "y=2;", metadata: "", data: "", epilog: "" },
       ],
     });
@@ -128,7 +145,11 @@ describe("tm1_audit_complexity tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
       rules: [
-        { cubeName: "WithCheck", rulesText: "skipcheck;\n['A']=N:1;", skipCheck: true },
+        {
+          cubeName: "WithCheck",
+          rulesText: "skipcheck;\n['A']=N:1;",
+          skipCheck: true,
+        },
         { cubeName: "NoCheck", rulesText: "['A']=N:1;", skipCheck: false },
       ],
     });
@@ -144,7 +165,13 @@ describe("tm1_audit_complexity tool", () => {
       productVersion: "11.8",
       processes: [
         { name: "Load_Sales", prolog: "", metadata: "", data: "", epilog: "" },
-        { name: "Aggregate_Sales", prolog: "", metadata: "", data: "", epilog: "" },
+        {
+          name: "Aggregate_Sales",
+          prolog: "",
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
       ],
       variables: {
         Load_Sales: [
@@ -158,7 +185,9 @@ describe("tm1_audit_complexity tool", () => {
       },
     });
     registerAuditComplexity(fake.server, tm1);
-    const out = parseResult(await fake.getHandler()({ scope: ["consistency"] }));
+    const out = parseResult(
+      await fake.getHandler()({ scope: ["consistency"] }),
+    );
     expect(out.consistency.variableClusters).toHaveLength(1);
     expect(out.consistency.variableClusters[0].normalized).toBe("year");
     expect(out.consistency.typeConflicts).toHaveLength(1);
@@ -179,7 +208,9 @@ describe("tm1_audit_complexity tool", () => {
     }));
     const tm1 = makeFakeTM1Client({ productVersion: "11.8", processes: procs });
     registerAuditComplexity(fake.server, tm1);
-    const out = parseResult(await fake.getHandler()({ scope: ["processes"], topN: 5 }));
+    const out = parseResult(
+      await fake.getHandler()({ scope: ["processes"], topN: 5 }),
+    );
     expect(out.scanned.processes).toBe(30);
     expect(out.topProcesses).toHaveLength(5);
     expect(out.truncated.processes).toBe(true);
@@ -224,7 +255,10 @@ describe("tm1_audit_complexity tool", () => {
 
   // FlatBig: 10 sibling IFs (branch-heavy, no loops) -> high v1, modest v2.
   // DeepLoop: 4 nested whiles -> modest v1, high v2 (loop nesting multiplies).
-  const FLAT_BIG = Array.from({ length: 10 }, () => "IF(x=1);\na=1;\nENDIF;").join("\n");
+  const FLAT_BIG = Array.from(
+    { length: 10 },
+    () => "IF(x=1);\na=1;\nENDIF;",
+  ).join("\n");
   const DEEP_LOOP =
     "WHILE(a<1);\nWHILE(b<1);\nWHILE(c<1);\nWHILE(d<1);\nx=1;\nEND;\nEND;\nEND;\nEND;";
 
@@ -233,8 +267,20 @@ describe("tm1_audit_complexity tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
       processes: [
-        { name: "DeepLoop", prolog: DEEP_LOOP, metadata: "", data: "", epilog: "" },
-        { name: "FlatBig", prolog: FLAT_BIG, metadata: "", data: "", epilog: "" },
+        {
+          name: "DeepLoop",
+          prolog: DEEP_LOOP,
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
+        {
+          name: "FlatBig",
+          prolog: FLAT_BIG,
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
       ],
     });
     registerAuditComplexity(fake.server, tm1);
@@ -247,8 +293,20 @@ describe("tm1_audit_complexity tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
       processes: [
-        { name: "FlatBig", prolog: FLAT_BIG, metadata: "", data: "", epilog: "" },
-        { name: "DeepLoop", prolog: DEEP_LOOP, metadata: "", data: "", epilog: "" },
+        {
+          name: "FlatBig",
+          prolog: FLAT_BIG,
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
+        {
+          name: "DeepLoop",
+          prolog: DEEP_LOOP,
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
       ],
     });
     registerAuditComplexity(fake.server, tm1);
@@ -265,7 +323,13 @@ describe("tm1_audit_complexity tool", () => {
     const tm1Args = {
       productVersion: "11.8",
       processes: [
-        { name: "DeepLoop", prolog: DEEP_LOOP, metadata: "", data: "", epilog: "" },
+        {
+          name: "DeepLoop",
+          prolog: DEEP_LOOP,
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
       ],
     };
     const base = makeFakeServer();
@@ -275,7 +339,10 @@ describe("tm1_audit_complexity tool", () => {
     const tuned = makeFakeServer();
     registerAuditComplexity(tuned.server, makeFakeTM1Client(tm1Args));
     const out = parseResult(
-      await tuned.getHandler()({ scope: ["processes"], weights: { nestMult: 5 } }),
+      await tuned.getHandler()({
+        scope: ["processes"],
+        weights: { nestMult: 5 },
+      }),
     );
     expect(out.topProcesses[0].totals.scoreV2).toBeGreaterThan(
       def.topProcesses[0].totals.scoreV2,
@@ -302,7 +369,9 @@ describe("tm1_audit_complexity tool", () => {
       await fake.getHandler()({ scope: ["processes"], scoreThreshold: 10 }),
     );
     expect(
-      out.topProcesses.every((p: { totals: { score: number } }) => p.totals.score >= 10),
+      out.topProcesses.every(
+        (p: { totals: { score: number } }) => p.totals.score >= 10,
+      ),
     ).toBe(true);
   });
 
@@ -324,9 +393,9 @@ describe("tm1_audit_complexity tool", () => {
     const out = parseResult(
       await fake.getHandler()({ scope: ["antipatterns"] }),
     );
-    expect(out.antipatterns.findings.map((f: { rule: string }) => f.rule)).toContain(
-      "destructive-unguarded",
-    );
+    expect(
+      out.antipatterns.findings.map((f: { rule: string }) => f.rule),
+    ).toContain("destructive-unguarded");
     expect(out.antipatterns.summary.error).toBe(1);
     expect(out.status).toBe("fail");
   });
@@ -336,7 +405,13 @@ describe("tm1_audit_complexity tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
       processes: [
-        { name: "Daily_Load", prolog: "CubeClearData('Sales');", metadata: "", data: "", epilog: "" },
+        {
+          name: "Daily_Load",
+          prolog: "CubeClearData('Sales');",
+          metadata: "",
+          data: "",
+          epilog: "",
+        },
       ],
     });
     registerAuditComplexity(fake.server, tm1);

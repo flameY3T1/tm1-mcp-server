@@ -11,7 +11,10 @@ const HEAVY_RATIO = 0.4;
 
 const TABS = ["prolog", "metadata", "data", "epilog"] as const;
 
-export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) {
+export function registerGetProcessCode(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_get_process_code",
     "Get the source code of all four tabs (Prolog, Metadata, Data, Epilog) of a TI process. " +
@@ -19,20 +22,37 @@ export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) 
       "to collapse runs of 4+ comment lines into a `# [... N lines ...]` marker and save context.",
     {
       processName: z.string().describe("Name of the TI process"),
-      stripComments: z.boolean().optional().default(false).describe(
-        "If true, collapse blocks of 4+ consecutive comment lines into a single marker (dead-code reduction). " +
-          "Inline and short comments are kept. Default false (full verbatim source).",
-      ),
-      maskSecrets: z.boolean().optional().default(true).describe(
-        "Redact credential literals in the returned code. Masks the password arg of ODBCOpen() and quoted values " +
-          "assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
-      ),
-      includeSecurityAccess: z.boolean().optional().default(false).describe(
-        "Also fetch process's HasSecurityAccess elevation flag (one extra GET). " +
-          "Default false — pure code reads stay single request.",
-      ),
+      stripComments: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "If true, collapse blocks of 4+ consecutive comment lines into a single marker (dead-code reduction). " +
+            "Inline and short comments are kept. Default false (full verbatim source).",
+        ),
+      maskSecrets: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Redact credential literals in the returned code. Masks the password arg of ODBCOpen() and quoted values " +
+            "assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
+        ),
+      includeSecurityAccess: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Also fetch process's HasSecurityAccess elevation flag (one extra GET). " +
+            "Default false — pure code reads stay single request.",
+        ),
     },
-    async ({ processName, stripComments, maskSecrets, includeSecurityAccess }) => {
+    async ({
+      processName,
+      stripComments,
+      maskSecrets,
+      includeSecurityAccess,
+    }) => {
       const code = await tm1Client.processes.getCode(processName);
       let hint: string | undefined;
 
@@ -46,22 +66,31 @@ export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) 
           collapsedBlocks += r.collapsedBlocks;
         }
         if (collapsedBlocks > 0) {
-          hint = `stripComments collapsed ${collapsedBlocks} comment block(s) (${removedLines} lines) into markers. ` +
+          hint =
+            `stripComments collapsed ${collapsedBlocks} comment block(s) (${removedLines} lines) into markers. ` +
             `Re-run without stripComments for the full source.`;
         }
       } else {
-        let worst: { tab: string; total: number; comment: number; ratio: number } | undefined;
+        let worst:
+          | { tab: string; total: number; comment: number; ratio: number }
+          | undefined;
         for (const tab of TABS) {
           const s = commentStats(code[tab]);
           if (s.totalLines < HEAVY_MIN_LINES) continue;
           const ratio = s.commentLines / s.totalLines;
           if (ratio >= HEAVY_RATIO && (!worst || ratio > worst.ratio)) {
-            worst = { tab, total: s.totalLines, comment: s.commentLines, ratio };
+            worst = {
+              tab,
+              total: s.totalLines,
+              comment: s.commentLines,
+              ratio,
+            };
           }
         }
         if (worst) {
           const pct = Math.round(worst.ratio * 100);
-          hint = `${worst.tab} tab is ${pct}% comments (${worst.comment}/${worst.total} lines). ` +
+          hint =
+            `${worst.tab} tab is ${pct}% comments (${worst.comment}/${worst.total} lines). ` +
             `Set stripComments=true to collapse dead-code blocks and save context.`;
         }
       }
@@ -72,7 +101,9 @@ export function registerGetProcessCode(server: McpServer, tm1Client: TM1Client) 
 
       let hasSecurityAccess: boolean | undefined;
       if (includeSecurityAccess) {
-        hasSecurityAccess = (await tm1Client.processes.getDeployMeta(processName)).hasSecurityAccess;
+        hasSecurityAccess = (
+          await tm1Client.processes.getDeployMeta(processName)
+        ).hasSecurityAccess;
       }
 
       const payload = {

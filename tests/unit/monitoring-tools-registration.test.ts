@@ -7,7 +7,9 @@ import type { TM1Client } from "../../src/tm1-client.js";
 
 function mockServer() {
   const names: string[] = [];
-  const server = { tool: (name: string) => void names.push(name) } as unknown as McpServer;
+  const server = {
+    tool: (name: string) => void names.push(name),
+  } as unknown as McpServer;
   return { server, names };
 }
 const clientWith = (version: 11 | 12) =>

@@ -8,13 +8,17 @@ import { maskSecretsDeep } from "../../lib/mask-secrets.js";
 function pick(extra: Record<string, unknown>, path: string[]): unknown {
   let node: unknown = extra;
   for (const seg of path) {
-    if (node === null || node === undefined || typeof node !== "object") return undefined;
+    if (node === null || node === undefined || typeof node !== "object")
+      return undefined;
     node = (node as Record<string, unknown>)[seg];
   }
   return node;
 }
 
-export function registerGetServerInfo(server: McpServer, tm1Client: TM1Client): void {
+export function registerGetServerInfo(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_get_server_info",
     [
@@ -24,7 +28,7 @@ export function registerGetServerInfo(server: McpServer, tm1Client: TM1Client): 
     { ...FORMAT_SCHEMA },
     async ({ format }) => {
       const info = await tm1Client.server.getInfo();
-      const x = (info.extra ?? {});
+      const x = info.extra ?? {};
 
       const payload = {
         serverName: info.serverName,
@@ -35,55 +39,140 @@ export function registerGetServerInfo(server: McpServer, tm1Client: TM1Client): 
         timeZoneId: info.timeZoneId,
         integratedSecurityMode: info.integratedSecurityMode,
         modelling: {
-          enableNewHierarchyCreation: pick(x, ["Modelling", "EnableNewHierarchyCreation"]),
-          mdxSelectCalculatedMemberInputs: pick(x, ["Modelling", "MDXSelectCalculatedMemberInputs"]),
-          defaultMeasuresDimension: pick(x, ["Modelling", "DefaultMeasuresDimension"]),
-          userDefinedCalculations: pick(x, ["Modelling", "UserDefinedCalculations"]),
+          enableNewHierarchyCreation: pick(x, [
+            "Modelling",
+            "EnableNewHierarchyCreation",
+          ]),
+          mdxSelectCalculatedMemberInputs: pick(x, [
+            "Modelling",
+            "MDXSelectCalculatedMemberInputs",
+          ]),
+          defaultMeasuresDimension: pick(x, [
+            "Modelling",
+            "DefaultMeasuresDimension",
+          ]),
+          userDefinedCalculations: pick(x, [
+            "Modelling",
+            "UserDefinedCalculations",
+          ]),
         },
         ti: {
-          maximumTILockObjects: pick(x, ["Modelling", "TI", "MaximumTILockObjects"]),
+          maximumTILockObjects: pick(x, [
+            "Modelling",
+            "TI",
+            "MaximumTILockObjects",
+          ]),
           enableTIDebugging: pick(x, ["Modelling", "TI", "EnableTIDebugging"]),
-          useExcelSerialDate: pick(x, ["Modelling", "TI", "UseExcelSerialDate"]),
+          useExcelSerialDate: pick(x, [
+            "Modelling",
+            "TI",
+            "UseExcelSerialDate",
+          ]),
         },
         rules: {
-          allowSeparateNandCRules: pick(x, ["Modelling", "Rules", "AllowSeparateNandCRules"]),
-          automaticallyAddCubeDependencies: pick(x, ["Modelling", "Rules", "AutomaticallyAddCubeDependencies"]),
-          rulesOverwriteCellsOnLoad: pick(x, ["Modelling", "Rules", "RulesOverwriteCellsOnLoad"]),
-          forceReevaluationOfFeeders: pick(x, ["Modelling", "Rules", "ForceReevaluationOfFeedersForFedCellsOnDataChange"]),
+          allowSeparateNandCRules: pick(x, [
+            "Modelling",
+            "Rules",
+            "AllowSeparateNandCRules",
+          ]),
+          automaticallyAddCubeDependencies: pick(x, [
+            "Modelling",
+            "Rules",
+            "AutomaticallyAddCubeDependencies",
+          ]),
+          rulesOverwriteCellsOnLoad: pick(x, [
+            "Modelling",
+            "Rules",
+            "RulesOverwriteCellsOnLoad",
+          ]),
+          forceReevaluationOfFeeders: pick(x, [
+            "Modelling",
+            "Rules",
+            "ForceReevaluationOfFeedersForFedCellsOnDataChange",
+          ]),
         },
         mtq: {
           useAllThreads: pick(x, ["Performance", "MTQ", "UseAllThreads"]),
-          numberOfThreadsToUse: pick(x, ["Performance", "MTQ", "NumberOfThreadsToUse"]),
-          singleCellConsolidation: pick(x, ["Performance", "MTQ", "SingleCellConsolidation"]),
+          numberOfThreadsToUse: pick(x, [
+            "Performance",
+            "MTQ",
+            "NumberOfThreadsToUse",
+          ]),
+          singleCellConsolidation: pick(x, [
+            "Performance",
+            "MTQ",
+            "SingleCellConsolidation",
+          ]),
           mtqQuery: pick(x, ["Performance", "MTQ", "MTQQuery"]),
           mtFeeders: pick(x, ["Performance", "MTQ", "MTFeeders"]),
-          mtFeedersAtStartup: pick(x, ["Performance", "MTQ", "MTFeedersAtStartup"]),
+          mtFeedersAtStartup: pick(x, [
+            "Performance",
+            "MTQ",
+            "MTFeedersAtStartup",
+          ]),
         },
         jobQueuing: {
           enabled: pick(x, ["Performance", "JobQueuing", "Enable"]),
-          threadPoolSize: pick(x, ["Performance", "JobQueuing", "ThreadPoolSize"]),
+          threadPoolSize: pick(x, [
+            "Performance",
+            "JobQueuing",
+            "ThreadPoolSize",
+          ]),
           maxWaitTime: pick(x, ["Performance", "JobQueuing", "MaxWaitTime"]),
         },
         memory: {
-          maximumViewSizeMB: pick(x, ["Performance", "Memory", "MaximumViewSizeMB"]),
-          maximumUserSandboxSizeMB: pick(x, ["Performance", "Memory", "MaximumUserSandboxSizeMB"]),
-          disableSandboxing: pick(x, ["Administration", "DisableSandboxing"]) ?? pick(x, ["DisableSandboxing"]),
+          maximumViewSizeMB: pick(x, [
+            "Performance",
+            "Memory",
+            "MaximumViewSizeMB",
+          ]),
+          maximumUserSandboxSizeMB: pick(x, [
+            "Performance",
+            "Memory",
+            "MaximumUserSandboxSizeMB",
+          ]),
+          disableSandboxing:
+            pick(x, ["Administration", "DisableSandboxing"]) ??
+            pick(x, ["DisableSandboxing"]),
         },
         logging: {
-          loggingDirectory: pick(x, ["Administration", "DebugLog", "LoggingDirectory"]),
+          loggingDirectory: pick(x, [
+            "Administration",
+            "DebugLog",
+            "LoggingDirectory",
+          ]),
           auditLogEnabled: pick(x, ["Administration", "AuditLog", "Enable"]),
-          auditLogMaxKB: pick(x, ["Administration", "AuditLog", "MaxFileSizeKilobytes"]),
-          performanceMonitorOn: pick(x, ["Administration", "PerformanceMonitorOn"]),
+          auditLogMaxKB: pick(x, [
+            "Administration",
+            "AuditLog",
+            "MaxFileSizeKilobytes",
+          ]),
+          performanceMonitorOn: pick(x, [
+            "Administration",
+            "PerformanceMonitorOn",
+          ]),
         },
         http: {
           port: pick(x, ["Access", "HTTP", "Port"]),
           sessionTimeout: pick(x, ["Access", "HTTP", "SessionTimeout"]),
-          requestEntityMaxKB: pick(x, ["Access", "HTTP", "RequestEntityMaxSizeInKB"]),
+          requestEntityMaxKB: pick(x, [
+            "Access",
+            "HTTP",
+            "RequestEntityMaxSizeInKB",
+          ]),
         },
         security: {
           sslEnabled: pick(x, ["Access", "SSL", "Enable"]),
-          securityPackageName: pick(x, ["Access", "Authentication", "SecurityPackageName"]),
-          integratedSecurityMode: pick(x, ["Access", "Authentication", "IntegratedSecurityMode"]),
+          securityPackageName: pick(x, [
+            "Access",
+            "Authentication",
+            "SecurityPackageName",
+          ]),
+          integratedSecurityMode: pick(x, [
+            "Access",
+            "Authentication",
+            "IntegratedSecurityMode",
+          ]),
           ldapEnabled: pick(x, ["Access", "LDAP", "Enable"]),
         },
         // Mask credential-named values (e.g. Access.LDAP.Password) before the

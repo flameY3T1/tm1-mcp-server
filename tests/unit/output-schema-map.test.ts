@@ -64,18 +64,20 @@ const SAMPLES: Record<string, unknown[]> = {
       objectName: "",
     },
   ],
-  tm1_list_sessions: [
-    { id: "1", user: "admin", threads: [] },
-  ],
-  tm1_list_element_attributes: [
-    { name: "Currency", type: "String" },
-  ],
+  tm1_list_sessions: [{ id: "1", user: "admin", threads: [] }],
+  tm1_list_element_attributes: [{ name: "Currency", type: "String" }],
 };
 
 const mockLogger = {
-  info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn(),
-  fatal: vi.fn(), trace: vi.fn(), child: vi.fn().mockReturnThis(),
-  level: "silent", flush: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  fatal: vi.fn(),
+  trace: vi.fn(),
+  child: vi.fn().mockReturnThis(),
+  level: "silent",
+  flush: vi.fn(),
 } as unknown as pino.Logger;
 
 // Version-gated tools (tm1_list_jobs/tm1_cancel_job on v12, tm1_list_threads/
@@ -88,12 +90,13 @@ function registeredToolNames(): Set<string> {
     const orig = server.registerTool.bind(server);
     server.registerTool = (...args: unknown[]) => {
       names.add(args[0] as string);
-      return (orig as (...a: unknown[]) => unknown)(...args) as ReturnType<typeof server.registerTool>;
+      return (orig as (...a: unknown[]) => unknown)(...args) as ReturnType<
+        typeof server.registerTool
+      >;
     };
-    registerAllTools(
-      withAnnotations(server, mockLogger, "readwrite"),
-      { version } as unknown as TM1Client,
-    );
+    registerAllTools(withAnnotations(server, mockLogger, "readwrite"), {
+      version,
+    } as unknown as TM1Client);
   }
   return names;
 }
@@ -101,7 +104,9 @@ function registeredToolNames(): Set<string> {
 describe("OUTPUT_SCHEMA_MAP", () => {
   it("every OUTPUT_SCHEMA_MAP key is a registered tool (no orphaned schemas)", () => {
     const registered = registeredToolNames();
-    const orphans = Object.keys(OUTPUT_SCHEMA_MAP).filter((k) => !registered.has(k));
+    const orphans = Object.keys(OUTPUT_SCHEMA_MAP).filter(
+      (k) => !registered.has(k),
+    );
     expect(orphans).toEqual([]);
   });
 
@@ -140,7 +145,9 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     };
     const result = schema.safeParse(payload);
     if (!result.success) {
-      throw new Error(`warning-branch validation failed: ${JSON.stringify(result.error.issues, null, 2)}`);
+      throw new Error(
+        `warning-branch validation failed: ${JSON.stringify(result.error.issues, null, 2)}`,
+      );
     }
   });
 
@@ -157,7 +164,9 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     };
     const result = schema.safeParse(payload);
     if (!result.success) {
-      throw new Error(`compact validation failed: ${JSON.stringify(result.error.issues, null, 2)}`);
+      throw new Error(
+        `compact validation failed: ${JSON.stringify(result.error.issues, null, 2)}`,
+      );
     }
   });
 
@@ -189,9 +198,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       viewName: "Default",
       axes: [
         {
-          tuples: [
-            { members: [{ name: "EU", hierarchyName: "Region" }] },
-          ],
+          tuples: [{ members: [{ name: "EU", hierarchyName: "Region" }] }],
         },
       ],
       total: 1,
@@ -287,9 +294,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_execute_mdx: {
       axes: [
         {
-          tuples: [
-            { members: [{ name: "EU", hierarchyName: "Region" }] },
-          ],
+          tuples: [{ members: [{ name: "EU", hierarchyName: "Region" }] }],
         },
       ],
       total: 1,
@@ -384,7 +389,12 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       direction: "downstream",
       mode: "full",
       maskSecrets: false,
-      tree: { process: "Load.Sales", cycle: false, incomingEdge: null, children: [] },
+      tree: {
+        process: "Load.Sales",
+        cycle: false,
+        incomingEdge: null,
+        children: [],
+      },
     },
     tm1_analyze_chore_graph: {
       choreName: "Daily.Load",
@@ -446,15 +456,11 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     },
     tm1_get_process_parameters: {
       processName: "Load.Sales",
-      parameters: [
-        { name: "p", type: "String", defaultValue: "x" },
-      ],
+      parameters: [{ name: "p", type: "String", defaultValue: "x" }],
     },
     tm1_get_process_variables: {
       processName: "Load.Sales",
-      variables: [
-        { name: "v1", type: "String", position: 1 },
-      ],
+      variables: [{ name: "v1", type: "String", position: 1 }],
     },
     tm1_get_client: { Name: "admin", Enabled: true },
     tm1_get_cube_rules: {
@@ -522,7 +528,10 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       has_more: false,
       next_offset: null,
       items: [
-        { filename: "Load.Sales_20260504_123045.log", lastUpdated: "2026-05-04T12:30:45Z" },
+        {
+          filename: "Load.Sales_20260504_123045.log",
+          lastUpdated: "2026-05-04T12:30:45Z",
+        },
       ],
     },
     tm1_get_error_log_content: {
@@ -530,17 +539,35 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       totalBytes: 256,
       returnedBytes: 256,
       truncated: false,
-      content: "ERROR: Process 'Load.Sales' line 12 — Invalid dimension 'Foo'\n",
+      content:
+        "ERROR: Process 'Load.Sales' line 12 — Invalid dimension 'Foo'\n",
     },
     // Generic mutation envelope: success + per-tool extras flow through
     // passthrough. One fixture per shape variant is enough to lock behavior.
-    tm1_assign_client_group: { success: true, clientName: "admin", groupName: "ADMIN" },
+    tm1_assign_client_group: {
+      success: true,
+      clientName: "admin",
+      groupName: "ADMIN",
+    },
     tm1_cancel_thread: { success: true, threadId: 42 },
-    tm1_clear_cube: { success: true, cubeName: "Sales", summary: "Region=*, Period=Jan" },
-    tm1_create_chore: { success: true, name: "Daily.Load", stepCount: 2, active: true },
+    tm1_clear_cube: {
+      success: true,
+      cubeName: "Sales",
+      summary: "Region=*, Period=Jan",
+    },
+    tm1_create_chore: {
+      success: true,
+      name: "Daily.Load",
+      stepCount: 2,
+      active: true,
+    },
     tm1_create_client: { success: true, name: "newuser" },
     tm1_create_element: { success: true, elementName: "DE" },
-    tm1_create_element_attribute: { success: true, attributeName: "Currency", attributeType: "String" },
+    tm1_create_element_attribute: {
+      success: true,
+      attributeName: "Currency",
+      attributeType: "String",
+    },
     tm1_create_subset: { success: true, subsetName: "EU", kind: "static" },
     tm1_delete_element: { success: true, elementName: "DE" },
     tm1_delete_process: { success: true, processName: "Load.Sales" },
@@ -559,7 +586,12 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     tm1_invalidate_callgraph_cache: {
       cleared: 3,
       entriesBefore: [
-        { key: "tm1://server/refs", ageMs: 1234, ttlRemainingMs: 60_000, buildMs: 250 },
+        {
+          key: "tm1://server/refs",
+          ageMs: 1234,
+          ttlRemainingMs: 60_000,
+          buildMs: 250,
+        },
       ],
     },
   };

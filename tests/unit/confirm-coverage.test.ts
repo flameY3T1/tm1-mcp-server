@@ -27,9 +27,14 @@ function collectInputSchemas(): Map<string, Record<string, unknown>> {
     const name = args[0] as string;
     const config = args[1] as { inputSchema?: Record<string, unknown> };
     schemas.set(name, config?.inputSchema ?? {});
-    return (original as (...a: unknown[]) => unknown)(...args) as ReturnType<typeof server.registerTool>;
+    return (original as (...a: unknown[]) => unknown)(...args) as ReturnType<
+      typeof server.registerTool
+    >;
   };
-  registerAllTools(withAnnotations(server, mockLogger, "readwrite"), {} as TM1Client);
+  registerAllTools(
+    withAnnotations(server, mockLogger, "readwrite"),
+    {} as TM1Client,
+  );
   return schemas;
 }
 

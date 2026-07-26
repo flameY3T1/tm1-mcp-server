@@ -51,44 +51,66 @@ describe("R2-05: HTTP layer emits mutation events", () => {
   });
 
   it("emits on successful POST", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true, status: 204, statusText: "No Content",
-      headers: new Headers(),
-      text: vi.fn().mockResolvedValue(""),
-    } as unknown as Response));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+        statusText: "No Content",
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue(""),
+      } as unknown as Response),
+    );
 
     await client.request("POST", "/api/v1/Dimensions", { Name: "Test" });
     expect(events).toEqual([{ method: "POST", path: "/api/v1/Dimensions" }]);
   });
 
   it("emits on successful DELETE", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true, status: 204, statusText: "No Content",
-      headers: new Headers(),
-      text: vi.fn().mockResolvedValue(""),
-    } as unknown as Response));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+        statusText: "No Content",
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue(""),
+      } as unknown as Response),
+    );
 
     await client.request("DELETE", "/api/v1/Cubes('Old')");
-    expect(events).toEqual([{ method: "DELETE", path: "/api/v1/Cubes('Old')" }]);
+    expect(events).toEqual([
+      { method: "DELETE", path: "/api/v1/Cubes('Old')" },
+    ]);
   });
 
   it("does not emit on GET (safe method)", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true, status: 200, statusText: "OK",
-      headers: new Headers(),
-      text: vi.fn().mockResolvedValue("{}"),
-    } as unknown as Response));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue("{}"),
+      } as unknown as Response),
+    );
 
     await client.request("GET", "/api/v1/Configuration");
     expect(events).toEqual([]);
   });
 
   it("does not emit when request fails", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: false, status: 500, statusText: "Server Error",
-      headers: new Headers(),
-      text: vi.fn().mockResolvedValue("boom"),
-    } as unknown as Response));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Server Error",
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue("boom"),
+      } as unknown as Response),
+    );
 
     await expect(client.request("POST", "/api/v1/Bad")).rejects.toThrow();
     expect(events).toEqual([]);

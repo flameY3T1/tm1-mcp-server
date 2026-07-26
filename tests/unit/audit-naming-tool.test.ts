@@ -115,7 +115,11 @@ function parseResult(raw: unknown): {
   appliedMajor: number;
   invalidCount: number;
   truncated: boolean;
-  findings?: Array<{ objectKind: string; objectName: string; violations: Array<{ rule: string }> }>;
+  findings?: Array<{
+    objectKind: string;
+    objectName: string;
+    violations: Array<{ rule: string }>;
+  }>;
   findingsByGroup?: FindingGroup[];
   scanned: Record<string, number>;
   summary: { byKind: Record<string, number>; byRule: Record<string, number> };
@@ -345,7 +349,12 @@ describe("tm1_audit_naming tool", () => {
     );
     expect(out.scanned.elements).toBe(7); // first 5 of Huge + all 2 of Small
     expect(out.elementsTruncated).toEqual([
-      { dimension: "Huge", hierarchy: "Huge", elementCount: 10, scannedCount: 5 },
+      {
+        dimension: "Huge",
+        hierarchy: "Huge",
+        elementCount: 10,
+        scannedCount: 5,
+      },
     ]);
   });
 
@@ -354,7 +363,9 @@ describe("tm1_audit_naming tool", () => {
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8.01100",
       processes: [{ name: "Load" }],
-      variables: { Load: [{ name: "1bad" }, { name: "v-dash" }, { name: "vOK" }] },
+      variables: {
+        Load: [{ name: "1bad" }, { name: "v-dash" }, { name: "vOK" }],
+      },
     });
     registerAuditNaming(fake.server, tm1);
     const out = parseResult(
@@ -405,7 +416,11 @@ describe("tm1_audit_naming tool", () => {
       });
       registerAuditNaming(fake.server, tm1);
       const out = parseResult(
-        await fake.getHandler()({ scope: ["elements"], summary: true, maxFindings: 2 }),
+        await fake.getHandler()({
+          scope: ["elements"],
+          summary: true,
+          maxFindings: 2,
+        }),
       );
       expect(out.invalidCount).toBe(4);
       expect(out.findings).toBeUndefined();
@@ -473,10 +488,17 @@ describe("tm1_audit_naming tool", () => {
       });
       registerAuditNaming(fake.server, tm1);
       const out = parseResult(
-        await fake.getHandler()({ scope: ["cubes", "processes"], summary: true }),
+        await fake.getHandler()({
+          scope: ["cubes", "processes"],
+          summary: true,
+        }),
       );
-      const cubeGroup = out.findingsByGroup!.find((g) => g.objectKind === "cube")!;
-      const procGroup = out.findingsByGroup!.find((g) => g.objectKind === "process")!;
+      const cubeGroup = out.findingsByGroup!.find(
+        (g) => g.objectKind === "cube",
+      )!;
+      const procGroup = out.findingsByGroup!.find(
+        (g) => g.objectKind === "process",
+      )!;
       expect(cubeGroup.totalCount).toBe(2);
       expect(cubeGroup.parent).toBeUndefined();
       expect(cubeGroup.dimension).toBeUndefined();

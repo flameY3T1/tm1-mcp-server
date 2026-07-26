@@ -23,4 +23,7 @@ if (process.env.DOTENV_CONFIG_PATH) {
   loadDotenv({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
 }
 loadDotenv({ quiet: true });
-loadDotenv({ path: join(dirname(fileURLToPath(import.meta.url)), "..", ".env"), quiet: true });
+loadDotenv({
+  path: join(dirname(fileURLToPath(import.meta.url)), "..", ".env"),
+  quiet: true,
+});

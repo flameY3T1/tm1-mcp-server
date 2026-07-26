@@ -50,8 +50,17 @@ const memberRef = (dim: string, elem: string): string => {
   return `[${escapeMdxName(dim)}].[${escapeMdxName(elem)}]`;
 };
 
-export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuildResult {
-  const { cubeName, dimensions, maxCells, filters = {}, leavesOnly, includeStrings = false } = args;
+export function buildSampleCellsMdx(
+  args: SampleCellsBuildArgs,
+): SampleCellsBuildResult {
+  const {
+    cubeName,
+    dimensions,
+    maxCells,
+    filters = {},
+    leavesOnly,
+    includeStrings = false,
+  } = args;
 
   if (dimensions.length === 0) {
     throw new Error(`Cube '${cubeName}' has no dimensions`);
@@ -138,10 +147,12 @@ export function buildSampleCellsMdx(args: SampleCellsBuildArgs): SampleCellsBuil
     // TM1's NONEMPTY(set, filterSet) is a set function. Plain "NON EMPTY <set>"
     // is an axis modifier and is rejected as a syntax error inside HEAD().
     const nonEmptyExpr = `NONEMPTY(${rowExpr},${columnSet})`;
-    rowAxisExpr = maxCells > 0 ? `HEAD(${nonEmptyExpr},${maxCells})` : nonEmptyExpr;
+    rowAxisExpr =
+      maxCells > 0 ? `HEAD(${nonEmptyExpr},${maxCells})` : nonEmptyExpr;
   }
 
-  const whereClause = whereParts.length > 0 ? ` WHERE (${whereParts.join(",")})` : "";
+  const whereClause =
+    whereParts.length > 0 ? ` WHERE (${whereParts.join(",")})` : "";
   const mdx = `SELECT ${columnSet} ON COLUMNS, ${rowAxisExpr} ON ROWS FROM [${escapeMdxName(cubeName)}]${whereClause}`;
 
   return { mdx, whereDims, rowDims, columnDim };

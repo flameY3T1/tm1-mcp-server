@@ -224,7 +224,11 @@ export function checkName(
   const whitespace = checkLeadingTrailingWhitespace(name);
   if (whitespace) violations.push(whitespace);
 
-  if (SERVER_RESERVED_KINDS.has(kind) || kind === "element" || kind === "attribute") {
+  if (
+    SERVER_RESERVED_KINDS.has(kind) ||
+    kind === "element" ||
+    kind === "attribute"
+  ) {
     const reserved = checkServerReservedChars(name);
     if (reserved) violations.push(reserved);
   }

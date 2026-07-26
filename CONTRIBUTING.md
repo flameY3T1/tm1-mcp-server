@@ -35,18 +35,18 @@ npm run verify
 
 This chains:
 
-| Step | Command | Checks |
-|------|---------|--------|
-| Types | `npm run typecheck` | `tsc --noEmit`, strict flags on |
-| API shape | `npm run lint:no-flat-api` | new TM1 calls go through a service, not flat client |
-| Annotations | `npm run lint:annotations` | every tool declares its MCP hint annotations |
-| Output schemas | `npm run lint:output-schema` | every tool has a registered strict output schema |
-| Schema budget | `npm run lint:output-schema-budget` | serialized output schemas stay within the byte budget |
-| Registration | `npm run lint:tool-registration` | every `register*` is wired into `src/tools/index.ts` |
-| Input naming | `npm run lint:input-naming` | no tool takes a bare top-level `name` input (use `<entity>Name`) |
-| Envelope | `npm run lint:mutation-envelope` | mutation tools return via `actionResponse()`, not hand-rolled |
-| Lint | `npm run lint:eslint` | ESLint over the repo |
-| Tests + coverage | `npm run coverage:check` | full `vitest` suite under coverage, then the coverage ratchet gate |
+| Step             | Command                             | Checks                                                             |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------ |
+| Types            | `npm run typecheck`                 | `tsc --noEmit`, strict flags on                                    |
+| API shape        | `npm run lint:no-flat-api`          | new TM1 calls go through a service, not flat client                |
+| Annotations      | `npm run lint:annotations`          | every tool declares its MCP hint annotations                       |
+| Output schemas   | `npm run lint:output-schema`        | every tool has a registered strict output schema                   |
+| Schema budget    | `npm run lint:output-schema-budget` | serialized output schemas stay within the byte budget              |
+| Registration     | `npm run lint:tool-registration`    | every `register*` is wired into `src/tools/index.ts`               |
+| Input naming     | `npm run lint:input-naming`         | no tool takes a bare top-level `name` input (use `<entity>Name`)   |
+| Envelope         | `npm run lint:mutation-envelope`    | mutation tools return via `actionResponse()`, not hand-rolled      |
+| Lint             | `npm run lint:eslint`               | ESLint over the repo                                               |
+| Tests + coverage | `npm run coverage:check`            | full `vitest` suite under coverage, then the coverage ratchet gate |
 
 If your change adds, removes, or renames a tool, regenerate the README tool list:
 
@@ -75,7 +75,7 @@ npm run tools:update-readme
   pure function over an end-to-end mock where possible.
 - Run a single file: `npx vitest run tests/unit/<file>.test.ts`.
 - **Coverage is a ratchet.** Floors live in `coverage-thresholds.json` and are
-  enforced by `vitest` *and* by `scripts/check-coverage-ratchet.mjs`, which also
+  enforced by `vitest` _and_ by `scripts/check-coverage-ratchet.mjs`, which also
   fails when coverage climbs well above the floor without the floor being
   raised. Never lower a floor to turn a red build green — see
   [Coverage Policy](README.md#coverage-policy).

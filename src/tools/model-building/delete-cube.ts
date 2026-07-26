@@ -5,7 +5,10 @@ import { actionResponse } from "../format.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 import { withToolHint } from "../error-format.js";
 
-export function registerDeleteCube(server: McpServer, tm1Client: TM1Client): void {
+export function registerDeleteCube(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_delete_cube",
     [

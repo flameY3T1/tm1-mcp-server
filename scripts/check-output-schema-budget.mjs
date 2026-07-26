@@ -66,7 +66,9 @@ function newestSrcMtimeMs() {
 }
 
 function build(reason) {
-  console.error(`check-output-schema-budget: ${reason} — running \`npm run build\`…`);
+  console.error(
+    `check-output-schema-budget: ${reason} — running \`npm run build\`…`,
+  );
   try {
     execFileSync("npm", ["run", "build"], { cwd: root, stdio: "inherit" });
   } catch {
@@ -84,7 +86,9 @@ if (!existsSync(mapPath) || !existsSync(slimPath)) {
 }
 for (const p of [mapPath, slimPath]) {
   if (!existsSync(p)) {
-    console.error(`check-output-schema-budget: expected ${p} after build, not found.`);
+    console.error(
+      `check-output-schema-budget: expected ${p} after build, not found.`,
+    );
     process.exit(1);
   }
 }

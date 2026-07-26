@@ -4,7 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 import { FORMAT_SCHEMA, wrappedPageResponse, type Column } from "../format.js";
 
-export function registerListFiles(server: McpServer, tm1Client: TM1Client): void {
+export function registerListFiles(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_list_files",
     [
@@ -15,9 +18,12 @@ export function registerListFiles(server: McpServer, tm1Client: TM1Client): void
       "Paginated (default 50/page).",
     ].join(" "),
     {
-      path: z.string().optional().describe(
-        "Subfolder path (e.g. 'imports' or 'imports/2024'). Empty = root.",
-      ),
+      path: z
+        .string()
+        .optional()
+        .describe(
+          "Subfolder path (e.g. 'imports' or 'imports/2024'). Empty = root.",
+        ),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
     },
@@ -27,7 +33,10 @@ export function registerListFiles(server: McpServer, tm1Client: TM1Client): void
       const wrapper = { path: path ?? "", ...page };
       type Row = (typeof files)[number];
       const columns: Column<Row>[] = [{ header: "filename", get: (f) => f }];
-      return wrappedPageResponse(wrapper, page, format, { title: `Files in /${path ?? ""}`, columns });
+      return wrappedPageResponse(wrapper, page, format, {
+        title: `Files in /${path ?? ""}`,
+        columns,
+      });
     },
   );
 }

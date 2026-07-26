@@ -24,7 +24,12 @@ function makeFakeServer() {
   let captured: ToolHandler | null = null;
   let parser: z.ZodObject<ZodRawShape> | null = null;
   const server = {
-    tool: (_name: string, _desc: string, schema: ZodRawShape, handler: ToolHandler) => {
+    tool: (
+      _name: string,
+      _desc: string,
+      schema: ZodRawShape,
+      handler: ToolHandler,
+    ) => {
       parser = z.object(schema);
       captured = handler;
     },
@@ -41,10 +46,13 @@ function makeFakeServer() {
 }
 
 function makeTM1Client(): TM1Client {
-  const request = async (_method: string, _path: string) => ({ Name: "H", Elements: POOL });
-  const hierarchies = new HierarchyService({ request } as unknown as ConstructorParameters<
-    typeof HierarchyService
-  >[0]);
+  const request = async (_method: string, _path: string) => ({
+    Name: "H",
+    Elements: POOL,
+  });
+  const hierarchies = new HierarchyService({
+    request,
+  } as unknown as ConstructorParameters<typeof HierarchyService>[0]);
   return { hierarchies } as unknown as TM1Client;
 }
 
@@ -53,7 +61,11 @@ describe("tm1_get_descendants tool", () => {
     const { server, getHandler } = makeFakeServer();
     registerGetDescendants(server, makeTM1Client());
 
-    const res = await getHandler()({ dimensionName: "D", hierarchyName: "H", elementName: "Total" });
+    const res = await getHandler()({
+      dimensionName: "D",
+      hierarchyName: "H",
+      elementName: "Total",
+    });
     const out = JSON.parse(res.content[0]!.text);
 
     expect(out.descendants).toHaveLength(5);
@@ -73,7 +85,11 @@ describe("tm1_get_descendants tool", () => {
     const out = JSON.parse(res.content[0]!.text);
 
     expect(out.descendants).toHaveLength(3);
-    expect(out.descendants.map((d: { name: string }) => d.name)).toEqual(["E1", "E2", "E3"]);
+    expect(out.descendants.map((d: { name: string }) => d.name)).toEqual([
+      "E1",
+      "E2",
+      "E3",
+    ]);
     expect(out.truncated).toBe(true);
   });
 

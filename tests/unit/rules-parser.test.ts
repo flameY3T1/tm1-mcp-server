@@ -29,11 +29,15 @@ describe("parseRules — hasStet flag", () => {
   });
 
   it("does not flag STET inside a string literal", () => {
-    expect(parseRules("['A'] = S: 'STET label';").lines[0]!.hasStet).toBe(false);
+    expect(parseRules("['A'] = S: 'STET label';").lines[0]!.hasStet).toBe(
+      false,
+    );
   });
 
   it("does not flag STET inside a `#` comment", () => {
-    expect(parseRules("['A'] = N: 1; # STET note").lines[0]!.hasStet).toBe(false);
+    expect(parseRules("['A'] = N: 1; # STET note").lines[0]!.hasStet).toBe(
+      false,
+    );
   });
 
   it("does not flag SUBSTET or other substrings (word boundary)", () => {
@@ -49,21 +53,29 @@ describe("parseRules — hasStet flag", () => {
 
 describe("parseRules — hasIfGuard flag", () => {
   it("flags rule line with IF(...) RHS", () => {
-    expect(parseRules("['A'] = N: IF(1=1, 1, 0);").lines[0]!.hasIfGuard).toBe(true);
+    expect(parseRules("['A'] = N: IF(1=1, 1, 0);").lines[0]!.hasIfGuard).toBe(
+      true,
+    );
   });
 
   it("flags feeder line with IF(...) LHS guard", () => {
-    const ast = parseRules("feeders;\nIF(['Year':'2026'] > 0, ['A'] => ['B'], 0);");
+    const ast = parseRules(
+      "feeders;\nIF(['Year':'2026'] > 0, ['A'] => ['B'], 0);",
+    );
     expect(ast.lines[1]!.hasIfGuard).toBe(true);
   });
 
   it("is case-insensitive and whitespace-tolerant", () => {
     expect(parseRules("['A'] = if (x, 1, 0);").lines[0]!.hasIfGuard).toBe(true);
-    expect(parseRules("['A'] = N: If( x, 1, 0);").lines[0]!.hasIfGuard).toBe(true);
+    expect(parseRules("['A'] = N: If( x, 1, 0);").lines[0]!.hasIfGuard).toBe(
+      true,
+    );
   });
 
   it("does not flag IF inside a string literal", () => {
-    expect(parseRules("['A'] = S: 'IF(label)';").lines[0]!.hasIfGuard).toBe(false);
+    expect(parseRules("['A'] = S: 'IF(label)';").lines[0]!.hasIfGuard).toBe(
+      false,
+    );
   });
 
   it("does not flag plain feeder without IF()", () => {
@@ -71,6 +83,8 @@ describe("parseRules — hasIfGuard flag", () => {
   });
 
   it("does not match identifier-prefix matches (DIFF, IFNULL — separate function)", () => {
-    expect(parseRules("['A'] = N: DIFF(1, 0);").lines[0]!.hasIfGuard).toBe(false);
+    expect(parseRules("['A'] = N: DIFF(1, 0);").lines[0]!.hasIfGuard).toBe(
+      false,
+    );
   });
 });

@@ -3,7 +3,8 @@
 // Param-name regex: matches typical credential identifiers (case-insensitive).
 // Kept conservative — false positives turn legitimate parameter values into
 // "***" in audit reports, so we err on the side of obvious credential names.
-export const SECRET_NAME_RE = /pass(?:wd|word)?|pwd|secret|token|api[_-]?key|^key$|credential|auth/i;
+export const SECRET_NAME_RE =
+  /pass(?:wd|word)?|pwd|secret|token|api[_-]?key|^key$|credential|auth/i;
 
 export const MASK = "***";
 
@@ -89,7 +90,9 @@ export function maskSecretsDeep(value: unknown): unknown {
 // without an import cycle. The password field is already redacted at the
 // service layer (ProcessService.getDataSource), so only oDBCConnection needs
 // handling here.
-export function maskDataSourceSecrets<T extends { oDBCConnection?: string | undefined }>(ds: T): T {
+export function maskDataSourceSecrets<
+  T extends { oDBCConnection?: string | undefined },
+>(ds: T): T {
   if (ds.oDBCConnection === undefined) return ds;
   return { ...ds, oDBCConnection: maskConnectionString(ds.oDBCConnection) };
 }

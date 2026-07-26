@@ -163,7 +163,9 @@ for (const file of walk(toolsDir)) {
 }
 
 if (offenders.length === 0) {
-  console.log("check-no-bare-name-input: OK (no tool declares a bare top-level `name` input)");
+  console.log(
+    "check-no-bare-name-input: OK (no tool declares a bare top-level `name` input)",
+  );
   process.exit(0);
 }
 

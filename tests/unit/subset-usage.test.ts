@@ -3,8 +3,12 @@ import { extractSubsetUsage } from "../../src/lib/callgraph/subsetUsage.js";
 
 describe("extractSubsetUsage", () => {
   it("links subset view via ViewSubsetAssign", () => {
-    const u = extractSubsetUsage("ViewSubsetAssign('Sales','vTmp','Currency','sTmp');");
-    expect(u.get("stmp")?.views).toEqual([{ view: "vTmp", cube: "Sales", zeroOut: false }]);
+    const u = extractSubsetUsage(
+      "ViewSubsetAssign('Sales','vTmp','Currency','sTmp');",
+    );
+    expect(u.get("stmp")?.views).toEqual([
+      { view: "vTmp", cube: "Sales", zeroOut: false },
+    ]);
   });
   it("marks zero-out when assigned view is ViewZeroOut'd", () => {
     const u = extractSubsetUsage(
@@ -27,7 +31,9 @@ describe("extractSubsetUsage", () => {
     expect(u.get("stmp")?.loopZero).toBe(true);
   });
   it("flags an unresolved subset handle without guessing", () => {
-    const u = extractSubsetUsage("ViewSubsetAssign('Sales','vTmp','Currency',pSub);");
+    const u = extractSubsetUsage(
+      "ViewSubsetAssign('Sales','vTmp','Currency',pSub);",
+    );
     const only = [...u.values()][0]!;
     expect(only.resolved).toBe(false);
   });

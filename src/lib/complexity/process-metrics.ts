@@ -6,9 +6,7 @@
  * raw variable totals.
  */
 import { parseTiCode } from "../callgraph/tiParser.js";
-import type {
-  TiStatement,
-} from "../callgraph/types.js";
+import type { TiStatement } from "../callgraph/types.js";
 import { isCommentedOutCode } from "./comment-classifier.js";
 
 export type TiTab = "prolog" | "metadata" | "data" | "epilog";
@@ -353,7 +351,8 @@ export function computeProcessMetrics(
   const commentRatio = denom === 0 ? 0 : commentLines / denom;
   const deadCodeRatio = denom === 0 ? 0 : deadCodeLines / denom;
   const rawV2 = loc + ifCost + loopCost + hotInLoop;
-  const discount = Math.min(Math.max(w.commentDiscountMax, 0), 1) * commentRatio;
+  const discount =
+    Math.min(Math.max(w.commentDiscountMax, 0), 1) * commentRatio;
   const scoreV2 = rawV2 * (1 - discount);
 
   return {

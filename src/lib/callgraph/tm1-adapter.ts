@@ -1,5 +1,12 @@
 import type { TM1Client } from "../../tm1-client.js";
-import { buildReferenceIndex, type ReferenceIndex, type ProcessFetchResult, type CubeRulesFetchResult, type ChoreFetchResult, type ChoreTaskRef } from "./referenceIndex.js";
+import {
+  buildReferenceIndex,
+  type ReferenceIndex,
+  type ProcessFetchResult,
+  type CubeRulesFetchResult,
+  type ChoreFetchResult,
+  type ChoreTaskRef,
+} from "./referenceIndex.js";
 import { tm1Events } from "../tm1-events.js";
 import { rethrowIfSystemic } from "../../tm1-client/services/fallback.js";
 
@@ -7,7 +14,9 @@ import { rethrowIfSystemic } from "../../tm1-client/services/fallback.js";
 // registerCallgraphCacheInvalidation() at client construction — no import-time
 // side-effect. Keeping this a named, stable function reference lets the wiring
 // be idempotent (the registrar checks for it before re-adding).
-const invalidateOnMutation = (): void => { invalidateCallgraphCache(); };
+const invalidateOnMutation = (): void => {
+  invalidateCallgraphCache();
+};
 
 /**
  * Wire the callgraph reference-index cache to tm1Events "mutation" notifications:
@@ -45,7 +54,12 @@ export function invalidateCallgraphCache(): { cleared: number } {
   return { cleared: n };
 }
 
-export function getCallgraphCacheStats(): Array<{ key: string; ageMs: number; ttlRemainingMs: number; buildMs: number }> {
+export function getCallgraphCacheStats(): Array<{
+  key: string;
+  ageMs: number;
+  ttlRemainingMs: number;
+  buildMs: number;
+}> {
   const now = Date.now();
   return Array.from(cache.entries()).map(([key, e]) => ({
     key,
@@ -59,7 +73,10 @@ export function getCallgraphCacheStats(): Array<{ key: string; ageMs: number; tt
  * Build a full ReferenceIndex from a connected TM1 server.
  * TTL-cached (60 s) per `includeControl` flag. Concurrent calls share one inflight promise.
  */
-export async function buildIndexFromTM1(tm1Client: TM1Client, opts: BuildIndexOpts = {}): Promise<ReferenceIndex> {
+export async function buildIndexFromTM1(
+  tm1Client: TM1Client,
+  opts: BuildIndexOpts = {},
+): Promise<ReferenceIndex> {
   const includeControl = opts.includeControl ?? false;
   const key = `inc=${includeControl}`;
 
@@ -85,8 +102,10 @@ export async function buildIndexFromTM1(tm1Client: TM1Client, opts: BuildIndexOp
   }
 }
 
-async function buildIndexInternal(tm1Client: TM1Client, includeControl: boolean): Promise<ReferenceIndex> {
-
+async function buildIndexInternal(
+  tm1Client: TM1Client,
+  includeControl: boolean,
+): Promise<ReferenceIndex> {
   const fetchProcesses = async (): Promise<ProcessFetchResult[]> => {
     const all = await tm1Client.processes.fetchForCallgraph(includeControl);
     return all.map((p) => ({
@@ -132,5 +151,9 @@ async function buildIndexInternal(tm1Client: TM1Client, includeControl: boolean)
     }
   };
 
-  return buildReferenceIndex({ fetchProcesses, fetchCubesWithRules, fetchChores });
+  return buildReferenceIndex({
+    fetchProcesses,
+    fetchCubesWithRules,
+    fetchChores,
+  });
 }

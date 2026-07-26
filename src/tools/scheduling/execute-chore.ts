@@ -3,7 +3,10 @@ import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { actionResponse } from "../format.js";
 
-export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): void {
+export function registerExecuteChore(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_execute_chore",
     [
@@ -19,10 +22,15 @@ export function registerExecuteChore(server: McpServer, tm1Client: TM1Client): v
         .min(1000)
         .max(3600000)
         .optional()
-        .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for chores running long TI chains."),
+        .describe(
+          "Override the default 30s request timeout for this call (ms, 1000–3600000). Use for chores running long TI chains.",
+        ),
     },
     async ({ choreName, timeoutMs }, extra) => {
-      await tm1Client.chores.execute(choreName, { signal: extra?.signal, ...(timeoutMs ? { timeoutMs } : {}) });
+      await tm1Client.chores.execute(choreName, {
+        signal: extra?.signal,
+        ...(timeoutMs ? { timeoutMs } : {}),
+      });
       return actionResponse({ success: true, choreName });
     },
   );

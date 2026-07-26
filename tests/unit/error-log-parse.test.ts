@@ -1,39 +1,61 @@
 import { describe, it, expect } from "vitest";
-import { parseLogName, formatTs, spanDays } from "../../src/tools/operations/list-error-logs.js";
+import {
+  parseLogName,
+  formatTs,
+  spanDays,
+} from "../../src/tools/operations/list-error-logs.js";
 
 describe("parseLogName", () => {
   it("parses modern v11 pattern with base36 session hash", () => {
     // Real-world v11 hash: lowercase base36, ~12 chars, contains digits.
-    expect(parseLogName("TM1ProcessError_20260513174354_81004880_LoadActuals_mp4clzmld56v.log")).toEqual({
+    expect(
+      parseLogName(
+        "TM1ProcessError_20260513174354_81004880_LoadActuals_mp4clzmld56v.log",
+      ),
+    ).toEqual({
       ts: "20260513174354",
       process: "LoadActuals",
     });
   });
 
   it("parses modern v11 pattern without hash", () => {
-    expect(parseLogName("TM1ProcessError_20260615123045_42_LoadActuals.log")).toEqual({
+    expect(
+      parseLogName("TM1ProcessError_20260615123045_42_LoadActuals.log"),
+    ).toEqual({
       ts: "20260615123045",
       process: "LoadActuals",
     });
   });
 
   it("keeps underscores inside the process name (strips only the hash)", () => {
-    expect(parseLogName("TM1ProcessError_20260615123045_7_Sales_Load_Daily_mp2su7f4sybb.log")).toEqual({
+    expect(
+      parseLogName(
+        "TM1ProcessError_20260615123045_7_Sales_Load_Daily_mp2su7f4sybb.log",
+      ),
+    ).toEqual({
       ts: "20260615123045",
       process: "Sales_Load_Daily",
     });
   });
 
   it("collapses TIRecord variants with control-object proc name", () => {
-    const a = parseLogName("TM1ProcessError_20260512154239_111_TIRecord_}bedrock.hier.sub.delete_mp2su7f4sybb.log");
-    const b = parseLogName("TM1ProcessError_20260512205706_222_TIRecord_}bedrock.hier.sub.delete_mp342kxn9gv3.log");
+    const a = parseLogName(
+      "TM1ProcessError_20260512154239_111_TIRecord_}bedrock.hier.sub.delete_mp2su7f4sybb.log",
+    );
+    const b = parseLogName(
+      "TM1ProcessError_20260512205706_222_TIRecord_}bedrock.hier.sub.delete_mp342kxn9gv3.log",
+    );
     expect(a.process).toBe("TIRecord_}bedrock.hier.sub.delete");
     expect(b.process).toBe("TIRecord_}bedrock.hier.sub.delete");
     expect(a.process).toBe(b.process);
   });
 
   it("does NOT strip an all-letter trailing token (no digit → real proc suffix)", () => {
-    expect(parseLogName("TM1ProcessError_20260615123045_7_Cube_Assumptions.Export.log")).toEqual({
+    expect(
+      parseLogName(
+        "TM1ProcessError_20260615123045_7_Cube_Assumptions.Export.log",
+      ),
+    ).toEqual({
       ts: "20260615123045",
       process: "Cube_Assumptions.Export",
     });

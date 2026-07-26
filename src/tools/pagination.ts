@@ -28,7 +28,13 @@ export const PAGINATION_SCHEMA = {
     .optional()
     .default(50)
     .describe("Page size; 0 = all."),
-  offset: z.number().int().min(0).optional().default(0).describe("Items to skip."),
+  offset: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .default(0)
+    .describe("Items to skip."),
   fetchAll: z
     .boolean()
     .optional()

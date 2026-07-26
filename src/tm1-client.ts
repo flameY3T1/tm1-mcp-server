@@ -51,7 +51,11 @@ export class TM1Client {
   readonly monitoring: MonitoringService;
   readonly files: FileService;
 
-  constructor(config: TM1Config, sessionManager: SessionManager, logger: pino.Logger) {
+  constructor(
+    config: TM1Config,
+    sessionManager: SessionManager,
+    logger: pino.Logger,
+  ) {
     this.config = config;
     this.http = new TM1HttpClient(config, sessionManager, logger);
     this.sessionManager = sessionManager;
@@ -70,7 +74,9 @@ export class TM1Client {
     // Enforced at runtime so a future reorder fails loudly instead of injecting
     // `undefined` (TS types it as defined, so the compiler won't catch a move).
     if (!this.cells) {
-      throw new Error("TM1Client init order: CellService must be constructed before ElementService");
+      throw new Error(
+        "TM1Client init order: CellService must be constructed before ElementService",
+      );
     }
     this.elements = new ElementService(this.http, this.cells);
     this.processes = new ProcessService(this.http);

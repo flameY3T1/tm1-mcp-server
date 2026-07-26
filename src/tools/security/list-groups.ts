@@ -31,7 +31,13 @@ export function registerListGroups(server: McpServer, tm1Client: TM1Client) {
       type Row = (typeof items)[number];
       const columns: Column<Row>[] = [
         { header: "Name", get: (g) => g.Name },
-        { header: "Clients", get: (g) => ("clientCount" in g ? `${g.clientCount} (count)` : (g.Clients ?? []).join(", ")) },
+        {
+          header: "Clients",
+          get: (g) =>
+            "clientCount" in g
+              ? `${g.clientCount} (count)`
+              : (g.Clients ?? []).join(", "),
+        },
       ];
       return pageResponse(projectedPage, format, { title: "Groups", columns });
     },

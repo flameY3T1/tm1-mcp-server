@@ -6,14 +6,29 @@ import { actionResponse } from "../format.js";
 
 const ElementSchema = z.object({
   name: z.string().describe("Element name"),
-  type: z.enum(["Numeric", "String", "Consolidated"]).describe("N=numeric leaf, C=consolidated/parent, S=string"),
-  components: z.array(z.object({
-    name: z.string().describe("Child element name"),
-    weight: z.number().default(1).describe("Consolidation weight (default: 1)"),
-  })).optional().describe("Child elements for a Consolidated element. REPLACES the full existing child set (verified live: passing [X,Y] drops any current children not in the list — it does not append). Omit or pass an empty array to leave existing children unchanged. To add one child, list the complete intended set."),
+  type: z
+    .enum(["Numeric", "String", "Consolidated"])
+    .describe("N=numeric leaf, C=consolidated/parent, S=string"),
+  components: z
+    .array(
+      z.object({
+        name: z.string().describe("Child element name"),
+        weight: z
+          .number()
+          .default(1)
+          .describe("Consolidation weight (default: 1)"),
+      }),
+    )
+    .optional()
+    .describe(
+      "Child elements for a Consolidated element. REPLACES the full existing child set (verified live: passing [X,Y] drops any current children not in the list — it does not append). Omit or pass an empty array to leave existing children unchanged. To add one child, list the complete intended set.",
+    ),
 });
 
-export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Client): void {
+export function registerBulkUpsertElements(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_bulk_upsert_elements",
     [
@@ -24,8 +39,14 @@ export function registerBulkUpsertElements(server: McpServer, tm1Client: TM1Clie
     ].join(" "),
     {
       dimensionName: z.string().describe("Dimension name"),
-      hierarchyName: z.string().optional().describe("Hierarchy name (defaults to dimension name)"),
-      elements: z.array(ElementSchema).min(1).describe("Elements to create or update"),
+      hierarchyName: z
+        .string()
+        .optional()
+        .describe("Hierarchy name (defaults to dimension name)"),
+      elements: z
+        .array(ElementSchema)
+        .min(1)
+        .describe("Elements to create or update"),
     },
     async ({ dimensionName, hierarchyName, elements }) => {
       const hier = hierarchyName ?? dimensionName;

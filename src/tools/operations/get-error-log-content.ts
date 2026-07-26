@@ -11,7 +11,10 @@ const DEFAULT_RELATED_MAX_FILES = 5;
 const HARD_MAX_RELATED_FILES = 20;
 const DEFAULT_RELATED_MAX_BYTES = 16 * 1024;
 
-export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Client): void {
+export function registerGetErrorLogContent(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_get_error_log_content",
     [
@@ -20,27 +23,77 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
       "includeRelated also pulls sibling logs within a timestamp window — useful for tracing cascade failures in chained TI processes.",
     ].join(" "),
     {
-      filename: z.string().describe(
-        "Exact filename returned by tm1_list_error_logs, e.g. 'MyProc_20260504_123045.log'",
-      ),
-      tail: z.number().int().positive().max(10000).optional()
-        .describe("If set, return only the last N lines (overrides maxBytes byte truncation)."),
-      maxBytes: z.number().int().positive().max(HARD_MAX_BYTES).optional()
+      filename: z
+        .string()
+        .describe(
+          "Exact filename returned by tm1_list_error_logs, e.g. 'MyProc_20260504_123045.log'",
+        ),
+      tail: z
+        .number()
+        .int()
+        .positive()
+        .max(10000)
+        .optional()
+        .describe(
+          "If set, return only the last N lines (overrides maxBytes byte truncation).",
+        ),
+      maxBytes: z
+        .number()
+        .int()
+        .positive()
+        .max(HARD_MAX_BYTES)
+        .optional()
         .default(DEFAULT_MAX_BYTES)
-        .describe(`Truncate to last N bytes if no tail is given (default ${DEFAULT_MAX_BYTES}, hard max ${HARD_MAX_BYTES}).`),
-      includeRelated: z.boolean().optional().default(false)
-        .describe("If true, also fetch sibling error logs whose embedded YYYYMMDDHHMMSS timestamp is within ±relatedWindowSec of the source log."),
-      relatedWindowSec: z.number().int().positive().max(HARD_MAX_RELATED_WINDOW_SEC).optional()
+        .describe(
+          `Truncate to last N bytes if no tail is given (default ${DEFAULT_MAX_BYTES}, hard max ${HARD_MAX_BYTES}).`,
+        ),
+      includeRelated: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "If true, also fetch sibling error logs whose embedded YYYYMMDDHHMMSS timestamp is within ±relatedWindowSec of the source log.",
+        ),
+      relatedWindowSec: z
+        .number()
+        .int()
+        .positive()
+        .max(HARD_MAX_RELATED_WINDOW_SEC)
+        .optional()
         .default(DEFAULT_RELATED_WINDOW_SEC)
-        .describe(`Time window in seconds for related-log discovery (default ${DEFAULT_RELATED_WINDOW_SEC}, max ${HARD_MAX_RELATED_WINDOW_SEC}).`),
-      relatedMaxFiles: z.number().int().positive().max(HARD_MAX_RELATED_FILES).optional()
+        .describe(
+          `Time window in seconds for related-log discovery (default ${DEFAULT_RELATED_WINDOW_SEC}, max ${HARD_MAX_RELATED_WINDOW_SEC}).`,
+        ),
+      relatedMaxFiles: z
+        .number()
+        .int()
+        .positive()
+        .max(HARD_MAX_RELATED_FILES)
+        .optional()
         .default(DEFAULT_RELATED_MAX_FILES)
-        .describe(`Cap on number of related logs returned (default ${DEFAULT_RELATED_MAX_FILES}, max ${HARD_MAX_RELATED_FILES}).`),
-      relatedMaxBytes: z.number().int().positive().max(HARD_MAX_BYTES).optional()
+        .describe(
+          `Cap on number of related logs returned (default ${DEFAULT_RELATED_MAX_FILES}, max ${HARD_MAX_RELATED_FILES}).`,
+        ),
+      relatedMaxBytes: z
+        .number()
+        .int()
+        .positive()
+        .max(HARD_MAX_BYTES)
+        .optional()
         .default(DEFAULT_RELATED_MAX_BYTES)
-        .describe(`Per-related-log byte cap (tail-truncated, default ${DEFAULT_RELATED_MAX_BYTES}).`),
+        .describe(
+          `Per-related-log byte cap (tail-truncated, default ${DEFAULT_RELATED_MAX_BYTES}).`,
+        ),
     },
-    async ({ filename, tail, maxBytes, includeRelated, relatedWindowSec, relatedMaxFiles, relatedMaxBytes }) => {
+    async ({
+      filename,
+      tail,
+      maxBytes,
+      includeRelated,
+      relatedWindowSec,
+      relatedMaxFiles,
+      relatedMaxBytes,
+    }) => {
       const content = await tm1Client.server.getErrorLogContent(filename);
       const totalBytes = Buffer.byteLength(content, "utf8");
 
@@ -60,7 +113,9 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
           body = trimmed;
         }
       } else if (totalBytes > maxBytes) {
-        body = Buffer.from(content, "utf8").subarray(-maxBytes).toString("utf8");
+        body = Buffer.from(content, "utf8")
+          .subarray(-maxBytes)
+          .toString("utf8");
         truncated = true;
         truncationReason = `maxBytes=${maxBytes} (tail-truncated)`;
       } else {
@@ -84,14 +139,21 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
             files: [],
           };
         } else {
-          const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
+          const allFiles = await tm1Client.server.listErrorLogFiles({
+            top: 500,
+          });
           const windowMs = relatedWindowSec * 1000;
           const candidates = allFiles
             .filter((f) => f.filename !== filename)
-            .map((f) => ({ filename: f.filename, ts: tsFromFilename(f.filename) }))
+            .map((f) => ({
+              filename: f.filename,
+              ts: tsFromFilename(f.filename),
+            }))
             .filter((f): f is { filename: string; ts: number } => f.ts !== null)
             .filter((f) => Math.abs(f.ts - sourceTs) <= windowMs)
-            .sort((a, b) => Math.abs(a.ts - sourceTs) - Math.abs(b.ts - sourceTs))
+            .sort(
+              (a, b) => Math.abs(a.ts - sourceTs) - Math.abs(b.ts - sourceTs),
+            )
             .slice(0, relatedMaxFiles);
 
           const fetched = await Promise.all(
@@ -99,7 +161,10 @@ export function registerGetErrorLogContent(server: McpServer, tm1Client: TM1Clie
               try {
                 const raw = await tm1Client.server.getErrorLogContent(rf);
                 const rawBytes = Buffer.byteLength(raw, "utf8");
-                const { body: rb, truncated: rt } = truncateTail(raw, relatedMaxBytes);
+                const { body: rb, truncated: rt } = truncateTail(
+                  raw,
+                  relatedMaxBytes,
+                );
                 return {
                   filename: rf,
                   deltaSec: Math.round((ts - sourceTs) / 1000),

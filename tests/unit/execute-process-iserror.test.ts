@@ -10,8 +10,11 @@ import { registerExecuteProcess } from "../../src/tools/ti-development/execute-p
 // successful call carrying success:false.
 type ToolCb = (
   args: { processName: string; parameters?: Record<string, string | number> },
-  extra: Record<string, unknown>
-) => Promise<{ isError?: boolean; content: Array<{ type: string; text: string }> }>;
+  extra: Record<string, unknown>,
+) => Promise<{
+  isError?: boolean;
+  content: Array<{ type: string; text: string }>;
+}>;
 
 function captureHandler(execute: TM1Client["processes"]["execute"]): ToolCb {
   let cb: ToolCb | undefined;
@@ -28,9 +31,10 @@ function captureHandler(execute: TM1Client["processes"]["execute"]): ToolCb {
 
 describe("tm1_execute_process isError contract (T2.1)", () => {
   it("flags isError when the TI run reports success:false", async () => {
-    const cb = captureHandler(
-      async () => ({ success: false, processErrorStatus: "DataSource error" })
-    );
+    const cb = captureHandler(async () => ({
+      success: false,
+      processErrorStatus: "DataSource error",
+    }));
     const result = await cb({ processName: "Failing.Process" }, {});
     expect(result.isError).toBe(true);
     // Payload is preserved for diagnosis.
@@ -40,23 +44,24 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
   it("flags isError when the TI run completes with minor errors", async () => {
     // execute() now routes through tm1.ExecuteWithReturn, so partial failures
     // surface as success:false with the real status + error log attached.
-    const cb = captureHandler(
-      async () => ({
-        success: false,
-        processErrorStatus: "CompletedWithMinorErrors",
-        errorLogFile: "TM1ProcessError_20260718_Partial.log",
-      })
-    );
+    const cb = captureHandler(async () => ({
+      success: false,
+      processErrorStatus: "CompletedWithMinorErrors",
+      errorLogFile: "TM1ProcessError_20260718_Partial.log",
+    }));
     const result = await cb({ processName: "Partial.Process" }, {});
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("CompletedWithMinorErrors");
-    expect(result.content[0]?.text).toContain("TM1ProcessError_20260718_Partial.log");
+    expect(result.content[0]?.text).toContain(
+      "TM1ProcessError_20260718_Partial.log",
+    );
   });
 
   it("does not flag isError on a successful run", async () => {
-    const cb = captureHandler(
-      async () => ({ success: true, processErrorStatus: "CompletedSuccessfully" })
-    );
+    const cb = captureHandler(async () => ({
+      success: true,
+      processErrorStatus: "CompletedSuccessfully",
+    }));
     const result = await cb({ processName: "Ok.Process" }, {});
     expect(result.isError).toBeUndefined();
   });

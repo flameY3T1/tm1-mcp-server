@@ -41,7 +41,10 @@ export interface StripResult {
  * trailing comments are kept verbatim (they are usually documentation, not dead
  * code). Line endings are normalized to `\n` (read-only display).
  */
-export function stripCommentBlocks(src: string, minRun = COLLAPSE_MIN): StripResult {
+export function stripCommentBlocks(
+  src: string,
+  minRun = COLLAPSE_MIN,
+): StripResult {
   if (src === "") return { code: "", removedLines: 0, collapsedBlocks: 0 };
   const lines = src.split(/\r?\n/);
   const out: string[] = [];

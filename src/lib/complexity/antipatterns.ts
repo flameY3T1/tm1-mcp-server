@@ -7,9 +7,7 @@
  * to be reusable later from a single-process pre-commit lint entry point.
  */
 import { parseTiCode } from "../callgraph/tiParser.js";
-import type {
-  TiStatement,
-} from "../callgraph/types.js";
+import type { TiStatement } from "../callgraph/types.js";
 import type { ProcessCodeInput, TiTab } from "./process-metrics.js";
 
 export type Severity = "error" | "warn" | "info";

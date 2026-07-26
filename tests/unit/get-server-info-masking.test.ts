@@ -42,7 +42,10 @@ describe("tm1_get_server_info – _raw credential masking", () => {
         LDAP: { Enable: true, Password: "ldap-secret" },
         // The whole Authentication node matches the credential regex ("auth"),
         // so it is masked wholesale — its secret child never serializes.
-        Authentication: { SecurityPackageName: "kerberos", ServiceAuthPassword: "svc-secret" },
+        Authentication: {
+          SecurityPackageName: "kerberos",
+          ServiceAuthPassword: "svc-secret",
+        },
       },
       Performance: { MTQ: { UseAllThreads: true } },
     });

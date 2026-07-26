@@ -37,7 +37,10 @@ interface BulkResult {
   cubes: Array<Record<string, unknown>>;
 }
 
-async function run(client: TM1Client, input: Record<string, unknown>): Promise<BulkResult> {
+async function run(
+  client: TM1Client,
+  input: Record<string, unknown>,
+): Promise<BulkResult> {
   const { schema, handler } = capture(client);
   const args = z.object(schema).parse(input);
   const res = await handler(args as Record<string, unknown>, {});
@@ -50,18 +53,27 @@ function bulkRulesClient(rows: CubeRules[]): TM1Client {
   return {
     cubes: {
       getAllRules: async (_includeControl?: boolean, top?: number) =>
-        top === undefined ? rows : { items: rows.slice(0, top), total: rows.length },
+        top === undefined
+          ? rows
+          : { items: rows.slice(0, top), total: rows.length },
     },
   } as unknown as TM1Client;
 }
 
 function cube(name: string, rulesText: string): CubeRules {
-  return { cubeName: name, rulesText, skipCheck: rulesText.toUpperCase().includes("SKIPCHECK") };
+  return {
+    cubeName: name,
+    rulesText,
+    skipCheck: rulesText.toUpperCase().includes("SKIPCHECK"),
+  };
 }
 
 describe("tm1_get_all_cube_rules default cap", () => {
   const rows = Array.from({ length: 60 }, (_, i) =>
-    cube(`Cube.${String(i).padStart(2, "0")}`, i % 2 === 0 ? "SKIPCHECK;\n['A'] = N: 1;" : ""),
+    cube(
+      `Cube.${String(i).padStart(2, "0")}`,
+      i % 2 === 0 ? "SKIPCHECK;\n['A'] = N: 1;" : "",
+    ),
   );
   const client = bulkRulesClient(rows);
 
@@ -109,7 +121,9 @@ describe("tm1_get_all_cube_rules default cap", () => {
     expect(parsed.returned).toBe(30);
     expect(parsed.truncated).toBe(false);
     expect(parsed.count).toBe(30);
-    expect(parsed.cubes.every((c) => String(c.rulesText).trim().length > 0)).toBe(true);
+    expect(
+      parsed.cubes.every((c) => String(c.rulesText).trim().length > 0),
+    ).toBe(true);
   });
 
   it("onlyWithRules with a smaller limit truncates deterministically by name", async () => {
@@ -117,6 +131,10 @@ describe("tm1_get_all_cube_rules default cap", () => {
     expect(parsed.returned).toBe(3);
     expect(parsed.truncated).toBe(true);
     expect(parsed.count).toBe(30);
-    expect(parsed.cubes.map((c) => c.cubeName)).toEqual(["Cube.00", "Cube.02", "Cube.04"]);
+    expect(parsed.cubes.map((c) => c.cubeName)).toEqual([
+      "Cube.00",
+      "Cube.02",
+      "Cube.04",
+    ]);
   });
 });

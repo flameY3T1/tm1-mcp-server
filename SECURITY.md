@@ -3,7 +3,7 @@
 ## Supported Versions
 
 | Version | Supported |
-|---------|-----------|
+| ------- | --------- |
 | 2.x     | ✅        |
 | < 2.0   | ❌        |
 
@@ -15,7 +15,7 @@ Only the latest `2.x` release line receives security fixes.
 
 Report privately via GitHub's
 [**Report a vulnerability**](https://github.com/flameY3T1/tm1-mcp-server/security/advisories/new)
-(Security → Advisories → *Report a vulnerability*). This opens a confidential
+(Security → Advisories → _Report a vulnerability_). This opens a confidential
 advisory visible only to you and the maintainer.
 
 Please include:

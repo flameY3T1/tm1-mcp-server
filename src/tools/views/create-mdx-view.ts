@@ -3,7 +3,10 @@ import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { actionResponse } from "../format.js";
 
-export function registerCreateMdxView(server: McpServer, tm1Client: TM1Client): void {
+export function registerCreateMdxView(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_create_mdx_view",
     "Create a public MDX-based view on a cube. The view persists server-side and can be used as a TI process datasource (TM1CubeView) or executed via tm1_get_view.",

@@ -63,12 +63,18 @@ describe("ElementService.getAttributeValues — MDX identifier escaping (M8)", (
   });
 
   it("doubles `]` in the dimension and element names", async () => {
-    fetchSpy.mockResolvedValueOnce(mockResponse({ ID: "cs-1", Cells: [], Axes: [{ Tuples: [] }] }));
+    fetchSpy.mockResolvedValueOnce(
+      mockResponse({ ID: "cs-1", Cells: [], Axes: [{ Tuples: [] }] }),
+    );
 
     await client.elements.getAttributeValues("Region]evil", "Foo]Bar");
 
     const firstCall = fetchSpy.mock.calls[0]!;
-    const sentMdx = (JSON.parse(String((firstCall[1] as { body: string }).body)) as { MDX: string }).MDX;
+    const sentMdx = (
+      JSON.parse(String((firstCall[1] as { body: string }).body)) as {
+        MDX: string;
+      }
+    ).MDX;
 
     // Escaped forms present; raw single-`]` breakouts absent.
     expect(sentMdx).toContain("Foo]]Bar");

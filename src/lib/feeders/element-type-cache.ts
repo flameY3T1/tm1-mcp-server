@@ -26,13 +26,20 @@ function normalize(s: string): string {
 export class ElementTypeCache {
   private readonly hierarchy: HierarchyLike;
   private readonly slots = new Map<string, Map<string, ElementType> | null>();
-  private readonly pending = new Map<string, Promise<Map<string, ElementType> | null>>();
+  private readonly pending = new Map<
+    string,
+    Promise<Map<string, ElementType> | null>
+  >();
 
   constructor(hierarchy: HierarchyLike) {
     this.hierarchy = hierarchy;
   }
 
-  async getType(dim: string, hier: string, elem: string): Promise<ElementType | null> {
+  async getType(
+    dim: string,
+    hier: string,
+    elem: string,
+  ): Promise<ElementType | null> {
     const slotKey = `${normalize(dim)}|${normalize(hier)}`;
     let slot = this.slots.get(slotKey);
     if (slot === undefined) {

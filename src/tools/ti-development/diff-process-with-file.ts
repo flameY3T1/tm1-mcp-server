@@ -3,7 +3,11 @@ import { resolveLocalPath } from "../local-file.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import type { ProcessParameter, ProcessVariable, DataSource } from "../../types.js";
+import type {
+  ProcessParameter,
+  ProcessVariable,
+  DataSource,
+} from "../../types.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
 import { maskCode } from "../../lib/mask-secrets.js";
@@ -15,7 +19,11 @@ interface TabDiff {
   identical: boolean;
 }
 
-function tabDiff(name: TabDiff["tab"], installed: string, file: string): TabDiff {
+function tabDiff(
+  name: TabDiff["tab"],
+  installed: string,
+  file: string,
+): TabDiff {
   const norm = (s: string) => s.replace(/\r\n/g, "\n").trimEnd();
   return {
     tab: name,
@@ -31,7 +39,11 @@ function diffParams(installed: ProcessParameter[], file: ProcessParameter[]) {
   const b = map(file);
   const added: string[] = [];
   const removed: string[] = [];
-  const changed: Array<{ name: string; installed: ProcessParameter; file: ProcessParameter }> = [];
+  const changed: Array<{
+    name: string;
+    installed: ProcessParameter;
+    file: ProcessParameter;
+  }> = [];
   for (const [name, fp] of b) {
     const ip = a.get(name);
     if (!ip) {
@@ -56,7 +68,11 @@ function diffVars(installed: ProcessVariable[], file: ProcessVariable[]) {
   const b = map(file);
   const added: string[] = [];
   const removed: string[] = [];
-  const changed: Array<{ name: string; installed: ProcessVariable; file: ProcessVariable }> = [];
+  const changed: Array<{
+    name: string;
+    installed: ProcessVariable;
+    file: ProcessVariable;
+  }> = [];
   for (const [name, fv] of b) {
     const iv = a.get(name);
     if (!iv) added.push(name);
@@ -68,9 +84,13 @@ function diffVars(installed: ProcessVariable[], file: ProcessVariable[]) {
   return { added, removed, changed };
 }
 
-function diffDataSource(installed: DataSource, file: DataSource): { identical: boolean; differences: string[] } {
+function diffDataSource(
+  installed: DataSource,
+  file: DataSource,
+): { identical: boolean; differences: string[] } {
   const diffs: string[] = [];
-  if (installed.type !== file.type) diffs.push(`type: ${installed.type} → ${file.type}`);
+  if (installed.type !== file.type)
+    diffs.push(`type: ${installed.type} → ${file.type}`);
   const fields: Array<keyof DataSource> = [
     "dataSourceNameForServer",
     "dataSourceNameForClient",
@@ -86,19 +106,34 @@ function diffDataSource(installed: DataSource, file: DataSource): { identical: b
   for (const f of fields) {
     const a = installed[f];
     const b = file[f];
-    if ((a ?? "") !== (b ?? "")) diffs.push(`${String(f)}: ${JSON.stringify(a)} → ${JSON.stringify(b)}`);
+    if ((a ?? "") !== (b ?? ""))
+      diffs.push(`${String(f)}: ${JSON.stringify(a)} → ${JSON.stringify(b)}`);
   }
   return { identical: diffs.length === 0, differences: diffs };
 }
 
-export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Client) {
+export function registerDiffProcessWithFile(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_diff_process_with_file",
     "Compare an installed TI process on the server against a local .pro file. Returns per-tab identical flags + line counts, parameter diff (added/removed/changed), variable diff, and datasource diff. Use before tm1_import_pro_file to preview what will change.",
     {
-      filePath: z.string().optional().describe("Absolute path to the .pro file on the MCP server host. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline."),
-      content: z.string().optional().describe("Raw .pro file content as string"),
-      processName: z.string().optional().describe("Override process name. Default: from .pro 602 line."),
+      filePath: z
+        .string()
+        .optional()
+        .describe(
+          "Absolute path to the .pro file on the MCP server host. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline.",
+        ),
+      content: z
+        .string()
+        .optional()
+        .describe("Raw .pro file content as string"),
+      processName: z
+        .string()
+        .optional()
+        .describe("Override process name. Default: from .pro 602 line."),
       maskSecrets: z
         .boolean()
         .optional()
@@ -130,17 +165,22 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
         });
       }
 
-      const [installedCode, installedParams, installedVars, installedDs] = await Promise.all([
-        tm1Client.processes.getCode(name),
-        tm1Client.processes.getParameters(name),
-        tm1Client.processes.getVariables(name),
-        tm1Client.processes.getDataSource(name),
-      ]);
+      const [installedCode, installedParams, installedVars, installedDs] =
+        await Promise.all([
+          tm1Client.processes.getCode(name),
+          tm1Client.processes.getParameters(name),
+          tm1Client.processes.getVariables(name),
+          tm1Client.processes.getDataSource(name),
+        ]);
 
       const mask = maskSecrets ? maskCode : (s: string) => s;
       const tabs = [
         tabDiff("prolog", mask(installedCode.prolog), mask(parsed.prolog)),
-        tabDiff("metadata", mask(installedCode.metadata), mask(parsed.metadata)),
+        tabDiff(
+          "metadata",
+          mask(installedCode.metadata),
+          mask(parsed.metadata),
+        ),
         tabDiff("data", mask(installedCode.data), mask(parsed.data)),
         tabDiff("epilog", mask(installedCode.epilog), mask(parsed.epilog)),
       ];
@@ -150,8 +190,12 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
 
       const allIdentical =
         tabs.every((t) => t.identical) &&
-        params.added.length === 0 && params.removed.length === 0 && params.changed.length === 0 &&
-        variables.added.length === 0 && variables.removed.length === 0 && variables.changed.length === 0 &&
+        params.added.length === 0 &&
+        params.removed.length === 0 &&
+        params.changed.length === 0 &&
+        variables.added.length === 0 &&
+        variables.removed.length === 0 &&
+        variables.changed.length === 0 &&
         dataSource.identical;
 
       return {
@@ -159,7 +203,14 @@ export function registerDiffProcessWithFile(server: McpServer, tm1Client: TM1Cli
           {
             type: "text" as const,
             text: JSON.stringify(
-              { processName: name, identical: allIdentical, tabs, parameters: params, variables, dataSource },
+              {
+                processName: name,
+                identical: allIdentical,
+                tabs,
+                parameters: params,
+                variables,
+                dataSource,
+              },
               null,
               2,
             ),

@@ -45,7 +45,10 @@ function realpathNearestExisting(p: string): string {
  * When the root IS configured, the resolved absolute path must stay within it; any
  * `..` traversal or absolute escape is rejected. Returns the resolved absolute path.
  */
-export function resolveLocalPath(inputPath: string, paramName = "filePath"): string {
+export function resolveLocalPath(
+  inputPath: string,
+  paramName = "filePath",
+): string {
   const root = process.env[ROOT_ENV]?.trim();
   if (!root) {
     throw new TM1Error({
@@ -77,7 +80,11 @@ export function resolveLocalPath(inputPath: string, paramName = "filePath"): str
   const realRoot = realpathNearestExisting(resolvedRoot);
   const realResolved = realpathNearestExisting(resolved);
   const relReal = path.relative(realRoot, realResolved);
-  if (relReal === ".." || relReal.startsWith(`..${path.sep}`) || path.isAbsolute(relReal)) {
+  if (
+    relReal === ".." ||
+    relReal.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relReal)
+  ) {
     throw new TM1Error({
       code: TM1ErrorCode.VALIDATION_ERROR,
       message:

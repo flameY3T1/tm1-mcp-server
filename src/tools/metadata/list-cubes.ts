@@ -4,10 +4,16 @@ import type { TM1Client } from "../../tm1-client.js";
 import type { Cube } from "../../types.js";
 import { compileUserRegex } from "../../lib/safe-regex.js";
 import { compareByName } from "../../tm1-client/services/odata-page.js";
-import { PAGINATION_SCHEMA, paginate, pageFromServer, type Page } from "../pagination.js";
+import {
+  PAGINATION_SCHEMA,
+  paginate,
+  pageFromServer,
+  type Page,
+} from "../pagination.js";
 import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
-type CubeOut = Pick<Cube, "name"> & Partial<Pick<Cube, "dimensions" | "hasRules">>;
+type CubeOut = Pick<Cube, "name"> &
+  Partial<Pick<Cube, "dimensions" | "hasRules">>;
 
 export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -24,21 +30,29 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
         .boolean()
         .optional()
         .default(false)
-        .describe("Include TM1 control cubes whose names start with '}' (default: false)."),
+        .describe(
+          "Include TM1 control cubes whose names start with '}' (default: false).",
+        ),
       includeDimensions: z
         .boolean()
         .optional()
         .default(true)
-        .describe("Include the dimensions[] array per cube (default: true). Set false for compact output on wide cubes."),
+        .describe(
+          "Include the dimensions[] array per cube (default: true). Set false for compact output on wide cubes.",
+        ),
       includeRules: z
         .boolean()
         .optional()
         .default(false)
-        .describe("Include hasRules:boolean per cube (default: false). Triggers one extra OData $select=Rules; useful for audits to skip cubes without rules."),
+        .describe(
+          "Include hasRules:boolean per cube (default: false). Triggers one extra OData $select=Rules; useful for audits to skip cubes without rules.",
+        ),
       nameExact: z
         .string()
         .optional()
-        .describe("Return only the cube whose name matches exactly (case-sensitive). Fast-path for known cube names; overrides nameContains/nameRegex when set."),
+        .describe(
+          "Return only the cube whose name matches exactly (case-sensitive). Fast-path for known cube names; overrides nameContains/nameRegex when set.",
+        ),
       nameContains: z
         .string()
         .optional()
@@ -46,7 +60,9 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
       nameRegex: z
         .string()
         .optional()
-        .describe("JS regex (case-insensitive) on cube name. Invalid patterns return an error."),
+        .describe(
+          "JS regex (case-insensitive) on cube name. Invalid patterns return an error.",
+        ),
     },
     async ({
       limit,
@@ -97,7 +113,9 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
       // reach. nameExact takes precedence over nameContains/nameRegex
       // (documented), so when it is set the others are not active filters.
       const usesNameRegex =
-        nameExact === undefined && nameRegex !== undefined && nameRegex.length > 0;
+        nameExact === undefined &&
+        nameRegex !== undefined &&
+        nameRegex.length > 0;
       const canPushDown = !fetchAll && limit > 0 && !usesNameRegex;
 
       let page: Page<CubeOut>;
@@ -124,8 +142,22 @@ export function registerListCubes(server: McpServer, tm1Client: TM1Client) {
 
       const columns: Column<CubeOut>[] = [
         { header: "name", get: (c) => c.name },
-        ...(includeDimensions ? [{ header: "dimensions", get: (c: CubeOut) => c.dimensions ?? [] } as Column<CubeOut>] : []),
-        ...(includeRules ? [{ header: "hasRules", get: (c: CubeOut) => c.hasRules ?? false } as Column<CubeOut>] : []),
+        ...(includeDimensions
+          ? [
+              {
+                header: "dimensions",
+                get: (c: CubeOut) => c.dimensions ?? [],
+              } as Column<CubeOut>,
+            ]
+          : []),
+        ...(includeRules
+          ? [
+              {
+                header: "hasRules",
+                get: (c: CubeOut) => c.hasRules ?? false,
+              } as Column<CubeOut>,
+            ]
+          : []),
       ];
       return pageResponse(page, format, { title: "Cubes", columns });
     },

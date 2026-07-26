@@ -18,7 +18,9 @@ export function registerCreateElement(server: McpServer, tm1Client: TM1Client) {
     {
       dimensionName: z.string().describe("Name of the dimension"),
       hierarchyName: z.string().describe("Name of the hierarchy"),
-      element: elementSchema.describe("Element definition with name, type and optional components"),
+      element: elementSchema.describe(
+        "Element definition with name, type and optional components",
+      ),
     },
     async ({ dimensionName, hierarchyName, element }) => {
       await tm1Client.elements.create(dimensionName, hierarchyName, element);

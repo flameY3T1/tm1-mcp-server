@@ -6,7 +6,8 @@ import type { Chore, ChoreCreate } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 function frequencyDuration(f: ChoreCreate["frequency"]): string {
   return `P${f.days}DT${String(f.hours).padStart(2, "0")}H${String(f.minutes).padStart(2, "0")}M${String(f.seconds).padStart(2, "0")}S`;
@@ -85,7 +86,10 @@ export class ChoreService {
       Tasks: chore.steps.map((step, idx) => ({
         Step: idx,
         "Process@odata.bind": `Processes('${enc(step.process)}')`,
-        Parameters: step.parameters.map((p) => ({ Name: p.name, Value: p.value })),
+        Parameters: step.parameters.map((p) => ({
+          Name: p.name,
+          Value: p.value,
+        })),
       })),
     };
     await this.http.request<void>("POST", "/api/v1/Chores", body);
@@ -110,8 +114,10 @@ export class ChoreService {
     const body: Record<string, unknown> = {};
     if (updates.startTime !== undefined) body.StartTime = updates.startTime;
     if (updates.active !== undefined) body.Active = updates.active;
-    if (updates.dstSensitive !== undefined) body.DSTSensitive = updates.dstSensitive;
-    if (updates.executionMode !== undefined) body.ExecutionMode = updates.executionMode;
+    if (updates.dstSensitive !== undefined)
+      body.DSTSensitive = updates.dstSensitive;
+    if (updates.executionMode !== undefined)
+      body.ExecutionMode = updates.executionMode;
     if (updates.frequency !== undefined) {
       body.Frequency = frequencyDuration(updates.frequency);
     }
@@ -119,7 +125,10 @@ export class ChoreService {
       body.Tasks = updates.steps.map((step, idx) => ({
         Step: idx,
         "Process@odata.bind": `Processes('${enc(step.process)}')`,
-        Parameters: step.parameters.map((p) => ({ Name: p.name, Value: p.value })),
+        Parameters: step.parameters.map((p) => ({
+          Name: p.name,
+          Value: p.value,
+        })),
       }));
     }
     await this.http.request<void>("PATCH", path, body);
@@ -130,6 +139,9 @@ export class ChoreService {
    * DELETE /api/v1/Chores('{name}')
    */
   async delete(choreName: string): Promise<void> {
-    await this.http.request<void>("DELETE", `/api/v1/Chores('${enc(choreName)}')`);
+    await this.http.request<void>(
+      "DELETE",
+      `/api/v1/Chores('${enc(choreName)}')`,
+    );
   }
 }

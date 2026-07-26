@@ -84,7 +84,12 @@ export function serializeProcessToGit(input: GitProcessInput): GitProcessJson {
   return { json, credentialsOmitted };
 }
 
-const TAB_NAMES: ReadonlySet<Tab> = new Set(["prolog", "metadata", "data", "epilog"]);
+const TAB_NAMES: ReadonlySet<Tab> = new Set([
+  "prolog",
+  "metadata",
+  "data",
+  "epilog",
+]);
 
 interface RegionMarker {
   kind: "region" | "endregion";
@@ -146,7 +151,12 @@ function extractRegionMarkers(ti: string): RegionMarker[] {
  *     (Prolog/Metadata/Data/Epilog) — genuinely malformed, not a user fold
  */
 function parseCodeBlob(ti: string): Record<Tab, string> {
-  const out: Record<Tab, string> = { prolog: "", metadata: "", data: "", epilog: "" };
+  const out: Record<Tab, string> = {
+    prolog: "",
+    metadata: "",
+    data: "",
+    epilog: "",
+  };
   const markers = extractRegionMarkers(ti);
 
   if (markers.length === 0) {
@@ -188,7 +198,9 @@ function parseCodeBlob(ti: string): Record<Tab, string> {
         // Back to top level: this #endregion closes the current tab. Strip
         // the single newline the server places before #endregion; nested
         // #region/#endregion lines (user folds) stay in the sliced content.
-        out[currentTab as Tab] = ti.slice(contentStart, marker.start).replace(/\r?\n$/, "");
+        out[currentTab as Tab] = ti
+          .slice(contentStart, marker.start)
+          .replace(/\r?\n$/, "");
         found++;
         currentTab = null;
       }
@@ -205,7 +217,9 @@ function parseCodeBlob(ti: string): Record<Tab, string> {
   // Structurally unreachable given the checks above, but keep the original
   // invariant explicit rather than silently returning a default-filled `out`.
   if (found === 0) {
-    throw regionBlobError("no valid #region <Tab> … #endregion pair was found.");
+    throw regionBlobError(
+      "no valid #region <Tab> … #endregion pair was found.",
+    );
   }
   return out;
 }
@@ -230,14 +244,21 @@ export function parseProcessFromGit(
 
   const name = typeof meta.name === "string" ? meta.name : "";
   const hasSecurityAccess =
-    typeof meta.hasSecurityAccess === "boolean" ? meta.hasSecurityAccess : undefined;
+    typeof meta.hasSecurityAccess === "boolean"
+      ? meta.hasSecurityAccess
+      : undefined;
 
   // Git .json uses the OData-native param field name `value`; the internal
   // schema uses `defaultValue`. Normalize value→defaultValue before validation,
   // keeping back-compat with legacy files that wrote `defaultValue`.
   const rawParams = Array.isArray(meta.parameters)
     ? meta.parameters.map((p) => {
-        if (p && typeof p === "object" && "value" in p && !("defaultValue" in p)) {
+        if (
+          p &&
+          typeof p === "object" &&
+          "value" in p &&
+          !("defaultValue" in p)
+        ) {
           const { value, ...rest } = p as Record<string, unknown>;
           return { ...rest, defaultValue: value };
         }
@@ -261,7 +282,9 @@ export function parseProcessFromGit(
   }
   const variables: ProcessVariable[] = varsResult.data;
 
-  const dsResult = dataSourceSchema.safeParse(meta.dataSource ?? { type: "None" });
+  const dsResult = dataSourceSchema.safeParse(
+    meta.dataSource ?? { type: "None" },
+  );
   if (!dsResult.success) {
     throw new Error(
       `Process JSON has invalid 'dataSource': ${dsResult.error.issues[0]?.message ?? "shape mismatch"}`,

@@ -72,7 +72,9 @@ function readJson(path, what) {
   try {
     return JSON.parse(readFileSync(path, "utf8"));
   } catch (err) {
-    fail2(`${what} at ${path} is not valid JSON: ${String(err?.message ?? err)}`);
+    fail2(
+      `${what} at ${path} is not valid JSON: ${String(err?.message ?? err)}`,
+    );
   }
 }
 
@@ -88,7 +90,9 @@ function printWeakestFiles(sum) {
   console.error(`\nLowest-covered files of meaningful size (lines %):`);
   for (const f of files) {
     const rel = f.file.startsWith(root) ? relative(root, f.file) : f.file;
-    console.error(`  - ${pad(f.pct.toFixed(1) + "%", 6)}  ${rel}  (${f.size} lines)`);
+    console.error(
+      `  - ${pad(f.pct.toFixed(1) + "%", 6)}  ${rel}  (${f.size} lines)`,
+    );
   }
 }
 
@@ -102,7 +106,8 @@ if (floors === null || typeof floors !== "object") {
   fail2(`threshold config is missing a "floors" object.`);
 }
 const slack = typeof config.slack === "number" ? config.slack : 5;
-const headroom = typeof config.headroomPoints === "number" ? config.headroomPoints : 2;
+const headroom =
+  typeof config.headroomPoints === "number" ? config.headroomPoints : 2;
 const target = config.target ?? null;
 
 for (const m of METRICS) {
@@ -113,7 +118,9 @@ for (const m of METRICS) {
 
 const total = summary.total;
 if (total === null || typeof total !== "object") {
-  fail2(`coverage summary has no "total" block — is this an istanbul json-summary report?`);
+  fail2(
+    `coverage summary has no "total" block — is this an istanbul json-summary report?`,
+  );
 }
 for (const m of METRICS) {
   if (typeof total[m]?.pct !== "number") {
@@ -154,7 +161,10 @@ console.log(
     `   covered   (slack ${slack} pts)`,
 );
 for (const r of rows) {
-  const t = target && typeof target[r.metric] === "number" ? pad(`${target[r.metric]}%`, 10) : "";
+  const t =
+    target && typeof target[r.metric] === "number"
+      ? pad(`${target[r.metric]}%`, 10)
+      : "";
   console.log(
     `  ${mark[r.status]} ${r.metric.padEnd(11)} ${pad(r.pct.toFixed(2) + "%", 7)} ` +
       `${pad(r.floor + "%", 6)} ${pad((r.drift >= 0 ? "+" : "") + r.drift.toFixed(2), 8)}` +
@@ -163,7 +173,9 @@ for (const r of rows) {
 }
 
 if (below.length === 0 && ratchet.length === 0) {
-  console.log(`✓ coverage ratchet OK — every metric within [floor, floor + ${slack}].`);
+  console.log(
+    `✓ coverage ratchet OK — every metric within [floor, floor + ${slack}].`,
+  );
   process.exit(0);
 }
 
@@ -194,7 +206,9 @@ if (ratchet.length > 0) {
   }
   const next = Object.fromEntries(rows.map((r) => [r.metric, r.suggested]));
   console.error(`\nFix: set "floors" in coverage-thresholds.json to:\n`);
-  console.error(`  "floors": ${JSON.stringify(next, null, 4).replace(/\n/g, "\n  ")}\n`);
+  console.error(
+    `  "floors": ${JSON.stringify(next, null, 4).replace(/\n/g, "\n  ")}\n`,
+  );
 }
 
 process.exit(1);

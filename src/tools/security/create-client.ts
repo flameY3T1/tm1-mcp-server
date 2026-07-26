@@ -8,9 +8,15 @@ export function registerCreateClient(server: McpServer, tm1Client: TM1Client) {
     "Create a new TM1 client (user). Optionally set initial password, friendly name, and group memberships.",
     {
       clientName: z.string().describe("Client (user) name"),
-      password: z.string().optional().describe("Initial password (omit if external auth)"),
+      password: z
+        .string()
+        .optional()
+        .describe("Initial password (omit if external auth)"),
       friendlyName: z.string().optional().describe("Display name"),
-      groups: z.array(z.string()).optional().describe("Group names to assign on creation"),
+      groups: z
+        .array(z.string())
+        .optional()
+        .describe("Group names to assign on creation"),
     },
     async ({ clientName, ...rest }) => {
       await tm1Client.security.createClient({ name: clientName, ...rest });

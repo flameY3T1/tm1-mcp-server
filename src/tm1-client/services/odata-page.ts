@@ -130,6 +130,9 @@ export function nameFilterPredicates(opts: NameFilterOpts): string[] {
  * the same order as the pushed-down path. Do not swap in `localeCompare` —
  * it collates case- and accent-insensitively and would diverge.
  */
-export function compareByName(a: { name: string }, b: { name: string }): number {
+export function compareByName(
+  a: { name: string },
+  b: { name: string },
+): number {
   return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 }

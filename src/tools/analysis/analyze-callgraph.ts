@@ -2,8 +2,15 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
-import { buildCallGraph, type CallGraphNode, type EffectiveValue } from "../../lib/callgraph/callGraph.js";
-import type { CallParam, ReferenceIndex } from "../../lib/callgraph/referenceIndex.js";
+import {
+  buildCallGraph,
+  type CallGraphNode,
+  type EffectiveValue,
+} from "../../lib/callgraph/callGraph.js";
+import type {
+  CallParam,
+  ReferenceIndex,
+} from "../../lib/callgraph/referenceIndex.js";
 import { isSecretName, MASK, maskCodeLine } from "../../lib/mask-secrets.js";
 
 function maskParams(params: readonly CallParam[]): CallParam[] {
@@ -13,30 +20,44 @@ function maskParams(params: readonly CallParam[]): CallParam[] {
           ...p,
           valueRaw: MASK,
           resolution:
-            p.resolution.kind === "literal" ? { kind: "literal" as const, value: MASK } : p.resolution,
+            p.resolution.kind === "literal"
+              ? { kind: "literal" as const, value: MASK }
+              : p.resolution,
         }
       : p,
   );
 }
 
 function maskEffective(
-  eff: ReadonlyArray<{ name: string; effective: EffectiveValue; valueRaw: string }>,
+  eff: ReadonlyArray<{
+    name: string;
+    effective: EffectiveValue;
+    valueRaw: string;
+  }>,
 ): Array<{ name: string; effective: EffectiveValue; valueRaw: string }> {
   return eff.map((e) =>
     isSecretName(e.name)
       ? {
           ...e,
           valueRaw: MASK,
-          effective: e.effective.kind === "literal" ? { kind: "literal" as const, value: MASK } : e.effective,
+          effective:
+            e.effective.kind === "literal"
+              ? { kind: "literal" as const, value: MASK }
+              : e.effective,
         }
       : e,
   );
 }
 
-function maskEnv(env: Map<string, EffectiveValue>): Record<string, EffectiveValue> {
+function maskEnv(
+  env: Map<string, EffectiveValue>,
+): Record<string, EffectiveValue> {
   const out: Record<string, EffectiveValue> = {};
   for (const [k, v] of env.entries()) {
-    out[k] = isSecretName(k) && v.kind === "literal" ? { kind: "literal", value: MASK } : v;
+    out[k] =
+      isSecretName(k) && v.kind === "literal"
+        ? { kind: "literal", value: MASK }
+        : v;
   }
   return out;
 }
@@ -45,7 +66,13 @@ interface CompactNode {
   process: string;
   cycle?: boolean;
   depthLimitReached?: boolean;
-  unresolvedCalls?: Array<{ section: string; line: number; funcName: string; expr: string; reason: string }>;
+  unresolvedCalls?: Array<{
+    section: string;
+    line: number;
+    funcName: string;
+    expr: string;
+    reason: string;
+  }>;
   children: CompactNode[];
 }
 
@@ -80,8 +107,12 @@ function serializeNode(node: CallGraphNode, mask: boolean): unknown {
           section: node.incomingEdge.section,
           line: node.incomingEdge.line,
           funcName: node.incomingEdge.funcName,
-          snippet: mask ? maskCodeLine(node.incomingEdge.snippet) : node.incomingEdge.snippet,
-          params: mask ? maskParams(node.incomingEdge.params) : node.incomingEdge.params,
+          snippet: mask
+            ? maskCodeLine(node.incomingEdge.snippet)
+            : node.incomingEdge.snippet,
+          params: mask
+            ? maskParams(node.incomingEdge.params)
+            : node.incomingEdge.params,
           effectiveParams: node.incomingEdge.effectiveParams
             ? mask
               ? maskEffective(node.incomingEdge.effectiveParams)
@@ -89,7 +120,11 @@ function serializeNode(node: CallGraphNode, mask: boolean): unknown {
             : undefined,
         }
       : null,
-    env: node.env ? (mask ? maskEnv(node.env) : Object.fromEntries(node.env.entries())) : undefined,
+    env: node.env
+      ? mask
+        ? maskEnv(node.env)
+        : Object.fromEntries(node.env.entries())
+      : undefined,
     unresolvedCalls: node.unresolvedCalls
       ? node.unresolvedCalls.map((u) => ({
           section: u.section,
@@ -209,7 +244,11 @@ interface RankAcc {
  */
 export function globalRanking(
   index: ReferenceIndex,
-  opts: { rankBy: "outgoing" | "incoming"; topN: number; includeSystem: boolean },
+  opts: {
+    rankBy: "outgoing" | "incoming";
+    topN: number;
+    includeSystem: boolean;
+  },
 ): GlobalRankingResult {
   const { rankBy, topN, includeSystem } = opts;
   const isSystem = (name: string) => name.startsWith("}");
@@ -219,7 +258,13 @@ export function globalRanking(
     const key = name.toLowerCase();
     let e = acc.get(key);
     if (!e) {
-      e = { process: name, outgoingCalls: 0, incomingCalls: 0, callees: new Set(), callers: new Set() };
+      e = {
+        process: name,
+        outgoingCalls: 0,
+        incomingCalls: 0,
+        callees: new Set(),
+        callers: new Set(),
+      };
       acc.set(key, e);
     }
     return e;
@@ -256,10 +301,14 @@ export function globalRanking(
 
   all.sort((a, b) => {
     const primary =
-      rankBy === "incoming" ? b.incomingCalls - a.incomingCalls : b.outgoingCalls - a.outgoingCalls;
+      rankBy === "incoming"
+        ? b.incomingCalls - a.incomingCalls
+        : b.outgoingCalls - a.outgoingCalls;
     if (primary !== 0) return primary;
     const secondary =
-      rankBy === "incoming" ? b.outgoingCalls - a.outgoingCalls : b.incomingCalls - a.incomingCalls;
+      rankBy === "incoming"
+        ? b.outgoingCalls - a.outgoingCalls
+        : b.incomingCalls - a.incomingCalls;
     if (secondary !== 0) return secondary;
     return a.process.localeCompare(b.process);
   });
@@ -275,7 +324,10 @@ export function globalRanking(
   };
 }
 
-export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client) {
+export function registerAnalyzeCallgraph(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_analyze_callgraph",
     "Build a process call graph (ExecuteProcess/RunProcess) for a TI process. direction='downstream' shows what `start` calls (with parameter env propagation: literal/passthrough/dynamic). direction='upstream' shows callers. Returns nested JSON tree. Omit `start` for a global ranking: every process ranked by outgoing (fan-out) or incoming (fan-in) call counts — answers 'which process triggers/is triggered by the most others' without a per-process traversal. ExecuteProcess/RunProcess calls whose target is a computed expression or process parameter (not statically resolvable) are surfaced per node via `unresolvedCalls` (full/compact) or `unresolvedCount` (summary) — flagged, not resolved.",
@@ -283,19 +335,25 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
       start: z
         .string()
         .optional()
-        .describe("Process name to start traversal from. Omit for global ranking across all processes."),
+        .describe(
+          "Process name to start traversal from. Omit for global ranking across all processes.",
+        ),
       direction: z.enum(["downstream", "upstream"]).default("downstream"),
       maxDepth: z.number().int().min(1).max(50).optional().default(20),
       includeSystem: z
         .boolean()
         .optional()
         .default(false)
-        .describe("Include TM1 control objects (names starting with '}') in graph. Default: false."),
+        .describe(
+          "Include TM1 control objects (names starting with '}') in graph. Default: false.",
+        ),
       includeControl: z
         .boolean()
         .optional()
         .default(false)
-        .describe("Index control processes/cubes/chores (broader graph). Default: false."),
+        .describe(
+          "Index control processes/cubes/chores (broader graph). Default: false.",
+        ),
       mode: z
         .enum(["full", "summary", "compact"])
         .optional()
@@ -324,16 +382,31 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
         .max(1000)
         .optional()
         .default(50)
-        .describe("Global-ranking mode only: cap on ranked processes returned (default 50)."),
+        .describe(
+          "Global-ranking mode only: cap on ranked processes returned (default 50).",
+        ),
     },
-    async ({ start, direction, maxDepth, includeSystem, includeControl, mode, maskSecrets, rankBy, topN }) => {
+    async ({
+      start,
+      direction,
+      maxDepth,
+      includeSystem,
+      includeControl,
+      mode,
+      maskSecrets,
+      rankBy,
+      topN,
+    }) => {
       const index = await buildIndexFromTM1(tm1Client, { includeControl });
 
       if (start === undefined || start === "") {
         const result = globalRanking(index, { rankBy, topN, includeSystem });
         return {
           content: [
-            { type: "text" as const, text: JSON.stringify({ mode: "globalRanking", ...result }) },
+            {
+              type: "text" as const,
+              text: JSON.stringify({ mode: "globalRanking", ...result }),
+            },
           ],
         };
       }
@@ -356,14 +429,30 @@ export function registerAnalyzeCallgraph(server: McpServer, tm1Client: TM1Client
           ],
         };
       }
-      const tree = buildCallGraph(index, start, { direction, maxDepth, includeSystem });
+      const tree = buildCallGraph(index, start, {
+        direction,
+        maxDepth,
+        includeSystem,
+      });
       let payload: Record<string, unknown>;
       if (mode === "summary") {
-        payload = { start, direction, mode, maskSecrets, summary: summarize(tree) };
+        payload = {
+          start,
+          direction,
+          mode,
+          maskSecrets,
+          summary: summarize(tree),
+        };
       } else if (mode === "compact") {
         payload = { start, direction, mode, tree: serializeCompact(tree) };
       } else {
-        payload = { start, direction, mode, maskSecrets, tree: serializeNode(tree, maskSecrets) };
+        payload = {
+          start,
+          direction,
+          mode,
+          maskSecrets,
+          tree: serializeNode(tree, maskSecrets),
+        };
       }
       return {
         content: [

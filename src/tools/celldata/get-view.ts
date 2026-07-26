@@ -29,9 +29,15 @@ export function registerGetView(server: McpServer, tm1Client: TM1Client) {
       const all = fetchAll === true || limit === 0;
       const top = all ? undefined : limit;
       const skip = all ? undefined : offset;
-      const result = await tm1Client.views.getView(cubeName, viewName, top, skip, {
-        signal: extra?.signal,
-      });
+      const result = await tm1Client.views.getView(
+        cubeName,
+        viewName,
+        top,
+        skip,
+        {
+          signal: extra?.signal,
+        },
+      );
 
       const total = result.totalCellCount;
       const count = result.cells.length;

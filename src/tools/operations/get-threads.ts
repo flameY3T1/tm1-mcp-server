@@ -2,9 +2,17 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
-import { actionResponse, FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
+import {
+  actionResponse,
+  FORMAT_SCHEMA,
+  pageResponse,
+  type Column,
+} from "../format.js";
 
-export function registerGetThreads(server: McpServer, tm1Client: TM1Client): void {
+export function registerGetThreads(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   if (tm1Client.version !== 11) return;
 
   server.tool(

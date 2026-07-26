@@ -6,7 +6,9 @@ import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 // one method is enough to drive ServerService without pulling in the full
 // TM1Client/SessionManager/fetch stack (see tm1-client-transaction-log.test.ts
 // for that heavier pattern, used where session/keepalive plumbing matters).
-function makeHttp(requestImpl: (method: string, path: string) => Promise<unknown>): TM1HttpClient {
+function makeHttp(
+  requestImpl: (method: string, path: string) => Promise<unknown>,
+): TM1HttpClient {
   return { request: vi.fn(requestImpl) } as unknown as TM1HttpClient;
 }
 
@@ -26,7 +28,10 @@ describe("ServerService.getInfo() — v12 ProductVersion fallback", () => {
     const info = await server.getInfo();
 
     expect(info.productVersion).toBe("11.8.0");
-    expect(request).not.toHaveBeenCalledWith("GET", "/api/v1/Configuration/ProductVersion");
+    expect(request).not.toHaveBeenCalledWith(
+      "GET",
+      "/api/v1/Configuration/ProductVersion",
+    );
   });
 
   it("v12: falls back to the ProductVersion scalar sub-resource when the inline field is absent", async () => {
@@ -47,7 +52,10 @@ describe("ServerService.getInfo() — v12 ProductVersion fallback", () => {
     const info = await server.getInfo();
 
     expect(info.productVersion).toBe("12.5.9");
-    expect(request).toHaveBeenCalledWith("GET", "/api/v1/Configuration/ProductVersion");
+    expect(request).toHaveBeenCalledWith(
+      "GET",
+      "/api/v1/Configuration/ProductVersion",
+    );
   });
 
   it("falls back to an empty string (no throw) when the scalar sub-resource is also unavailable", async () => {

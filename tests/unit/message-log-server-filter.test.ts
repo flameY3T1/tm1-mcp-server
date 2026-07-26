@@ -17,7 +17,8 @@ function makeHttp(impl: (method: string, path: string) => Promise<unknown>): {
 const OLD_MATCH = {
   TimeStamp: "2020-01-01T00:00:00Z",
   Level: "error",
-  Message: 'Process "Load" aborted, see TM1ProcessError_20200101000000_1_Load.log',
+  Message:
+    'Process "Load" aborted, see TM1ProcessError_20200101000000_1_Load.log',
 };
 
 describe("ServerService.getMessageLog — server-side $filter (D3)", () => {
@@ -33,11 +34,18 @@ describe("ServerService.getMessageLog — server-side $filter (D3)", () => {
     });
     const svc = new ServerService(http);
 
-    const entries = await svc.getMessageLog({ filter: "TM1ProcessError", top: 100 });
+    const entries = await svc.getMessageLog({
+      filter: "TM1ProcessError",
+      top: 100,
+    });
 
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.message).toContain("TM1ProcessError_20200101000000_1_Load.log");
-    expect(entries[0]!.errorFile).toBe("TM1ProcessError_20200101000000_1_Load.log");
+    expect(entries[0]!.message).toContain(
+      "TM1ProcessError_20200101000000_1_Load.log",
+    );
+    expect(entries[0]!.errorFile).toBe(
+      "TM1ProcessError_20200101000000_1_Load.log",
+    );
     expect(request).toHaveBeenCalledTimes(1);
   });
 
@@ -70,13 +78,20 @@ describe("ServerService.getMessageLog — server-side $filter (D3)", () => {
       call += 1;
       if (call === 1) {
         expect(path).toContain("$filter="); // filtered attempt
-        throw new TM1Error({ code: TM1ErrorCode.TM1_ERROR, message: "bad filter" });
+        throw new TM1Error({
+          code: TM1ErrorCode.TM1_ERROR,
+          message: "bad filter",
+        });
       }
       expect(path).not.toContain("$filter"); // degraded newest-N fetch
       return {
         value: [
           OLD_MATCH,
-          { TimeStamp: "2020-01-02T00:00:00Z", Level: "info", Message: "unrelated line" },
+          {
+            TimeStamp: "2020-01-02T00:00:00Z",
+            Level: "info",
+            Message: "unrelated line",
+          },
         ],
       };
     });
@@ -93,18 +108,31 @@ describe("ServerService.getMessageLog — server-side $filter (D3)", () => {
     let call = 0;
     const { http } = makeHttp(async (_m, path) => {
       call += 1;
-      if (call === 1) throw new TM1Error({ code: TM1ErrorCode.TM1_ERROR, message: "bad filter" });
+      if (call === 1)
+        throw new TM1Error({
+          code: TM1ErrorCode.TM1_ERROR,
+          message: "bad filter",
+        });
       expect(path).not.toContain("$filter");
       return {
         value: [
-          { TimeStamp: "2026-06-15T00:00:00Z", Level: "error", Message: "recent boom", Logger: "TM1.Process" },
+          {
+            TimeStamp: "2026-06-15T00:00:00Z",
+            Level: "error",
+            Message: "recent boom",
+            Logger: "TM1.Process",
+          },
           { ...OLD_MATCH, Message: "old boom", Logger: "TM1.Process" }, // 2020 — before `since`
         ],
       };
     });
     const svc = new ServerService(http);
 
-    const entries = await svc.getMessageLog({ filter: "boom", since: "2026-01-01", logger: "TM1.Process" });
+    const entries = await svc.getMessageLog({
+      filter: "boom",
+      since: "2026-01-01",
+      logger: "TM1.Process",
+    });
 
     expect(call).toBe(2);
     expect(entries).toHaveLength(1);
@@ -113,7 +141,10 @@ describe("ServerService.getMessageLog — server-side $filter (D3)", () => {
 
   it("does NOT fall back on a systemic transport error — it surfaces", async () => {
     const { http } = makeHttp(async () => {
-      throw new TM1Error({ code: TM1ErrorCode.CONNECTION_FAILED, message: "down" });
+      throw new TM1Error({
+        code: TM1ErrorCode.CONNECTION_FAILED,
+        message: "down",
+      });
     });
     const svc = new ServerService(http);
 

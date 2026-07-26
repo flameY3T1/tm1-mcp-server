@@ -108,12 +108,16 @@ describe("TM1Client – TI Development Methods", () => {
     it("should throw CONFLICT error when process already exists (409)", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse(
-          { error: { message: { value: "Process 'Existing' already exists" } } },
+          {
+            error: { message: { value: "Process 'Existing' already exists" } },
+          },
           409,
         ),
       );
 
-      await expect(client.processes.create("Existing")).rejects.toThrow(TM1Error);
+      await expect(client.processes.create("Existing")).rejects.toThrow(
+        TM1Error,
+      );
       try {
         await client.processes.create("Existing");
       } catch (e) {
@@ -122,7 +126,9 @@ describe("TM1Client – TI Development Methods", () => {
       // Re-test with fresh mock
       fetchSpy.mockResolvedValueOnce(
         mockResponse(
-          { error: { message: { value: "Process 'Existing' already exists" } } },
+          {
+            error: { message: { value: "Process 'Existing' already exists" } },
+          },
           409,
         ),
       );
@@ -255,7 +261,9 @@ describe("TM1Client – TI Development Methods", () => {
     it("should PATCH a single tab", async () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
-      await client.processes.updateCode("TestProcess", { epilog: "# Epilog only" });
+      await client.processes.updateCode("TestProcess", {
+        epilog: "# Epilog only",
+      });
 
       const [, opts] = fetchSpy.mock.calls[0];
       const body = JSON.parse(opts.body);
@@ -288,7 +296,7 @@ describe("TM1Client – TI Development Methods", () => {
             dataSourceNameForServer: "/data/input.csv",
             dataSourceNameForClient: "C:\\data\\input.csv",
             asciiDelimiterChar: ",",
-            asciiQuoteCharacter: "\"",
+            asciiQuoteCharacter: '"',
             asciiHeaderRecords: 1,
           },
         }),
@@ -301,7 +309,7 @@ describe("TM1Client – TI Development Methods", () => {
         dataSourceNameForServer: "/data/input.csv",
         dataSourceNameForClient: "C:\\data\\input.csv",
         asciiDelimiterChar: ",",
-        asciiQuoteCharacter: "\"",
+        asciiQuoteCharacter: '"',
         asciiHeaderRecords: 1,
       });
     });
@@ -393,7 +401,11 @@ describe("TM1Client – TI Development Methods", () => {
     });
 
     it("should drop usesUnicode on TM1 11.x", async () => {
-      const cfg = { ...makeConfig(), version: 11, tm1Version: "11.8" } as TM1Config;
+      const cfg = {
+        ...makeConfig(),
+        version: 11,
+        tm1Version: "11.8",
+      } as TM1Config;
       const sm = new SessionManager(cfg, mockLogger);
       vi.spyOn(sm, "ensureSession").mockResolvedValue("sess");
       vi.spyOn(sm, "authenticate").mockResolvedValue("sess");
@@ -412,7 +424,11 @@ describe("TM1Client – TI Development Methods", () => {
     });
 
     it("should send usesUnicode on TM1 12.x", async () => {
-      const cfg = { ...makeConfig(), version: 12, tm1Version: "12.0" } as TM1Config;
+      const cfg = {
+        ...makeConfig(),
+        version: 12,
+        tm1Version: "12.0",
+      } as TM1Config;
       const sm = new SessionManager(cfg, mockLogger);
       vi.spyOn(sm, "ensureSession").mockResolvedValue("sess");
       vi.spyOn(sm, "authenticate").mockResolvedValue("sess");
@@ -438,7 +454,12 @@ describe("TM1Client – TI Development Methods", () => {
       fetchSpy.mockResolvedValueOnce(mock204Response());
 
       await client.processes.updateParameters("TestProcess", [
-        { name: "pFile", type: "String", defaultValue: "/data/in.csv", prompt: "File path" },
+        {
+          name: "pFile",
+          type: "String",
+          defaultValue: "/data/in.csv",
+          prompt: "File path",
+        },
         { name: "pYear", type: "Numeric", defaultValue: 2024 },
       ]);
 

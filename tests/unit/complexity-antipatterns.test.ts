@@ -66,7 +66,9 @@ describe("exec-in-loop", () => {
   it("flags ExecuteProcess inside a while as a sync-complexity warning", () => {
     const findings = lintProcess(
       "p",
-      code({ data: `WHILE(i<10);\n  ExecuteProcess('Child');\n  i=i+1;\nEND;` }),
+      code({
+        data: `WHILE(i<10);\n  ExecuteProcess('Child');\n  i=i+1;\nEND;`,
+      }),
     );
     const hit = findings.find((f) => f.rule === "exec-in-loop");
     expect(hit?.severity).toBe("warn");
@@ -97,7 +99,9 @@ describe("hot-op-in-loop removed", () => {
   it("does not emit hot-op-in-loop (cell writes in a loop are complexity, not an anti-pattern)", () => {
     const findings = lintProcess(
       "p",
-      code({ data: `WHILE(i<10);\n  ASCIIOutput('out.txt', n);\n  CellPutN(1, 'c', 'e');\nEND;` }),
+      code({
+        data: `WHILE(i<10);\n  ASCIIOutput('out.txt', n);\n  CellPutN(1, 'c', 'e');\nEND;`,
+      }),
     );
     expect(rules(findings)).not.toContain("hot-op-in-loop");
   });
@@ -123,7 +127,9 @@ describe("cellget-perf", () => {
   it("escalates a high-dimensional CellGetN inside a loop to warn", () => {
     const findings = lintProcess(
       "p",
-      code({ data: `WHILE(i<10);\n  v = CellGetN(${cellGet("Big", 12)});\nEND;` }),
+      code({
+        data: `WHILE(i<10);\n  v = CellGetN(${cellGet("Big", 12)});\nEND;`,
+      }),
     );
     const hit = findings.find((f) => f.rule === "cellget-perf");
     expect(hit?.severity).toBe("warn");
@@ -181,10 +187,7 @@ describe("dead-assignment", () => {
   });
 
   it("does not flag a variable assigned in prolog (only data/metadata flagged)", () => {
-    const findings = lintProcess(
-      "p",
-      code({ prolog: `vUnused = 99;` }),
-    );
+    const findings = lintProcess("p", code({ prolog: `vUnused = 99;` }));
     expect(rules(findings)).not.toContain("dead-assignment");
   });
 
@@ -200,10 +203,7 @@ describe("dead-assignment", () => {
   });
 
   it("flags a variable assigned in metadata tab but never read", () => {
-    const findings = lintProcess(
-      "p",
-      code({ metadata: `vDead = 'unused';` }),
-    );
+    const findings = lintProcess("p", code({ metadata: `vDead = 'unused';` }));
     const hit = findings.find((f) => f.rule === "dead-assignment");
     expect(hit?.tab).toBe("metadata");
   });
@@ -217,10 +217,7 @@ describe("dead-assignment", () => {
   });
 
   it("does not flag V1..Vn datasource column vars", () => {
-    const findings = lintProcess(
-      "p",
-      code({ data: `V1 = V1;\nV12 = V12;` }),
-    );
+    const findings = lintProcess("p", code({ data: `V1 = V1;\nV12 = V12;` }));
     expect(rules(findings)).not.toContain("dead-assignment");
   });
 
@@ -243,19 +240,14 @@ describe("dead-assignment", () => {
   });
 
   it("respects excludeVarsFromDeadCheck option", () => {
-    const findings = lintProcess(
-      "p",
-      code({ data: `pExcluded = 7;` }),
-      { excludeVarsFromDeadCheck: ["pExcluded"] },
-    );
+    const findings = lintProcess("p", code({ data: `pExcluded = 7;` }), {
+      excludeVarsFromDeadCheck: ["pExcluded"],
+    });
     expect(rules(findings)).not.toContain("dead-assignment");
   });
 
   it("reports dead variable only once even if assigned multiple times", () => {
-    const findings = lintProcess(
-      "p",
-      code({ data: `vX = 1;\nvX = 2;` }),
-    );
+    const findings = lintProcess("p", code({ data: `vX = 1;\nvX = 2;` }));
     const hits = findings.filter((f) => f.rule === "dead-assignment");
     expect(hits.length).toBe(1);
   });

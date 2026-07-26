@@ -39,7 +39,9 @@ describe("Property 11: Maskierung sensibler Daten", () => {
   it("passwords in log entries are masked to ***", () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 100 }).filter((s) => s.trim().length > 0 && !s.includes("***")),
+        fc
+          .string({ minLength: 1, maxLength: 100 })
+          .filter((s) => s.trim().length > 0 && !s.includes("***")),
         (sensitivePassword) => {
           const { logger, flush } = createTestLogger();
           logger.info({ password: sensitivePassword }, "login attempt");
@@ -55,10 +57,15 @@ describe("Property 11: Maskierung sensibler Daten", () => {
   it("Authorization headers in log entries are masked to ***", () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 100 }).filter((s) => s.trim().length > 0 && !s.includes("***")),
+        fc
+          .string({ minLength: 1, maxLength: 100 })
+          .filter((s) => s.trim().length > 0 && !s.includes("***")),
         (authValue) => {
           const { logger, flush } = createTestLogger();
-          logger.info({ headers: { Authorization: `Basic ${authValue}` } }, "request");
+          logger.info(
+            { headers: { Authorization: `Basic ${authValue}` } },
+            "request",
+          );
           const entries = flush();
           expect(entries.length).toBeGreaterThanOrEqual(1);
           const headers = entries[0].headers as Record<string, unknown>;
@@ -72,7 +79,9 @@ describe("Property 11: Maskierung sensibler Daten", () => {
   it("TM1SessionId tokens in log entries are masked to ***", () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 100 }).filter((s) => s.trim().length > 0 && !s.includes("***")),
+        fc
+          .string({ minLength: 1, maxLength: 100 })
+          .filter((s) => s.trim().length > 0 && !s.includes("***")),
         (sessionToken) => {
           const { logger, flush } = createTestLogger();
           logger.info({ TM1SessionId: sessionToken }, "session");
@@ -89,19 +98,28 @@ describe("Property 11: Maskierung sensibler Daten", () => {
     fc.assert(
       fc.property(
         fc.record({
-          password: fc.string({ minLength: 1, maxLength: 50 }).filter((s) => s.trim().length > 0 && !s.includes("***")),
-          auth: fc.string({ minLength: 1, maxLength: 50 }).filter((s) => s.trim().length > 0 && !s.includes("***")),
-          session: fc.string({ minLength: 1, maxLength: 50 }).filter((s) => s.trim().length > 0 && !s.includes("***")),
+          password: fc
+            .string({ minLength: 1, maxLength: 50 })
+            .filter((s) => s.trim().length > 0 && !s.includes("***")),
+          auth: fc
+            .string({ minLength: 1, maxLength: 50 })
+            .filter((s) => s.trim().length > 0 && !s.includes("***")),
+          session: fc
+            .string({ minLength: 1, maxLength: 50 })
+            .filter((s) => s.trim().length > 0 && !s.includes("***")),
         }),
         (vals) => {
           const { logger, flush } = createTestLogger();
-          logger.info({
-            request: {
-              password: vals.password,
-              Authorization: vals.auth,
-              TM1SessionId: vals.session,
+          logger.info(
+            {
+              request: {
+                password: vals.password,
+                Authorization: vals.auth,
+                TM1SessionId: vals.session,
+              },
             },
-          }, "nested data");
+            "nested data",
+          );
           const entries = flush();
           expect(entries.length).toBeGreaterThanOrEqual(1);
           const request = entries[0].request as Record<string, unknown>;

@@ -20,7 +20,9 @@ describe("MonitoringService.getJobs", () => {
           ElapsedTime: "PT5S",
           WaitTime: "PT1S",
           Session: { ID: 42, Context: "client/1.0", User: { Name: "Admin" } },
-          WaitingOn: [{ ID: "job-2", Description: "blocker", State: "Waiting" }],
+          WaitingOn: [
+            { ID: "job-2", Description: "blocker", State: "Waiting" },
+          ],
         },
       ],
     });
@@ -36,11 +38,16 @@ describe("MonitoringService.getJobs", () => {
         waitingOn: [{ id: "job-2", description: "blocker", state: "Waiting" }],
       },
     ]);
-    expect(request).toHaveBeenCalledWith("GET", expect.stringContaining("/api/v1/Jobs"));
+    expect(request).toHaveBeenCalledWith(
+      "GET",
+      expect.stringContaining("/api/v1/Jobs"),
+    );
   });
 
   it("omits optional fields when session/waitingOn/times are absent", async () => {
-    const { svc } = svcWith({ value: [{ ID: "j", Description: "d", State: "Running" }] });
+    const { svc } = svcWith({
+      value: [{ ID: "j", Description: "d", State: "Running" }],
+    });
     const jobs = await svc.getJobs();
     expect(jobs[0]).toEqual({ id: "j", description: "d", state: "Running" });
   });
@@ -76,18 +83,30 @@ describe("MonitoringService.cancelJob", () => {
   it("POSTs bound Cancel action with simple id", async () => {
     const { svc, request } = svcWith(undefined);
     await svc.cancelJob("job-1");
-    expect(request).toHaveBeenCalledWith("POST", "/api/v1/Jobs('job-1')/tm1.Cancel", {});
+    expect(request).toHaveBeenCalledWith(
+      "POST",
+      "/api/v1/Jobs('job-1')/tm1.Cancel",
+      {},
+    );
   });
 
   it("doubles single-quotes and url-encodes id", async () => {
     const { svc, request } = svcWith(undefined);
     await svc.cancelJob("j'1");
-    expect(request).toHaveBeenCalledWith("POST", "/api/v1/Jobs('j%27%271')/tm1.Cancel", {});
+    expect(request).toHaveBeenCalledWith(
+      "POST",
+      "/api/v1/Jobs('j%27%271')/tm1.Cancel",
+      {},
+    );
   });
 
   it("url-encodes non-quote special characters in the id", async () => {
     const { svc, request } = svcWith(undefined);
     await svc.cancelJob("a b/c");
-    expect(request).toHaveBeenCalledWith("POST", "/api/v1/Jobs('a%20b%2Fc')/tm1.Cancel", {});
+    expect(request).toHaveBeenCalledWith(
+      "POST",
+      "/api/v1/Jobs('a%20b%2Fc')/tm1.Cancel",
+      {},
+    );
   });
 });

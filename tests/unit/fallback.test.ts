@@ -12,7 +12,9 @@ describe("rethrowIfSystemic", () => {
       TM1ErrorCode.CONFLICT,
       TM1ErrorCode.VALIDATION_ERROR,
     ] as const) {
-      expect(() => rethrowIfSystemic(new TM1Error({ code, message: "x" }))).not.toThrow();
+      expect(() =>
+        rethrowIfSystemic(new TM1Error({ code, message: "x" })),
+      ).not.toThrow();
     }
   });
 

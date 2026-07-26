@@ -13,7 +13,10 @@ const TS_RE = /(\d{14})/;
  * name is delimited by underscores inside another (e.g. "Import" vs "Re_Import_X").
  * Acceptable trade for correctness on real-world v11 filenames.
  */
-export function matchesProcessName(filename: string, processName: string): boolean {
+export function matchesProcessName(
+  filename: string,
+  processName: string,
+): boolean {
   const f = filename.toLowerCase();
   const p = processName.toLowerCase();
   return (
@@ -38,7 +41,10 @@ export function tsFromFilename(filename: string): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-export function truncateTail(content: string, maxBytes: number): { body: string; truncated: boolean } {
+export function truncateTail(
+  content: string,
+  maxBytes: number,
+): { body: string; truncated: boolean } {
   const totalBytes = Buffer.byteLength(content, "utf8");
   if (totalBytes <= maxBytes) return { body: content, truncated: false };
   return {
@@ -47,9 +53,17 @@ export function truncateTail(content: string, maxBytes: number): { body: string;
   };
 }
 
-export function tailLines(content: string, n: number): { body: string; truncated: boolean; totalLines: number } {
+export function tailLines(
+  content: string,
+  n: number,
+): { body: string; truncated: boolean; totalLines: number } {
   const trimmed = content.replace(/[\r\n]+$/, "");
   const lines = trimmed.split(/\r?\n/);
-  if (lines.length <= n) return { body: trimmed, truncated: false, totalLines: lines.length };
-  return { body: lines.slice(-n).join("\n"), truncated: true, totalLines: lines.length };
+  if (lines.length <= n)
+    return { body: trimmed, truncated: false, totalLines: lines.length };
+  return {
+    body: lines.slice(-n).join("\n"),
+    truncated: true,
+    totalLines: lines.length,
+  };
 }

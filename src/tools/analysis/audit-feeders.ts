@@ -57,8 +57,8 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_feeders",
     "Static heuristics (S1–S5) scan cube rules for overfeeding: wildcard brackets, feeders into consolidated " +
-    "elements, over-broad feeders, DB() without skipcheck, orphan feeders. " +
-    "mode='runtime' returns StatsByCube fed/populated ratio + memory stats; mode='both' runs both and escalates static findings with runtime evidence.",
+      "elements, over-broad feeders, DB() without skipcheck, orphan feeders. " +
+      "mode='runtime' returns StatsByCube fed/populated ratio + memory stats; mode='both' runs both and escalates static findings with runtime evidence.",
     {
       cubes: z
         .array(z.string())
@@ -147,7 +147,10 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       const skipcheckMap = new Map<string, boolean>();
       for (const c of all) {
         if (!c.rulesText) continue;
-        skipcheckMap.set(c.cubeName.toLowerCase(), parseRules(c.rulesText).hasSkipcheck);
+        skipcheckMap.set(
+          c.cubeName.toLowerCase(),
+          parseRules(c.rulesText).hasSkipcheck,
+        );
       }
       const lookupSkipcheck = (cubeName: string): boolean | null => {
         const v = skipcheckMap.get(cubeName.toLowerCase());
@@ -231,7 +234,9 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                   lhsRuleHit = "feeder_broader_than_rule";
                   lhsDetail = `pins ${feederLhs.entries.length} vs rule ${matchedRule.entries.length}`;
                 }
-              } else if (detectBroaderThanRule(feederLhs, cubeDimCount, s1MinPinnedRatio)) {
+              } else if (
+                detectBroaderThanRule(feederLhs, cubeDimCount, s1MinPinnedRatio)
+              ) {
                 lhsRuleHit = "feeder_broader_than_rule";
                 lhsDetail = `pins ${feederLhs.entries.length}/${cubeDimCount} dims (no matching rule — ratio fallback)`;
               }
@@ -264,7 +269,10 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
             });
           }
 
-          const dbTarget = detectDbFeederWithoutSkipcheck(line.trimmed, lookupSkipcheck);
+          const dbTarget = detectDbFeederWithoutSkipcheck(
+            line.trimmed,
+            lookupSkipcheck,
+          );
           if (dbTarget) {
             findings.push({
               cube: c.cubeName,
@@ -313,10 +321,15 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
           const memoryTotal =
             typeof stats.memoryTotal === "number" ? stats.memoryTotal : null;
           const memoryMb =
-            memoryTotal !== null ? Number((memoryTotal / 1_048_576).toFixed(2)) : null;
-          const fedCells = typeof stats.fedCells === "number" ? stats.fedCells : null;
+            memoryTotal !== null
+              ? Number((memoryTotal / 1_048_576).toFixed(2))
+              : null;
+          const fedCells =
+            typeof stats.fedCells === "number" ? stats.fedCells : null;
           const populatedNumeric =
-            typeof stats.populatedNumeric === "number" ? stats.populatedNumeric : null;
+            typeof stats.populatedNumeric === "number"
+              ? stats.populatedNumeric
+              : null;
           const fedToPopulatedRatio = computeFedToPopulatedRatio(stats);
           const feederMemoryRatio = computeFeederMemoryRatio(stats);
           const stat: RuntimeStats = {
@@ -334,7 +347,10 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
           // Cube-level findings. Fed-ratio severity follows community
           // calibration: ≥ threshold (50) = suspicious hint, ≥ evidence
           // threshold (100) = definite overfeeding.
-          if (fedToPopulatedRatio !== null && fedToPopulatedRatio >= fedRatioThreshold) {
+          if (
+            fedToPopulatedRatio !== null &&
+            fedToPopulatedRatio >= fedRatioThreshold
+          ) {
             const definite =
               fedRatioEvidenceThreshold >= fedRatioThreshold &&
               fedToPopulatedRatio >= fedRatioEvidenceThreshold;

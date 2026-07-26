@@ -3,7 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { traceDataFlow } from "../../lib/callgraph/dataFlow.js";
-import { buildDatasourceMembership, type DatasourceMembership } from "../../lib/callgraph/datasourceMembership.js";
+import {
+  buildDatasourceMembership,
+  type DatasourceMembership,
+} from "../../lib/callgraph/datasourceMembership.js";
 import { membersFromAxis } from "../../lib/callgraph/mdxMembers.js";
 
 export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
@@ -33,15 +36,21 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
         .boolean()
         .optional()
         .default(false)
-        .describe("Include control processes (names starting with '}') when building the index. Default: false."),
+        .describe(
+          "Include control processes (names starting with '}') when building the index. Default: false.",
+        ),
       element: z
         .string()
         .optional()
-        .describe("Element name to trace. With 'dimension', results add which processes touch this element via in-code subset-membership calls (SubsetElementInsert/Add/Delete)."),
+        .describe(
+          "Element name to trace. With 'dimension', results add which processes touch this element via in-code subset-membership calls (SubsetElementInsert/Add/Delete).",
+        ),
       dimension: z
         .string()
         .optional()
-        .describe("Owning dimension of 'element' (required when 'element' is set)."),
+        .describe(
+          "Owning dimension of 'element' (required when 'element' is set).",
+        ),
       resolveDatasourceMembership: z
         .boolean()
         .optional()
@@ -59,11 +68,30 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
       elementAccess: z
         .array(z.enum(["source", "write", "zero-out", "indeterminate"]))
         .optional()
-        .describe("Element roles to include (default source+write+zero-out). Add 'indeterminate' to also list processes that build the subset but whose use we could not classify (NOT proof of no use)."),
+        .describe(
+          "Element roles to include (default source+write+zero-out). Add 'indeterminate' to also list processes that build the subset but whose use we could not classify (NOT proof of no use).",
+        ),
     },
-    async ({ cubeName, direction, includeControl, element, dimension, resolveDatasourceMembership, resolveComputed, elementAccess }) => {
+    async ({
+      cubeName,
+      direction,
+      includeControl,
+      element,
+      dimension,
+      resolveDatasourceMembership,
+      resolveComputed,
+      elementAccess,
+    }) => {
       if (element && !dimension) {
-        return { isError: true, content: [{ type: "text" as const, text: "When 'element' is set, 'dimension' is required (element names are only unique within a dimension)." }] };
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text" as const,
+              text: "When 'element' is set, 'dimension' is required (element names are only unique within a dimension).",
+            },
+          ],
+        };
       }
       const [index, dsList] = await Promise.all([
         buildIndexFromTM1(tm1Client, { includeControl }),
@@ -74,11 +102,17 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
       if (element && dimension && resolveDatasourceMembership) {
         datasourceMembership = await buildDatasourceMembership(
           {
-            getViewDefinition: (cube, view) => tm1Client.views.getDefinition(cube, view),
-            getSubset: (dim, hier, sub) => tm1Client.subsets.get(dim, hier, sub),
+            getViewDefinition: (cube, view) =>
+              tm1Client.views.getDefinition(cube, view),
+            getSubset: (dim, hier, sub) =>
+              tm1Client.subsets.get(dim, hier, sub),
             ...(resolveComputed
               ? {
-                  evaluateSetExpression: async (cube: string, dim: string, mdxSet: string): Promise<string[]> => {
+                  evaluateSetExpression: async (
+                    cube: string,
+                    dim: string,
+                    mdxSet: string,
+                  ): Promise<string[]> => {
                     const res = await tm1Client.cells.executeMdx(
                       `SELECT {${mdxSet}} ON 0 FROM [${cube.replace(/\]/g, "]]")}]`,
                       1,

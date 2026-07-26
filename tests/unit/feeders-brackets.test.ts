@@ -39,9 +39,7 @@ describe("parseBracketList — qualified form", () => {
   });
 
   it("parses multiple qualified pairs", () => {
-    const r = parseBracketList(
-      "['Region':'North', 'Product':'Widget']",
-    );
+    const r = parseBracketList("['Region':'North', 'Product':'Widget']");
     expect(r!.entries).toEqual<BracketEntry[]>([
       { dim: "Region", elem: "North" },
       { dim: "Product", elem: "Widget" },
@@ -126,7 +124,10 @@ describe("extractBracketLists — finds all bracket lists in a line", () => {
     const line = "['A'] => ['Year':{'2025','2026'}];";
     const lists = extractBracketLists(line);
     expect(lists).toHaveLength(2);
-    expect(lists[1]!.entries[0]).toEqual({ dim: "Year", elems: ["2025", "2026"] });
+    expect(lists[1]!.entries[0]).toEqual({
+      dim: "Year",
+      elems: ["2025", "2026"],
+    });
   });
 });
 

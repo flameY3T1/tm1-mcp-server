@@ -9,8 +9,11 @@ import { registerCheckProcessCode } from "../../src/tools/ti-development/check-p
 // `message`) over it — observed in the 2026-07-04 prod live sweep.
 type ToolCb = (
   args: { processName?: string; prolog?: string },
-  extra: Record<string, unknown>
-) => Promise<{ isError?: boolean; content: Array<{ type: string; text: string }> }>;
+  extra: Record<string, unknown>,
+) => Promise<{
+  isError?: boolean;
+  content: Array<{ type: string; text: string }>;
+}>;
 
 function captureHandler(check: TM1Client["processes"]["check"]): ToolCb {
   let cb: ToolCb | undefined;
@@ -29,7 +32,9 @@ describe("tm1_check_process_code failure payload", () => {
   it("carries code/message/hint alongside the compile errors", async () => {
     const cb = captureHandler(async () => ({
       success: false,
-      errors: [{ lineNumber: 2, procedure: "Prolog", message: "missing bracket" }],
+      errors: [
+        { lineNumber: 2, procedure: "Prolog", message: "missing bracket" },
+      ],
     }));
     const result = await cb({ processName: "_probe", prolog: "nX = (" }, {});
     const payload = JSON.parse(result.content[0].text);

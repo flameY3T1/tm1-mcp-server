@@ -4,7 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 import { FORMAT_SCHEMA, wrappedPageResponse, type Column } from "../format.js";
 
-export function registerSearchFiles(server: McpServer, tm1Client: TM1Client): void {
+export function registerSearchFiles(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_search_files",
     [
@@ -15,23 +18,46 @@ export function registerSearchFiles(server: McpServer, tm1Client: TM1Client): vo
       "Paginated (default 50/page).",
     ].join(" "),
     {
-      startswith: z.string().optional().describe(
-        "Case-insensitive prefix match on the file name (e.g. 'sales_').",
-      ),
-      contains: z.array(z.string()).optional().describe(
-        "List of case-insensitive substrings the name must contain (joined by `operator`).",
-      ),
-      operator: z.enum(["and", "or"]).optional().default("and").describe(
-        "How to join multiple `contains` substrings. Default 'and'.",
-      ),
-      path: z.string().optional().describe(
-        "Subfolder to search in (v12 only). Empty = root.",
-      ),
+      startswith: z
+        .string()
+        .optional()
+        .describe(
+          "Case-insensitive prefix match on the file name (e.g. 'sales_').",
+        ),
+      contains: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "List of case-insensitive substrings the name must contain (joined by `operator`).",
+        ),
+      operator: z
+        .enum(["and", "or"])
+        .optional()
+        .default("and")
+        .describe("How to join multiple `contains` substrings. Default 'and'."),
+      path: z
+        .string()
+        .optional()
+        .describe("Subfolder to search in (v12 only). Empty = root."),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
     },
-    async ({ startswith, contains, operator, path, limit, offset, fetchAll, format }) => {
-      const names = await tm1Client.files.search({ startswith, contains, operator, path });
+    async ({
+      startswith,
+      contains,
+      operator,
+      path,
+      limit,
+      offset,
+      fetchAll,
+      format,
+    }) => {
+      const names = await tm1Client.files.search({
+        startswith,
+        contains,
+        operator,
+        path,
+      });
       const page = paginate(names, limit, offset, fetchAll);
       const wrapper = {
         path: path ?? "",

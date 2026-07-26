@@ -44,7 +44,9 @@ function capture(processes: Partial<TM1Client["processes"]>): {
 
 const stubs = {
   getCode: async () => ({ prolog: "p", metadata: "m", data: "d", epilog: "e" }),
-  getParameters: async () => [{ name: "pMonth", type: "String", defaultValue: "Jan" }],
+  getParameters: async () => [
+    { name: "pMonth", type: "String", defaultValue: "Jan" },
+  ],
   getVariables: async () => [{ name: "v1", type: "Numeric", position: 1 }],
   getDataSource: async () => ({ type: "None" }),
   getDeployMeta: async () => ({ hasSecurityAccess: true }),
@@ -53,7 +55,9 @@ const stubs = {
 describe("tm1_get_process", () => {
   it("returns all parts with upsert field names by default", async () => {
     const { cb } = capture(stubs);
-    const payload = JSON.parse((await cb({ processName: "proc.a" }, {})).content[0].text);
+    const payload = JSON.parse(
+      (await cb({ processName: "proc.a" }, {})).content[0].text,
+    );
     expect(payload).toMatchObject({
       name: "proc.a",
       prolog: "p",
@@ -100,7 +104,9 @@ describe("tm1_get_process", () => {
       ...stubs,
       getDataSource: async () => ({ type: "ODBC", password: "hunter2" }),
     });
-    const payload = JSON.parse((await cb({ processName: "proc.a" }, {})).content[0].text);
+    const payload = JSON.parse(
+      (await cb({ processName: "proc.a" }, {})).content[0].text,
+    );
     expect(payload.dataSource.password).toBe("***");
   });
 });

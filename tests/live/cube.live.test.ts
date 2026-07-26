@@ -6,7 +6,12 @@
 // Opt-in: skips unless TM1_BASE_URL + TM1_USER are set. Every object is
 // prefixed `${SANDBOX}_CUBE` so a stray run can never touch real model data.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getHarness, LIVE_ENABLED, SANDBOX, type LiveHarness } from "./harness.js";
+import {
+  getHarness,
+  LIVE_ENABLED,
+  SANDBOX,
+  type LiveHarness,
+} from "./harness.js";
 
 const D1 = `${SANDBOX}_CUBE_D1`;
 const D2 = `${SANDBOX}_CUBE_D2`;
@@ -67,13 +72,22 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
       }
     };
     await swallow(h.call("tm1_delete_cube", { cubeName: C1, confirm: C1 }));
-    await swallow(h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 }));
-    await swallow(h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 }));
+    await swallow(
+      h.call("tm1_delete_dimension", { dimensionName: D1, confirm: D1 }),
+    );
+    await swallow(
+      h.call("tm1_delete_dimension", { dimensionName: D2, confirm: D2 }),
+    );
   });
 
   it("create_cube produced a cube over the two sandbox dimensions", async () => {
-    const r = await h.ok("tm1_list_cubes", { nameContains: SANDBOX, fetchAll: true });
-    const found = (r.json.items as Array<{ name: string }>).find((c) => c.name === C1);
+    const r = await h.ok("tm1_list_cubes", {
+      nameContains: SANDBOX,
+      fetchAll: true,
+    });
+    const found = (r.json.items as Array<{ name: string }>).find(
+      (c) => c.name === C1,
+    );
     expect(found).toBeTruthy();
   });
 
@@ -126,7 +140,10 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
       `NON EMPTY {[${D2}].[${D2}].Members} ON ROWS ` +
       `FROM [${C1}]`;
     const r = await h.ok("tm1_execute_mdx", { mdx });
-    expect(r.json).toMatchObject({ count: expect.any(Number), items: expect.any(Array) });
+    expect(r.json).toMatchObject({
+      count: expect.any(Number),
+      items: expect.any(Array),
+    });
     expect(r.json.items.length).toBeGreaterThan(0);
   });
 
@@ -154,13 +171,19 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
   });
 
   it("get_all_cube_rules includes the sandbox cube (summary mode)", async () => {
-    const r = await h.ok("tm1_get_all_cube_rules", { onlyWithRules: true, summary: true });
+    const r = await h.ok("tm1_get_all_cube_rules", {
+      onlyWithRules: true,
+      summary: true,
+    });
     const cubes = r.json.cubes as Array<{ cubeName: string }>;
     expect(cubes.some((c) => c.cubeName === C1)).toBe(true);
   });
 
   it("search_rules finds the SKIPCHECK line in the sandbox cube", async () => {
-    const r = await h.ok("tm1_search_rules", { pattern: "SKIPCHECK", cubes: [C1] });
+    const r = await h.ok("tm1_search_rules", {
+      pattern: "SKIPCHECK",
+      cubes: [C1],
+    });
     expect(r.json.matchCount).toBeGreaterThanOrEqual(1);
     const items = r.json.items as Array<{ cube: string }>;
     expect(items.some((m) => m.cube === C1)).toBe(true);

@@ -1,9 +1,19 @@
-import { KNOWN_SIGNATURES } from './tiSignatures.js';
-import { extractDbCalls, extractBracketRefs, parseBracketDimRefs, validateBracketRefSyntax } from './rulesLinter.js';
-import { joinContinuationLines } from './tiParser.js';
-import { buildProcessEnv, resolveExpression, type ProcessEnv, type VarBinding } from './variableEnv.js';
-import { rethrowIfSystemic } from '../../tm1-client/services/fallback.js';
-import { extractSubsetUsage, type SubsetUsage } from './subsetUsage.js';
+import { KNOWN_SIGNATURES } from "./tiSignatures.js";
+import {
+  extractDbCalls,
+  extractBracketRefs,
+  parseBracketDimRefs,
+  validateBracketRefSyntax,
+} from "./rulesLinter.js";
+import { joinContinuationLines } from "./tiParser.js";
+import {
+  buildProcessEnv,
+  resolveExpression,
+  type ProcessEnv,
+  type VarBinding,
+} from "./variableEnv.js";
+import { rethrowIfSystemic } from "../../tm1-client/services/fallback.js";
+import { extractSubsetUsage, type SubsetUsage } from "./subsetUsage.js";
 
 // ─── Argument-Index Auto-Derivation ──────────────────────────────────────────
 
@@ -22,46 +32,53 @@ function buildArgIdxMap(paramName: string): ArgIdxMap {
   return map;
 }
 
-const CUBE_ARG_IDX    = buildArgIdxMap('cubename');
-const DIM_ARG_IDX     = buildArgIdxMap('dimensionname');
-const PROCESS_ARG_IDX = buildArgIdxMap('processname');
-const ELEM_ARG_IDX    = buildArgIdxMap('elementname');
-const SUBSET_ARG_IDX  = buildArgIdxMap('subsetname');
+const CUBE_ARG_IDX = buildArgIdxMap("cubename");
+const DIM_ARG_IDX = buildArgIdxMap("dimensionname");
+const PROCESS_ARG_IDX = buildArgIdxMap("processname");
+const ELEM_ARG_IDX = buildArgIdxMap("elementname");
+const SUBSET_ARG_IDX = buildArgIdxMap("subsetname");
 
 /** Subset-membership calls whose ElementName arg is a real element-data-flow reference. */
-const SUBSET_ELEM_FUNCS = new Set(['subsetelementinsert', 'subsetelementadd', 'subsetelementdelete']);
+const SUBSET_ELEM_FUNCS = new Set([
+  "subsetelementinsert",
+  "subsetelementadd",
+  "subsetelementdelete",
+]);
 
-const TRACKED_FUNCS = [...new Set([
-  ...CUBE_ARG_IDX.keys(),
-  ...DIM_ARG_IDX.keys(),
-  ...PROCESS_ARG_IDX.keys(),
-])];
-const FUNC_RE = new RegExp(`\\b(${TRACKED_FUNCS.join('|')})\\s*\\(`, 'gi');
+const TRACKED_FUNCS = [
+  ...new Set([
+    ...CUBE_ARG_IDX.keys(),
+    ...DIM_ARG_IDX.keys(),
+    ...PROCESS_ARG_IDX.keys(),
+  ]),
+];
+const FUNC_RE = new RegExp(`\\b(${TRACKED_FUNCS.join("|")})\\s*\\(`, "gi");
 
 const SKIP_VALIDATION_FUNCS = new Set([
-  'dimensioncreate',
-  'cubecreate',
-  'hierarchycreate',
-  'subsetcreate',
-  'subsetcreatebymdx',
-  'viewcreate',
-  'viewcreatebymdx',
+  "dimensioncreate",
+  "cubecreate",
+  "hierarchycreate",
+  "subsetcreate",
+  "subsetcreatebymdx",
+  "viewcreate",
+  "viewcreatebymdx",
 ]);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type RefTargetKind = 'cube' | 'dimension' | 'process' | 'element';
-export type RefSourceKind = 'process' | 'rule';
-export type RefSection    = 'prolog' | 'metadata' | 'data' | 'epilog' | 'rules' | 'feeders';
+export type RefTargetKind = "cube" | "dimension" | "process" | "element";
+export type RefSourceKind = "process" | "rule";
+export type RefSection =
+  "prolog" | "metadata" | "data" | "epilog" | "rules" | "feeders";
 
 /**
  * How a value argument in an ExecuteProcess/RunProcess call-site resolves
  * based on the caller's code (literals + local var tracking, no chain resolution).
  */
 export type CallParamResolution =
-  | { kind: 'literal'; value: string }                 // literal or local var whose single assignment is a literal
-  | { kind: 'passthrough'; paramName: string }         // value comes from a caller-process parameter
-  | { kind: 'dynamic' };                               // cannot resolve (function call, concat, loop, CellGet, …)
+  | { kind: "literal"; value: string } // literal or local var whose single assignment is a literal
+  | { kind: "passthrough"; paramName: string } // value comes from a caller-process parameter
+  | { kind: "dynamic" }; // cannot resolve (function call, concat, loop, CellGet, …)
 
 /**
  * One param pair (name + value) in an ExecuteProcess/RunProcess call.
@@ -74,12 +91,12 @@ export interface CallParam {
 }
 
 export interface TmReference {
-  sourceKind: RefSourceKind;           // Where the reference was found
-  sourceName: string;                   // Process name or cube name (owner of rules)
+  sourceKind: RefSourceKind; // Where the reference was found
+  sourceName: string; // Process name or cube name (owner of rules)
   section: RefSection;
-  line: number;                         // 0-based within section text
-  snippet: string;                      // Trimmed source line (≤200 chars)
-  funcName?: string | undefined;        // e.g. CellGetN, DB, ExecuteProcess
+  line: number; // 0-based within section text
+  snippet: string; // Trimmed source line (≤200 chars)
+  funcName?: string | undefined; // e.g. CellGetN, DB, ExecuteProcess
   targetKind: RefTargetKind;
   targetName: string;
   /** Only set for ExecuteProcess/RunProcess references (targetKind = 'process'). */
@@ -92,36 +109,36 @@ export interface TmReference {
 
 /** One task inside a chore: the scheduled process plus its fixed call-site params. */
 export interface ChoreTaskRef {
-  step: number;                        // 0-based order
-  processName: string;                 // original casing
-  params: Array<{ name: string; value: string; type: 'string' | 'numeric' }>;
+  step: number; // 0-based order
+  processName: string; // original casing
+  params: Array<{ name: string; value: string; type: "string" | "numeric" }>;
 }
 
 /** An ExecuteProcess/RunProcess call-site whose target could not be resolved to a literal process name. */
 export interface UnresolvedCall {
-  section: RefSection;                 // prolog | metadata | data | epilog
-  line: number;                        // 0-based within section text
-  funcName: string;                    // ExecuteProcess | RunProcess
-  expr: string;                        // raw target-arg text, e.g. "sDyn" or "'te'|'st'"
-  snippet: string;                     // trimmed source line
-  reason: 'dynamic' | 'param';         // param = callee target is itself a process parameter
+  section: RefSection; // prolog | metadata | data | epilog
+  line: number; // 0-based within section text
+  funcName: string; // ExecuteProcess | RunProcess
+  expr: string; // raw target-arg text, e.g. "sDyn" or "'te'|'st'"
+  snippet: string; // trimmed source line
+  reason: "dynamic" | "param"; // param = callee target is itself a process parameter
 }
 
 /** A subset-membership element arg (SubsetElementInsert/Add/Delete) whose element name could not be resolved to a literal. */
 export interface UnresolvedElementRef {
   section: RefSection;
   line: number;
-  funcName: string;                    // SubsetElementInsert | SubsetElementAdd | SubsetElementDelete
-  dimension?: string | undefined;      // may still resolve even when the element does not
-  expr: string;                        // raw element-arg text, e.g. "sElem" or "CellGetS(...)"
+  funcName: string; // SubsetElementInsert | SubsetElementAdd | SubsetElementDelete
+  dimension?: string | undefined; // may still resolve even when the element does not
+  expr: string; // raw element-arg text, e.g. "sElem" or "CellGetS(...)"
   snippet: string;
-  reason: 'dynamic' | 'param';
+  reason: "dynamic" | "param";
 }
 
 export interface ReferenceIndex {
   all: TmReference[];
-  byCube:    Map<string, TmReference[]>;
-  byDim:     Map<string, TmReference[]>;
+  byCube: Map<string, TmReference[]>;
+  byDim: Map<string, TmReference[]>;
   byProcess: Map<string, TmReference[]>;
   /** Process name (lowercased) → refs originating FROM that process (for call-graph downstream traversal). */
   bySourceProcess: Map<string, TmReference[]>;
@@ -145,26 +162,40 @@ export interface ReferenceIndex {
 
 function neutralizeLine(line: string): string {
   return line
-    .replace(/'[^']*'/g, s => ' '.repeat(s.length))
-    .replace(/#.*$/, '');
+    .replace(/'[^']*'/g, (s) => " ".repeat(s.length))
+    .replace(/#.*$/, "");
 }
 
 export function splitArgs(argsStr: string): string[] {
-  if (!argsStr.trim()) { return []; }
+  if (!argsStr.trim()) {
+    return [];
+  }
   const args: string[] = [];
   let depth = 0;
   let inStr = false;
-  let cur = '';
+  let cur = "";
   for (const ch of argsStr) {
-    if (ch === "'" && !inStr)      { inStr = true;  cur += ch; }
-    else if (ch === "'" && inStr)  { inStr = false; cur += ch; }
-    else if (!inStr && ch === '(') { depth++; cur += ch; }
-    else if (!inStr && ch === ')') { depth--; cur += ch; }
-    else if (!inStr && depth === 0 && ch === ',') { args.push(cur.trim()); cur = ''; }
-    else { cur += ch; }
+    if (ch === "'" && !inStr) {
+      inStr = true;
+      cur += ch;
+    } else if (ch === "'" && inStr) {
+      inStr = false;
+      cur += ch;
+    } else if (!inStr && ch === "(") {
+      depth++;
+      cur += ch;
+    } else if (!inStr && ch === ")") {
+      depth--;
+      cur += ch;
+    } else if (!inStr && depth === 0 && ch === ",") {
+      args.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
   }
   args.push(cur.trim());
-  return args.filter(a => a !== '');
+  return args.filter((a) => a !== "");
 }
 
 /** Composite key for the byElement index: dimension + element, both lowercased. */
@@ -176,7 +207,9 @@ export function extractStringLiteral(arg: string): string | null {
   const t = arg.trim();
   if (t.startsWith("'") && t.endsWith("'") && t.length >= 3) {
     const inner = t.slice(1, -1);
-    if (!inner.includes("'")) { return inner; }
+    if (!inner.includes("'")) {
+      return inner;
+    }
   }
   return null;
 }
@@ -185,7 +218,7 @@ const SECTION_MARKER_RE = /^57[2345],\d*$/;
 
 function truncateSnippet(line: string): string {
   const t = line.trim();
-  return t.length > 200 ? t.slice(0, 197) + '…' : t;
+  return t.length > 200 ? t.slice(0, 197) + "…" : t;
 }
 
 // ─── TI reference extraction (one section at a time) ─────────────────────────
@@ -197,8 +230,8 @@ interface RawTiRef {
   targetName: string;
   snippet: string;
   params?: CallParam[] | undefined;
-  dimension?: string | undefined;   // set for element refs (owning dimension)
-  subset?: string | undefined;      // set for element refs (subset the element was inserted into)
+  dimension?: string | undefined; // set for element refs (owning dimension)
+  subset?: string | undefined; // set for element refs (subset the element was inserted into)
 }
 
 interface RawUnresolvedCall {
@@ -206,7 +239,7 @@ interface RawUnresolvedCall {
   funcName: string;
   expr: string;
   snippet: string;
-  reason: 'dynamic' | 'param';
+  reason: "dynamic" | "param";
 }
 
 /** A subset-membership element arg that could not be resolved to a literal (raw, pre-section). */
@@ -216,7 +249,7 @@ interface RawUnresolvedElementRef {
   dimension?: string | undefined;
   expr: string;
   snippet: string;
-  reason: 'dynamic' | 'param';
+  reason: "dynamic" | "param";
 }
 
 /**
@@ -224,12 +257,22 @@ interface RawUnresolvedElementRef {
  * Uses the caller's ProcessEnv to resolve bare variables to literals or
  * caller-param references.
  */
-function resolveValueArg(arg: string, env: ProcessEnv): { resolution: CallParamResolution; valueRaw: string } {
+function resolveValueArg(
+  arg: string,
+  env: ProcessEnv,
+): { resolution: CallParamResolution; valueRaw: string } {
   const valueRaw = arg.trim();
   const binding: VarBinding = resolveExpression(valueRaw, env);
-  if (binding.kind === 'literal')    { return { resolution: { kind: 'literal',     value: binding.value }, valueRaw }; }
-  if (binding.kind === 'param')      { return { resolution: { kind: 'passthrough', paramName: binding.paramName }, valueRaw }; }
-  return { resolution: { kind: 'dynamic' }, valueRaw };
+  if (binding.kind === "literal") {
+    return { resolution: { kind: "literal", value: binding.value }, valueRaw };
+  }
+  if (binding.kind === "param") {
+    return {
+      resolution: { kind: "passthrough", paramName: binding.paramName },
+      valueRaw,
+    };
+  }
+  return { resolution: { kind: "dynamic" }, valueRaw };
 }
 
 /**
@@ -241,14 +284,16 @@ function extractCallParams(args: string[], env: ProcessEnv): CallParam[] {
   const params: CallParam[] = [];
   for (let i = 1; i + 1 < args.length; i += 2) {
     const nameLit = extractStringLiteral(args[i]!);
-    if (nameLit === null) { continue; }
+    if (nameLit === null) {
+      continue;
+    }
     const { resolution, valueRaw } = resolveValueArg(args[i + 1]!, env);
     params.push({ name: nameLit, resolution, valueRaw });
   }
   return params;
 }
 
-const PROCESS_CALL_FUNCS = new Set(['executeprocess', 'runprocess']);
+const PROCESS_CALL_FUNCS = new Set(["executeprocess", "runprocess"]);
 
 /**
  * Extracts cube/dimension/process references from a single TI text (one section).
@@ -281,20 +326,26 @@ export function extractTiReferences(
   const callerEnv: ProcessEnv = { ...baseEnv, vars: liveVars };
   const refs: RawTiRef[] = [];
   // Multi-line-Calls auf ihre Startzeile zusammenfassen — Continuation-Zeilen werden leer.
-  const lines = joinContinuationLines(text.split('\n').map(l => l.replace(/\r$/, '')));
+  const lines = joinContinuationLines(
+    text.split("\n").map((l) => l.replace(/\r$/, "")),
+  );
 
   const assignRe = /^\s*([A-Za-z_]\w*)\s*=\s*(.+?)\s*;?\s*(?:#.*)?$/;
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx]!;
-    if (SECTION_MARKER_RE.test(line.trim()) || line.trim() === '') { continue; }
+    if (SECTION_MARKER_RE.test(line.trim()) || line.trim() === "") {
+      continue;
+    }
 
     const neutralized = neutralizeLine(line);
-    if (neutralized.trim() === '') { continue; }
+    if (neutralized.trim() === "") {
+      continue;
+    }
 
     // Vor der Call-Erkennung: Zuweisungen in liveVars eintragen (last-assignment-wins).
     const aM = assignRe.exec(line);
-    if (aM && !aM[2]!.startsWith('=')) {
+    if (aM && !aM[2]!.startsWith("=")) {
       const varLc = aM[1]!.toLowerCase();
       if (!baseEnv.paramsLc.has(varLc) && !baseEnv.datasourceVars.has(varLc)) {
         liveVars.set(varLc, resolveExpression(aM[2]!, callerEnv));
@@ -310,48 +361,69 @@ export function extractTiReferences(
       let depth = 1;
       let i = openParen + 1;
       while (i < neutralized.length && depth > 0) {
-        if (neutralized[i] === '(')      { depth++; }
-        else if (neutralized[i] === ')') { depth--; }
+        if (neutralized[i] === "(") {
+          depth++;
+        } else if (neutralized[i] === ")") {
+          depth--;
+        }
         i++;
       }
-      if (depth !== 0) { continue; }
+      if (depth !== 0) {
+        continue;
+      }
 
       const argsStr = line.slice(openParen + 1, i - 1);
       const args = splitArgs(argsStr);
 
-      if (SKIP_VALIDATION_FUNCS.has(funcLower)) { continue; }
+      if (SKIP_VALIDATION_FUNCS.has(funcLower)) {
+        continue;
+      }
 
       const snippet = truncateSnippet(line);
       const pushRef = (kind: RefTargetKind, argIdx: number | undefined) => {
-        if (argIdx === undefined || argIdx >= args.length) { return; }
+        if (argIdx === undefined || argIdx >= args.length) {
+          return;
+        }
         const argVal = args[argIdx]!;
         let targetName = extractStringLiteral(argVal);
         if (targetName === null) {
           const binding = resolveExpression(argVal, callerEnv);
-          if (binding.kind !== 'literal') {
+          if (binding.kind !== "literal") {
             // Surface (do not resolve) a process-call target that isn't a literal —
             // it's still a real call edge, just one we can't name statically.
-            if (unresolvedOut && kind === 'process' && PROCESS_CALL_FUNCS.has(funcLower)) {
+            if (
+              unresolvedOut &&
+              kind === "process" &&
+              PROCESS_CALL_FUNCS.has(funcLower)
+            ) {
               unresolvedOut.push({
                 line: lineIdx,
                 funcName: m![1]!,
                 expr: argVal.trim(),
                 snippet,
-                reason: binding.kind === 'param' ? 'param' : 'dynamic',
+                reason: binding.kind === "param" ? "param" : "dynamic",
               });
             }
             return;
           }
           targetName = binding.value;
         }
-        const params = kind === 'process' && PROCESS_CALL_FUNCS.has(funcLower)
-          ? extractCallParams(args, callerEnv)
-          : undefined;
-        refs.push({ line: lineIdx, funcName: m![1]!, targetKind: kind, targetName, snippet, params });
+        const params =
+          kind === "process" && PROCESS_CALL_FUNCS.has(funcLower)
+            ? extractCallParams(args, callerEnv)
+            : undefined;
+        refs.push({
+          line: lineIdx,
+          funcName: m![1]!,
+          targetKind: kind,
+          targetName,
+          snippet,
+          params,
+        });
       };
-      pushRef('cube',      CUBE_ARG_IDX.get(funcLower));
-      pushRef('dimension', DIM_ARG_IDX.get(funcLower));
-      pushRef('process',   PROCESS_ARG_IDX.get(funcLower));
+      pushRef("cube", CUBE_ARG_IDX.get(funcLower));
+      pushRef("dimension", DIM_ARG_IDX.get(funcLower));
+      pushRef("process", PROCESS_ARG_IDX.get(funcLower));
 
       // Element refs need BOTH the element name and its owning dimension resolved
       // together, so use a dedicated block instead of the single-arg pushRef.
@@ -367,7 +439,9 @@ export function extractTiReferences(
             dimName = extractStringLiteral(dimArg) ?? undefined;
             if (dimName === undefined) {
               const db = resolveExpression(dimArg, callerEnv);
-              if (db.kind === 'literal') { dimName = db.value; }
+              if (db.kind === "literal") {
+                dimName = db.value;
+              }
             }
           }
           // Resolve the subset the element was inserted into (literal or var);
@@ -379,13 +453,15 @@ export function extractTiReferences(
             subName = extractStringLiteral(subArg) ?? undefined;
             if (subName === undefined) {
               const sb = resolveExpression(subArg, callerEnv);
-              if (sb.kind === 'literal') { subName = sb.value; }
+              if (sb.kind === "literal") {
+                subName = sb.value;
+              }
             }
           }
           let elemName = extractStringLiteral(elemArg);
           if (elemName === null) {
             const eb = resolveExpression(elemArg, callerEnv);
-            if (eb.kind === 'literal') {
+            if (eb.kind === "literal") {
               elemName = eb.value;
             } else {
               if (unresolvedElemOut) {
@@ -395,7 +471,7 @@ export function extractTiReferences(
                   dimension: dimName,
                   expr: elemArg.trim(),
                   snippet,
-                  reason: eb.kind === 'param' ? 'param' : 'dynamic',
+                  reason: eb.kind === "param" ? "param" : "dynamic",
                 });
               }
               elemName = null;
@@ -412,7 +488,16 @@ export function extractTiReferences(
             // is reverse-queryable by name via bySourceProcess but not via the
             // element/dimension filter. A future "unresolved dimension" bucket could
             // close this gap.
-            refs.push({ line: lineIdx, funcName: m[1]!, targetKind: 'element', targetName: elemName, dimension: dimName, subset: subName, snippet, params: undefined });
+            refs.push({
+              line: lineIdx,
+              funcName: m[1]!,
+              targetKind: "element",
+              targetName: elemName,
+              dimension: dimName,
+              subset: subName,
+              snippet,
+              params: undefined,
+            });
           }
         }
       }
@@ -425,9 +510,9 @@ export function extractTiReferences(
 
 interface RawRuleRef {
   line: number;
-  section: 'rules' | 'feeders';
+  section: "rules" | "feeders";
   funcName?: string | undefined;
-  targetKind: 'cube' | 'dimension';
+  targetKind: "cube" | "dimension";
   targetName: string;
   snippet: string;
 }
@@ -440,30 +525,52 @@ const FEEDERS_MARKER_RE = /^\s*FEEDERS\s*;/i;
  */
 export function extractRulesReferences(text: string): RawRuleRef[] {
   const refs: RawRuleRef[] = [];
-  const lines = text.split('\n');
-  let section: 'rules' | 'feeders' = 'rules';
+  const lines = text.split("\n");
+  let section: "rules" | "feeders" = "rules";
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx]!.replace(/\r$/, '');
+    const line = lines[lineIdx]!.replace(/\r$/, "");
     const trimmed = line.trim();
-    if (FEEDERS_MARKER_RE.test(trimmed)) { section = 'feeders'; continue; }
-    if (trimmed === '' || trimmed.startsWith('#')) { continue; }
+    if (FEEDERS_MARKER_RE.test(trimmed)) {
+      section = "feeders";
+      continue;
+    }
+    if (trimmed === "" || trimmed.startsWith("#")) {
+      continue;
+    }
 
     const snippet = truncateSnippet(line);
 
     // DB(...) → cube reference
     for (const call of extractDbCalls(line)) {
       if (call.cubeName !== null) {
-        refs.push({ line: lineIdx, section, funcName: 'DB', targetKind: 'cube', targetName: call.cubeName, snippet });
+        refs.push({
+          line: lineIdx,
+          section,
+          funcName: "DB",
+          targetKind: "cube",
+          targetName: call.cubeName,
+          snippet,
+        });
       }
     }
 
     // [...] → dimension references (only valid syntactic refs)
     for (const bracket of extractBracketRefs(line)) {
-      if (validateBracketRefSyntax(bracket) !== null) { continue; }
-      if (!bracket.includes("'")) { continue; }
+      if (validateBracketRefSyntax(bracket) !== null) {
+        continue;
+      }
+      if (!bracket.includes("'")) {
+        continue;
+      }
       for (const { dim } of parseBracketDimRefs(bracket)) {
-        refs.push({ line: lineIdx, section, targetKind: 'dimension', targetName: dim, snippet });
+        refs.push({
+          line: lineIdx,
+          section,
+          targetKind: "dimension",
+          targetName: dim,
+          snippet,
+        });
       }
     }
   }
@@ -486,7 +593,7 @@ export interface ProcessFetchResult {
 
 export interface CubeRulesFetchResult {
   cubeName: string;
-  rulesText: string;   // full rules incl. FEEDERS section
+  rulesText: string; // full rules incl. FEEDERS section
 }
 
 export interface ChoreFetchResult {
@@ -504,7 +611,9 @@ export interface BuildIndexDeps {
  * Builds a complete reference index from processes + cube rules.
  * Pure function — dependencies are injected to allow testing without network.
  */
-export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<ReferenceIndex> {
+export async function buildReferenceIndex(
+  deps: BuildIndexDeps,
+): Promise<ReferenceIndex> {
   // Per-source tolerance: a NOT_FOUND / PERMISSION_DENIED on one domain
   // degrades to an empty slice. But a systemic failure (auth expired, server
   // unreachable, lock timeout) must propagate — otherwise an outage builds an
@@ -526,7 +635,10 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
 
   const all: TmReference[] = [];
   const unresolvedCallsBySourceProcess = new Map<string, UnresolvedCall[]>();
-  const unresolvedElementRefsBySourceProcess = new Map<string, UnresolvedElementRef[]>();
+  const unresolvedElementRefsBySourceProcess = new Map<
+    string,
+    UnresolvedElementRef[]
+  >();
   const subsetUsageByProcess = new Map<string, Map<string, SubsetUsage>>();
 
   const pushTi = (
@@ -536,12 +648,20 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
     env: ProcessEnv,
     sharedLiveVars: Map<string, VarBinding>,
   ) => {
-    if (!text) { return; }
+    if (!text) {
+      return;
+    }
     const unresolvedOut: RawUnresolvedCall[] = [];
     const unresolvedElemOut: RawUnresolvedElementRef[] = [];
-    for (const r of extractTiReferences(text, env, sharedLiveVars, unresolvedOut, unresolvedElemOut)) {
+    for (const r of extractTiReferences(
+      text,
+      env,
+      sharedLiveVars,
+      unresolvedOut,
+      unresolvedElemOut,
+    )) {
       all.push({
-        sourceKind: 'process',
+        sourceKind: "process",
         sourceName,
         section,
         line: r.line,
@@ -549,8 +669,8 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
         funcName: r.funcName,
         targetKind: r.targetKind,
         targetName: r.targetName,
-        dimension: r.dimension,          // ← forward element owner
-        subset: r.subset,                // ← forward subset the element was inserted into
+        dimension: r.dimension, // ← forward element owner
+        subset: r.subset, // ← forward subset the element was inserted into
         params: r.params,
       });
     }
@@ -558,7 +678,14 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
       const key = sourceName.toLowerCase();
       const bucket = unresolvedCallsBySourceProcess.get(key) ?? [];
       for (const u of unresolvedOut) {
-        bucket.push({ section, line: u.line, funcName: u.funcName, expr: u.expr, snippet: u.snippet, reason: u.reason });
+        bucket.push({
+          section,
+          line: u.line,
+          funcName: u.funcName,
+          expr: u.expr,
+          snippet: u.snippet,
+          reason: u.reason,
+        });
       }
       unresolvedCallsBySourceProcess.set(key, bucket);
     }
@@ -566,7 +693,15 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
       const key = sourceName.toLowerCase();
       const arr = unresolvedElementRefsBySourceProcess.get(key) ?? [];
       for (const u of unresolvedElemOut) {
-        arr.push({ section, line: u.line, funcName: u.funcName, dimension: u.dimension, expr: u.expr, snippet: u.snippet, reason: u.reason });
+        arr.push({
+          section,
+          line: u.line,
+          funcName: u.funcName,
+          dimension: u.dimension,
+          expr: u.expr,
+          snippet: u.snippet,
+          reason: u.reason,
+        });
       }
       unresolvedElementRefsBySourceProcess.set(key, arr);
     }
@@ -575,25 +710,30 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
   for (const p of processes) {
     // Build env once from *all* sections concatenated so var assignments made in
     // Prolog are visible to ExecuteProcess calls in Data/Epilog (mirrors TI runtime behavior).
-    const combinedText = [p.prolog, p.metadata, p.data, p.epilog].join('\n');
+    const combinedText = [p.prolog, p.metadata, p.data, p.epilog].join("\n");
     const env = buildProcessEnv(combinedText, p.parameters ?? []);
     // Shared liveVars über alle 4 Sections — Prolog-Zuweisungen bleiben in Data/Epilog sichtbar
     // und die flow-sensitive Auswertung funktioniert auch über Section-Grenzen hinweg.
     const sharedLiveVars = new Map(env.vars);
 
-    pushTi(p.name, 'prolog',   p.prolog,   env, sharedLiveVars);
-    pushTi(p.name, 'metadata', p.metadata, env, sharedLiveVars);
-    pushTi(p.name, 'data',     p.data,     env, sharedLiveVars);
-    pushTi(p.name, 'epilog',   p.epilog,   env, sharedLiveVars);
+    pushTi(p.name, "prolog", p.prolog, env, sharedLiveVars);
+    pushTi(p.name, "metadata", p.metadata, env, sharedLiveVars);
+    pushTi(p.name, "data", p.data, env, sharedLiveVars);
+    pushTi(p.name, "epilog", p.epilog, env, sharedLiveVars);
 
-    subsetUsageByProcess.set(p.name.toLowerCase(), extractSubsetUsage(combinedText, env));
+    subsetUsageByProcess.set(
+      p.name.toLowerCase(),
+      extractSubsetUsage(combinedText, env),
+    );
   }
 
   for (const c of cubes) {
-    if (!c.rulesText) { continue; }
+    if (!c.rulesText) {
+      continue;
+    }
     for (const r of extractRulesReferences(c.rulesText)) {
       all.push({
-        sourceKind: 'rule',
+        sourceKind: "rule",
         sourceName: c.cubeName,
         section: r.section,
         line: r.line,
@@ -605,13 +745,17 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
     }
   }
 
-  const byCube          = new Map<string, TmReference[]>();
-  const byDim           = new Map<string, TmReference[]>();
-  const byProcess       = new Map<string, TmReference[]>();
-  const byElement       = new Map<string, TmReference[]>();
+  const byCube = new Map<string, TmReference[]>();
+  const byDim = new Map<string, TmReference[]>();
+  const byProcess = new Map<string, TmReference[]>();
+  const byElement = new Map<string, TmReference[]>();
   const bySourceProcess = new Map<string, TmReference[]>();
 
-  const bucket = (m: Map<string, TmReference[]>, key: string, ref: TmReference) => {
+  const bucket = (
+    m: Map<string, TmReference[]>,
+    key: string,
+    ref: TmReference,
+  ) => {
     const lc = key.toLowerCase();
     const arr = m.get(lc) ?? [];
     arr.push(ref);
@@ -620,10 +764,16 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
 
   for (const ref of all) {
     switch (ref.targetKind) {
-      case 'cube':      bucket(byCube,    ref.targetName, ref); break;
-      case 'dimension': bucket(byDim,     ref.targetName, ref); break;
-      case 'process':   bucket(byProcess, ref.targetName, ref); break;
-      case 'element':
+      case "cube":
+        bucket(byCube, ref.targetName, ref);
+        break;
+      case "dimension":
+        bucket(byDim, ref.targetName, ref);
+        break;
+      case "process":
+        bucket(byProcess, ref.targetName, ref);
+        break;
+      case "element":
         if (ref.dimension) {
           const k = elementKey(ref.dimension, ref.targetName);
           const arr = byElement.get(k) ?? [];
@@ -632,7 +782,7 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
         }
         break;
     }
-    if (ref.sourceKind === 'process') {
+    if (ref.sourceKind === "process") {
       bucket(bySourceProcess, ref.sourceName, ref);
     }
   }
@@ -650,7 +800,9 @@ export async function buildReferenceIndex(deps: BuildIndexDeps): Promise<Referen
 
   const choreTasks = new Map<string, ChoreTaskRef[]>();
   for (const c of chores) {
-    if (!c.name) { continue; }
+    if (!c.name) {
+      continue;
+    }
     choreTasks.set(c.name.toLowerCase(), c.tasks);
   }
 
@@ -678,11 +830,15 @@ export function lookupReferences(
 ): TmReference[] {
   const lc = targetName.toLowerCase();
   switch (targetKind) {
-    case 'cube':      return idx.byCube.get(lc)    ?? [];
-    case 'dimension': return idx.byDim.get(lc)     ?? [];
-    case 'process':   return idx.byProcess.get(lc) ?? [];
+    case "cube":
+      return idx.byCube.get(lc) ?? [];
+    case "dimension":
+      return idx.byDim.get(lc) ?? [];
+    case "process":
+      return idx.byProcess.get(lc) ?? [];
     // byElement is keyed by elementKey(dim, element), a composite key this single-name
     // lookup can't build — callers needing element refs use idx.byElement directly.
-    case 'element':   return [];
+    case "element":
+      return [];
   }
 }

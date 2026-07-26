@@ -17,7 +17,9 @@ export function pageShapeFor<T extends ZodTypeAny>(itemSchema: T) {
       .number()
       .int()
       .nullable()
-      .describe("Offset to pass for the next page, or null when has_more=false"),
+      .describe(
+        "Offset to pass for the next page, or null when has_more=false",
+      ),
     items: z.array(itemSchema).describe("Items in this page"),
   };
 }

@@ -11,10 +11,25 @@ export function registerMoveElement(server: McpServer, tm1Client: TM1Client) {
       hierarchyName: z.string().describe("Name of the hierarchy"),
       elementName: z.string().describe("Name of the element to move"),
       newParent: z.string().describe("Name of the new parent element"),
-      weight: z.number().optional().describe("Weight for the parent-child relationship (default: 1)"),
+      weight: z
+        .number()
+        .optional()
+        .describe("Weight for the parent-child relationship (default: 1)"),
     },
-    async ({ dimensionName, hierarchyName, elementName, newParent, weight }) => {
-      await tm1Client.elements.move(dimensionName, hierarchyName, elementName, newParent, weight);
+    async ({
+      dimensionName,
+      hierarchyName,
+      elementName,
+      newParent,
+      weight,
+    }) => {
+      await tm1Client.elements.move(
+        dimensionName,
+        hierarchyName,
+        elementName,
+        newParent,
+        weight,
+      );
       return actionResponse({ success: true, elementName, newParent });
     },
   );

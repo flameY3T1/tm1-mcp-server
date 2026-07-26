@@ -19,12 +19,22 @@ export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
       dimensions: z
         .array(z.string())
         .min(2)
-        .describe("Cube dimension names in exact cube order (required because the element tuples use @odata.bind references)"),
+        .describe(
+          "Cube dimension names in exact cube order (required because the element tuples use @odata.bind references)",
+        ),
       cells: z
         .array(
           z.object({
-            elements: z.array(z.string()).describe("Element names, one per dimension, in the cube's dimension order"),
-            value: z.union([z.number(), z.string()]).describe("Cell value (number for Numeric cubes, string for String cells)"),
+            elements: z
+              .array(z.string())
+              .describe(
+                "Element names, one per dimension, in the cube's dimension order",
+              ),
+            value: z
+              .union([z.number(), z.string()])
+              .describe(
+                "Cell value (number for Numeric cubes, string for String cells)",
+              ),
           }),
         )
         .min(1)

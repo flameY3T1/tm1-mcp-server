@@ -39,6 +39,7 @@ export function rethrowIfSystemic(e: unknown): void {
  * from "access denied".
  */
 export function rethrowIfSystemicOrDenied(e: unknown): void {
-  if (e instanceof TM1Error && e.code === TM1ErrorCode.PERMISSION_DENIED) throw e;
+  if (e instanceof TM1Error && e.code === TM1ErrorCode.PERMISSION_DENIED)
+    throw e;
   rethrowIfSystemic(e);
 }

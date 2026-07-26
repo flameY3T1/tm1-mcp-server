@@ -31,23 +31,33 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
       includeDimensions: true,
       includeControl: false,
     });
-    const cubeItems: Array<{ name: string; hasRules?: boolean; dimensions?: string[] }> =
-      cubes.json?.items ?? [];
+    const cubeItems: Array<{
+      name: string;
+      hasRules?: boolean;
+      dimensions?: string[];
+    }> = cubes.json?.items ?? [];
     cubeNames = cubeItems.map((c) => c.name);
 
     const procs = await h.ok("tm1_list_processes", { fetchAll: true });
     processNames = (procs.json?.items ?? [])
-      .map((p: unknown) => (typeof p === "string" ? p : (p as { name?: string })?.name))
+      .map((p: unknown) =>
+        typeof p === "string" ? p : (p as { name?: string })?.name,
+      )
       .filter((n: unknown): n is string => typeof n === "string");
 
     // ── Find a rule-bearing cube and a real populated cell inside it ───────
-    const ruleCubes = cubeItems.filter((c) => c.hasRules && !c.name.startsWith("}"));
+    const ruleCubes = cubeItems.filter(
+      (c) => c.hasRules && !c.name.startsWith("}"),
+    );
     for (const c of ruleCubes) {
       ruleCube ??= c.name;
       const dims = c.dimensions ?? [];
       if (dims.length === 0) continue;
       // sample_cells returns self-describing {coordinates: {dim->el}} cells.
-      const sample = await h.call("tm1_sample_cells", { cubeName: c.name, maxCells: 1 });
+      const sample = await h.call("tm1_sample_cells", {
+        cubeName: c.name,
+        maxCells: 1,
+      });
       const cell = sample.json?.cells?.[0];
       const coords: Record<string, string> | undefined = cell?.coordinates;
       if (!coords) continue;
@@ -76,7 +86,11 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
   });
 
   it("tm1_search_code: groupBy='process' returns sorted count aggregation", async () => {
-    const r = await h.ok("tm1_search_code", { pattern: "If", groupBy: "process", limit: 5 });
+    const r = await h.ok("tm1_search_code", {
+      pattern: "If",
+      groupBy: "process",
+      limit: 5,
+    });
     expect(r.isError).toBe(false);
     expect(r.json).toMatchObject({
       groupBy: "process",
@@ -84,10 +98,15 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
       matchCount: expect.any(Number),
       items: expect.any(Array),
     });
-    const items = r.json.items as Array<{ process: string; matchCount: number }>;
+    const items = r.json.items as Array<{
+      process: string;
+      matchCount: number;
+    }>;
     // sorted desc by matchCount
     for (let i = 1; i < items.length; i++) {
-      expect(items[i - 1]!.matchCount).toBeGreaterThanOrEqual(items[i]!.matchCount);
+      expect(items[i - 1]!.matchCount).toBeGreaterThanOrEqual(
+        items[i]!.matchCount,
+      );
     }
   });
 
@@ -96,7 +115,9 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
     const r = await h.ok("tm1_search_rules", { pattern: ".", limit: 5 });
     expect(r.isError).toBe(false);
     expect(r.json).toMatchObject({ items: expect.any(Array) });
-    expect(typeof r.json.matchCount === "number" || Array.isArray(r.json.items)).toBe(true);
+    expect(
+      typeof r.json.matchCount === "number" || Array.isArray(r.json.items),
+    ).toBe(true);
   });
 
   // ── analyze_object_usage ────────────────────────────────────────────────
@@ -146,12 +167,17 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
     // Either a tree payload, or a structured "not found in index" warning —
     // both are valid non-error JSON shapes for a real-but-leaf process.
     expect(r.json).toBeTruthy();
-    expect(r.json.tree !== undefined || r.json.warning !== undefined).toBe(true);
+    expect(r.json.tree !== undefined || r.json.warning !== undefined).toBe(
+      true,
+    );
   });
 
   // ── analyze_callgraph: global ranking form (no start) ────────────────────
   it("tm1_analyze_callgraph: global fan-out ranking (no start)", async () => {
-    const r = await h.ok("tm1_analyze_callgraph", { rankBy: "outgoing", topN: 10 });
+    const r = await h.ok("tm1_analyze_callgraph", {
+      rankBy: "outgoing",
+      topN: 10,
+    });
     expect(r.isError).toBe(false);
     expect(r.json).toMatchObject({ mode: "globalRanking" });
     // Ranking returns an array of per-process entries under some key.
@@ -161,7 +187,10 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
 
   // ── audit_complexity (small scope) ──────────────────────────────────────
   it("tm1_audit_complexity: processes scope, small topN", async () => {
-    const r = await h.ok("tm1_audit_complexity", { scope: ["processes"], topN: 5 });
+    const r = await h.ok("tm1_audit_complexity", {
+      scope: ["processes"],
+      topN: 5,
+    });
     expect(r.isError).toBe(false);
     expect(r.json).toMatchObject({
       status: expect.any(String),
@@ -192,7 +221,10 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
 
   // ── check_v12_readiness ─────────────────────────────────────────────────
   it("tm1_check_v12_readiness: scan processes+rules", async () => {
-    const r = await h.ok("tm1_check_v12_readiness", { scope: "all", maxFindings: 20 });
+    const r = await h.ok("tm1_check_v12_readiness", {
+      scope: "all",
+      maxFindings: 20,
+    });
     expect(r.isError).toBe(false);
     expect(r.json).toMatchObject({
       readinessScore: expect.any(String),
@@ -206,7 +238,10 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
     expect(cubeNames.length).toBeGreaterThan(0);
     const r = await h.ok("tm1_get_cube_stats", { cubeName: cubeNames[0] });
     expect(r.isError).toBe(false);
-    expect(r.json).toMatchObject({ count: expect.any(Number), items: expect.any(Array) });
+    expect(r.json).toMatchObject({
+      count: expect.any(Number),
+      items: expect.any(Array),
+    });
     expect(r.json.items[0]).toMatchObject({ cubeName: expect.any(String) });
   });
 
@@ -263,7 +298,10 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
     });
     // Empty fedCells (fully-fed) is a valid non-error result on 11.8.
     expect(r.isError).toBe(false);
-    expect(r.json).toMatchObject({ count: expect.any(Number), fedCells: expect.any(Array) });
+    expect(r.json).toMatchObject({
+      count: expect.any(Number),
+      fedCells: expect.any(Array),
+    });
   });
 
   // ── trace_feeders (v11 runtime, real cell) ──────────────────────────────
@@ -274,7 +312,10 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
       elements: sampleElements,
     });
     expect(r.isError).toBe(false);
-    expect(r.json).toMatchObject({ count: expect.any(Number), fedCells: expect.any(Array) });
+    expect(r.json).toMatchObject({
+      count: expect.any(Number),
+      fedCells: expect.any(Array),
+    });
   });
 
   // ── trace_cell_calculation (v11 runtime, real cell) ─────────────────────

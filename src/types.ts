@@ -413,7 +413,7 @@ export interface ChoreStep {
 
 export interface ChoreCreate {
   name: string;
-  startTime: string;        // ISO 8601, z.B. "2025-01-01T06:00:00"
+  startTime: string; // ISO 8601, z.B. "2025-01-01T06:00:00"
   dstSensitive: boolean;
   active: boolean;
   executionMode: "SingleCommit" | "MultipleCommit";
@@ -425,7 +425,6 @@ export interface ChoreCreate {
   };
   steps: ChoreStep[];
 }
-
 
 export interface ToolResult {
   content: Array<{

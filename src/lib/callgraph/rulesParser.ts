@@ -11,14 +11,14 @@ export interface ParsedRulesLine {
   hasStet: boolean;
   /** `IF(` call present outside string literals / comments (rule RHS or feeder LHS guard). */
   hasIfGuard: boolean;
-  section: 'rules' | 'feeders';
+  section: "rules" | "feeders";
 }
 
 /** Replace quoted strings with same-length spaces and strip trailing `#…` comment. */
 function neutralize(line: string): string {
   return line
-    .replace(/'[^']*'/g, (s) => ' '.repeat(s.length))
-    .replace(/#.*$/, '');
+    .replace(/'[^']*'/g, (s) => " ".repeat(s.length))
+    .replace(/#.*$/, "");
 }
 
 export interface RulesAst {
@@ -32,7 +32,7 @@ export interface RulesAst {
 }
 
 export function parseRules(text: string): RulesAst {
-  const rawLines = text.split('\n');
+  const rawLines = text.split("\n");
   let feedersCount = 0;
   let feedersLineIndex = -1;
   let hasSkipcheck = false;
@@ -42,13 +42,13 @@ export function parseRules(text: string): RulesAst {
   let inFeeders = false;
 
   const lines: ParsedRulesLine[] = rawLines.map((raw, lineIndex) => {
-    const trimmed = raw.replace(/\r$/, '').trim();
-    const isComment = trimmed.startsWith('#');
-    const isBlank = trimmed === '';
+    const trimmed = raw.replace(/\r$/, "").trim();
+    const isComment = trimmed.startsWith("#");
+    const isBlank = trimmed === "";
     const isSkipcheck = /^skipcheck\s*;?\s*$/i.test(trimmed);
     const isFeedstrings = /^feedstrings\s*;?\s*$/i.test(trimmed);
     const isFeedersMarker = /^feeders\s*;?\s*$/i.test(trimmed);
-    const neutralized = isComment || isBlank ? '' : neutralize(trimmed);
+    const neutralized = isComment || isBlank ? "" : neutralize(trimmed);
     const hasStet = /\bstet\b/i.test(neutralized);
     const hasIfGuard = /\bif\s*\(/i.test(neutralized);
 
@@ -65,10 +65,12 @@ export function parseRules(text: string): RulesAst {
     // that follow it carry `section: 'feeders'`. Otherwise consumers that
     // iterate `section === 'feeders'` would sweep the marker too unless
     // they also test `isFeedersMarker`.
-    const section: 'rules' | 'feeders' = inFeeders ? 'feeders' : 'rules';
+    const section: "rules" | "feeders" = inFeeders ? "feeders" : "rules";
     if (isFeedersMarker) {
       feedersCount++;
-      if (feedersCount === 1) { feedersLineIndex = lineIndex; }
+      if (feedersCount === 1) {
+        feedersLineIndex = lineIndex;
+      }
       inFeeders = true;
     }
 

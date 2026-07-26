@@ -82,7 +82,9 @@ describe("v12 rerooting: TM1HttpClient prefixes request paths with the database 
   it("request(): rewrites /api/v1/... to the database-rooted path", async () => {
     await client.request("GET", "/api/v1/Cubes('Sales')");
     const url = fetchSpy.mock.calls.at(-1)![0];
-    expect(url).toBe("http://host:4444/tm1/api/v1/Databases('db1')/Cubes('Sales')");
+    expect(url).toBe(
+      "http://host:4444/tm1/api/v1/Databases('db1')/Cubes('Sales')",
+    );
   });
 
   it("requestRaw(): rewrites /api/v1/... to the database-rooted path", async () => {

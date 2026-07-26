@@ -10,7 +10,10 @@
 import { elementKey, type ReferenceIndex } from "./referenceIndex.js";
 import { classifyAccess } from "./callGraph.js";
 import type { SubsetUsage } from "./subsetUsage.js";
-import type { DatasourceMembership, MembershipVia } from "./datasourceMembership.js";
+import type {
+  DatasourceMembership,
+  MembershipVia,
+} from "./datasourceMembership.js";
 
 /** How a process touches a traced element (from in-code subset usage + datasource join). */
 export type AccessKind = "source" | "write" | "zero-out" | "indeterminate";
@@ -56,7 +59,12 @@ export interface DataFlowResult {
   element?: {
     dimension: string;
     name: string;
-    processes: Array<{ process: string; funcNames: string[]; access: AccessKind[]; via?: MembershipVia[] }>;
+    processes: Array<{
+      process: string;
+      funcNames: string[];
+      access: AccessKind[];
+      via?: MembershipVia[];
+    }>;
     /** Processes where this dimension has an UNRESOLVED element arg (element identity not statically known). */
     unresolvedInProcesses?: string[];
     /** Count of touching processes hidden because their only access classification was 'indeterminate' (opts.elementAccess default excludes it). */
@@ -149,10 +157,15 @@ function buildProcessIO(
 }
 
 /** In-code subset-membership element names a process manipulates, sorted & de-duped. */
-function elementsForProcess(index: ReferenceIndex, processOrig: string): string[] {
+function elementsForProcess(
+  index: ReferenceIndex,
+  processOrig: string,
+): string[] {
   const refs = index.bySourceProcess.get(processOrig.toLowerCase()) ?? [];
   const names = new Set<string>();
-  for (const r of refs) { if (r.targetKind === "element") names.add(r.targetName); }
+  for (const r of refs) {
+    if (r.targetKind === "element") names.add(r.targetName);
+  }
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
@@ -232,9 +245,18 @@ export function traceDataFlow(
         .map(cubeLabel)
         .sort((a, b) => a.localeCompare(b));
       const readsVia: DownstreamReader["readsVia"] =
-        e.readsViaCode && e.readsViaDatasource ? "both" : e.readsViaCode ? "code" : "datasource";
+        e.readsViaCode && e.readsViaDatasource
+          ? "both"
+          : e.readsViaCode
+            ? "code"
+            : "datasource";
       const elements = elementsForProcess(index, e.orig);
-      readers.push({ process: e.orig, targetCubes, readsVia, ...(elements.length ? { elements } : {}) });
+      readers.push({
+        process: e.orig,
+        targetCubes,
+        readsVia,
+        ...(elements.length ? { elements } : {}),
+      });
     }
     readers.sort((a, b) => a.process.localeCompare(b.process));
     result.downstream = readers;
@@ -266,12 +288,20 @@ export function traceDataFlow(
   if (opts?.element) {
     const { dimension, name } = opts.element;
     const key = elementKey(dimension, name);
-    const wanted = new Set<AccessKind>(opts.elementAccess ?? ["source", "write", "zero-out"]);
+    const wanted = new Set<AccessKind>(
+      opts.elementAccess ?? ["source", "write", "zero-out"],
+    );
 
     // in-code (Phase 1/1.5): funcNames + subsets per process
-    const perProc = new Map<string, { funcNames: Set<string>; subsets: Set<string> }>();
+    const perProc = new Map<
+      string,
+      { funcNames: Set<string>; subsets: Set<string> }
+    >();
     for (const r of index.byElement.get(key) ?? []) {
-      const e = perProc.get(r.sourceName) ?? { funcNames: new Set<string>(), subsets: new Set<string>() };
+      const e = perProc.get(r.sourceName) ?? {
+        funcNames: new Set<string>(),
+        subsets: new Set<string>(),
+      };
       if (r.funcName) e.funcNames.add(r.funcName);
       if (r.subset) e.subsets.add(r.subset.toLowerCase());
       perProc.set(r.sourceName, e);
@@ -290,28 +320,55 @@ export function traceDataFlow(
 
     const allProcs = new Set<string>([...perProc.keys(), ...dsVia.keys()]);
     let suppressedIndeterminate = 0;
-    const processes: Array<{ process: string; funcNames: string[]; access: AccessKind[]; via?: MembershipVia[] }> = [];
+    const processes: Array<{
+      process: string;
+      funcNames: string[];
+      access: AccessKind[];
+      via?: MembershipVia[];
+    }> = [];
     for (const process of allProcs) {
       const e = perProc.get(process);
       const usage = index.subsetUsageByProcess.get(process.toLowerCase());
       const accessSet = new Set<AccessKind>(
-        e ? classifyElementAccess(usage, [...e.subsets], dsByProc.get(process.toLowerCase()), dimension) : [],
+        e
+          ? classifyElementAccess(
+              usage,
+              [...e.subsets],
+              dsByProc.get(process.toLowerCase()),
+              dimension,
+            )
+          : [],
       );
-      const via = [...(dsVia.get(process) ?? [])].sort((a, b) => a.localeCompare(b));
+      const via = [...(dsVia.get(process) ?? [])].sort((a, b) =>
+        a.localeCompare(b),
+      );
       if (via.length) accessSet.add("source"); // stored view/subset datasource = read
       if (accessSet.size === 0) accessSet.add("indeterminate");
       const access = [...accessSet].sort((a, b) => a.localeCompare(b));
       if (!access.some((a) => wanted.has(a))) {
-        if (access.length === 1 && access[0] === "indeterminate") suppressedIndeterminate++;
+        if (access.length === 1 && access[0] === "indeterminate")
+          suppressedIndeterminate++;
         continue;
       }
-      const funcNames = [...(e?.funcNames ?? [])].sort((a, b) => a.localeCompare(b));
-      processes.push(via.length ? { process, funcNames, access, via } : { process, funcNames, access });
+      const funcNames = [...(e?.funcNames ?? [])].sort((a, b) =>
+        a.localeCompare(b),
+      );
+      processes.push(
+        via.length
+          ? { process, funcNames, access, via }
+          : { process, funcNames, access },
+      );
     }
     processes.sort((a, b) => a.process.localeCompare(b.process));
 
-    const unresolvedInProcesses = [...index.unresolvedElementRefsBySourceProcess.entries()]
-      .filter(([, list]) => list.some((u) => (u.dimension ?? "").toLowerCase() === dimension.toLowerCase()))
+    const unresolvedInProcesses = [
+      ...index.unresolvedElementRefsBySourceProcess.entries(),
+    ]
+      .filter(([, list]) =>
+        list.some(
+          (u) => (u.dimension ?? "").toLowerCase() === dimension.toLowerCase(),
+        ),
+      )
       .map(([proc]) => proc)
       .sort((a, b) => a.localeCompare(b));
 
@@ -320,7 +377,9 @@ export function traceDataFlow(
     // tied to a single axis). Excludes processes whose computed selectors are on other axes
     // (e.g. a computed [Time] selector must not surface while tracing a [Region] element).
     const dimLc = dimension.toLowerCase();
-    const computedInProcesses = [...(opts.datasourceMembership?.computedByProcess.entries() ?? [])]
+    const computedInProcesses = [
+      ...(opts.datasourceMembership?.computedByProcess.entries() ?? []),
+    ]
       .filter(([, byDim]) => byDim.has(dimLc) || byDim.has("*"))
       .map(([proc]) => proc)
       .sort((a, b) => a.localeCompare(b));

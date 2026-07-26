@@ -54,12 +54,22 @@ export interface TM1Config {
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 const VALID_TRANSPORTS = ["stdio", "http"] as const;
 const VALID_MODES = ["readwrite", "readonly"] as const;
-const VALID_AUTH_MODES = ["s2s", "basic", "access_token", "oidc", "iam"] as const;
+const VALID_AUTH_MODES = [
+  "s2s",
+  "basic",
+  "access_token",
+  "oidc",
+  "iam",
+] as const;
 
 // Parse a positive-integer env var. Empty/unset → default. A non-numeric or
 // non-positive value throws at startup instead of silently becoming NaN — NaN
 // makes setInterval/setTimeout fire continuously and ports resolve to ":NaN".
-function parseIntEnv(name: string, raw: string | undefined, def: number): number {
+function parseIntEnv(
+  name: string,
+  raw: string | undefined,
+  def: number,
+): number {
   if (raw === undefined || raw === "") return def;
   const n = Number(raw);
   if (!Number.isInteger(n) || n <= 0) {
@@ -125,7 +135,9 @@ export function loadConfig(): TM1Config {
   );
 
   const logLevelRaw = process.env.TM1_LOG_LEVEL ?? "info";
-  const logLevel = VALID_LOG_LEVELS.includes(logLevelRaw as typeof VALID_LOG_LEVELS[number])
+  const logLevel = VALID_LOG_LEVELS.includes(
+    logLevelRaw as (typeof VALID_LOG_LEVELS)[number],
+  )
     ? (logLevelRaw as TM1Config["logLevel"])
     : "info";
 
@@ -134,14 +146,20 @@ export function loadConfig(): TM1Config {
   const tm1Version = process.env.TM1_VERSION || "11.8";
 
   const transportRaw = process.env.TM1_MCP_TRANSPORT ?? "stdio";
-  const transport = VALID_TRANSPORTS.includes(transportRaw as typeof VALID_TRANSPORTS[number])
+  const transport = VALID_TRANSPORTS.includes(
+    transportRaw as (typeof VALID_TRANSPORTS)[number],
+  )
     ? (transportRaw as TM1Config["transport"])
     : "stdio";
 
   // Default to loopback. Binding to 0.0.0.0 must be opt-in to avoid exposing
   // a TM1-credentialed MCP server to the LAN by accident.
   const httpHost = process.env.TM1_MCP_HTTP_HOST || "127.0.0.1";
-  const httpPort = parseIntEnv("TM1_MCP_HTTP_PORT", process.env.TM1_MCP_HTTP_PORT, 3000);
+  const httpPort = parseIntEnv(
+    "TM1_MCP_HTTP_PORT",
+    process.env.TM1_MCP_HTTP_PORT,
+    3000,
+  );
 
   // Origin allow-list for DNS-rebinding protection. Loopback origins are
   // always included so localhost dev clients work out of the box; if the
@@ -152,14 +170,23 @@ export function loadConfig(): TM1Config {
     `http://127.0.0.1:${httpPort}`,
     `http://localhost:${httpPort}`,
   ];
-  if (httpHost !== "127.0.0.1" && httpHost !== "localhost" && httpHost !== "0.0.0.0") {
+  if (
+    httpHost !== "127.0.0.1" &&
+    httpHost !== "localhost" &&
+    httpHost !== "0.0.0.0"
+  ) {
     defaultOrigins.push(`http://${httpHost}:${httpPort}`);
   }
   const extraOriginsRaw = process.env.TM1_MCP_HTTP_ALLOWED_ORIGINS;
   const extraOrigins = extraOriginsRaw
-    ? extraOriginsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+    ? extraOriginsRaw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
     : [];
-  const httpAllowedOrigins = Array.from(new Set([...defaultOrigins, ...extraOrigins]));
+  const httpAllowedOrigins = Array.from(
+    new Set([...defaultOrigins, ...extraOrigins]),
+  );
 
   const httpToken = process.env.TM1_MCP_HTTP_TOKEN || undefined;
 
@@ -169,7 +196,9 @@ export function loadConfig(): TM1Config {
   // warn-only behavior (see http-transport.ts).
   const hostLower = httpHost.toLowerCase();
   const isLoopbackHost =
-    hostLower === "localhost" || hostLower === "::1" || /^127\./.test(hostLower);
+    hostLower === "localhost" ||
+    hostLower === "::1" ||
+    /^127\./.test(hostLower);
   if (transport === "http" && !isLoopbackHost && !httpToken) {
     throw new Error(
       `TM1_MCP_HTTP_HOST="${httpHost}" is not loopback and TM1_MCP_HTTP_TOKEN is unset. ` +
@@ -202,7 +231,8 @@ export function loadConfig(): TM1Config {
   // while behaving as v12. Service branching keys off the numeric `version`
   // (the authoritative source of truth), so this coercion is cosmetic-only — it
   // stops the user-facing string from contradicting the real connection version.
-  const effectiveTm1Version = isV12 && versionMajor !== 12 ? "12.0" : tm1Version;
+  const effectiveTm1Version =
+    isV12 && versionMajor !== 12 ? "12.0" : tm1Version;
 
   let authMode: TM1Config["authMode"];
   let clientId: string | undefined;
@@ -213,13 +243,23 @@ export function loadConfig(): TM1Config {
 
   if (version === 12) {
     if (!instance) {
-      throw new Error("v12 connection requires TM1_INSTANCE (set alongside TM1_DATABASE).");
+      throw new Error(
+        "v12 connection requires TM1_INSTANCE (set alongside TM1_DATABASE).",
+      );
     }
     if (!database) {
-      throw new Error("v12 connection requires TM1_DATABASE (set alongside TM1_INSTANCE).");
+      throw new Error(
+        "v12 connection requires TM1_DATABASE (set alongside TM1_INSTANCE).",
+      );
     }
-    const authModeRaw = (process.env.TM1_AUTH_MODE ?? "s2s").trim().toLowerCase();
-    if (!VALID_AUTH_MODES.includes(authModeRaw as (typeof VALID_AUTH_MODES)[number])) {
+    const authModeRaw = (process.env.TM1_AUTH_MODE ?? "s2s")
+      .trim()
+      .toLowerCase();
+    if (
+      !VALID_AUTH_MODES.includes(
+        authModeRaw as (typeof VALID_AUTH_MODES)[number],
+      )
+    ) {
       throw new Error(
         `Invalid TM1_AUTH_MODE: "${process.env.TM1_AUTH_MODE}". ` +
           `Expected one of: ${VALID_AUTH_MODES.join(", ")}.`,

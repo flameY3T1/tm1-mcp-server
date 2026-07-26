@@ -51,9 +51,9 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_naming",
     "Bulk-scan TM1 objects against IBM PA 2.0/3.1 naming conventions; reports hard violations only " +
-    "(reserved chars, control-prefix misuse, 256-char limit, element leading +/-, TAB in v12 names, " +
-    "invalid process-variable identifiers). Auto-detects TM1 version; element scan paginated per hierarchy " +
-    "(default cap 100k, oversized hierarchies reported in elementsTruncated).",
+      "(reserved chars, control-prefix misuse, 256-char limit, element leading +/-, TAB in v12 names, " +
+      "invalid process-variable identifiers). Auto-detects TM1 version; element scan paginated per hierarchy " +
+      "(default cap 100k, oversized hierarchies reported in elementsTruncated).",
     {
       scope: z
         .array(z.enum(SCOPE_VALUES))
@@ -77,7 +77,9 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         .max(10000)
         .optional()
         .default(500)
-        .describe("Cap on returned findings (default 500). Summary counters reflect the full scan."),
+        .describe(
+          "Cap on returned findings (default 500). Summary counters reflect the full scan.",
+        ),
       versionOverride: z
         .enum(["11", "12"])
         .optional()
@@ -137,7 +139,9 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       const want = (s: Scope) => activeScope.includes(s);
 
       const serverInfo = await tm1Client.server.getInfo();
-      const detectedMajor: TM1MajorVersion = parseMajorVersion(serverInfo.productVersion);
+      const detectedMajor: TM1MajorVersion = parseMajorVersion(
+        serverInfo.productVersion,
+      );
       const major: TM1MajorVersion = versionOverride
         ? (Number(versionOverride) as TM1MajorVersion)
         : detectedMajor;
@@ -155,7 +159,11 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         subsets: 0,
       };
 
-      const addIfInvalid = (name: string, kind: ObjectKind, parent?: string): void => {
+      const addIfInvalid = (
+        name: string,
+        kind: ObjectKind,
+        parent?: string,
+      ): void => {
         const violations = checkName(name, kind, major);
         if (violations.length === 0) return;
         const f: Finding = { objectKind: kind, objectName: name, violations };
@@ -175,8 +183,12 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
 
       // ── Dimensions + Hierarchies + (later) Elements/Subsets ───────────
       const needDims =
-        want("dimensions") || want("hierarchies") || want("elements") || want("subsets");
-      let dimensionsForChildren: Array<{ name: string; hierarchies: string[] }> | undefined;
+        want("dimensions") ||
+        want("hierarchies") ||
+        want("elements") ||
+        want("subsets");
+      let dimensionsForChildren:
+        Array<{ name: string; hierarchies: string[] }> | undefined;
       if (needDims) {
         const dims = await tm1Client.dimensions.list();
         const filtered = includeControl
@@ -217,11 +229,15 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         let elemCount = 0;
         for (const d of dimensionsForChildren) {
           for (const h of d.hierarchies) {
-            const { names, total, scanned: scannedHere, truncated } =
-              await tm1Client.elements.scanElementNames(d.name, h, {
-                pageSize: elementsPageSize,
-                maxScan: maxElementsPerDim,
-              });
+            const {
+              names,
+              total,
+              scanned: scannedHere,
+              truncated,
+            } = await tm1Client.elements.scanElementNames(d.name, h, {
+              pageSize: elementsPageSize,
+              maxScan: maxElementsPerDim,
+            });
             totalElementsInScope += total;
             for (const name of names) {
               elemCount++;
@@ -260,9 +276,9 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       let processNames: string[] = [];
       if (want("processes") || want("processVariables")) {
         const procs = await tm1Client.processes.list();
-        processNames = (includeControl ? procs : procs.filter((p) => !isControlName(p.name))).map(
-          (p) => p.name,
-        );
+        processNames = (
+          includeControl ? procs : procs.filter((p) => !isControlName(p.name))
+        ).map((p) => p.name);
       }
       if (want("processes")) {
         scanned.processes = processNames.length;
@@ -313,11 +329,13 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       const byRule: Record<string, number> = {};
       for (const f of findings) {
         byKind[f.objectKind] = (byKind[f.objectKind] ?? 0) + 1;
-        for (const v of f.violations) byRule[v.rule] = (byRule[v.rule] ?? 0) + 1;
+        for (const v of f.violations)
+          byRule[v.rule] = (byRule[v.rule] ?? 0) + 1;
       }
 
       findings.sort((a, b) => {
-        if (a.objectKind !== b.objectKind) return a.objectKind.localeCompare(b.objectKind);
+        if (a.objectKind !== b.objectKind)
+          return a.objectKind.localeCompare(b.objectKind);
         return a.objectName.localeCompare(b.objectName);
       });
 
@@ -327,7 +345,9 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
       const totalScanned = Object.values(scanned).reduce((a, b) => a + b, 0);
       const status = findings.length === 0 ? "pass" : "fail";
 
-      const findingsByGroup = summary ? buildFindingsByGroup(findings) : undefined;
+      const findingsByGroup = summary
+        ? buildFindingsByGroup(findings)
+        : undefined;
 
       const payload: Record<string, unknown> = {
         status,
@@ -406,7 +426,8 @@ function buildFindingsByGroup(findings: Finding[]): FindingGroup[] {
     if (g.sampleNames.length < SAMPLE_SIZE) g.sampleNames.push(f.objectName);
   }
   return Array.from(groups.values()).sort((a, b) => {
-    if (a.objectKind !== b.objectKind) return a.objectKind.localeCompare(b.objectKind);
+    if (a.objectKind !== b.objectKind)
+      return a.objectKind.localeCompare(b.objectKind);
     return (a.parent ?? "").localeCompare(b.parent ?? "");
   });
 }

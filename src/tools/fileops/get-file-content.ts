@@ -5,7 +5,10 @@ import type { TM1Client } from "../../tm1-client.js";
 const DEFAULT_MAX_BYTES = 256 * 1024;
 const HARD_MAX_BYTES = 4 * 1024 * 1024;
 
-export function registerGetFileContent(server: McpServer, tm1Client: TM1Client): void {
+export function registerGetFileContent(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_get_file_content",
     [
@@ -15,14 +18,30 @@ export function registerGetFileContent(server: McpServer, tm1Client: TM1Client):
       "Response is truncated to maxBytes (default 256 KB) to keep MCP messages small.",
     ].join(" "),
     {
-      fileName: z.string().describe(
-        "File name or path (e.g. 'data.csv' or 'imports/sales_2024.csv')",
-      ),
-      maxBytes: z.number().int().positive().max(HARD_MAX_BYTES).optional()
+      fileName: z
+        .string()
+        .describe(
+          "File name or path (e.g. 'data.csv' or 'imports/sales_2024.csv')",
+        ),
+      maxBytes: z
+        .number()
+        .int()
+        .positive()
+        .max(HARD_MAX_BYTES)
+        .optional()
         .default(DEFAULT_MAX_BYTES)
-        .describe(`Truncate response after N bytes (default ${DEFAULT_MAX_BYTES}, hard max ${HARD_MAX_BYTES}).`),
-      headLines: z.number().int().positive().max(10000).optional()
-        .describe("If set, only return the first N lines (overrides byte truncation)."),
+        .describe(
+          `Truncate response after N bytes (default ${DEFAULT_MAX_BYTES}, hard max ${HARD_MAX_BYTES}).`,
+        ),
+      headLines: z
+        .number()
+        .int()
+        .positive()
+        .max(10000)
+        .optional()
+        .describe(
+          "If set, only return the first N lines (overrides byte truncation).",
+        ),
     },
     async ({ fileName, maxBytes, headLines }) => {
       const content = await tm1Client.files.getContent(fileName);
@@ -40,7 +59,9 @@ export function registerGetFileContent(server: McpServer, tm1Client: TM1Client):
           truncationReason = `headLines=${headLines} (of ${allLines.length})`;
         }
       } else if (totalBytes > maxBytes) {
-        body = Buffer.from(content, "utf8").subarray(0, maxBytes).toString("utf8");
+        body = Buffer.from(content, "utf8")
+          .subarray(0, maxBytes)
+          .toString("utf8");
         truncated = true;
         truncationReason = `maxBytes=${maxBytes}`;
       } else {

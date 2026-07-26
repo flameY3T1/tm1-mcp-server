@@ -30,8 +30,17 @@ export class MonitoringService {
         ObjectName: string;
         ElapsedTime?: string;
       }>;
-    }>("GET", "/api/v1/Threads?$select=ID,Type,Name,Context,State,Function,ObjectName,ElapsedTime");
-    const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
+    }>(
+      "GET",
+      "/api/v1/Threads?$select=ID,Type,Name,Context,State,Function,ObjectName,ElapsedTime",
+    );
+    const typeNames: Record<number, string> = {
+      1: "User",
+      2: "System",
+      4: "Admin",
+      8: "Chore",
+      16: "Extern",
+    };
     return (response.value ?? []).map((t) => ({
       id: t.ID,
       type: typeNames[t.Type] ?? `Type${t.Type}`,
@@ -49,7 +58,11 @@ export class MonitoringService {
    * POST /api/v1/Threads({id})/tm1.CancelOperation
    */
   async cancelThread(threadId: number): Promise<void> {
-    await this.http.request<void>("POST", `/api/v1/Threads(${threadId})/tm1.CancelOperation`, {});
+    await this.http.request<void>(
+      "POST",
+      `/api/v1/Threads(${threadId})/tm1.CancelOperation`,
+      {},
+    );
   }
 
   /**
@@ -79,14 +92,23 @@ export class MonitoringService {
         }>;
       }>;
     }>("GET", "/api/v1/Sessions?$expand=Threads,User($select=Name)");
-    const typeNames: Record<number, string> = { 1: "User", 2: "System", 4: "Admin", 8: "Chore", 16: "Extern" };
+    const typeNames: Record<number, string> = {
+      1: "User",
+      2: "System",
+      4: "Admin",
+      8: "Chore",
+      16: "Extern",
+    };
     return (response.value ?? []).map((s) => ({
       id: String(s.ID),
       user: s.User?.Name ?? "",
       ...(s.Active !== undefined ? { active: s.Active } : {}),
       threads: (s.Threads ?? []).map((t) => ({
         id: t.ID,
-        type: typeof t.Type === "number" ? (typeNames[t.Type] ?? `Type${t.Type}`) : (t.Type ?? ""),
+        type:
+          typeof t.Type === "number"
+            ? (typeNames[t.Type] ?? `Type${t.Type}`)
+            : (t.Type ?? ""),
         name: t.Name ?? "",
         state: t.State ?? "",
         function: t.Function ?? "",
@@ -140,8 +162,12 @@ export class MonitoringService {
         ? {
             session: {
               id: String(j.Session.ID),
-              ...(j.Session.Context != null ? { context: j.Session.Context } : {}),
-              ...(j.Session.User?.Name != null ? { user: j.Session.User.Name } : {}),
+              ...(j.Session.Context != null
+                ? { context: j.Session.Context }
+                : {}),
+              ...(j.Session.User?.Name != null
+                ? { user: j.Session.User.Name }
+                : {}),
             },
           }
         : {}),
@@ -162,6 +188,10 @@ export class MonitoringService {
    * POST /api/v1/Jobs('{id}')/tm1.Cancel
    */
   async cancelJob(jobId: string): Promise<void> {
-    await this.http.request<void>("POST", `/api/v1/Jobs('${encKey(jobId)}')/tm1.Cancel`, {});
+    await this.http.request<void>(
+      "POST",
+      `/api/v1/Jobs('${encKey(jobId)}')/tm1.Cancel`,
+      {},
+    );
   }
 }

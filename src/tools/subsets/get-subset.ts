@@ -9,10 +9,21 @@ export function registerGetSubset(server: McpServer, tm1Client: TM1Client) {
       dimensionName: z.string().describe("Dimension name"),
       hierarchyName: z.string().describe("Hierarchy name"),
       subsetName: z.string().describe("Subset name"),
-      isPrivate: z.boolean().optional().default(false).describe("Look up the subset in PrivateSubsets instead of public Subsets"),
+      isPrivate: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Look up the subset in PrivateSubsets instead of public Subsets",
+        ),
     },
     async ({ dimensionName, hierarchyName, subsetName, isPrivate }) => {
-      const subset = await tm1Client.subsets.get(dimensionName, hierarchyName, subsetName, isPrivate ?? false);
+      const subset = await tm1Client.subsets.get(
+        dimensionName,
+        hierarchyName,
+        subsetName,
+        isPrivate ?? false,
+      );
       return {
         content: [{ type: "text" as const, text: JSON.stringify(subset) }],
       };

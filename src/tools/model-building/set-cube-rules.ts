@@ -5,7 +5,10 @@ import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 import { withToolHint } from "../error-format.js";
 import { actionResponse } from "../format.js";
 
-export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): void {
+export function registerSetCubeRules(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_set_cube_rules",
     [
@@ -16,9 +19,18 @@ export function registerSetCubeRules(server: McpServer, tm1Client: TM1Client): v
     ].join(" "),
     {
       cubeName: z.string().describe("Cube name (case-sensitive)"),
-      rules: z.string().describe("Full rules text (must start with SKIPCHECK; and include FEEDERS; section)"),
-      skipCheck: z.boolean().optional().default(true)
-        .describe("Enable SKIPCHECK for performance (default: true, recommended)"),
+      rules: z
+        .string()
+        .describe(
+          "Full rules text (must start with SKIPCHECK; and include FEEDERS; section)",
+        ),
+      skipCheck: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Enable SKIPCHECK for performance (default: true, recommended)",
+        ),
     },
     async ({ cubeName, rules, skipCheck }) => {
       await withToolHint(

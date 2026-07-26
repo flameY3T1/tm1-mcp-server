@@ -3,7 +3,11 @@
 // NOT a datasource check — the process datasource lives in dsList and is joined at
 // query time in traceDataFlow.
 
-import { buildProcessEnv, resolveExpression, type ProcessEnv } from "./variableEnv.js";
+import {
+  buildProcessEnv,
+  resolveExpression,
+  type ProcessEnv,
+} from "./variableEnv.js";
 import { splitArgs, extractStringLiteral } from "./referenceIndex.js";
 import { classifyAccess } from "./callGraph.js";
 
@@ -23,7 +27,10 @@ export interface SubsetUsage {
 
 const CALL_RE = /\b([A-Za-z_]\w*)\s*\(/gi;
 
-function resolveArg(raw: string | undefined, env: ProcessEnv): { value?: string; resolved: boolean } {
+function resolveArg(
+  raw: string | undefined,
+  env: ProcessEnv,
+): { value?: string; resolved: boolean } {
   if (raw === undefined) return { resolved: false };
   const lit = extractStringLiteral(raw);
   if (lit !== null) return { value: lit, resolved: true };
@@ -32,16 +39,30 @@ function resolveArg(raw: string | undefined, env: ProcessEnv): { value?: string;
   return { resolved: false };
 }
 
-export function extractSubsetUsage(text: string, env?: ProcessEnv): Map<string, SubsetUsage> {
+export function extractSubsetUsage(
+  text: string,
+  env?: ProcessEnv,
+): Map<string, SubsetUsage> {
   const baseEnv = env ?? buildProcessEnv(text, []);
   const usage = new Map<string, SubsetUsage>();
   const viewToSubsets = new Map<string, string[]>(); // lc "cube view" -> subset lc keys
   let synth = 0;
 
-  const getBucket = (subLc: string, subName: string | undefined, resolved: boolean): SubsetUsage => {
+  const getBucket = (
+    subLc: string,
+    subName: string | undefined,
+    resolved: boolean,
+  ): SubsetUsage => {
     let u = usage.get(subLc);
     if (!u) {
-      u = { subset: subName ?? "", resolved, views: [], loopRead: false, loopWrite: false, loopZero: false };
+      u = {
+        subset: subName ?? "",
+        resolved,
+        views: [],
+        loopRead: false,
+        loopWrite: false,
+        loopZero: false,
+      };
       usage.set(subLc, u);
     }
     if (!resolved) u.resolved = false;
@@ -84,9 +105,14 @@ export function extractSubsetUsage(text: string, env?: ProcessEnv): Map<string, 
           const vk = `${cube.value!.toLowerCase()} ${view.value!.toLowerCase()}`;
           for (const subLc of viewToSubsets.get(vk) ?? []) {
             const u = usage.get(subLc);
-            if (u) for (const v of u.views) {
-              if (v.cube?.toLowerCase() === cube.value!.toLowerCase() && v.view?.toLowerCase() === view.value!.toLowerCase()) v.zeroOut = true;
-            }
+            if (u)
+              for (const v of u.views) {
+                if (
+                  v.cube?.toLowerCase() === cube.value!.toLowerCase() &&
+                  v.view?.toLowerCase() === view.value!.toLowerCase()
+                )
+                  v.zeroOut = true;
+              }
           }
         }
       } else if (fn === "subsetgetelementname" || fn === "subsetgetsize") {
@@ -97,7 +123,11 @@ export function extractSubsetUsage(text: string, env?: ProcessEnv): Map<string, 
         if (access === "read") hasCellRead = true;
         else if (access === "write") {
           hasCellWrite = true;
-          if ((fn === "cellputn" || fn === "cellincrementn") && isLiteralZero(args[0])) hasZeroWrite = true;
+          if (
+            (fn === "cellputn" || fn === "cellincrementn") &&
+            isLiteralZero(args[0])
+          )
+            hasZeroWrite = true;
         }
       }
     }
@@ -124,7 +154,10 @@ function sliceArgs(line: string, openIdx: number): string | null {
   for (let i = openIdx; i < line.length; i++) {
     const c = line[i];
     if (c === "(") depth++;
-    else if (c === ")") { depth--; if (depth === 0) return line.slice(openIdx + 1, i); }
+    else if (c === ")") {
+      depth--;
+      if (depth === 0) return line.slice(openIdx + 1, i);
+    }
   }
   return null;
 }

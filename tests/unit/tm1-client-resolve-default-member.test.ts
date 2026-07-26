@@ -46,7 +46,11 @@ function notFound(): Response {
     status: 404,
     statusText: "Not Found",
     headers: new Headers(),
-    text: vi.fn().mockResolvedValue(JSON.stringify({ error: { message: { value: "Not found" } } })),
+    text: vi
+      .fn()
+      .mockResolvedValue(
+        JSON.stringify({ error: { message: { value: "Not found" } } }),
+      ),
   } as unknown as Response;
 }
 
@@ -93,7 +97,9 @@ describe("DimensionService.resolveDefaultMember", () => {
     await client.dimensions.resolveDefaultMember("Region");
 
     const url = fetchSpy.mock.calls[0][0];
-    expect(url).toContain("Dimensions('Region')/Hierarchies('Region')/DefaultMember");
+    expect(url).toContain(
+      "Dimensions('Region')/Hierarchies('Region')/DefaultMember",
+    );
   });
 
   it("Tier 1: respects explicit hierarchyName parameter", async () => {
@@ -148,7 +154,10 @@ describe("DimensionService.resolveDefaultMember", () => {
     fetchSpy.mockResolvedValueOnce(ok(undefined));
     fetchSpy.mockResolvedValueOnce(
       ok({
-        value: [{ Name: "All", Level: 5, Parents: [] }, { Name: "Sub", Level: 0, Parents: [{ Name: "All" }] }],
+        value: [
+          { Name: "All", Level: 5, Parents: [] },
+          { Name: "Sub", Level: 0, Parents: [{ Name: "All" }] },
+        ],
       }),
     );
 

@@ -4,7 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
-export function registerListViews(server: McpServer, tm1Client: TM1Client): void {
+export function registerListViews(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_list_views",
     "List public and private views defined on a cube. Returns view name, visibility, and MDX (when available). Paginated (default 50/page).",
@@ -22,7 +25,10 @@ export function registerListViews(server: McpServer, tm1Client: TM1Client): void
         { header: "scope", get: (v) => (v.private ? "private" : "public") },
         { header: "mdx", get: (v) => v.mdx ?? "" },
       ];
-      return pageResponse(page, format, { title: `Views of ${cubeName}`, columns });
+      return pageResponse(page, format, {
+        title: `Views of ${cubeName}`,
+        columns,
+      });
     },
   );
 }

@@ -4,7 +4,9 @@ import { TM1Error, TM1ErrorCode } from "../../src/types.js";
 
 describe("requireConfirm", () => {
   it("passes when the provided value matches the target verbatim", () => {
-    expect(() => requireConfirm("SalesCube", "SalesCube", "cube")).not.toThrow();
+    expect(() =>
+      requireConfirm("SalesCube", "SalesCube", "cube"),
+    ).not.toThrow();
   });
 
   it("throws VALIDATION_ERROR on a mismatch", () => {
@@ -24,7 +26,9 @@ describe("requireConfirm", () => {
 
   it("is not satisfied by a whitespace-padded value", () => {
     // Guards against a future refactor that trims/normalises and weakens the check.
-    expect(() => requireConfirm("SalesCube ", "SalesCube", "cube")).toThrow(TM1Error);
+    expect(() => requireConfirm("SalesCube ", "SalesCube", "cube")).toThrow(
+      TM1Error,
+    );
   });
 
   it("exposes a required string `confirm` field in CONFIRM_SCHEMA", () => {

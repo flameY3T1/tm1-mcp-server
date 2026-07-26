@@ -92,7 +92,11 @@ describe("normalizeErrorResult", () => {
       content: [
         {
           type: "text",
-          text: JSON.stringify({ ok: false, errorCount: 2, errors: ["a", "b"] }),
+          text: JSON.stringify({
+            ok: false,
+            errorCount: 2,
+            errors: ["a", "b"],
+          }),
         },
       ],
     });

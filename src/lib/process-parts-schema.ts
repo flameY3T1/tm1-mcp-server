@@ -24,7 +24,14 @@ export const variableSchema = z.object({
 });
 
 export const dataSourceSchema = z.object({
-  type: z.enum(["None", "TM1CubeView", "TM1DimensionSubset", "ASCII", "ODBC", "TM1Process"]),
+  type: z.enum([
+    "None",
+    "TM1CubeView",
+    "TM1DimensionSubset",
+    "ASCII",
+    "ODBC",
+    "TM1Process",
+  ]),
   dataSourceNameForServer: z.string().optional(),
   dataSourceNameForClient: z.string().optional(),
   asciiDelimiterType: z.string().optional(),

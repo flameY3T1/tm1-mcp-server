@@ -2,9 +2,17 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
-import { FORMAT_SCHEMA, pageResponse, payloadResponse, type Column } from "../format.js";
+import {
+  FORMAT_SCHEMA,
+  pageResponse,
+  payloadResponse,
+  type Column,
+} from "../format.js";
 
-export function registerGetSessions(server: McpServer, tm1Client: TM1Client): void {
+export function registerGetSessions(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_list_sessions",
     [
@@ -13,20 +21,45 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
       "Paginated (default 50/page).",
     ].join(" "),
     {
-      activeOnly: z.boolean().optional().default(false)
-        .describe("If true, return only sessions flagged Active by the server (default: false — return all)"),
-      withThreads: z.boolean().optional().default(true)
+      activeOnly: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "If true, return only sessions flagged Active by the server (default: false — return all)",
+        ),
+      withThreads: z
+        .boolean()
+        .optional()
+        .default(true)
         .describe("Include thread details per session (default: true)"),
-      compact: z.boolean().optional().default(false)
-        .describe("Return summary only: { total, namedUsers, anonymousCount }. Skips pagination and per-session detail. Useful for a quick headcount without flooding context."),
+      compact: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Return summary only: { total, namedUsers, anonymousCount }. Skips pagination and per-session detail. Useful for a quick headcount without flooding context.",
+        ),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
     },
-    async ({ activeOnly, withThreads, compact, limit, offset, fetchAll, format }) => {
+    async ({
+      activeOnly,
+      withThreads,
+      compact,
+      limit,
+      offset,
+      fetchAll,
+      format,
+    }) => {
       const sessions = await tm1Client.monitoring.getSessions();
-      const filtered = activeOnly ? sessions.filter((s) => s.active !== false) : sessions;
+      const filtered = activeOnly
+        ? sessions.filter((s) => s.active !== false)
+        : sessions;
       if (compact) {
-        const namedUsers = filtered.filter((s) => s.user && s.user.trim() !== "").length;
+        const namedUsers = filtered.filter(
+          (s) => s.user && s.user.trim() !== "",
+        ).length;
         const summary = {
           total: filtered.length,
           count: 0,
@@ -36,8 +69,11 @@ export function registerGetSessions(server: McpServer, tm1Client: TM1Client): vo
           items: [],
           summary: { namedUsers, anonymousCount: filtered.length - namedUsers },
         };
-        return payloadResponse(summary, format, (p) =>
-          `## Sessions (compact)\n\n${p.total} total · ${p.summary.namedUsers} named users · ${p.summary.anonymousCount} anonymous`,
+        return payloadResponse(
+          summary,
+          format,
+          (p) =>
+            `## Sessions (compact)\n\n${p.total} total · ${p.summary.namedUsers} named users · ${p.summary.anonymousCount} anonymous`,
         );
       }
       const projected = withThreads

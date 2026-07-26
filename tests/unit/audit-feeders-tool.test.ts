@@ -38,7 +38,10 @@ interface FakeArgs {
   /** Map of cubeName -> ordered dimension names. Missing entry => getDimensionNames throws. */
   dims?: Record<string, string[]>;
   /** Map of "dim|hierarchy" -> { elemName: type } for the element-type cache. */
-  elements?: Record<string, Record<string, "Numeric" | "Consolidated" | "String">>;
+  elements?: Record<
+    string,
+    Record<string, "Numeric" | "Consolidated" | "String">
+  >;
   /** Map of cubeName -> }StatsByCube measure values (drives runtime mode). Throws on miss. */
   cubeStats?: Record<string, Record<string, number>>;
 }
@@ -82,7 +85,10 @@ function makeFakeTM1Client(args: FakeArgs) {
         if (!m) throw new Error(`fake executeMdx: cannot parse cube from MDX`);
         const cubeName = m[1]!;
         const stats = args.cubeStats?.[cubeName];
-        if (!stats) throw new Error(`fake executeMdx: }StatsByCube unavailable for ${cubeName}`);
+        if (!stats)
+          throw new Error(
+            `fake executeMdx: }StatsByCube unavailable for ${cubeName}`,
+          );
         const entries = Object.entries(stats);
         return {
           axes: [
@@ -108,7 +114,10 @@ function parseResult(raw: unknown) {
 describe("tm1_audit_feeders tool", () => {
   it("registers under the expected name", () => {
     const fake = makeFakeServer();
-    registerAuditFeeders(fake.server, makeFakeTM1Client({ productVersion: "11.8" }));
+    registerAuditFeeders(
+      fake.server,
+      makeFakeTM1Client({ productVersion: "11.8" }),
+    );
     expect(fake.getName()).toBe("tm1_audit_feeders");
   });
 
@@ -116,7 +125,13 @@ describe("tm1_audit_feeders tool", () => {
     const fake = makeFakeServer();
     const tm1 = makeFakeTM1Client({
       productVersion: "11.8",
-      rules: [{ cubeName: "Plain", rulesText: "skipcheck;\n['A']=N:1;", skipCheck: true }],
+      rules: [
+        {
+          cubeName: "Plain",
+          rulesText: "skipcheck;\n['A']=N:1;",
+          skipCheck: true,
+        },
+      ],
     });
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({}));
@@ -392,9 +407,12 @@ describe("tm1_audit_feeders tool", () => {
       rules: [
         {
           cubeName: "}Hidden",
-          rulesText: ["skipcheck;", "['A','B'] = N: 1;", "feeders;", "['A'] => ['B'];"].join(
-            "\n",
-          ),
+          rulesText: [
+            "skipcheck;",
+            "['A','B'] = N: 1;",
+            "feeders;",
+            "['A'] => ['B'];",
+          ].join("\n"),
           skipCheck: true,
         },
       ],
@@ -426,11 +444,11 @@ describe("tm1_audit_feeders tool", () => {
       ],
     });
     registerAuditFeeders(fake.server, tm1);
-    const out = parseResult(
-      await fake.getHandler()({ cubes: ["WantThis"] }),
-    );
+    const out = parseResult(await fake.getHandler()({ cubes: ["WantThis"] }));
     expect(out.scanned.cubes).toBe(1);
-    expect(out.findings.every((f: { cube: string }) => f.cube === "WantThis")).toBe(true);
+    expect(
+      out.findings.every((f: { cube: string }) => f.cube === "WantThis"),
+    ).toBe(true);
   });
 
   it("honours topN cap and reports truncation", async () => {
@@ -560,7 +578,12 @@ describe("tm1_audit_feeders tool", () => {
       rules: [
         {
           cubeName: "Wild",
-          rulesText: ["skipcheck;", "['A','B'] = N: 1;", "feeders;", "[] => ['B'];"].join("\n"),
+          rulesText: [
+            "skipcheck;",
+            "['A','B'] = N: 1;",
+            "feeders;",
+            "[] => ['B'];",
+          ].join("\n"),
           skipCheck: true,
         },
       ],
@@ -603,7 +626,9 @@ describe("tm1_audit_feeders tool", () => {
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
     expect(out.summary.byRule.cube_high_fed_ratio).toBe(1);
-    const ev = out.findings.find((f: { rule: string }) => f.rule === "cube_high_fed_ratio");
+    const ev = out.findings.find(
+      (f: { rule: string }) => f.rule === "cube_high_fed_ratio",
+    );
     expect(ev.severity).toBe("evidence");
     expect(out.runtimeStats.Sparse.fedToPopulatedRatio).toBeGreaterThan(100);
   });
@@ -630,7 +655,9 @@ describe("tm1_audit_feeders tool", () => {
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
     expect(out.summary.byRule.cube_high_fed_ratio).toBe(1);
-    const f = out.findings.find((x: { rule: string }) => x.rule === "cube_high_fed_ratio");
+    const f = out.findings.find(
+      (x: { rule: string }) => x.rule === "cube_high_fed_ratio",
+    );
     expect(f.severity).toBe("hint");
   });
 
@@ -659,8 +686,12 @@ describe("tm1_audit_feeders tool", () => {
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
     expect(out.summary.byRule.cube_high_fed_ratio).toBe(0);
-    expect(out.runtimeStats.Cube_Personnel.fedToPopulatedRatio).toBeGreaterThan(10);
-    expect(out.runtimeStats.Cube_Personnel.fedToPopulatedRatio).toBeLessThan(12);
+    expect(out.runtimeStats.Cube_Personnel.fedToPopulatedRatio).toBeGreaterThan(
+      10,
+    );
+    expect(out.runtimeStats.Cube_Personnel.fedToPopulatedRatio).toBeLessThan(
+      12,
+    );
   });
 
   it("ratio is null when populatedNumeric is zero — cross-cube-fed cube, no false flag", async () => {
@@ -747,7 +778,12 @@ describe("tm1_audit_feeders tool", () => {
       rules: [
         {
           cubeName: "Wild",
-          rulesText: ["skipcheck;", "['A','B'] = N: 1;", "feeders;", "[] => ['B'];"].join("\n"),
+          rulesText: [
+            "skipcheck;",
+            "['A','B'] = N: 1;",
+            "feeders;",
+            "[] => ['B'];",
+          ].join("\n"),
           skipCheck: true,
         },
       ],
@@ -762,7 +798,9 @@ describe("tm1_audit_feeders tool", () => {
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ mode: "both" }));
     // Wildcard finding plus cube_high_fed_ratio (1M x). Both severity = evidence.
-    const wildcard = out.findings.find((f: { rule: string }) => f.rule === "wildcard_bracket");
+    const wildcard = out.findings.find(
+      (f: { rule: string }) => f.rule === "wildcard_bracket",
+    );
     expect(wildcard.severity).toBe("evidence");
     expect(out.summary.bySeverity.evidence).toBeGreaterThanOrEqual(2);
   });

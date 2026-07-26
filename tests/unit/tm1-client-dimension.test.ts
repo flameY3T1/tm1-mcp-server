@@ -80,7 +80,9 @@ describe("TM1Client – Dimension Management Methods", () => {
 
       expect(fetchSpy).toHaveBeenCalledOnce();
       const [url, opts] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/Dimensions('Region')/Hierarchies('Region')/Elements");
+      expect(url).toContain(
+        "/api/v1/Dimensions('Region')/Hierarchies('Region')/Elements",
+      );
       expect(opts.method).toBe("POST");
       const body = JSON.parse(opts.body);
       expect(body).toEqual({ Name: "Germany", Type: "Numeric" });
@@ -226,7 +228,9 @@ describe("TM1Client – Dimension Management Methods", () => {
 
       expect(fetchSpy).toHaveBeenCalledOnce();
       const [url, opts] = fetchSpy.mock.calls[0];
-      expect(url).toContain("Dimensions('Region')/Hierarchies('Region')/Elements('Germany')");
+      expect(url).toContain(
+        "Dimensions('Region')/Hierarchies('Region')/Elements('Germany')",
+      );
       expect(opts.method).toBe("DELETE");
     });
 
@@ -240,7 +244,8 @@ describe("TM1Client – Dimension Management Methods", () => {
           JSON.stringify({
             error: {
               message: {
-                value: "Element 'Germany' is referenced in rules and cannot be deleted",
+                value:
+                  "Element 'Germany' is referenced in rules and cannot be deleted",
               },
             },
           }),
@@ -261,7 +266,8 @@ describe("TM1Client – Dimension Management Methods", () => {
             JSON.stringify({
               error: {
                 message: {
-                  value: "Element 'Germany' is referenced in rules and cannot be deleted",
+                  value:
+                    "Element 'Germany' is referenced in rules and cannot be deleted",
                 },
               },
             }),
@@ -315,7 +321,12 @@ describe("TM1Client – Dimension Management Methods", () => {
     it("should encode special characters in element and parent names", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
-      await client.elements.move("My Dim", "My Hier", "Child Elem", "Parent Elem");
+      await client.elements.move(
+        "My Dim",
+        "My Hier",
+        "Child Elem",
+        "Parent Elem",
+      );
 
       const [url, opts] = fetchSpy.mock.calls[0];
       expect(url).toContain("Dimensions('My%20Dim')");
@@ -340,7 +351,11 @@ describe("TM1Client – Dimension Management Methods", () => {
     // Cellset shape from ExecuteMDX over }DimensionProperties: Axes[1] = rows
     // (dimensions), Cells row-major (one measure column).
     const cellset = {
-      Cells: [{ Value: "20260401082819" }, { Value: "20250808141356" }, { Value: "" }],
+      Cells: [
+        { Value: "20260401082819" },
+        { Value: "20250808141356" },
+        { Value: "" },
+      ],
       Axes: [
         { Tuples: [{ Members: [{ Name: "LAST_TIME_UPDATED" }] }] },
         {

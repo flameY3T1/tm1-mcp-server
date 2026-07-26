@@ -22,10 +22,16 @@ interface Tm1Events {
 // outside this map are silently allowed by Node's EventEmitter but won't
 // receive emit calls from this module.
 class TypedEmitter extends EventEmitter {
-  override on<K extends keyof Tm1Events>(event: K, listener: Tm1Events[K]): this {
+  override on<K extends keyof Tm1Events>(
+    event: K,
+    listener: Tm1Events[K],
+  ): this {
     return super.on(event, listener);
   }
-  override off<K extends keyof Tm1Events>(event: K, listener: Tm1Events[K]): this {
+  override off<K extends keyof Tm1Events>(
+    event: K,
+    listener: Tm1Events[K],
+  ): this {
     return super.off(event, listener);
   }
   override emit<K extends keyof Tm1Events>(

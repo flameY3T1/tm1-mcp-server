@@ -9,7 +9,10 @@ import {
   dataSourceSchema,
 } from "../../lib/process-parts-schema.js";
 
-export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client): void {
+export function registerCheckProcessCode(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_check_process_code",
     [
@@ -19,22 +22,58 @@ export function registerCheckProcessCode(server: McpServer, tm1Client: TM1Client
       "All procedure tabs default to empty strings if omitted; pass only the tabs you want to validate.",
     ].join(" "),
     {
-      processName: z.string().optional().describe("Process name used in the synthetic body (no save). Default '_compile_check'."),
+      processName: z
+        .string()
+        .optional()
+        .describe(
+          "Process name used in the synthetic body (no save). Default '_compile_check'.",
+        ),
       prolog: z.string().optional().describe("Prolog tab TI code"),
       metadata: z.string().optional().describe("Metadata tab TI code"),
       data: z.string().optional().describe("Data tab TI code"),
       epilog: z.string().optional().describe("Epilog tab TI code"),
-      parameters: z.array(parameterSchema).optional().describe("TI parameters (Name, Type, defaultValue, optional Prompt). When omitted and baseProcess is set, inherited from baseProcess."),
-      variables: z.array(variableSchema).optional().describe("TI variables (column mapping for ASCII/ODBC). When omitted and baseProcess is set, inherited from baseProcess."),
-      dataSource: dataSourceSchema.optional().describe("DataSource config — defaults to { type: 'None' } when omitted"),
-      baseProcess: z.string().optional().describe("Existing process name to inherit parameters and variables from. Prevents 'undefined parameter' compile errors when validating code that references params defined on the saved process. Explicit parameters/variables override the inherited values."),
+      parameters: z
+        .array(parameterSchema)
+        .optional()
+        .describe(
+          "TI parameters (Name, Type, defaultValue, optional Prompt). When omitted and baseProcess is set, inherited from baseProcess.",
+        ),
+      variables: z
+        .array(variableSchema)
+        .optional()
+        .describe(
+          "TI variables (column mapping for ASCII/ODBC). When omitted and baseProcess is set, inherited from baseProcess.",
+        ),
+      dataSource: dataSourceSchema
+        .optional()
+        .describe(
+          "DataSource config — defaults to { type: 'None' } when omitted",
+        ),
+      baseProcess: z
+        .string()
+        .optional()
+        .describe(
+          "Existing process name to inherit parameters and variables from. Prevents 'undefined parameter' compile errors when validating code that references params defined on the saved process. Explicit parameters/variables override the inherited values.",
+        ),
     },
-    async ({ processName, prolog, metadata, data, epilog, parameters, variables, dataSource, baseProcess }) => {
+    async ({
+      processName,
+      prolog,
+      metadata,
+      data,
+      epilog,
+      parameters,
+      variables,
+      dataSource,
+      baseProcess,
+    }) => {
       let resolvedParams = parameters as ProcessParameter[] | undefined;
       let resolvedVars = variables as ProcessVariable[] | undefined;
       if (baseProcess) {
-        if (!resolvedParams) resolvedParams = await tm1Client.processes.getParameters(baseProcess);
-        if (!resolvedVars) resolvedVars = await tm1Client.processes.getVariables(baseProcess);
+        if (!resolvedParams)
+          resolvedParams = await tm1Client.processes.getParameters(baseProcess);
+        if (!resolvedVars)
+          resolvedVars = await tm1Client.processes.getVariables(baseProcess);
       }
       const result = await tm1Client.processes.check({
         ...(processName !== undefined ? { name: processName } : {}),

@@ -66,7 +66,11 @@ describe("startHttpTransport (stateless, per-request)", () => {
     close = null;
   });
 
-  function post(port: number, body: unknown, headers: Record<string, string> = {}) {
+  function post(
+    port: number,
+    body: unknown,
+    headers: Record<string, string> = {},
+  ) {
     return fetch(`http://127.0.0.1:${port}/mcp`, {
       method: "POST",
       headers: {
@@ -80,18 +84,26 @@ describe("startHttpTransport (stateless, per-request)", () => {
 
   it("answers multiple sequential requests without a 500 on the second (H1 regression)", async () => {
     const port = await freePort();
-    close = await startHttpTransport(buildServer, makeConfig(port), silentLogger);
+    close = await startHttpTransport(
+      buildServer,
+      makeConfig(port),
+      silentLogger,
+    );
 
     const r1 = await post(port, INIT);
     expect(r1.status).toBe(200);
-    const b1 = (await r1.json()) as { result: { serverInfo: { name: string } } };
+    const b1 = (await r1.json()) as {
+      result: { serverInfo: { name: string } };
+    };
     expect(b1.result.serverInfo.name).toBe("test-server");
 
     // Shared-transport bug returned 500 here ("Stateless transport cannot be
     // reused across requests"). Each request must get a fresh transport.
     const r2 = await post(port, INIT);
     expect(r2.status).toBe(200);
-    const b2 = (await r2.json()) as { result: { serverInfo: { name: string } } };
+    const b2 = (await r2.json()) as {
+      result: { serverInfo: { name: string } };
+    };
     expect(b2.result.serverInfo.name).toBe("test-server");
 
     const r3 = await post(port, INIT);
@@ -100,7 +112,11 @@ describe("startHttpTransport (stateless, per-request)", () => {
 
   it("rejects a request with a missing/wrong bearer token", async () => {
     const port = await freePort();
-    close = await startHttpTransport(buildServer, makeConfig(port, "s3cret"), silentLogger);
+    close = await startHttpTransport(
+      buildServer,
+      makeConfig(port, "s3cret"),
+      silentLogger,
+    );
 
     const noAuth = await post(port, INIT);
     expect(noAuth.status).toBe(401);
@@ -114,27 +130,48 @@ describe("startHttpTransport (stateless, per-request)", () => {
 
   it("returns 404 for non-/mcp paths", async () => {
     const port = await freePort();
-    close = await startHttpTransport(buildServer, makeConfig(port), silentLogger);
+    close = await startHttpTransport(
+      buildServer,
+      makeConfig(port),
+      silentLogger,
+    );
 
-    const res = await fetch(`http://127.0.0.1:${port}/nope`, { method: "POST", body: "{}" });
+    const res = await fetch(`http://127.0.0.1:${port}/nope`, {
+      method: "POST",
+      body: "{}",
+    });
     expect(res.status).toBe(404);
   });
 
   it("does not route /mcp-prefixed siblings like /mcpFoo (M3: exact-path match)", async () => {
     const port = await freePort();
-    close = await startHttpTransport(buildServer, makeConfig(port), silentLogger);
+    close = await startHttpTransport(
+      buildServer,
+      makeConfig(port),
+      silentLogger,
+    );
 
     // Loose startsWith("/mcp") would have routed these into the transport.
-    const foo = await fetch(`http://127.0.0.1:${port}/mcpFoo`, { method: "POST", body: "{}" });
+    const foo = await fetch(`http://127.0.0.1:${port}/mcpFoo`, {
+      method: "POST",
+      body: "{}",
+    });
     expect(foo.status).toBe(404);
 
-    const bar = await fetch(`http://127.0.0.1:${port}/mcp-extra`, { method: "POST", body: "{}" });
+    const bar = await fetch(`http://127.0.0.1:${port}/mcp-extra`, {
+      method: "POST",
+      body: "{}",
+    });
     expect(bar.status).toBe(404);
   });
 
   it("still routes exact /mcp with a query string", async () => {
     const port = await freePort();
-    close = await startHttpTransport(buildServer, makeConfig(port), silentLogger);
+    close = await startHttpTransport(
+      buildServer,
+      makeConfig(port),
+      silentLogger,
+    );
 
     const res = await fetch(`http://127.0.0.1:${port}/mcp?x=1`, {
       method: "POST",

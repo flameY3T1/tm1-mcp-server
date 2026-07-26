@@ -20,7 +20,8 @@ import { freeCellset, transformCellsetResponse } from "./cellset-transform.js";
 import { rethrowIfSystemic } from "./fallback.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export class ViewService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -33,21 +34,26 @@ export class ViewService {
   async list(cubeName: string): Promise<CubeView[]> {
     const result: CubeView[] = [];
     try {
-      const pub = await this.http.request<{ value: Array<{ Name: string; MDX?: string }> }>(
-        "GET",
-        `/api/v1/Cubes('${enc(cubeName)}')/Views?$select=Name,MDX`,
+      const pub = await this.http.request<{
+        value: Array<{ Name: string; MDX?: string }>;
+      }>("GET", `/api/v1/Cubes('${enc(cubeName)}')/Views?$select=Name,MDX`);
+      result.push(
+        ...pub.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: false })),
       );
-      result.push(...pub.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: false })));
     } catch (e) {
       rethrowIfSystemic(e);
       // no public views
     }
     try {
-      const priv = await this.http.request<{ value: Array<{ Name: string; MDX?: string }> }>(
+      const priv = await this.http.request<{
+        value: Array<{ Name: string; MDX?: string }>;
+      }>(
         "GET",
         `/api/v1/Cubes('${enc(cubeName)}')/PrivateViews?$select=Name,MDX`,
       );
-      result.push(...priv.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: true })));
+      result.push(
+        ...priv.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: true })),
+      );
     } catch (e) {
       rethrowIfSystemic(e);
       // no private views
@@ -74,7 +80,8 @@ export class ViewService {
     if (skip !== undefined) cellsExpand += `;$skip=${skip}`;
     cellsExpand += ")";
 
-    const axesExpand = "Axes($expand=Tuples($expand=Members($select=Name;$expand=Hierarchy($select=Name))))";
+    const axesExpand =
+      "Axes($expand=Tuples($expand=Members($select=Name;$expand=Hierarchy($select=Name))))";
     const path = `/api/v1/Cubes('${enc(cubeName)}')/Views('${enc(viewName)}')/tm1.Execute?$expand=${cellsExpand},${axesExpand}`;
 
     const response = await this.http.request<{
@@ -221,7 +228,8 @@ export class ViewService {
         dimensionName: s.Hierarchy?.Dimension?.Name,
         hierarchyName: s.Hierarchy?.Name,
         subsetName: s.Name && s.Name.length > 0 ? s.Name : undefined,
-        expression: s.Expression && s.Expression.length > 0 ? s.Expression : undefined,
+        expression:
+          s.Expression && s.Expression.length > 0 ? s.Expression : undefined,
       };
     };
     const mapTitle = (t: RawTitle) => ({
@@ -246,7 +254,11 @@ export class ViewService {
    * Create a public MDX-based view on a cube.
    * POST /api/v1/Cubes('{c}')/Views with @odata.type = #ibm.tm1.api.v1.MDXView
    */
-  async createMdx(cubeName: string, viewName: string, mdx: string): Promise<void> {
+  async createMdx(
+    cubeName: string,
+    viewName: string,
+    mdx: string,
+  ): Promise<void> {
     await this.http.request<void>(
       "POST",
       `/api/v1/Cubes('${enc(cubeName)}')/Views`,
@@ -274,7 +286,9 @@ export class ViewService {
       `Dimensions('${enc(a.dimension)}')/Hierarchies('${enc(a.hierarchy ?? a.dimension)}')`;
 
     const mapAxis = (a: NativeViewAxisSpec): Record<string, unknown> => {
-      const sources = [a.subset, a.expression, a.elements].filter((s) => s !== undefined);
+      const sources = [a.subset, a.expression, a.elements].filter(
+        (s) => s !== undefined,
+      );
       if (sources.length !== 1) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
@@ -285,15 +299,24 @@ export class ViewService {
         });
       }
       if (a.subset !== undefined) {
-        return { "Subset@odata.bind": `${hierPath(a)}/Subsets('${enc(a.subset)}')` };
+        return {
+          "Subset@odata.bind": `${hierPath(a)}/Subsets('${enc(a.subset)}')`,
+        };
       }
       if (a.expression !== undefined) {
-        return { Subset: { "Hierarchy@odata.bind": hierPath(a), Expression: a.expression } };
+        return {
+          Subset: {
+            "Hierarchy@odata.bind": hierPath(a),
+            Expression: a.expression,
+          },
+        };
       }
       return {
         Subset: {
           "Hierarchy@odata.bind": hierPath(a),
-          "Elements@odata.bind": (a.elements ?? []).map((e) => `${hierPath(a)}/Elements('${enc(e)}')`),
+          "Elements@odata.bind": (a.elements ?? []).map(
+            (e) => `${hierPath(a)}/Elements('${enc(e)}')`,
+          ),
         },
       };
     };
@@ -311,7 +334,8 @@ export class ViewService {
         });
       }
       const axis = mapAxis(t);
-      axis["Selected@odata.bind"] = `${hierPath(t)}/Elements('${enc(t.selected)}')`;
+      axis["Selected@odata.bind"] =
+        `${hierPath(t)}/Elements('${enc(t.selected)}')`;
       return axis;
     };
 
@@ -326,7 +350,11 @@ export class ViewService {
     };
     if (spec.formatString !== undefined) body.FormatString = spec.formatString;
 
-    await this.http.request<void>("POST", `/api/v1/Cubes('${enc(cubeName)}')/Views`, body);
+    await this.http.request<void>(
+      "POST",
+      `/api/v1/Cubes('${enc(cubeName)}')/Views`,
+      body,
+    );
   }
 
   /**

@@ -39,7 +39,12 @@ function makeFakeServer() {
   let captured: ToolHandler | null = null;
   let parser: z.ZodObject<ZodRawShape> | null = null;
   const server = {
-    tool: (_name: string, _desc: string, schema: ZodRawShape, handler: ToolHandler) => {
+    tool: (
+      _name: string,
+      _desc: string,
+      schema: ZodRawShape,
+      handler: ToolHandler,
+    ) => {
       parser = z.object(schema);
       captured = handler;
     },
@@ -95,7 +100,12 @@ describe("tm1_get_view tool", () => {
     const { server, getHandler } = makeFakeServer();
     registerGetView(server, makeTM1Client(paths));
 
-    const res = await getHandler()({ cubeName: "C", viewName: "V", limit: 2, offset: 2 });
+    const res = await getHandler()({
+      cubeName: "C",
+      viewName: "V",
+      limit: 2,
+      offset: 2,
+    });
     const env = JSON.parse(res.content[0]!.text);
 
     expect(paths[0]).toContain("$top=2");

@@ -22,7 +22,12 @@ export async function freeCellset(
 ): Promise<void> {
   if (!id) return;
   try {
-    await http.request<void>("DELETE", `/api/v1/Cellsets('${encId(id)}')`, undefined, opts);
+    await http.request<void>(
+      "DELETE",
+      `/api/v1/Cellsets('${encId(id)}')`,
+      undefined,
+      opts,
+    );
   } catch {
     // cleanup best-effort
   }
@@ -82,7 +87,9 @@ export function clipAxesToWindow(
   return { axes: out, clipped };
 }
 
-export function transformCellsetResponse(response: RawCellsetResponse): MdxResult {
+export function transformCellsetResponse(
+  response: RawCellsetResponse,
+): MdxResult {
   const cells = (response.Cells ?? []).map((c) => ({
     value: c.Value,
     formattedValue: c.FormattedValue,

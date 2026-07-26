@@ -54,15 +54,21 @@ describe("clusterVariableNames", () => {
 
   it("ranks clusters by variant count descending", () => {
     const clusters = clusterVariableNames([
-      { process: "A", variables: [
-        { name: "pYear", type: "Numeric" },
-        { name: "vYear", type: "Numeric" },
-        { name: "Year", type: "Numeric" },
-      ]},
-      { process: "B", variables: [
-        { name: "pCube", type: "String" },
-        { name: "vCube", type: "String" },
-      ]},
+      {
+        process: "A",
+        variables: [
+          { name: "pYear", type: "Numeric" },
+          { name: "vYear", type: "Numeric" },
+          { name: "Year", type: "Numeric" },
+        ],
+      },
+      {
+        process: "B",
+        variables: [
+          { name: "pCube", type: "String" },
+          { name: "vCube", type: "String" },
+        ],
+      },
     ]);
     expect(clusters[0]!.normalized).toBe("year");
     expect(clusters[1]!.normalized).toBe("cube");
@@ -95,12 +101,15 @@ describe("findTypeInconsistencies", () => {
 describe("reportPrefixConvention", () => {
   it("computes distribution and adherence", () => {
     const r = reportPrefixConvention([
-      { process: "A", variables: [
-        { name: "pYear", type: "Numeric" },
-        { name: "pMonth", type: "Numeric" },
-        { name: "vSum", type: "Numeric" },
-        { name: "year", type: "Numeric" },
-      ]},
+      {
+        process: "A",
+        variables: [
+          { name: "pYear", type: "Numeric" },
+          { name: "pMonth", type: "Numeric" },
+          { name: "vSum", type: "Numeric" },
+          { name: "year", type: "Numeric" },
+        ],
+      },
     ]);
     expect(r.total).toBe(4);
     expect(r.unprefixed).toBe(1);

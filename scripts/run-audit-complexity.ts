@@ -53,10 +53,15 @@ function makeHandler(tm1: TM1Client): {
 }
 
 async function run(
-  h: { handler: ToolHandler; parse: (a: Record<string, unknown>) => Record<string, unknown> },
+  h: {
+    handler: ToolHandler;
+    parse: (a: Record<string, unknown>) => Record<string, unknown>;
+  },
   args: Record<string, unknown>,
 ): Promise<{ topProcesses: ProcEntry[]; scanned: { processes: number } }> {
-  const res = (await h.handler(h.parse(args))) as { content: Array<{ text: string }> };
+  const res = (await h.handler(h.parse(args))) as {
+    content: Array<{ text: string }>;
+  };
   return JSON.parse(res.content[0]!.text);
 }
 
@@ -83,7 +88,9 @@ async function main() {
   const r1 = rank(v1.topProcesses);
 
   console.log("\n=== TOP 15 by v2 (scoreV2) ===");
-  console.log("rank  v1→v2   scoreV1  scoreV2  loop   if   hotLoop  nest  name");
+  console.log(
+    "rank  v1→v2   scoreV1  scoreV2  loop   if   hotLoop  nest  name",
+  );
   for (let i = 0; i < Math.min(15, v2.topProcesses.length); i++) {
     const p = v2.topProcesses[i]!;
     const t = p.totals;
@@ -96,7 +103,12 @@ async function main() {
 
   // Biggest rank climbers under v2 (v2 surfaces what v1 missed).
   const climbers = v2.topProcesses
-    .map((p, i) => ({ name: p.name, v1: r1.get(p.name) ?? 9999, v2: i + 1, t: p.totals }))
+    .map((p, i) => ({
+      name: p.name,
+      v1: r1.get(p.name) ?? 9999,
+      v2: i + 1,
+      t: p.totals,
+    }))
     .filter((x) => x.v1 - x.v2 >= 3)
     .sort((a, b) => b.v1 - b.v2 - (a.v1 - a.v2))
     .slice(0, 10);

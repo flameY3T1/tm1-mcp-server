@@ -2,9 +2,17 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { compileUserRegex } from "../../lib/safe-regex.js";
-import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
+import {
+  FORMAT_SCHEMA,
+  payloadResponse,
+  renderTable,
+  type Column,
+} from "../format.js";
 
-export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Client) {
+export function registerListProcessesGrouped(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_list_processes_grouped",
     [
@@ -15,20 +23,54 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
     ].join(" "),
     {
       ...FORMAT_SCHEMA,
-      includeControl: z.boolean().optional().default(false)
+      includeControl: z
+        .boolean()
+        .optional()
+        .default(false)
         .describe("Include control processes ('}'-prefixed). Default: false."),
-      prefixSegments: z.number().int().min(1).max(5).optional().default(1)
-        .describe("Number of '_'-delimited segments to use as group key. Default 1: '020_Param_Load' → '020'. Use 2 for '020_Param'."),
-      includeNames: z.boolean().optional().default(false)
-        .describe("Add processes[] array of names to each group. Default false — summary only."),
-      minCount: z.number().int().min(1).optional()
-        .describe("Only return groups with at least this many processes. Useful to hide one-off processes."),
-      excludePattern: z.string().optional()
-        .describe("JS-compatible regex (case-insensitive) — drop processes whose name matches before grouping. E.g. '^Bedrock\\.' to hide Bedrock utility processes."),
+      prefixSegments: z
+        .number()
+        .int()
+        .min(1)
+        .max(5)
+        .optional()
+        .default(1)
+        .describe(
+          "Number of '_'-delimited segments to use as group key. Default 1: '020_Param_Load' → '020'. Use 2 for '020_Param'.",
+        ),
+      includeNames: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Add processes[] array of names to each group. Default false — summary only.",
+        ),
+      minCount: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe(
+          "Only return groups with at least this many processes. Useful to hide one-off processes.",
+        ),
+      excludePattern: z
+        .string()
+        .optional()
+        .describe(
+          "JS-compatible regex (case-insensitive) — drop processes whose name matches before grouping. E.g. '^Bedrock\\.' to hide Bedrock utility processes.",
+        ),
     },
-    async ({ format, includeControl, prefixSegments, includeNames, minCount, excludePattern }) => {
+    async ({
+      format,
+      includeControl,
+      prefixSegments,
+      includeNames,
+      minCount,
+      excludePattern,
+    }) => {
       let processes = await tm1Client.processes.list();
-      if (!includeControl) processes = processes.filter((p) => !p.name.startsWith("}"));
+      if (!includeControl)
+        processes = processes.filter((p) => !p.name.startsWith("}"));
       if (excludePattern) {
         const re = compileUserRegex(excludePattern, "i", "excludePattern");
         processes = processes.filter((p) => !re.test(p.name));
@@ -51,7 +93,8 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
         }))
         .sort((a, b) => b.count - a.count);
 
-      if (minCount !== undefined) groups = groups.filter((g) => g.count >= minCount);
+      if (minCount !== undefined)
+        groups = groups.filter((g) => g.count >= minCount);
 
       const payload = {
         totalProcesses: processes.length,
@@ -63,10 +106,20 @@ export function registerListProcessesGrouped(server: McpServer, tm1Client: TM1Cl
       const columns: Column<GroupRow>[] = [
         { header: "prefix", get: (g) => g.prefix },
         { header: "count", get: (g) => g.count },
-        ...(includeNames ? [{ header: "processes", get: (g: GroupRow) => ("processes" in g ? g.processes : []) } as Column<GroupRow>] : []),
+        ...(includeNames
+          ? [
+              {
+                header: "processes",
+                get: (g: GroupRow) => ("processes" in g ? g.processes : []),
+              } as Column<GroupRow>,
+            ]
+          : []),
       ];
-      return payloadResponse(payload, format, (p) =>
-        `## Processes grouped by prefix\n\n${p.totalProcesses} processes · ${p.groupCount} groups · prefixSegments=${p.prefixSegments}\n\n${renderTable(p.groups, columns)}`,
+      return payloadResponse(
+        payload,
+        format,
+        (p) =>
+          `## Processes grouped by prefix\n\n${p.totalProcesses} processes · ${p.groupCount} groups · prefixSegments=${p.prefixSegments}\n\n${renderTable(p.groups, columns)}`,
       );
     },
   );

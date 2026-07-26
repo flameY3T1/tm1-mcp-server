@@ -11,10 +11,20 @@ export function registerUpdateSubset(server: McpServer, tm1Client: TM1Client) {
       hierarchyName: z.string().describe("Hierarchy name"),
       subsetName: z.string().describe("Existing subset name"),
       expression: z.string().optional().describe("New MDX expression"),
-      elements: z.array(z.string()).optional().describe("New static element list (clears MDX)"),
+      elements: z
+        .array(z.string())
+        .optional()
+        .describe("New static element list (clears MDX)"),
       alias: z.string().optional().describe("New alias attribute"),
     },
-    async ({ dimensionName, hierarchyName, subsetName, expression, elements, alias }) => {
+    async ({
+      dimensionName,
+      hierarchyName,
+      subsetName,
+      expression,
+      elements,
+      alias,
+    }) => {
       await tm1Client.subsets.update(dimensionName, hierarchyName, subsetName, {
         expression,
         elements,

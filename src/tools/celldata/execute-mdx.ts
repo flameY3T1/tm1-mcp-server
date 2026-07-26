@@ -59,7 +59,8 @@ export function renderMdxMarkdown(env: MdxEnvelope): string {
   }
 
   const contextAxes = axes.slice(2);
-  const fullSet = items.length === axes.reduce((a, ax) => a * ax.tuples.length, 1);
+  const fullSet =
+    items.length === axes.reduce((a, ax) => a * ax.tuples.length, 1);
   const isGrid =
     axes.length >= 2 &&
     offset === 0 &&
@@ -78,7 +79,9 @@ export function renderMdxMarkdown(env: MdxEnvelope): string {
     const header = `| ${mdCell(axisHeader(axes[1]!))} | ${cols.map((t) => mdCell(tupleLabel(t))).join(" | ")} |`;
     const sep = `| ${["---", ...cols.map(() => "---")].join(" | ")} |`;
     const body = rows.map((rt, r) => {
-      const vals = cols.map((_, c) => mdCell(cellText(items[r * colCount + c]!)));
+      const vals = cols.map((_, c) =>
+        mdCell(cellText(items[r * colCount + c]!)),
+      );
       return `| ${mdCell(tupleLabel(rt))} | ${vals.join(" | ")} |`;
     });
     return [...head, "", header, sep, ...body].join("\n");
@@ -118,14 +121,19 @@ export function registerExecuteMdx(server: McpServer, tm1Client: TM1Client) {
         .min(1000)
         .max(3600000)
         .optional()
-        .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for heavy MDX over wide views."),
+        .describe(
+          "Override the default 30s request timeout for this call (ms, 1000–3600000). Use for heavy MDX over wide views.",
+        ),
     },
     async ({ mdx, limit, offset, fetchAll, format, timeoutMs }, extra) => {
       const all = fetchAll === true || limit === 0;
       const top = all ? undefined : limit;
       const skip = all ? undefined : offset;
       const result = await withToolHint(
-        tm1Client.cells.executeMdx(mdx, top, skip, { signal: extra?.signal, ...(timeoutMs ? { timeoutMs } : {}) }),
+        tm1Client.cells.executeMdx(mdx, top, skip, {
+          signal: extra?.signal,
+          ...(timeoutMs ? { timeoutMs } : {}),
+        }),
         "MDX execution failed. Common causes: missing brackets around member names ([Dim].[Hier].[Member]), unbalanced FROM/SELECT, unknown cube. Inspect details; cross-check member names with tm1_get_hierarchy or tm1_list_cubes.",
       );
 

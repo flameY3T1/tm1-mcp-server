@@ -41,7 +41,10 @@ function write(prefix: string, doc: unknown): string {
 }
 
 /** Minimal istanbul json-summary payload with the given total percentages. */
-function summaryFixture(pcts: Pcts, files: Record<string, number> = {}): string {
+function summaryFixture(
+  pcts: Pcts,
+  files: Record<string, number> = {},
+): string {
   const block = (pct: number) => ({
     total: 1000,
     covered: Math.round((pct / 100) * 1000),
@@ -58,7 +61,12 @@ function summaryFixture(pcts: Pcts, files: Record<string, number> = {}): string 
   };
   for (const [file, pct] of Object.entries(files)) {
     doc[file] = {
-      lines: { total: 200, covered: Math.round((pct / 100) * 200), skipped: 0, pct },
+      lines: {
+        total: 200,
+        covered: Math.round((pct / 100) * 200),
+        skipped: 0,
+        pct,
+      },
       statements: block(pct),
       functions: block(pct),
       branches: block(pct),
@@ -76,10 +84,14 @@ interface RunResult {
 
 function run(summary: string, config: string): RunResult {
   try {
-    const out = execFileSync(process.execPath, [script, "--summary", summary, "--config", config], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const out = execFileSync(
+      process.execPath,
+      [script, "--summary", summary, "--config", config],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     return { code: 0, out };
   } catch (err) {
     const e = err as { status?: number; stdout?: string; stderr?: string };
@@ -131,7 +143,12 @@ describe("coverage ratchet gate — passing cases", () => {
 describe("coverage ratchet gate — failing cases", () => {
   it("fails when a metric drops below its floor", () => {
     const r = run(
-      summaryFixture({ lines: 57.99, statements: 60, functions: 60, branches: 60 }),
+      summaryFixture({
+        lines: 57.99,
+        statements: 60,
+        functions: 60,
+        branches: 60,
+      }),
       configFixture(BASE_CONFIG),
     );
     expect(r.code).toBe(1);
@@ -165,7 +182,12 @@ describe("coverage ratchet gate — failing cases", () => {
 
   it("prints the exact new floors to paste when ratcheting up", () => {
     const r = run(
-      summaryFixture({ lines: 80.4, statements: 79.6, functions: 70.2, branches: 66.9 }),
+      summaryFixture({
+        lines: 80.4,
+        statements: 79.6,
+        functions: 70.2,
+        branches: 66.9,
+      }),
       configFixture(BASE_CONFIG),
     );
     expect(r.code).toBe(1);
@@ -180,7 +202,12 @@ describe("coverage ratchet gate — failing cases", () => {
     // branches sits exactly at its floor while the rest shot up: the suggested
     // branches floor must stay 58, not slide down to 56.
     const r = run(
-      summaryFixture({ lines: 90, statements: 90, functions: 90, branches: 58 }),
+      summaryFixture({
+        lines: 90,
+        statements: 90,
+        functions: 90,
+        branches: 58,
+      }),
       configFixture(BASE_CONFIG),
     );
     expect(r.code).toBe(1);
@@ -190,14 +217,20 @@ describe("coverage ratchet gate — failing cases", () => {
 
 describe("coverage ratchet gate — bad input", () => {
   it("exits 2 with a run hint when the coverage summary is missing", () => {
-    const r = run(join(workdir, "does-not-exist.json"), configFixture(BASE_CONFIG));
+    const r = run(
+      join(workdir, "does-not-exist.json"),
+      configFixture(BASE_CONFIG),
+    );
     expect(r.code).toBe(2);
     expect(r.out).toContain("coverage summary not found");
     expect(r.out).toContain("npm run coverage:check");
   });
 
   it("exits 2 when the summary has no total block", () => {
-    const r = run(write("summary", { "/repo/src/a.ts": {} }), configFixture(BASE_CONFIG));
+    const r = run(
+      write("summary", { "/repo/src/a.ts": {} }),
+      configFixture(BASE_CONFIG),
+    );
     expect(r.code).toBe(2);
     expect(r.out).toContain('no "total" block');
   });
@@ -205,7 +238,10 @@ describe("coverage ratchet gate — bad input", () => {
   it("exits 2 when a floor is missing from the config", () => {
     const r = run(
       summaryFixture(EVEN(60)),
-      configFixture({ floors: { lines: 58, statements: 58, functions: 58 }, slack: 5 }),
+      configFixture({
+        floors: { lines: 58, statements: 58, functions: 58 },
+        slack: 5,
+      }),
     );
     expect(r.code).toBe(2);
     expect(r.out).toContain('"floors.branches"');
@@ -214,7 +250,9 @@ describe("coverage ratchet gate — bad input", () => {
   it("exits 2 on an unknown argument", () => {
     let code = 0;
     try {
-      execFileSync(process.execPath, [script, "--nope"], { stdio: ["ignore", "pipe", "pipe"] });
+      execFileSync(process.execPath, [script, "--nope"], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
     } catch (err) {
       code = (err as { status?: number }).status ?? -1;
     }
@@ -235,7 +273,9 @@ describe("coverage-thresholds.json (the checked-in config)", () => {
   });
 
   it("is accepted by the gate for a summary just above each floor", () => {
-    const pcts = Object.fromEntries(METRICS.map((m) => [m, cfg.floors[m] + 1])) as Pcts;
+    const pcts = Object.fromEntries(
+      METRICS.map((m) => [m, cfg.floors[m] + 1]),
+    ) as Pcts;
     const r = run(summaryFixture(pcts), realConfigPath);
     expect(r.code).toBe(0);
   });
@@ -247,6 +287,7 @@ describe("coverage-thresholds.json (the checked-in config)", () => {
 
   it("keeps every target at or above its floor", () => {
     if (!cfg.target) return;
-    for (const m of METRICS) expect(cfg.target[m]).toBeGreaterThanOrEqual(cfg.floors[m]);
+    for (const m of METRICS)
+      expect(cfg.target[m]).toBeGreaterThanOrEqual(cfg.floors[m]);
   });
 });

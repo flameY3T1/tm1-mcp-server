@@ -1,14 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { commentStats, stripCommentBlocks, COLLAPSE_MIN } from "../../src/lib/strip-comments.js";
+import {
+  commentStats,
+  stripCommentBlocks,
+  COLLAPSE_MIN,
+} from "../../src/lib/strip-comments.js";
 
 describe("commentStats", () => {
   it("counts total lines and full-line comments", () => {
-    const src = ["# header", "x = 1;", "  # indented comment", "y = 2; # inline"].join("\n");
+    const src = [
+      "# header",
+      "x = 1;",
+      "  # indented comment",
+      "y = 2; # inline",
+    ].join("\n");
     expect(commentStats(src)).toEqual({ totalLines: 4, commentLines: 2 });
   });
 
   it("treats an inline trailing comment as code, not a comment line", () => {
-    expect(commentStats("nValue = 5; # set value")).toEqual({ totalLines: 1, commentLines: 0 });
+    expect(commentStats("nValue = 5; # set value")).toEqual({
+      totalLines: 1,
+      commentLines: 0,
+    });
   });
 
   it("handles empty input", () => {
@@ -23,7 +35,9 @@ describe("stripCommentBlocks", () => {
     const r = stripCommentBlocks(src);
     expect(r.collapsedBlocks).toBe(1);
     expect(r.removedLines).toBe(6);
-    expect(r.code).toBe(["x = 1;", "# [... 6 lines commented out ...]", "y = 2;"].join("\n"));
+    expect(r.code).toBe(
+      ["x = 1;", "# [... 6 lines commented out ...]", "y = 2;"].join("\n"),
+    );
   });
 
   it("keeps short comment runs (< COLLAPSE_MIN) verbatim", () => {
@@ -40,13 +54,22 @@ describe("stripCommentBlocks", () => {
   });
 
   it("collapses multiple separate blocks", () => {
-    const block = (n: number) => Array.from({ length: 5 }, (_, i) => `# block${n} line ${i}`);
-    const src = ["a = 1;", ...block(1), "b = 2;", ...block(2), "c = 3;"].join("\n");
+    const block = (n: number) =>
+      Array.from({ length: 5 }, (_, i) => `# block${n} line ${i}`);
+    const src = ["a = 1;", ...block(1), "b = 2;", ...block(2), "c = 3;"].join(
+      "\n",
+    );
     const r = stripCommentBlocks(src);
     expect(r.collapsedBlocks).toBe(2);
     expect(r.removedLines).toBe(10);
     expect(r.code).toBe(
-      ["a = 1;", "# [... 5 lines commented out ...]", "b = 2;", "# [... 5 lines commented out ...]", "c = 3;"].join("\n"),
+      [
+        "a = 1;",
+        "# [... 5 lines commented out ...]",
+        "b = 2;",
+        "# [... 5 lines commented out ...]",
+        "c = 3;",
+      ].join("\n"),
     );
   });
 
@@ -56,6 +79,10 @@ describe("stripCommentBlocks", () => {
   });
 
   it("handles empty input", () => {
-    expect(stripCommentBlocks("")).toEqual({ code: "", removedLines: 0, collapsedBlocks: 0 });
+    expect(stripCommentBlocks("")).toEqual({
+      code: "",
+      removedLines: 0,
+      collapsedBlocks: 0,
+    });
   });
 });

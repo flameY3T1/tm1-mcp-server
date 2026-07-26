@@ -1,7 +1,6 @@
 /** Ergebnis des Parsers */
 export type TiParseResult =
-  | { ok: true; ast: TiAst }
-  | { ok: false; error: TiParseError };
+  { ok: true; ast: TiAst } | { ok: false; error: TiParseError };
 
 export interface TiParseError {
   line: number;
@@ -12,40 +11,41 @@ export interface TiParseError {
 export type TiAst = TiStatement[];
 
 export type TiStatement =
-  | TiAssignment
-  | TiIfBlock
-  | TiWhileBlock
-  | TiFunctionCall;
+  TiAssignment | TiIfBlock | TiWhileBlock | TiFunctionCall;
 
 export interface TiAssignment {
-  type: 'assignment';
+  type: "assignment";
   variable: string;
   expression: string;
   /** true if the expression contains CellGetN/CellGetS */
   isExternal: boolean;
   /** Falls isExternal: Funktionsname und Parameter */
-  cellGetInfo?: { fn: 'CellGetN' | 'CellGetS'; params: string[] } | undefined;
+  cellGetInfo?: { fn: "CellGetN" | "CellGetS"; params: string[] } | undefined;
   line: number;
 }
 
 export interface TiIfBlock {
-  type: 'if';
+  type: "if";
   condition: string;
   thenBody: TiStatement[];
-  elseIfClauses: Array<{ condition: string; body: TiStatement[]; line: number }>;
+  elseIfClauses: Array<{
+    condition: string;
+    body: TiStatement[];
+    line: number;
+  }>;
   elseBody: TiStatement[];
   line: number;
 }
 
 export interface TiWhileBlock {
-  type: 'while';
+  type: "while";
   condition: string;
   body: TiStatement[];
   line: number;
 }
 
 export interface TiFunctionCall {
-  type: 'functionCall';
+  type: "functionCall";
   name: string;
   args: string[];
   line: number;

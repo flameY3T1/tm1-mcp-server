@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { paginate, pageFromServer, PAGINATION_SCHEMA } from "../../src/tools/pagination.js";
+import {
+  paginate,
+  pageFromServer,
+  PAGINATION_SCHEMA,
+} from "../../src/tools/pagination.js";
 import { FORMAT_SCHEMA } from "../../src/tools/format.js";
 import {
   compareByName,
@@ -102,12 +106,15 @@ describe("shared paging/format input schemas", () => {
     for (const [name, schema] of Object.entries(described)) {
       const desc = schema.description ?? "";
       expect(desc.length, `${name} must stay described`).toBeGreaterThan(0);
-      expect(desc.length, `${name} description is paid 19x — keep it terse`).toBeLessThanOrEqual(
-        60,
-      );
+      expect(
+        desc.length,
+        `${name} description is paid 19x — keep it terse`,
+      ).toBeLessThanOrEqual(60);
       // Defaults/min/max are emitted structurally by JSON Schema; repeating
       // them in prose would be dead weight in all 19 copies.
-      expect(desc, `${name} must not restate its default`).not.toMatch(/default/i);
+      expect(desc, `${name} must not restate its default`).not.toMatch(
+        /default/i,
+      );
     }
   });
 });
@@ -118,9 +125,9 @@ describe("pageFromServer", () => {
   it("produces the same envelope paginate() would for the same window", () => {
     for (const offset of [0, 2, 4]) {
       const limit = 2;
-      expect(pageFromServer(ALL.slice(offset, offset + limit), ALL.length, offset)).toEqual(
-        paginate(ALL, limit, offset, false),
-      );
+      expect(
+        pageFromServer(ALL.slice(offset, offset + limit), ALL.length, offset),
+      ).toEqual(paginate(ALL, limit, offset, false));
     }
   });
 
@@ -153,7 +160,12 @@ describe("odata-page clause builders", () => {
     // R1: $skip against TM1's internal index order silently duplicates or
     // drops rows once anything is created or deleted mid-walk.
     const clauses = pageClauseList({ top: 50, skip: 100 });
-    expect(clauses).toEqual(["$orderby=Name", "$top=50", "$skip=100", "$count=true"]);
+    expect(clauses).toEqual([
+      "$orderby=Name",
+      "$top=50",
+      "$skip=100",
+      "$count=true",
+    ]);
     expect(pageClauses({ top: 50, skip: 100 })).toBe(
       "&$orderby=Name&$top=50&$skip=100&$count=true",
     );
@@ -166,14 +178,20 @@ describe("odata-page clause builders", () => {
   });
 
   it("honours a caller-chosen orderBy property", () => {
-    expect(pageClauses({ top: 1, skip: 0, orderBy: "Filename" })).toContain("$orderby=Filename");
+    expect(pageClauses({ top: 1, skip: 0, orderBy: "Filename" })).toContain(
+      "$orderby=Filename",
+    );
   });
 
   it("excludes control objects unless asked, and lowercases substring needles", () => {
     expect(nameFilterPredicates({})).toEqual(["not startswith(Name,'}')"]);
     expect(nameFilterPredicates({ includeControl: true })).toEqual([]);
     expect(
-      nameFilterPredicates({ includeControl: true, nameContains: "Plan", nameNotContains: "TEST" }),
+      nameFilterPredicates({
+        includeControl: true,
+        nameContains: "Plan",
+        nameNotContains: "TEST",
+      }),
     ).toEqual([
       "contains(tolower(Name),'plan')",
       "not contains(tolower(Name),'test')",
@@ -185,15 +203,19 @@ describe("odata-page clause builders", () => {
 
   it("ignores empty filter strings rather than emitting a match-nothing predicate", () => {
     expect(
-      nameFilterPredicates({ includeControl: true, nameExact: "", nameContains: "" }),
+      nameFilterPredicates({
+        includeControl: true,
+        nameExact: "",
+        nameContains: "",
+      }),
     ).toEqual([]);
   });
 
   it("doubles quotes so a name cannot break out of an OData literal", () => {
     expect(escapeOdataLiteral("O'Brien")).toBe("O''Brien");
-    expect(nameFilterPredicates({ includeControl: true, nameExact: "d'Or" })).toEqual([
-      "Name eq 'd''Or'",
-    ]);
+    expect(
+      nameFilterPredicates({ includeControl: true, nameExact: "d'Or" }),
+    ).toEqual(["Name eq 'd''Or'"]);
   });
 
   it("reads collection and nested counts, and reports absence as undefined", () => {
@@ -209,7 +231,11 @@ describe("odata-page clause builders", () => {
     // Live-probed: uppercase sorts before lowercase, which localeCompare would
     // get wrong (it collates case-insensitively).
     const names = ["c1", "Alpha", "Zulu"].map((name) => ({ name }));
-    expect([...names].sort(compareByName).map((n) => n.name)).toEqual(["Alpha", "Zulu", "c1"]);
+    expect([...names].sort(compareByName).map((n) => n.name)).toEqual([
+      "Alpha",
+      "Zulu",
+      "c1",
+    ]);
     expect(compareByName({ name: "x" }, { name: "x" })).toBe(0);
   });
 });

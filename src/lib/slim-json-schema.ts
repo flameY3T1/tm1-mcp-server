@@ -49,7 +49,10 @@ function slimNode(node: unknown, nameKeyed: boolean): unknown {
       if (key === "minimum" && value === SAFE_INT_MIN) continue;
       if (key === "maximum" && value === SAFE_INT_MAX) continue;
     }
-    const slimmed = slimNode(value, !nameKeyed && NAME_KEYED_CONTAINERS.has(key));
+    const slimmed = slimNode(
+      value,
+      !nameKeyed && NAME_KEYED_CONTAINERS.has(key),
+    );
     // A field named `__proto__` would otherwise mutate the prototype chain
     // instead of becoming an own property.
     if (key === "__proto__") {

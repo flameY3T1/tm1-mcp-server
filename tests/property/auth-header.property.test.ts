@@ -12,23 +12,35 @@ import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
 
 const mockLogger = {
-  info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn(),
-  fatal: vi.fn(), trace: vi.fn(), child: vi.fn().mockReturnThis(),
-  level: "silent", flush: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  fatal: vi.fn(),
+  trace: vi.fn(),
+  child: vi.fn().mockReturnThis(),
+  level: "silent",
+  flush: vi.fn(),
 } as unknown as import("pino").Logger;
 
 function makeConfig(user: string, password: string): TM1Config {
   return {
-    baseUrl: "https://tm1server:8010", user, password,
+    baseUrl: "https://tm1server:8010",
+    user,
+    password,
     ssl: { rejectUnauthorized: true },
-    keepAliveIntervalMs: 60000, requestTimeoutMs: 30000, logLevel: "info",
+    keepAliveIntervalMs: 60000,
+    requestTimeoutMs: 30000,
+    logLevel: "info",
   };
 }
 
 const originalFetch = globalThis.fetch;
 
 describe("Property 2: Authentifizierungs-Header-Konstruktion", () => {
-  afterEach(() => { globalThis.fetch = originalFetch; });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
 
   it("Authorization header matches Basic base64(user:password) for any credentials", async () => {
     await fc.assert(
@@ -37,8 +49,12 @@ describe("Property 2: Authentifizierungs-Header-Konstruktion", () => {
         fc.string({ minLength: 1, maxLength: 50 }),
         async (user, password) => {
           const localFetch = vi.fn().mockResolvedValue({
-            ok: true, status: 200, statusText: "OK",
-            headers: new Headers({ "set-cookie": "TM1SessionId=sess123; Path=/" }),
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            headers: new Headers({
+              "set-cookie": "TM1SessionId=sess123; Path=/",
+            }),
             json: vi.fn().mockResolvedValue({}),
             text: vi.fn().mockResolvedValue(""),
           } as unknown as Response);

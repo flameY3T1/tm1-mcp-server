@@ -1,4 +1,8 @@
-import type { DataSource, ProcessParameter, ProcessVariable } from "../types.js";
+import type {
+  DataSource,
+  ProcessParameter,
+  ProcessVariable,
+} from "../types.js";
 
 export interface ParsedPro {
   name: string | null;
@@ -40,7 +44,12 @@ function parseSections(lines: string[]): {
   data: string;
   epilog: string;
 } {
-  const map: Record<string, string[]> = { "572": [], "573": [], "574": [], "575": [] };
+  const map: Record<string, string[]> = {
+    "572": [],
+    "573": [],
+    "574": [],
+    "575": [],
+  };
   const headers: Array<{ code: string; idx: number }> = [];
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i]!.match(SECTION_RE);
@@ -82,7 +91,8 @@ function parseParameters(lines: string[]): ProcessParameter[] {
       const count = parseInt(m[2]!, 10);
       const data = pre.slice(i + 1, i + 1 + count);
       if (code === "560") names = data.map((l) => l.trim());
-      else if (code === "561") types = data.map((l) => parseInt(l.trim(), 10) || 1);
+      else if (code === "561")
+        types = data.map((l) => parseInt(l.trim(), 10) || 1);
       else if (code === "590" || code === "637") {
         for (const dl of data) {
           const ci = dl.indexOf(",");
@@ -130,8 +140,10 @@ function parseVariables(lines: string[]): ProcessVariable[] {
       const count = parseInt(m[2]!, 10);
       const data = pre.slice(i + 1, i + 1 + count);
       if (code === "577") names = data.map((l) => l.trim());
-      else if (code === "578") types = data.map((l) => parseInt(l.trim(), 10) || 2);
-      else if (code === "579") positions = data.map((l) => parseInt(l.trim(), 10) || 1);
+      else if (code === "578")
+        types = data.map((l) => parseInt(l.trim(), 10) || 2);
+      else if (code === "579")
+        positions = data.map((l) => parseInt(l.trim(), 10) || 1);
       i += 1 + count;
       continue;
     }
@@ -200,7 +212,8 @@ function parseDataSource(lines: string[]): DataSource {
     ds.asciiDecimalSeparator = get("588") ?? ".";
     ds.asciiThousandSeparator = get("589") ?? ",";
     const headerVal = get("569");
-    if (headerVal !== undefined) ds.asciiHeaderRecords = parseInt(headerVal, 10) || 0;
+    if (headerVal !== undefined)
+      ds.asciiHeaderRecords = parseInt(headerVal, 10) || 0;
   }
   if (restType === "ODBC") {
     const user = get("564");

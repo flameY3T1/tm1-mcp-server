@@ -24,7 +24,12 @@ function makeFakeServer() {
   let captured: ToolHandler | null = null;
   let parser: z.ZodObject<ZodRawShape> | null = null;
   const server = {
-    tool: (_name: string, _desc: string, schema: ZodRawShape, handler: ToolHandler) => {
+    tool: (
+      _name: string,
+      _desc: string,
+      schema: ZodRawShape,
+      handler: ToolHandler,
+    ) => {
       parser = z.object(schema);
       captured = handler;
     },
@@ -50,12 +55,14 @@ function makeTM1Client(paths: string[]): TM1Client {
     return {
       Name: "H",
       Elements: POOL.slice(from, from + n),
-      ...(path.includes("$count=true") ? { "Elements@odata.count": POOL.length } : {}),
+      ...(path.includes("$count=true")
+        ? { "Elements@odata.count": POOL.length }
+        : {}),
     };
   };
-  const hierarchies = new HierarchyService({ request } as unknown as ConstructorParameters<
-    typeof HierarchyService
-  >[0]);
+  const hierarchies = new HierarchyService({
+    request,
+  } as unknown as ConstructorParameters<typeof HierarchyService>[0]);
   return { hierarchies } as unknown as TM1Client;
 }
 
@@ -78,7 +85,11 @@ describe("tm1_get_hierarchy tool", () => {
     const { server, getHandler } = makeFakeServer();
     registerGetHierarchy(server, makeTM1Client(paths));
 
-    const res = await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 3 });
+    const res = await getHandler()({
+      dimensionName: "D",
+      hierarchyName: "H",
+      topN: 3,
+    });
     const out = JSON.parse(res.content[0]!.text);
 
     expect(paths[0]).toContain("$top=3");
@@ -92,10 +103,12 @@ describe("tm1_get_hierarchy tool", () => {
     registerGetHierarchy(server, makeTM1Client(paths));
 
     const low = JSON.parse(
-      (await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 3 })).content[0]!.text,
+      (await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 3 }))
+        .content[0]!.text,
     );
     const high = JSON.parse(
-      (await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 10 })).content[0]!.text,
+      (await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 10 }))
+        .content[0]!.text,
     );
 
     expect(high.elements.length).toBeGreaterThan(low.elements.length);
@@ -108,7 +121,12 @@ describe("tm1_get_hierarchy tool", () => {
     const { server, getHandler } = makeFakeServer();
     registerGetHierarchy(server, makeTM1Client(paths));
 
-    await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 2, offset: 2 });
+    await getHandler()({
+      dimensionName: "D",
+      hierarchyName: "H",
+      topN: 2,
+      offset: 2,
+    });
 
     // $orderby is not decoration: $skip without it walks TM1's internal index
     // order, which shifts on every element create/delete.
@@ -127,8 +145,14 @@ describe("tm1_get_hierarchy tool", () => {
     let offset = 0;
     for (;;) {
       const page = JSON.parse(
-        (await handler({ dimensionName: "D", hierarchyName: "H", topN: 2, offset })).content[0]!
-          .text,
+        (
+          await handler({
+            dimensionName: "D",
+            hierarchyName: "H",
+            topN: 2,
+            offset,
+          })
+        ).content[0]!.text,
       );
       expect(page.offset).toBe(offset);
       expect(page.total).toBe(5);
@@ -147,8 +171,14 @@ describe("tm1_get_hierarchy tool", () => {
     // 5 elements, offset 3, topN 2 → the page is full yet nothing remains.
     // Deriving has_more from `count === topN` would wrongly promise a page 4.
     const out = JSON.parse(
-      (await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 2, offset: 3 })).content[0]!
-        .text,
+      (
+        await getHandler()({
+          dimensionName: "D",
+          hierarchyName: "H",
+          topN: 2,
+          offset: 3,
+        })
+      ).content[0]!.text,
     );
 
     expect(out.elements).toHaveLength(2);
@@ -179,7 +209,10 @@ describe("tm1_get_hierarchy tool", () => {
 
     expect(paths[0]).not.toContain("$top=");
     expect(paths[0]).not.toContain("$skip=");
-    expect(out.elements.map((e: { name: string }) => e.name)).toEqual(["E3", "E4"]);
+    expect(out.elements.map((e: { name: string }) => e.name)).toEqual([
+      "E3",
+      "E4",
+    ]);
     expect(out.total).toBe(3);
     expect(out.has_more).toBe(false);
   });

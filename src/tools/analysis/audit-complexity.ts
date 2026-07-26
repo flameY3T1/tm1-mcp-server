@@ -31,14 +31,21 @@ type Scope = (typeof SCOPE_VALUES)[number];
 
 // antipatterns is opt-in (different output shape: a findings list, not a
 // ranked score) and excluded from the default scope.
-const SCOPE_DEFAULT: ReadonlyArray<Scope> = ["processes", "rules", "consistency"];
+const SCOPE_DEFAULT: ReadonlyArray<Scope> = [
+  "processes",
+  "rules",
+  "consistency",
+];
 
-export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client) {
+export function registerAuditComplexity(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_audit_complexity",
     "Bulk-scan TI processes and cube rules for complexity metrics (LOC, branches, max nesting, score) " +
-    "and cross-process naming consistency (variant clusters, type conflicts, prefix adherence p/v/n/s, cohorts). " +
-    "Cube rules: LOC, rule/feeder counts, DB() coupling, skipcheck/feedstrings flags.",
+      "and cross-process naming consistency (variant clusters, type conflicts, prefix adherence p/v/n/s, cohorts). " +
+      "Cube rules: LOC, rule/feeder counts, DB() coupling, skipcheck/feedstrings flags.",
     {
       scope: z
         .array(z.enum(SCOPE_VALUES))
@@ -238,7 +245,8 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
             };
           })()
         : null;
-      const antipatternErrors = antipatterns !== null && antipatterns.summary.error > 0;
+      const antipatternErrors =
+        antipatterns !== null && antipatterns.summary.error > 0;
 
       const status =
         consistencyIssues ||
@@ -252,76 +260,79 @@ export function registerAuditComplexity(server: McpServer, tm1Client: TM1Client)
           {
             type: "text" as const,
             text: JSON.stringify({
-                status,
-                productVersion: serverInfo.productVersion,
-                scope: activeScope,
-                includeControl,
-                rankBy,
-                scanned: {
-                  processes: processesScanned,
-                  rules: rulesScanned,
+              status,
+              productVersion: serverInfo.productVersion,
+              scope: activeScope,
+              includeControl,
+              rankBy,
+              scanned: {
+                processes: processesScanned,
+                rules: rulesScanned,
+              },
+              summary: {
+                processes: {
+                  totalLoc: processMetrics.reduce(
+                    (a, m) => a + m.totals.loc,
+                    0,
+                  ),
+                  totalBranches: processMetrics.reduce(
+                    (a, m) => a + m.totals.branches,
+                    0,
+                  ),
+                  maxNesting: processMetrics.reduce(
+                    (a, m) => Math.max(a, m.totals.maxNesting),
+                    0,
+                  ),
+                  avgCommentRatio:
+                    processesScanned === 0
+                      ? 0
+                      : processMetrics.reduce(
+                          (a, m) => a + m.totals.commentRatio,
+                          0,
+                        ) / processesScanned,
+                  totalDeadCodeLines: processMetrics.reduce(
+                    (a, m) => a + m.totals.deadCodeLines,
+                    0,
+                  ),
+                  avgDeadCodeRatio:
+                    processesScanned === 0
+                      ? 0
+                      : processMetrics.reduce(
+                          (a, m) => a + m.totals.deadCodeRatio,
+                          0,
+                        ) / processesScanned,
                 },
-                summary: {
-                  processes: {
-                    totalLoc: processMetrics.reduce((a, m) => a + m.totals.loc, 0),
-                    totalBranches: processMetrics.reduce(
-                      (a, m) => a + m.totals.branches,
-                      0,
-                    ),
-                    maxNesting: processMetrics.reduce(
-                      (a, m) => Math.max(a, m.totals.maxNesting),
-                      0,
-                    ),
-                    avgCommentRatio:
-                      processesScanned === 0
-                        ? 0
-                        : processMetrics.reduce(
-                            (a, m) => a + m.totals.commentRatio,
-                            0,
-                          ) / processesScanned,
-                    totalDeadCodeLines: processMetrics.reduce(
-                      (a, m) => a + m.totals.deadCodeLines,
-                      0,
-                    ),
-                    avgDeadCodeRatio:
-                      processesScanned === 0
-                        ? 0
-                        : processMetrics.reduce(
-                            (a, m) => a + m.totals.deadCodeRatio,
-                            0,
-                          ) / processesScanned,
-                  },
-                  rules: {
-                    totalRulesLoc: rulesMetrics.reduce(
-                      (a, m) => a + m.rulesLoc,
-                      0,
-                    ),
-                    totalRuleCount: rulesMetrics.reduce(
-                      (a, m) => a + m.ruleCount,
-                      0,
-                    ),
-                    totalDbCalls: rulesMetrics.reduce(
-                      (a, m) => a + m.dbCallCount,
-                      0,
-                    ),
-                    totalDeadCodeLines: rulesMetrics.reduce(
-                      (a, m) => a + m.deadCodeLines,
-                      0,
-                    ),
-                    cubesWithoutSkipcheck: rulesMetrics
-                      .filter((m) => !m.hasSkipcheck && m.rulesLoc > 0)
-                      .map((m) => m.cube),
-                  },
+                rules: {
+                  totalRulesLoc: rulesMetrics.reduce(
+                    (a, m) => a + m.rulesLoc,
+                    0,
+                  ),
+                  totalRuleCount: rulesMetrics.reduce(
+                    (a, m) => a + m.ruleCount,
+                    0,
+                  ),
+                  totalDbCalls: rulesMetrics.reduce(
+                    (a, m) => a + m.dbCallCount,
+                    0,
+                  ),
+                  totalDeadCodeLines: rulesMetrics.reduce(
+                    (a, m) => a + m.deadCodeLines,
+                    0,
+                  ),
+                  cubesWithoutSkipcheck: rulesMetrics
+                    .filter((m) => !m.hasSkipcheck && m.rulesLoc > 0)
+                    .map((m) => m.cube),
                 },
-                topProcesses,
-                topRules,
-                consistency,
-                antipatterns,
-                truncated: {
-                  processes: processMetrics.length > topProcesses.length,
-                  rules: rulesMetrics.length > topRules.length,
-                },
-              }),
+              },
+              topProcesses,
+              topRules,
+              consistency,
+              antipatterns,
+              truncated: {
+                processes: processMetrics.length > topProcesses.length,
+                rules: rulesMetrics.length > topRules.length,
+              },
+            }),
           },
         ],
       };

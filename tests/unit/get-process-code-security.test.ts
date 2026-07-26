@@ -43,7 +43,10 @@ describe("tm1_get_process_code includeSecurityAccess", () => {
       getCode: async () => code,
       getDeployMeta: async () => ({ hasSecurityAccess: true }),
     });
-    const res = await cb({ processName: "p1", includeSecurityAccess: true }, {});
+    const res = await cb(
+      { processName: "p1", includeSecurityAccess: true },
+      {},
+    );
     const payload = JSON.parse(res.content[0].text);
     expect(payload.hasSecurityAccess).toBe(true);
   });

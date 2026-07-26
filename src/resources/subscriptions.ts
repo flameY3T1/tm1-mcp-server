@@ -43,14 +43,20 @@ export class SubscriptionRegistry {
     lowLevel.setRequestHandler(SubscribeRequestSchema, (req) => {
       const uri = req.params.uri;
       this.subscribed.add(uri);
-      this.logger.debug({ uri, count: this.subscribed.size }, "Resource subscribed");
+      this.logger.debug(
+        { uri, count: this.subscribed.size },
+        "Resource subscribed",
+      );
       return {};
     });
 
     lowLevel.setRequestHandler(UnsubscribeRequestSchema, (req) => {
       const uri = req.params.uri;
       this.subscribed.delete(uri);
-      this.logger.debug({ uri, count: this.subscribed.size }, "Resource unsubscribed");
+      this.logger.debug(
+        { uri, count: this.subscribed.size },
+        "Resource unsubscribed",
+      );
       return {};
     });
 

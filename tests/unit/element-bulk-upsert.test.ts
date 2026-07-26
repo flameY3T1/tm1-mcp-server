@@ -20,7 +20,10 @@ interface FakeOpts {
   delayMs?: number; // per-call latency so concurrent scheduling interleaves
 }
 
-function makeService(opts: FakeOpts = {}): { svc: ElementService; calls: Call[] } {
+function makeService(opts: FakeOpts = {}): {
+  svc: ElementService;
+  calls: Call[];
+} {
   const calls: Call[] = [];
   const delay = opts.delayMs ?? 0;
   const http = {
@@ -44,7 +47,8 @@ function alreadyExists(): TM1Error {
   });
 }
 
-const hasComponents = (c: Call): boolean => !!(c.body as { Components?: unknown }).Components;
+const hasComponents = (c: Call): boolean =>
+  !!(c.body as { Components?: unknown }).Components;
 
 describe("ElementService.bulkUpsert — pass barrier + concurrency", () => {
   it("runs all leaf writes (pass 1) before any consolidation Components write (pass 2)", async () => {
@@ -52,23 +56,38 @@ describe("ElementService.bulkUpsert — pass barrier + concurrency", () => {
       { name: "L1", type: "Numeric" },
       { name: "L2", type: "Numeric" },
       { name: "L3", type: "String" },
-      { name: "C1", type: "Consolidated", components: [{ name: "L1", weight: 1 }] },
-      { name: "C2", type: "Consolidated", components: [{ name: "L2", weight: 1 }] },
+      {
+        name: "C1",
+        type: "Consolidated",
+        components: [{ name: "L1", weight: 1 }],
+      },
+      {
+        name: "C2",
+        type: "Consolidated",
+        components: [{ name: "L2", weight: 1 }],
+      },
     ];
     // Stagger latency so a broken barrier (pass 2 racing pass 1) surfaces as an
     // interleave rather than staying hidden behind deterministic ordering.
     const { svc, calls } = makeService({ delayMs: 5 });
     await svc.bulkUpsert("Dim", "Dim", elements);
 
-    const lastPost = calls.reduce((acc, c, i) => (c.method === "POST" ? i : acc), -1);
-    const firstComponentsPatch = calls.findIndex((c) => c.method === "PATCH" && hasComponents(c));
+    const lastPost = calls.reduce(
+      (acc, c, i) => (c.method === "POST" ? i : acc),
+      -1,
+    );
+    const firstComponentsPatch = calls.findIndex(
+      (c) => c.method === "PATCH" && hasComponents(c),
+    );
     expect(lastPost).toBeGreaterThanOrEqual(0);
     expect(firstComponentsPatch).toBeGreaterThanOrEqual(0);
     // Barrier: no Components-PATCH may precede any leaf/consolidation POST.
     expect(firstComponentsPatch).toBeGreaterThan(lastPost);
 
     expect(calls.filter((c) => c.method === "POST")).toHaveLength(5);
-    expect(calls.filter((c) => c.method === "PATCH" && hasComponents(c))).toHaveLength(2);
+    expect(
+      calls.filter((c) => c.method === "PATCH" && hasComponents(c)),
+    ).toHaveLength(2);
   });
 
   it("skips consolidations with no/empty components (no Components PATCH)", async () => {
@@ -127,10 +146,16 @@ describe("ElementService.bulkUpsert — pass barrier + concurrency", () => {
     const elements: ElementCreate[] = [
       { name: "L1", type: "Numeric" },
       { name: "L2", type: "Numeric" },
-      { name: "C1", type: "Consolidated", components: [{ name: "L1", weight: 1 }] },
+      {
+        name: "C1",
+        type: "Consolidated",
+        components: [{ name: "L1", weight: 1 }],
+      },
     ];
     await expect(svc.bulkUpsert("Dim", "Dim", elements)).rejects.toBe(boom);
     // Barrier held: a failed pass 1 aborts BEFORE any Components PATCH runs.
-    expect(calls.some((c) => c.method === "PATCH" && hasComponents(c))).toBe(false);
+    expect(calls.some((c) => c.method === "PATCH" && hasComponents(c))).toBe(
+      false,
+    );
   });
 });

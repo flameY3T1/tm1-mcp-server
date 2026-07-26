@@ -8,7 +8,9 @@ import { Writable } from "node:stream";
  * config (not a hand-copied one). Deleting a field from redactPaths() in
  * src/logger.ts now fails these tests, as it should.
  */
-function createTestLogger(level: "debug" | "info" | "warn" | "error" = "debug") {
+function createTestLogger(
+  level: "debug" | "info" | "warn" | "error" = "debug",
+) {
   const lines: string[] = [];
 
   const dest = new Writable({
@@ -71,7 +73,7 @@ describe("Logger", () => {
       const { logger, flush } = createTestLogger();
       logger.info(
         { headers: { Authorization: "Basic dXNlcjpwYXNz" } },
-        "request"
+        "request",
       );
 
       const entries = flush();
@@ -86,7 +88,7 @@ describe("Logger", () => {
       const { logger, flush } = createTestLogger();
       logger.info(
         { TM1SessionId: "abc123sessiontoken" },
-        "session established"
+        "session established",
       );
 
       const entries = flush();
@@ -106,7 +108,7 @@ describe("Logger", () => {
             TM1SessionId: "sess456",
           },
         },
-        "nested data"
+        "nested data",
       );
 
       const entries = flush();
@@ -129,7 +131,7 @@ describe("Logger", () => {
             apiKey: "v12ApiKey",
           },
         },
-        "v12 config"
+        "v12 config",
       );
 
       const entries = flush();
@@ -148,10 +150,7 @@ describe("Logger", () => {
 
     it("should not mask non-sensitive fields", () => {
       const { logger, flush } = createTestLogger();
-      logger.info(
-        { endpoint: "/api/v1/Cubes", status: 200 },
-        "api call"
-      );
+      logger.info({ endpoint: "/api/v1/Cubes", status: 200 }, "api call");
 
       const entries = flush();
       expect(entries.length).toBeGreaterThanOrEqual(1);
@@ -173,7 +172,7 @@ describe("Logger", () => {
       // pino isoTime produces a string like "2024-01-01T00:00:00.000Z"
       expect(typeof entry.time).toBe("string");
       expect(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(entry.time as string)
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(entry.time as string),
       ).toBe(true);
     });
 

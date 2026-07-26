@@ -14,7 +14,11 @@ import { TM1Error, TM1ErrorCode } from "../types.js";
  * @param flags   optional RegExp flags (e.g. "i", "gi")
  * @param label   human label for error messages (e.g. "nameRegex"); defaults to "regex"
  */
-export function compileUserRegex(pattern: string, flags?: string, label = "regex"): RegExp {
+export function compileUserRegex(
+  pattern: string,
+  flags?: string,
+  label = "regex",
+): RegExp {
   if (!safeRegex(pattern)) {
     throw new TM1Error({
       code: TM1ErrorCode.VALIDATION_ERROR,

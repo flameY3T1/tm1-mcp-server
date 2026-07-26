@@ -54,10 +54,10 @@ truth for any contributor adding TM1 calls or new tools.
 `src/index.ts` is the entry point. It builds one `McpServer`, registers the
 tools/prompts/resources, and connects it to a transport:
 
-| Transport            | When                                  | Notes                                              |
-|----------------------|---------------------------------------|----------------------------------------------------|
-| **stdio** (default)  | local Claude Code / Claude Desktop    | `StdioServerTransport`                              |
-| **Streamable HTTP**  | `TM1_MCP_TRANSPORT=http`             | stateless JSON, single `POST /mcp`, optional bearer token |
+| Transport           | When                               | Notes                                                     |
+| ------------------- | ---------------------------------- | --------------------------------------------------------- |
+| **stdio** (default) | local Claude Code / Claude Desktop | `StdioServerTransport`                                    |
+| **Streamable HTTP** | `TM1_MCP_TRANSPORT=http`           | stateless JSON, single `POST /mcp`, optional bearer token |
 
 Tool registration is gated by `config.mode` (env `TM1_MODE`):
 
@@ -99,15 +99,15 @@ export class CubeService {
 
 Key conventions:
 
-| Concern               | Convention                                                      |
-|-----------------------|-----------------------------------------------------------------|
-| Constructor           | `constructor(private readonly http: TM1HttpClient)`             |
-| Method names          | Domain-scoped — `list()`, not `listCubes()`. Prefix is implicit |
-| Long-running calls    | Accept `opts?: { timeoutMs?: number }` and pass to `request()`  |
-| Logging               | Use `this.http.logger` for warnings only — keep services quiet  |
-| Version branches      | `if (this.http.tm1Version.startsWith("11"))`                    |
-| Helpers               | Private methods on the service (e.g. `clearViaTI`)              |
-| State                 | None. Services are stateless wrappers.                          |
+| Concern            | Convention                                                      |
+| ------------------ | --------------------------------------------------------------- |
+| Constructor        | `constructor(private readonly http: TM1HttpClient)`             |
+| Method names       | Domain-scoped — `list()`, not `listCubes()`. Prefix is implicit |
+| Long-running calls | Accept `opts?: { timeoutMs?: number }` and pass to `request()`  |
+| Logging            | Use `this.http.logger` for warnings only — keep services quiet  |
+| Version branches   | `if (this.http.tm1Version.startsWith("11"))`                    |
+| Helpers            | Private methods on the service (e.g. `clearViaTI`)              |
+| State              | None. Services are stateless wrappers.                          |
 
 ### Wiring a service into TM1Client
 
@@ -136,7 +136,7 @@ surface while tools never do.
 **Init order is load-bearing where one service depends on another.**
 `ElementService` takes `CellService` (`new ElementService(this, this.cells)`),
 so `this.cells` must be assigned first. TypeScript types the field as defined
-and will *not* catch a reorder that leaves it `undefined` at construction time,
+and will _not_ catch a reorder that leaves it `undefined` at construction time,
 so the constructor asserts `this.cells` before wiring `elements`. Keep
 dependency-bearing services after the ones they consume, or the assert throws.
 
@@ -154,11 +154,11 @@ service (e.g. `ElementService.scanElementNames`) and call that.
 
 ## Why service-composition instead of mixins or inheritance
 
-| Pattern                  | Pro                              | Con                                      |
-|--------------------------|----------------------------------|------------------------------------------|
-| Inheritance chain        | Zero call-site diff              | 7-deep extends becomes opaque            |
-| TS function-mixins       | Zero call-site diff              | Method-name collision risk, hard to mock |
-| **Service-composition**  | TM1py-parity, sharp domain edges | One-time call-site migration cost        |
+| Pattern                 | Pro                              | Con                                      |
+| ----------------------- | -------------------------------- | ---------------------------------------- |
+| Inheritance chain       | Zero call-site diff              | 7-deep extends becomes opaque            |
+| TS function-mixins      | Zero call-site diff              | Method-name collision risk, hard to mock |
+| **Service-composition** | TM1py-parity, sharp domain edges | One-time call-site migration cost        |
 
 The service-composition path was chosen because:
 

@@ -15,7 +15,11 @@ export function registerDeleteElement(server: McpServer, tm1Client: TM1Client) {
     },
     async ({ dimensionName, hierarchyName, elementName, confirm }) => {
       requireConfirm(confirm, elementName, "element");
-      await tm1Client.elements.delete(dimensionName, hierarchyName, elementName);
+      await tm1Client.elements.delete(
+        dimensionName,
+        hierarchyName,
+        elementName,
+      );
       return actionResponse({ success: true, elementName });
     },
   );

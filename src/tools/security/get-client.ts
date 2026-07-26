@@ -14,7 +14,10 @@ export function registerGetClient(server: McpServer, tm1Client: TM1Client) {
     async ({ clientName, format }) => {
       const client = await tm1Client.security.getClient(clientName);
       return payloadResponse(client, format, (c) =>
-        renderKV(c as unknown as Record<string, unknown>, `Client ${clientName}`),
+        renderKV(
+          c as unknown as Record<string, unknown>,
+          `Client ${clientName}`,
+        ),
       );
     },
   );

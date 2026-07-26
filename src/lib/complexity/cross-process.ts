@@ -38,7 +38,9 @@ export function normalizeVarName(raw: string): string {
   return stripped.replace(/_/g, "").toLowerCase();
 }
 
-export function clusterVariableNames(processes: ProcessVarInput[]): NameCluster[] {
+export function clusterVariableNames(
+  processes: ProcessVarInput[],
+): NameCluster[] {
   const byKey = new Map<
     string,
     { variants: Set<string>; processes: Set<string> }
@@ -76,7 +78,9 @@ export interface TypeConflict {
   occurrences: Array<{ type: VarType; processes: string[] }>;
 }
 
-export function findTypeInconsistencies(processes: ProcessVarInput[]): TypeConflict[] {
+export function findTypeInconsistencies(
+  processes: ProcessVarInput[],
+): TypeConflict[] {
   const byName = new Map<string, Map<VarType, Set<string>>>();
   for (const p of processes) {
     for (const v of p.variables) {
@@ -125,8 +129,16 @@ function classifyPrefix(name: string): PrefixClass {
   return m ? (m[0] as PrefixClass) : "none";
 }
 
-export function reportPrefixConvention(processes: ProcessVarInput[]): PrefixConventionReport {
-  const counts: Record<PrefixClass, number> = { p: 0, v: 0, n: 0, s: 0, none: 0 };
+export function reportPrefixConvention(
+  processes: ProcessVarInput[],
+): PrefixConventionReport {
+  const counts: Record<PrefixClass, number> = {
+    p: 0,
+    v: 0,
+    n: 0,
+    s: 0,
+    none: 0,
+  };
   let total = 0;
   for (const p of processes) {
     for (const v of p.variables) {

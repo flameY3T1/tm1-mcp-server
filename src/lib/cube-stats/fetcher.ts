@@ -68,7 +68,11 @@ export async function fetchCubeStats(
   // Derived metric: feederEfficiency = fedCells / populatedNumeric.
   const fed = item.fedCells;
   const populated = item.populatedNumeric;
-  if (typeof fed === "number" && typeof populated === "number" && populated > 0) {
+  if (
+    typeof fed === "number" &&
+    typeof populated === "number" &&
+    populated > 0
+  ) {
     item.feederEfficiency = Number((fed / populated).toFixed(3));
   }
 
@@ -83,10 +87,13 @@ export async function fetchCubeStats(
  * cube fed purely cross-cube can legitimately hold no input data, so a
  * missing denominator is "insufficient signal", not overfeeding.
  */
-export function computeFedToPopulatedRatio(stats: CubeStatsItem): number | null {
+export function computeFedToPopulatedRatio(
+  stats: CubeStatsItem,
+): number | null {
   const pop = stats.populatedNumeric;
   const fed = stats.fedCells;
-  if (typeof pop !== "number" || typeof fed !== "number" || pop <= 0) return null;
+  if (typeof pop !== "number" || typeof fed !== "number" || pop <= 0)
+    return null;
   return fed / pop;
 }
 
@@ -98,6 +105,7 @@ export function computeFedToPopulatedRatio(stats: CubeStatsItem): number | null 
 export function computeFeederMemoryRatio(stats: CubeStatsItem): number | null {
   const feeders = stats.memoryFeeders;
   const input = stats.memoryInput;
-  if (typeof feeders !== "number" || typeof input !== "number" || input <= 0) return null;
+  if (typeof feeders !== "number" || typeof input !== "number" || input <= 0)
+    return null;
   return feeders / input;
 }

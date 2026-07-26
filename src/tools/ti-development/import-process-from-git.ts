@@ -7,7 +7,10 @@ import { resolveLocalPath } from "../local-file.js";
 import { parseProcessFromGit } from "../../lib/git-process.js";
 import { withToolHint } from "../error-format.js";
 
-export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Client) {
+export function registerImportProcessFromGit(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_import_process_from_git",
     [
@@ -16,17 +19,30 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
       "If the source datasource is ODBC, pass dataSourcePassword to re-inject the credential that export strips.",
     ].join(" "),
     {
-      jsonContent: z.string().optional().describe("Raw '{name}.json' body as string (structure)."),
-      tiContent: z.string().optional().describe("Raw '{name}.ti' body as string (procedure tabs)."),
+      jsonContent: z
+        .string()
+        .optional()
+        .describe("Raw '{name}.json' body as string (structure)."),
+      tiContent: z
+        .string()
+        .optional()
+        .describe("Raw '{name}.ti' body as string (procedure tabs)."),
       jsonPath: z
         .string()
         .optional()
-        .describe("Absolute host path to the .json file. Disabled unless TM1_LOCAL_FILE_ROOT is set; must resolve within that directory."),
+        .describe(
+          "Absolute host path to the .json file. Disabled unless TM1_LOCAL_FILE_ROOT is set; must resolve within that directory.",
+        ),
       tiPath: z
         .string()
         .optional()
-        .describe("Absolute host path to the .ti file. Disabled unless TM1_LOCAL_FILE_ROOT is set; must resolve within that directory."),
-      processName: z.string().optional().describe("Override process name. Default: name from the JSON."),
+        .describe(
+          "Absolute host path to the .ti file. Disabled unless TM1_LOCAL_FILE_ROOT is set; must resolve within that directory.",
+        ),
+      processName: z
+        .string()
+        .optional()
+        .describe("Override process name. Default: name from the JSON."),
       mode: z
         .enum(["create", "update", "upsert"])
         .optional()
@@ -35,23 +51,42 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
       dataSourcePassword: z
         .string()
         .optional()
-        .describe("ODBC password to re-inject (export omits it for security). Ignored for non-ODBC datasources."),
+        .describe(
+          "ODBC password to re-inject (export omits it for security). Ignored for non-ODBC datasources.",
+        ),
       preflight: z
         .boolean()
         .optional()
         .default(true)
-        .describe("Run tm1_check_process_code before applying. Abort on syntax errors. Default true."),
+        .describe(
+          "Run tm1_check_process_code before applying. Abort on syntax errors. Default true.",
+        ),
     },
-    async ({ jsonContent, tiContent, jsonPath, tiPath, processName: nameOverride, mode, dataSourcePassword, preflight }) => {
+    async ({
+      jsonContent,
+      tiContent,
+      jsonPath,
+      tiPath,
+      processName: nameOverride,
+      mode,
+      dataSourcePassword,
+      preflight,
+    }) => {
       let json = jsonContent ?? "";
       let ti = tiContent ?? "";
-      if (!json && jsonPath) json = await fs.readFile(resolveLocalPath(jsonPath, "jsonPath"), "utf8");
-      if (!ti && tiPath) ti = await fs.readFile(resolveLocalPath(tiPath, "tiPath"), "utf8");
+      if (!json && jsonPath)
+        json = await fs.readFile(
+          resolveLocalPath(jsonPath, "jsonPath"),
+          "utf8",
+        );
+      if (!ti && tiPath)
+        ti = await fs.readFile(resolveLocalPath(tiPath, "tiPath"), "utf8");
 
       if (!json || !ti) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
-          message: "Provide both the JSON and TI parts (jsonContent+tiContent or jsonPath+tiPath)",
+          message:
+            "Provide both the JSON and TI parts (jsonContent+tiContent or jsonPath+tiPath)",
         });
       }
 
@@ -69,7 +104,8 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
       if (!processName) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
-          message: "Process name not found in JSON ('name') and no name override provided",
+          message:
+            "Process name not found in JSON ('name') and no name override provided",
         });
       }
 
@@ -91,7 +127,16 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
         });
         if (!check.success) {
           return {
-            content: [{ type: "text" as const, text: JSON.stringify({ stage: "preflight", processName, errors: check.errors }) }],
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  stage: "preflight",
+                  processName,
+                  errors: check.errors,
+                }),
+              },
+            ],
             isError: true,
           };
         }
@@ -126,7 +171,10 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
       // absent are cleared, matching the exported .ti exactly.
       // Note: parsed tabs were used only for preflight validation above; this raw blob deploys, and TM1 owns the authoritative region split.
       await withToolHint(
-        tm1Client.processes.updateCodeBlob(processName, ti.replace(/\r?\n/g, "\r\n")),
+        tm1Client.processes.updateCodeBlob(
+          processName,
+          ti.replace(/\r?\n/g, "\r\n"),
+        ),
         `Code update failed after process '${processName}' was ${exists ? "located" : "created"}. PARTIAL APPLY: shell exists but tabs are stale/empty. Re-run with mode=update once root cause fixed, or tm1_delete_process to roll back.`,
       );
 
@@ -151,7 +199,10 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
 
       if (parsed.hasSecurityAccess !== undefined) {
         await withToolHint(
-          tm1Client.processes.updateSecurityAccess(processName, parsed.hasSecurityAccess),
+          tm1Client.processes.updateSecurityAccess(
+            processName,
+            parsed.hasSecurityAccess,
+          ),
           `HasSecurityAccess update failed for '${processName}'. Code+params+vars+datasource applied. Re-run with mode=update once root cause fixed.`,
         );
       }
@@ -164,7 +215,9 @@ export function registerImportProcessFromGit(server: McpServer, tm1Client: TM1Cl
               {
                 action,
                 processName,
-                ...(parsed.hasSecurityAccess !== undefined ? { hasSecurityAccess: parsed.hasSecurityAccess } : {}),
+                ...(parsed.hasSecurityAccess !== undefined
+                  ? { hasSecurityAccess: parsed.hasSecurityAccess }
+                  : {}),
                 parsed: {
                   prologLines: parsed.prolog.split("\n").length,
                   metadataLines: parsed.metadata.split("\n").length,

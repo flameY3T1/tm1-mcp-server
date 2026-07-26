@@ -1,9 +1,9 @@
-import { parseRules } from './rulesParser.js';
+import { parseRules } from "./rulesParser.js";
 
 export interface RulesLintDiagnose {
-  line: number;   // 0-based
+  line: number; // 0-based
   message: string;
-  severity: 'error' | 'warning' | 'hint';
+  severity: "error" | "warning" | "hint";
   ruleId: string;
 }
 
@@ -15,15 +15,16 @@ export type ApiRequestFn = (
 // OData key-segment encoding: double single quotes (OData literal escaping)
 // before percent-encoding, matching every service's `enc` helper. Cube/dim
 // names here come from semi-trusted rule text, so a `'` must not pass through raw.
-const odataKey = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const odataKey = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 // ─── String/comment neutralization ──────────────────────────────────────────
 
 /** Replaces quoted strings with same-length spaces and strips trailing comments. */
 function neutralizeLine(line: string): string {
   return line
-    .replace(/'[^']*'/g, s => ' '.repeat(s.length))
-    .replace(/#.*$/, '');
+    .replace(/'[^']*'/g, (s) => " ".repeat(s.length))
+    .replace(/#.*$/, "");
 }
 
 // ─── Existing helpers ────────────────────────────────────────────────────────
@@ -32,15 +33,18 @@ function hasUnclosedBracket(trimmed: string): boolean {
   const stripped = neutralizeLine(trimmed);
   let depth = 0;
   for (const ch of stripped) {
-    if (ch === '[') { depth++; }
-    else if (ch === ']') { depth--; }
+    if (ch === "[") {
+      depth++;
+    } else if (ch === "]") {
+      depth--;
+    }
   }
   return depth > 0;
 }
 
 function endsSemicolon(trimmed: string): boolean {
-  const noComment = trimmed.replace(/#.*$/, '').trim();
-  return noComment.endsWith(';');
+  const noComment = trimmed.replace(/#.*$/, "").trim();
+  return noComment.endsWith(";");
 }
 
 /**
@@ -51,8 +55,11 @@ function parenDepthChange(trimmed: string): number {
   const stripped = neutralizeLine(trimmed);
   let delta = 0;
   for (const ch of stripped) {
-    if (ch === '(')      { delta++; }
-    else if (ch === ')') { delta--; }
+    if (ch === "(") {
+      delta++;
+    } else if (ch === ")") {
+      delta--;
+    }
   }
   return delta;
 }
@@ -65,8 +72,12 @@ function parenDepthChange(trimmed: string): number {
  */
 function endsWithRuleTypeMarker(trimmed: string): boolean {
   const stripped = neutralizeLine(trimmed);
-  if (/[CNS]\s*:\s*$/i.test(stripped)) { return true; }
-  if (/(^|[^=])=\s*$/.test(stripped)) { return true; }
+  if (/[CNS]\s*:\s*$/i.test(stripped)) {
+    return true;
+  }
+  if (/(^|[^=])=\s*$/.test(stripped)) {
+    return true;
+  }
   return false;
 }
 
@@ -75,8 +86,8 @@ function endsWithRuleTypeMarker(trimmed: string): boolean {
  * After stripping comments and trailing whitespace, the last char must be `\`.
  */
 function endsWithBackslashContinuation(trimmed: string): boolean {
-  const stripped = trimmed.replace(/#.*$/, '').replace(/\s+$/, '');
-  return stripped.endsWith('\\');
+  const stripped = trimmed.replace(/#.*$/, "").replace(/\s+$/, "");
+  return stripped.endsWith("\\");
 }
 
 /**
@@ -85,7 +96,7 @@ function endsWithBackslashContinuation(trimmed: string): boolean {
  * (Rule-specific: `\` is float division in TM1 rules.)
  */
 function endsWithContinuingOperator(trimmed: string): boolean {
-  const stripped = neutralizeLine(trimmed).replace(/\s+$/, '');
+  const stripped = neutralizeLine(trimmed).replace(/\s+$/, "");
   return /[|+\-*/\\&,]$/.test(stripped);
 }
 
@@ -111,10 +122,12 @@ export function extractBracketRefs(line: string): string[] {
 
   for (let i = 0; i < neutralized.length; i++) {
     const ch = neutralized[i];
-    if (ch === '[') {
-      if (depth === 0) { start = i + 1; }
+    if (ch === "[") {
+      if (depth === 0) {
+        start = i + 1;
+      }
       depth++;
-    } else if (ch === ']') {
+    } else if (ch === "]") {
       depth--;
       if (depth === 0 && start !== -1) {
         results.push(line.slice(start, i).trim());
@@ -135,8 +148,8 @@ export function extractBracketRefs(line: string): string[] {
  *   Multiple of the above separated by commas
  */
 export function validateBracketRefSyntax(content: string): string | null {
-  if (content.trim() === '') {
-    return '[invalid-cell-ref-syntax] Empty cell reference [].';
+  if (content.trim() === "") {
+    return "[invalid-cell-ref-syntax] Empty cell reference [].";
   }
   // No quotes → likely a dynamic/variable reference (e.g. !Year) — skip validation
   if (!content.includes("'")) {
@@ -144,11 +157,13 @@ export function validateBracketRefSyntax(content: string): string | null {
   }
 
   const singleElem = `'[^']+'\\s*:\\s*'[^']+'`;
-  const multiElem  = `'[^']+'\\s*:\\s*\\{\\s*'[^']+'(?:\\s*,\\s*'[^']+')*\\s*\\}`;
-  const dimSpec    = `(?:${multiElem}|${singleElem})`;
-  const fullRe     = new RegExp(`^\\s*${dimSpec}(?:\\s*,\\s*${dimSpec})*\\s*$`);
+  const multiElem = `'[^']+'\\s*:\\s*\\{\\s*'[^']+'(?:\\s*,\\s*'[^']+')*\\s*\\}`;
+  const dimSpec = `(?:${multiElem}|${singleElem})`;
+  const fullRe = new RegExp(`^\\s*${dimSpec}(?:\\s*,\\s*${dimSpec})*\\s*$`);
 
-  if (fullRe.test(content)) { return null; }
+  if (fullRe.test(content)) {
+    return null;
+  }
 
   // Identify the offending sub-spec: split content on top-level commas, find
   // the first part that doesn't match the dimSpec pattern.
@@ -166,19 +181,22 @@ export function validateBracketRefSyntax(content: string): string | null {
 function splitTopLevelCommas(s: string): string[] {
   const out: string[] = [];
   let depth = 0;
-  let cur = '';
+  let cur = "";
   for (const ch of s) {
-    if (ch === '{') { depth++; }
-    else if (ch === '}') { depth = Math.max(0, depth - 1); }
-    if (ch === ',' && depth === 0) {
+    if (ch === "{") {
+      depth++;
+    } else if (ch === "}") {
+      depth = Math.max(0, depth - 1);
+    }
+    if (ch === "," && depth === 0) {
       out.push(cur);
-      cur = '';
+      cur = "";
     } else {
       cur += ch;
     }
   }
   out.push(cur);
-  return out.filter(p => p.trim().length > 0);
+  return out.filter((p) => p.trim().length > 0);
 }
 
 /** Parsed dimension + element(s) from a single [...] spec. */
@@ -200,7 +218,7 @@ export function parseBracketDimRefs(content: string): BracketDimRef[] {
     if (m[2] !== undefined) {
       result.push({ dim, elems: [m[2]] });
     } else if (m[3] !== undefined) {
-      const elems = [...m[3].matchAll(/'([^']+)'/g)].map(r => r[1]!);
+      const elems = [...m[3].matchAll(/'([^']+)'/g)].map((r) => r[1]!);
       result.push({ dim, elems });
     }
   }
@@ -211,31 +229,41 @@ export function parseBracketDimRefs(content: string): BracketDimRef[] {
 
 interface DbCall {
   args: string[];
-  cubeName: string | null;  // null = not a string literal
+  cubeName: string | null; // null = not a string literal
 }
 
 /** Splits a comma-separated DB() argument string, respecting nested parens and quotes. */
 function splitArgs(argsStr: string): string[] {
-  if (!argsStr.trim()) { return []; }
+  if (!argsStr.trim()) {
+    return [];
+  }
   const args: string[] = [];
   let depth = 0;
   let inString = false;
-  let current = '';
+  let current = "";
 
   for (const ch of argsStr) {
-    if (ch === "'" && !inString)      { inString = true;  current += ch; }
-    else if (ch === "'" && inString)  { inString = false; current += ch; }
-    else if (!inString && ch === '(') { depth++; current += ch; }
-    else if (!inString && ch === ')') { depth--; current += ch; }
-    else if (!inString && depth === 0 && ch === ',') {
+    if (ch === "'" && !inString) {
+      inString = true;
+      current += ch;
+    } else if (ch === "'" && inString) {
+      inString = false;
+      current += ch;
+    } else if (!inString && ch === "(") {
+      depth++;
+      current += ch;
+    } else if (!inString && ch === ")") {
+      depth--;
+      current += ch;
+    } else if (!inString && depth === 0 && ch === ",") {
       args.push(current.trim());
-      current = '';
+      current = "";
     } else {
       current += ch;
     }
   }
   args.push(current.trim());
-  return args.filter(a => a !== '');
+  return args.filter((a) => a !== "");
 }
 
 /**
@@ -253,18 +281,24 @@ export function extractDbCalls(line: string): DbCall[] {
     let depth = 1;
     let i = openPos + 1;
     while (i < neutralized.length && depth > 0) {
-      if (neutralized[i] === '(')      { depth++; }
-      else if (neutralized[i] === ')') { depth--; }
+      if (neutralized[i] === "(") {
+        depth++;
+      } else if (neutralized[i] === ")") {
+        depth--;
+      }
       i++;
     }
-    if (depth !== 0) { continue; } // unmatched paren — skip
+    if (depth !== 0) {
+      continue;
+    } // unmatched paren — skip
 
     const argsStr = line.slice(openPos + 1, i - 1);
     const args = splitArgs(argsStr);
-    const first = args[0]?.trim() ?? '';
-    const cubeName = first.startsWith("'") && first.endsWith("'") && first.length >= 3
-      ? first.slice(1, -1)
-      : null;
+    const first = args[0]?.trim() ?? "";
+    const cubeName =
+      first.startsWith("'") && first.endsWith("'") && first.length >= 3
+        ? first.slice(1, -1)
+        : null;
 
     results.push({ args, cubeName });
   }
@@ -280,13 +314,16 @@ export function lintRules(text: string): RulesLintDiagnose[] {
   // --- Structural checks ---
 
   if (ast.feedersCount === 0) {
-    const hasContent = ast.lines.some(l => !l.isBlank && !l.isComment && !l.isSkipcheck);
+    const hasContent = ast.lines.some(
+      (l) => !l.isBlank && !l.isComment && !l.isSkipcheck,
+    );
     if (hasContent) {
       diags.push({
         line: 0,
-        message: '[no-feeders-section] No FEEDERS; block found. Without feeders no rules are calculated.',
-        severity: 'warning',
-        ruleId: 'no-feeders-section',
+        message:
+          "[no-feeders-section] No FEEDERS; block found. Without feeders no rules are calculated.",
+        severity: "warning",
+        ruleId: "no-feeders-section",
       });
     }
   }
@@ -299,9 +336,10 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (seen > 1) {
           diags.push({
             line: l.lineIndex,
-            message: '[multiple-feeders] Multiple FEEDERS; markers found. Only the first is recognized by TM1.',
-            severity: 'error',
-            ruleId: 'multiple-feeders',
+            message:
+              "[multiple-feeders] Multiple FEEDERS; markers found. Only the first is recognized by TM1.",
+            severity: "error",
+            ruleId: "multiple-feeders",
           });
         }
       }
@@ -317,7 +355,9 @@ export function lintRules(text: string): RulesLintDiagnose[] {
   {
     let prev = -1;
     for (const l of ast.lines) {
-      if (l.isBlank || l.isComment || l.isSkipcheck || l.isFeedersMarker) { continue; }
+      if (l.isBlank || l.isComment || l.isSkipcheck || l.isFeedersMarker) {
+        continue;
+      }
       if (prev !== -1 && startsWithContinuingOperator(l.trimmed)) {
         continuedByNextLine.add(prev);
       }
@@ -352,7 +392,13 @@ export function lintRules(text: string): RulesLintDiagnose[] {
     }
 
     // Is this line a continuation of a multi-line statement?
-    const isContinuation = parenDepth > 0 || pendingRuleExpr || pendingFeedersArrow || pendingBackslashCont || pendingContinuingOp || pendingNextStartsWithOp;
+    const isContinuation =
+      parenDepth > 0 ||
+      pendingRuleExpr ||
+      pendingFeedersArrow ||
+      pendingBackslashCont ||
+      pendingContinuingOp ||
+      pendingNextStartsWithOp;
     parenDepth = Math.max(0, parenDepth + parenDepthChange(l.trimmed));
     // Does this line leave parens open (statement continues on next line)?
     const hasOpenParens = parenDepth > 0;
@@ -374,32 +420,40 @@ export function lintRules(text: string): RulesLintDiagnose[] {
     if (hasUnclosedBracket(l.trimmed)) {
       diags.push({
         line: l.lineIndex,
-        message: '[unclosed-bracket] Unclosed square bracket `[`.',
-        severity: 'error',
-        ruleId: 'unclosed-bracket',
+        message: "[unclosed-bracket] Unclosed square bracket `[`.",
+        severity: "error",
+        ruleId: "unclosed-bracket",
       });
     }
 
     const hasSemi = endsSemicolon(l.trimmed);
 
-    if (l.section === 'rules') {
+    if (l.section === "rules") {
       // Only flag missing-semicolon on complete statements (not mid-expression lines).
       // Also suppress when the line ends with a rule-type marker (N:, C:, S:) — expression on next line.
-      if (!hasSemi && !isContinuation && !hasOpenParens && !thisLineEndsRuleType && !thisLineEndsBackslash && !thisLineEndsContOp && !thisLineContinuedByNext) {
+      if (
+        !hasSemi &&
+        !isContinuation &&
+        !hasOpenParens &&
+        !thisLineEndsRuleType &&
+        !thisLineEndsBackslash &&
+        !thisLineEndsContOp &&
+        !thisLineContinuedByNext
+      ) {
         diags.push({
           line: l.lineIndex,
-          message: '[missing-semicolon] Statement does not end with a semicolon.',
-          severity: 'error',
-          ruleId: 'missing-semicolon',
+          message:
+            "[missing-semicolon] Statement does not end with a semicolon.",
+          severity: "error",
+          ruleId: "missing-semicolon",
         });
       }
-
     }
 
-    if (l.section === 'feeders') {
+    if (l.section === "feeders") {
       // Compute once for all feeder checks on this line.
       const neutralFeed = neutralizeLine(l.trimmed);
-      const hasArrow = neutralFeed.includes('=>');
+      const hasArrow = neutralFeed.includes("=>");
 
       // Missing-comma between two adjacent feeder targets (cell-ref or DB-call)
       // on separate lines — fires when prev line closed a target without
@@ -409,9 +463,10 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (startsNewTarget) {
           diags.push({
             line: l.lineIndex,
-            message: '[feeder-missing-comma] Missing comma between feeder targets.',
-            severity: 'error',
-            ruleId: 'feeder-missing-comma',
+            message:
+              "[feeder-missing-comma] Missing comma between feeder targets.",
+            severity: "error",
+            ruleId: "feeder-missing-comma",
           });
         }
       }
@@ -420,16 +475,17 @@ export function lintRules(text: string): RulesLintDiagnose[] {
       // LHS is the part before `=>`. If LHS contains more than one closing `]`
       // at top level (whether comma-separated or whitespace-separated), it
       // means multiple cell-refs on LHS — invalid (LHS must be a single ref).
-      const arrowIdx = neutralFeed.indexOf('=>');
+      const arrowIdx = neutralFeed.indexOf("=>");
       if (arrowIdx > 0) {
         const lhs = neutralFeed.slice(0, arrowIdx);
         const lhsCloseCount = (lhs.match(/\]/g) || []).length;
         if (lhsCloseCount > 1) {
           diags.push({
             line: l.lineIndex,
-            message: '[feeder-multi-lhs] Left-hand side of a feeder must be a single cell reference, not several.',
-            severity: 'error',
-            ruleId: 'feeder-multi-lhs',
+            message:
+              "[feeder-multi-lhs] Left-hand side of a feeder must be a single cell reference, not several.",
+            severity: "error",
+            ruleId: "feeder-multi-lhs",
           });
         }
       }
@@ -442,12 +498,15 @@ export function lintRules(text: string): RulesLintDiagnose[] {
       const sameLineRe = /[\])]\s+(?:\[|[A-Za-z_]\w*\s*\()/g;
       let m: RegExpExecArray | null;
       while ((m = sameLineRe.exec(neutralFeed)) !== null) {
-        if (arrowIdx >= 0 && m.index < arrowIdx) { continue; }
+        if (arrowIdx >= 0 && m.index < arrowIdx) {
+          continue;
+        }
         diags.push({
           line: l.lineIndex,
-          message: '[feeder-missing-comma] Missing comma between feeder targets.',
-          severity: 'error',
-          ruleId: 'feeder-missing-comma',
+          message:
+            "[feeder-missing-comma] Missing comma between feeder targets.",
+          severity: "error",
+          ruleId: "feeder-missing-comma",
         });
         break;
       }
@@ -464,9 +523,9 @@ export function lintRules(text: string): RulesLintDiagnose[] {
       // Update pendingFeederNeedsComma for the next iteration: true when the
       // current feeder line closes a target (`]` or `)`) without `,`/`;`/`=>`/
       // `\` continuation and parens are balanced.
-      const stripped = neutralFeed.replace(/\s+$/, '');
+      const stripped = neutralFeed.replace(/\s+$/, "");
       const lastChar = stripped.slice(-1);
-      const endsWithTargetClose = lastChar === ']' || lastChar === ')';
+      const endsWithTargetClose = lastChar === "]" || lastChar === ")";
       pendingFeederNeedsComma =
         pendingFeedersArrow &&
         endsWithTargetClose &&
@@ -474,26 +533,39 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         !hasOpenParens &&
         !thisLineEndsContOp &&
         !thisLineEndsBackslash &&
-        !stripped.endsWith('=>');
+        !stripped.endsWith("=>");
 
-      if (!hasSemi && !isContinuation && !hasOpenParens && !thisLineEndsRuleType && !thisLineEndsBackslash && !thisLineEndsContOp && !thisLineContinuedByNext && !pendingFeedersArrow) {
+      if (
+        !hasSemi &&
+        !isContinuation &&
+        !hasOpenParens &&
+        !thisLineEndsRuleType &&
+        !thisLineEndsBackslash &&
+        !thisLineEndsContOp &&
+        !thisLineContinuedByNext &&
+        !pendingFeedersArrow
+      ) {
         diags.push({
           line: l.lineIndex,
-          message: '[missing-semicolon] Statement does not end with a semicolon.',
-          severity: 'error',
-          ruleId: 'missing-semicolon',
+          message:
+            "[missing-semicolon] Statement does not end with a semicolon.",
+          severity: "error",
+          ruleId: "missing-semicolon",
         });
       }
 
       if (!isContinuation) {
-        const strippedFeed = l.trimmed.replace(/#.*$/, '').replace(/'[^']*'/g, '""');
+        const strippedFeed = l.trimmed
+          .replace(/#.*$/, "")
+          .replace(/'[^']*'/g, '""');
         if (!hasArrow && !pendingFeedersArrow) {
-          if (strippedFeed.includes('[')) {
+          if (strippedFeed.includes("[")) {
             diags.push({
               line: l.lineIndex,
-              message: '[feeder-missing-arrow] Feeder line without `=>` operator.',
-              severity: 'warning',
-              ruleId: 'feeder-missing-arrow',
+              message:
+                "[feeder-missing-arrow] Feeder line without `=>` operator.",
+              severity: "warning",
+              ruleId: "feeder-missing-arrow",
             });
           }
         }
@@ -503,18 +575,20 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         if (dbIdx !== -1 && (arrowIdx === -1 || dbIdx < arrowIdx)) {
           diags.push({
             line: l.lineIndex,
-            message: '[feeder-db-on-lhs] DB() is invalid on the left-hand side of a feeder. The source cell reference must be [...]; DB() is only allowed on the right-hand side.',
-            severity: 'error',
-            ruleId: 'feeder-db-on-lhs',
+            message:
+              "[feeder-db-on-lhs] DB() is invalid on the left-hand side of a feeder. The source cell reference must be [...]; DB() is only allowed on the right-hand side.",
+            severity: "error",
+            ruleId: "feeder-db-on-lhs",
           });
         }
 
         if (/=\s*[CNS]\s*:/i.test(strippedFeed)) {
           diags.push({
             line: l.lineIndex,
-            message: '[rule-after-feeders] Rule line (C:/N:/S:) after FEEDERS; — rules belong before the FEEDERS block.',
-            severity: 'warning',
-            ruleId: 'rule-after-feeders',
+            message:
+              "[rule-after-feeders] Rule line (C:/N:/S:) after FEEDERS; — rules belong before the FEEDERS block.",
+            severity: "warning",
+            ruleId: "rule-after-feeders",
           });
         }
       }
@@ -527,8 +601,8 @@ export function lintRules(text: string): RulesLintDiagnose[] {
         diags.push({
           line: l.lineIndex,
           message: msg,
-          severity: 'hint',
-          ruleId: 'invalid-cell-ref-syntax',
+          severity: "hint",
+          ruleId: "invalid-cell-ref-syntax",
         });
       }
     }
@@ -538,16 +612,18 @@ export function lintRules(text: string): RulesLintDiagnose[] {
       if (call.args.length < 2) {
         diags.push({
           line: l.lineIndex,
-          message: '[db-too-few-args] DB() needs at least 2 arguments (cube name + 1 dimension).',
-          severity: 'error',
-          ruleId: 'db-too-few-args',
+          message:
+            "[db-too-few-args] DB() needs at least 2 arguments (cube name + 1 dimension).",
+          severity: "error",
+          ruleId: "db-too-few-args",
         });
       } else if (call.cubeName === null) {
         diags.push({
           line: l.lineIndex,
-          message: '[db-invalid-cube-arg] First DB() argument must be a string literal (cube name in single quotes).',
-          severity: 'error',
-          ruleId: 'db-invalid-cube-arg',
+          message:
+            "[db-invalid-cube-arg] First DB() argument must be a string literal (cube name in single quotes).",
+          severity: "error",
+          ruleId: "db-invalid-cube-arg",
         });
       }
     }
@@ -580,17 +656,19 @@ export async function lintRulesServer(
 
   // Maps: lowercase key → original casing (first occurrence wins)
   const cubeOriginal = new Map<string, string>();
-  const dimOriginal  = new Map<string, string>();
+  const dimOriginal = new Map<string, string>();
   const lineData: LineServerData[] = [];
 
   // First pass: collect all DB() calls and valid bracket refs
   for (const l of ast.lines) {
-    if (l.isBlank || l.isComment || l.isSkipcheck || l.isFeedersMarker) { continue; }
+    if (l.isBlank || l.isComment || l.isSkipcheck || l.isFeedersMarker) {
+      continue;
+    }
 
     const dbCalls = extractDbCalls(l.trimmed);
     const rawRefs = extractBracketRefs(l.trimmed);
 
-    const bracketRefs: LineServerData['bracketRefs'] = [];
+    const bracketRefs: LineServerData["bracketRefs"] = [];
     for (const content of rawRefs) {
       // Only check refs that passed syntax validation and contain quoted literals
       if (validateBracketRefSyntax(content) === null && content.includes("'")) {
@@ -599,7 +677,9 @@ export async function lintRulesServer(
           bracketRefs.push({ dimRefs });
           for (const { dim } of dimRefs) {
             const lc = dim.toLowerCase();
-            if (!dimOriginal.has(lc)) { dimOriginal.set(lc, dim); }
+            if (!dimOriginal.has(lc)) {
+              dimOriginal.set(lc, dim);
+            }
           }
         }
       }
@@ -608,109 +688,145 @@ export async function lintRulesServer(
     for (const call of dbCalls) {
       if (call.cubeName !== null && call.args.length >= 2) {
         const lc = call.cubeName.toLowerCase();
-        if (!cubeOriginal.has(lc)) { cubeOriginal.set(lc, call.cubeName); }
+        if (!cubeOriginal.has(lc)) {
+          cubeOriginal.set(lc, call.cubeName);
+        }
       }
     }
 
-    const hasRelevantDb = dbCalls.some(c => c.cubeName !== null && c.args.length >= 2);
+    const hasRelevantDb = dbCalls.some(
+      (c) => c.cubeName !== null && c.args.length >= 2,
+    );
     if (hasRelevantDb || bracketRefs.length > 0) {
       lineData.push({ lineIndex: l.lineIndex, dbCalls, bracketRefs });
     }
   }
 
-  if (cubeOriginal.size === 0 && dimOriginal.size === 0) { return []; }
+  if (cubeOriginal.size === 0 && dimOriginal.size === 0) {
+    return [];
+  }
 
   // Fetch cube dimensions in parallel (names, not just count)
-  const cubeDimDetails = new Map<string, string[] | 'not-found'>();
-  await Promise.all([...cubeOriginal.entries()].map(async ([lc, orig]) => {
-    try {
-      const res = await api('GET', `Cubes('${odataKey(orig)}')/Dimensions?$select=Name`);
-      if (res.statusCode === 404) {
-        cubeDimDetails.set(lc, 'not-found');
-      } else if (res.statusCode >= 200 && res.statusCode < 300) {
-        const parsed = JSON.parse(res.body);
-        const dims = Array.isArray(parsed.value)
-          ? parsed.value.map((d: { Name: string }) => String(d.Name))
-          : [];
-        cubeDimDetails.set(lc, dims);
+  const cubeDimDetails = new Map<string, string[] | "not-found">();
+  await Promise.all(
+    [...cubeOriginal.entries()].map(async ([lc, orig]) => {
+      try {
+        const res = await api(
+          "GET",
+          `Cubes('${odataKey(orig)}')/Dimensions?$select=Name`,
+        );
+        if (res.statusCode === 404) {
+          cubeDimDetails.set(lc, "not-found");
+        } else if (res.statusCode >= 200 && res.statusCode < 300) {
+          const parsed = JSON.parse(res.body);
+          const dims = Array.isArray(parsed.value)
+            ? parsed.value.map((d: { Name: string }) => String(d.Name))
+            : [];
+          cubeDimDetails.set(lc, dims);
+        }
+      } catch {
+        /* network error — skip */
       }
-    } catch { /* network error — skip */ }
-  }));
+    }),
+  );
 
   // Add dimensions referenced by string-literal DB() args to dimOriginal,
   // so their elements are fetched in the next step.
   for (const { dbCalls } of lineData) {
     for (const call of dbCalls) {
-      if (call.cubeName === null) { continue; }
+      if (call.cubeName === null) {
+        continue;
+      }
       const dims = cubeDimDetails.get(call.cubeName.toLowerCase());
-      if (!Array.isArray(dims) || call.args.length !== dims.length + 1) { continue; }
+      if (!Array.isArray(dims) || call.args.length !== dims.length + 1) {
+        continue;
+      }
       for (let i = 1; i < call.args.length; i++) {
         const arg = call.args[i]!.trim();
-        if (!arg.startsWith("'") || !arg.endsWith("'") || arg.length < 3) { continue; }
-        if (arg.slice(1, -1).includes("'")) { continue; } // concatenation — skip
+        if (!arg.startsWith("'") || !arg.endsWith("'") || arg.length < 3) {
+          continue;
+        }
+        if (arg.slice(1, -1).includes("'")) {
+          continue;
+        } // concatenation — skip
         const dimIdx = i - 1;
         if (dimIdx < dims.length) {
           const dim = dims[dimIdx]!;
           const lc = dim.toLowerCase();
-          if (!dimOriginal.has(lc)) { dimOriginal.set(lc, dim); }
+          if (!dimOriginal.has(lc)) {
+            dimOriginal.set(lc, dim);
+          }
         }
       }
     }
   }
 
   // Fetch dimension elements in parallel (one call per unique dimension)
-  const dimElements = new Map<string, Set<string> | 'not-found'>();
-  await Promise.all([...dimOriginal.entries()].map(async ([lc, orig]) => {
-    try {
-      const enc = odataKey(orig);
-      const res = await api('GET',
-        `Dimensions('${enc}')/Hierarchies('${enc}')/Elements?$select=Name`,
-      );
-      if (res.statusCode === 404) {
-        dimElements.set(lc, 'not-found');
-      } else if (res.statusCode >= 200 && res.statusCode < 300) {
-        const parsed = JSON.parse(res.body);
-        const names = new Set<string>(
-          Array.isArray(parsed.value)
-            ? parsed.value.map((e: { Name: string }) => String(e.Name).toLowerCase())
-            : [],
+  const dimElements = new Map<string, Set<string> | "not-found">();
+  await Promise.all(
+    [...dimOriginal.entries()].map(async ([lc, orig]) => {
+      try {
+        const enc = odataKey(orig);
+        const res = await api(
+          "GET",
+          `Dimensions('${enc}')/Hierarchies('${enc}')/Elements?$select=Name`,
         );
-        dimElements.set(lc, names);
+        if (res.statusCode === 404) {
+          dimElements.set(lc, "not-found");
+        } else if (res.statusCode >= 200 && res.statusCode < 300) {
+          const parsed = JSON.parse(res.body);
+          const names = new Set<string>(
+            Array.isArray(parsed.value)
+              ? parsed.value.map((e: { Name: string }) =>
+                  String(e.Name).toLowerCase(),
+                )
+              : [],
+          );
+          dimElements.set(lc, names);
+        }
+      } catch {
+        /* network error — skip */
       }
-    } catch { /* network error — skip */ }
-  }));
+    }),
+  );
 
   // Second pass: validate against fetched data
   for (const { lineIndex, dbCalls, bracketRefs } of lineData) {
     // DB() argument count + element checks
     for (const call of dbCalls) {
-      if (call.cubeName === null || call.args.length < 2) { continue; }
+      if (call.cubeName === null || call.args.length < 2) {
+        continue;
+      }
       const lc = call.cubeName.toLowerCase();
       const dims = cubeDimDetails.get(lc);
 
-      if (dims === 'not-found') {
+      if (dims === "not-found") {
         diags.push({
           line: lineIndex,
           message: `[db-unknown-cube] Cube '${call.cubeName}' was not found on the server.`,
-          severity: 'warning',
-          ruleId: 'db-unknown-cube',
+          severity: "warning",
+          ruleId: "db-unknown-cube",
         });
       } else if (Array.isArray(dims)) {
         const expected = dims.length + 1; // cube name + one arg per dimension
         if (call.args.length !== expected) {
           diags.push({
             line: lineIndex,
-            message: `[db-arg-count-mismatch] DB('${call.cubeName}') expects ${expected} argument${expected !== 1 ? 's' : ''} (${dims.length} dimension${dims.length !== 1 ? 's' : ''}), but has ${call.args.length}.`,
-            severity: 'error',
-            ruleId: 'db-arg-count-mismatch',
+            message: `[db-arg-count-mismatch] DB('${call.cubeName}') expects ${expected} argument${expected !== 1 ? "s" : ""} (${dims.length} dimension${dims.length !== 1 ? "s" : ""}), but has ${call.args.length}.`,
+            severity: "error",
+            ruleId: "db-arg-count-mismatch",
           });
         } else {
           // Element existence check for string-literal dimension args
           for (let i = 1; i < call.args.length; i++) {
             const arg = call.args[i]!.trim();
-            if (!arg.startsWith("'") || !arg.endsWith("'") || arg.length < 3) { continue; }
+            if (!arg.startsWith("'") || !arg.endsWith("'") || arg.length < 3) {
+              continue;
+            }
             const inner = arg.slice(1, -1);
-            if (inner.includes("'")) { continue; } // concatenation — skip
+            if (inner.includes("'")) {
+              continue;
+            } // concatenation — skip
             const dimIdx = i - 1;
             const dim = dims[dimIdx]!;
             const elemSet = dimElements.get(dim.toLowerCase());
@@ -718,8 +834,8 @@ export async function lintRulesServer(
               diags.push({
                 line: lineIndex,
                 message: `[db-element-not-found] Element '${inner}' not found in dimension '${dim}' (DB() arg ${i + 1}).`,
-                severity: 'warning',
-                ruleId: 'db-element-not-found',
+                severity: "warning",
+                ruleId: "db-element-not-found",
               });
             }
           }
@@ -733,12 +849,12 @@ export async function lintRulesServer(
         const dimLc = dim.toLowerCase();
         const elemSet = dimElements.get(dimLc);
 
-        if (elemSet === 'not-found') {
+        if (elemSet === "not-found") {
           diags.push({
             line: lineIndex,
             message: `[dimension-not-found] Dimension '${dim}' was not found on the server.`,
-            severity: 'error',
-            ruleId: 'dimension-not-found',
+            severity: "error",
+            ruleId: "dimension-not-found",
           });
           continue;
         }
@@ -749,8 +865,8 @@ export async function lintRulesServer(
               diags.push({
                 line: lineIndex,
                 message: `[element-not-found] Element '${elem}' not found in dimension '${dim}'.`,
-                severity: 'warning',
-                ruleId: 'element-not-found',
+                severity: "warning",
+                ruleId: "element-not-found",
               });
             }
           }

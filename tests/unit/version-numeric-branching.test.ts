@@ -95,7 +95,11 @@ describe("A3 — service version-gating uses numeric config.version", () => {
 
   it("exposes numeric version off the held HTTP client via the same source of truth", () => {
     // TM1Client.version and the http-client branch source agree (both config.version).
-    expect(makeClient(makeConfig({ version: 12, tm1Version: "11.8" })).version).toBe(12);
-    expect(makeClient(makeConfig({ version: 11, tm1Version: "11.8" })).version).toBe(11);
+    expect(
+      makeClient(makeConfig({ version: 12, tm1Version: "11.8" })).version,
+    ).toBe(12);
+    expect(
+      makeClient(makeConfig({ version: 11, tm1Version: "11.8" })).version,
+    ).toBe(11);
   });
 });

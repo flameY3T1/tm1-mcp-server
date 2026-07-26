@@ -8,7 +8,10 @@ import { resolveLocalPath } from "../local-file.js";
 import { serializeProcessToGit } from "../../lib/git-process.js";
 import { maskCode, maskDataSourceSecrets } from "../../lib/mask-secrets.js";
 
-export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Client) {
+export function registerExportProcessToGit(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_export_process_to_git",
     [
@@ -22,7 +25,9 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
       writeToDir: z
         .string()
         .optional()
-        .describe("Optional absolute host directory to write '{name}.json' and '{name}.ti' into. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. If omitted, content is only returned inline."),
+        .describe(
+          "Optional absolute host directory to write '{name}.json' and '{name}.ti' into. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. If omitted, content is only returned inline.",
+        ),
       maskSecrets: z
         .boolean()
         .optional()
@@ -33,13 +38,14 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         ),
     },
     async ({ processName, writeToDir, maskSecrets }) => {
-      const [codeBlob, parameters, variables, dataSource, deployMeta] = await Promise.all([
-        tm1Client.processes.getCodeBlob(processName),
-        tm1Client.processes.getParameters(processName),
-        tm1Client.processes.getVariables(processName),
-        tm1Client.processes.getDataSource(processName),
-        tm1Client.processes.getDeployMeta(processName),
-      ]);
+      const [codeBlob, parameters, variables, dataSource, deployMeta] =
+        await Promise.all([
+          tm1Client.processes.getCodeBlob(processName),
+          tm1Client.processes.getParameters(processName),
+          tm1Client.processes.getVariables(processName),
+          tm1Client.processes.getDataSource(processName),
+          tm1Client.processes.getDeployMeta(processName),
+        ]);
 
       const mask = maskSecrets ? maskCode : (s: string) => s;
       const ti = mask(codeBlob);
@@ -47,14 +53,19 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
         name: processName,
         parameters,
         variables,
-        dataSource: maskSecrets ? maskDataSourceSecrets(dataSource) : dataSource,
+        dataSource: maskSecrets
+          ? maskDataSourceSecrets(dataSource)
+          : dataSource,
         hasSecurityAccess: deployMeta.hasSecurityAccess,
       });
 
       const jsonFileName = `${processName}.json`;
       const tiFileName = `${processName}.ti`;
 
-      const writtenTo: { json: string | null; ti: string | null } = { json: null, ti: null };
+      const writtenTo: { json: string | null; ti: string | null } = {
+        json: null,
+        ti: null,
+      };
       if (writeToDir) {
         // Reject path separators in the process name so the join below cannot
         // climb out of the target directory (resolveLocalPath also confines it).
@@ -65,8 +76,14 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
           });
         }
         const dir = resolveLocalPath(writeToDir, "writeToDir");
-        const jsonPath = resolveLocalPath(path.join(dir, jsonFileName), "writeToDir");
-        const tiPath = resolveLocalPath(path.join(dir, tiFileName), "writeToDir");
+        const jsonPath = resolveLocalPath(
+          path.join(dir, jsonFileName),
+          "writeToDir",
+        );
+        const tiPath = resolveLocalPath(
+          path.join(dir, tiFileName),
+          "writeToDir",
+        );
         // Create the target directory only AFTER confinement above, so the
         // symlink-aware realpath check ran against the pre-existing tree.
         await fs.mkdir(dir, { recursive: true });
@@ -77,24 +94,26 @@ export function registerExportProcessToGit(server: McpServer, tm1Client: TM1Clie
       }
 
       return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({
-            processName,
-            jsonFileName,
-            tiFileName,
-            parameterCount: parameters.length,
-            variableCount: variables.length,
-            dataSourceType: dataSource.type,
-            credentialsOmitted,
-            hasSecurityAccess: deployMeta.hasSecurityAccess,
-            writtenTo,
-            // Echo the file bodies inline only when NOT persisting to disk. With
-            // writeToDir the caller already has the files, so returning the code
-            // would just duplicate thousands of tokens into the context window.
-            ...(writeToDir ? {} : { json, ti }),
-          }),
-        }],
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              processName,
+              jsonFileName,
+              tiFileName,
+              parameterCount: parameters.length,
+              variableCount: variables.length,
+              dataSourceType: dataSource.type,
+              credentialsOmitted,
+              hasSecurityAccess: deployMeta.hasSecurityAccess,
+              writtenTo,
+              // Echo the file bodies inline only when NOT persisting to disk. With
+              // writeToDir the caller already has the files, so returning the code
+              // would just duplicate thousands of tokens into the context window.
+              ...(writeToDir ? {} : { json, ti }),
+            }),
+          },
+        ],
       };
     },
   );

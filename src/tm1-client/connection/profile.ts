@@ -18,7 +18,8 @@ export interface ConnectionProfile {
 
 // OData single-quote escaping for a key segment (double the apostrophes),
 // then URL-encode. Mirrors the `enc` helper used across the service layer.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 function buildBasicToken(user: string, password: string): string {
   return "Basic " + Buffer.from(`${user}:${password}`).toString("base64");
@@ -31,7 +32,10 @@ function buildV11Authorization(config: TM1Config): string {
   const { user, password, namespace, camPassport } = config;
   if (camPassport) return `CAMPassport ${camPassport}`;
   if (namespace) {
-    return "CAMNamespace " + Buffer.from(`${user}:${password}:${namespace}`).toString("base64");
+    return (
+      "CAMNamespace " +
+      Buffer.from(`${user}:${password}:${namespace}`).toString("base64")
+    );
   }
   return buildBasicToken(user, password);
 }
@@ -66,7 +70,10 @@ async function exchangeIamApiKey(
     encodeURIComponent(apiKey);
   const response = await fetch(iamUrl, {
     method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
     body,
     signal: AbortSignal.timeout(timeoutMs ?? 30000),
   });
@@ -75,7 +82,9 @@ async function exchangeIamApiKey(
   }
   const json = (await response.json()) as { access_token?: string };
   if (!json.access_token) {
-    throw new Error(`IAM token exchange returned no access_token from ${iamUrl}`);
+    throw new Error(
+      `IAM token exchange returned no access_token from ${iamUrl}`,
+    );
   }
   return json.access_token;
 }
@@ -84,7 +93,12 @@ async function exchangeIamApiKey(
 async function buildV12Authorization(config: TM1Config): Promise<string> {
   switch (config.authMode) {
     case "s2s":
-      return "Basic " + Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+      return (
+        "Basic " +
+        Buffer.from(`${config.clientId}:${config.clientSecret}`).toString(
+          "base64",
+        )
+      );
     case "basic":
       return buildBasicToken(config.user, config.password);
     case "access_token":

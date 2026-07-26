@@ -84,7 +84,8 @@ export function toOdataDateTime(input: string): string {
 // the inner string literals are already single-quote-escaped via esc().
 const enc = encodeURIComponent;
 // OData entity-key encoder: double ' per OData literal rules, then percent-encode.
-const encKey = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const encKey = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export class ServerService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -95,10 +96,16 @@ export class ServerService {
    * older builds.
    */
   async getInfo(): Promise<ServerInfo> {
-    const cfg = await this.http.request<Record<string, unknown>>("GET", "/api/v1/Configuration");
+    const cfg = await this.http.request<Record<string, unknown>>(
+      "GET",
+      "/api/v1/Configuration",
+    );
     let active: Record<string, unknown> = {};
     try {
-      active = await this.http.request<Record<string, unknown>>("GET", "/api/v1/ActiveConfiguration");
+      active = await this.http.request<Record<string, unknown>>(
+        "GET",
+        "/api/v1/ActiveConfiguration",
+      );
     } catch {
       // Some TM1 versions don't expose ActiveConfiguration — ignore.
     }
@@ -125,11 +132,22 @@ export class ServerService {
     return {
       serverName: String(merged.ServerName ?? ""),
       productVersion,
-      productEdition: merged.ProductEdition !== undefined ? String(merged.ProductEdition) : undefined,
-      adminHost: merged.AdminHost !== undefined ? String(merged.AdminHost) : undefined,
-      dataDirectory: merged.DataBaseDirectory !== undefined ? String(merged.DataBaseDirectory) : undefined,
-      timeZoneId: merged.TimeZoneID !== undefined ? String(merged.TimeZoneID) : undefined,
-      integratedSecurityMode: merged.IntegratedSecurityMode !== undefined ? String(merged.IntegratedSecurityMode) : undefined,
+      productEdition:
+        merged.ProductEdition !== undefined
+          ? String(merged.ProductEdition)
+          : undefined,
+      adminHost:
+        merged.AdminHost !== undefined ? String(merged.AdminHost) : undefined,
+      dataDirectory:
+        merged.DataBaseDirectory !== undefined
+          ? String(merged.DataBaseDirectory)
+          : undefined,
+      timeZoneId:
+        merged.TimeZoneID !== undefined ? String(merged.TimeZoneID) : undefined,
+      integratedSecurityMode:
+        merged.IntegratedSecurityMode !== undefined
+          ? String(merged.IntegratedSecurityMode)
+          : undefined,
       extra: merged,
     };
   }
@@ -166,8 +184,12 @@ export class ServerService {
     // URL-encoded with enc() below (mirrors getAuditLog()'s esc()+enc() pattern).
     const esc = (s: string): string => s.replace(/'/g, "''");
     const filters: string[] = [];
-    if (opts.filter) filters.push(`contains(tolower(Message),'${esc(opts.filter.toLowerCase())}')`);
-    if (opts.level) filters.push(`toupper(Level) eq '${esc(opts.level.toUpperCase())}'`);
+    if (opts.filter)
+      filters.push(
+        `contains(tolower(Message),'${esc(opts.filter.toLowerCase())}')`,
+      );
+    if (opts.level)
+      filters.push(`toupper(Level) eq '${esc(opts.level.toUpperCase())}'`);
     if (opts.logger) filters.push(`Logger eq '${esc(opts.logger)}'`);
     if (opts.since) filters.push(`TimeStamp ge ${toOdataDateTime(opts.since)}`);
     if (opts.until) filters.push(`TimeStamp le ${toOdataDateTime(opts.until)}`);
@@ -175,7 +197,14 @@ export class ServerService {
     const qs: string[] = [`$orderby=${enc("TimeStamp desc")}`, `$top=${top}`];
     if (filters.length > 0) qs.push(`$filter=${enc(filters.join(" and "))}`);
 
-    type RawEntry = { TimeStamp?: string; Timestamp?: string; Level?: string; Message?: string; Text?: string; Logger?: string };
+    type RawEntry = {
+      TimeStamp?: string;
+      Timestamp?: string;
+      Level?: string;
+      Message?: string;
+      Text?: string;
+      Logger?: string;
+    };
     const map = (rows: RawEntry[]): MessageLogEntry[] =>
       rows.map((e) => {
         const message = e.Message ?? e.Text ?? "";
@@ -218,7 +247,9 @@ export class ServerService {
       let rows = response.value;
       if (opts.filter) {
         const needle = opts.filter.toLowerCase();
-        rows = rows.filter((e) => (e.Message ?? e.Text ?? "").toLowerCase().includes(needle));
+        rows = rows.filter((e) =>
+          (e.Message ?? e.Text ?? "").toLowerCase().includes(needle),
+        );
       }
       if (opts.level) {
         const want = opts.level.toUpperCase();
@@ -267,8 +298,10 @@ export class ServerService {
     const esc = (s: string): string => s.replace(/'/g, "''");
     const filters: string[] = [];
     if (opts.user) filters.push(`UserName eq '${esc(opts.user)}'`);
-    if (opts.objectType) filters.push(`ObjectType eq '${esc(opts.objectType)}'`);
-    if (opts.objectName) filters.push(`ObjectName eq '${esc(opts.objectName)}'`);
+    if (opts.objectType)
+      filters.push(`ObjectType eq '${esc(opts.objectType)}'`);
+    if (opts.objectName)
+      filters.push(`ObjectName eq '${esc(opts.objectName)}'`);
     if (opts.since) filters.push(`TimeStamp ge ${toOdataDateTime(opts.since)}`);
     if (opts.until) filters.push(`TimeStamp le ${toOdataDateTime(opts.until)}`);
 
@@ -303,7 +336,8 @@ export class ServerService {
 
     return response.value.map((e): AuditLogEntry => {
       const entry: AuditLogEntry = mapDetail(e);
-      if (e.AuditDetails !== undefined) entry.details = e.AuditDetails.map(mapDetail);
+      if (e.AuditDetails !== undefined)
+        entry.details = e.AuditDetails.map(mapDetail);
       return entry;
     });
   }
@@ -335,7 +369,11 @@ export class ServerService {
         since: opts.since,
         until: opts.until,
       });
-      return { entries, coverage: "complete", scannedFrom: toOdataDateTime(opts.since) };
+      return {
+        entries,
+        coverage: "complete",
+        scannedFrom: toOdataDateTime(opts.since),
+      };
     }
 
     // No lower bound → adaptive backward windowing from `until` (or now). An
@@ -345,7 +383,9 @@ export class ServerService {
     // Coverage: "partial" if we stopped because `top` filled or a window failed
     // (older matching rows may exist earlier); "complete" if windows exhausted.
     const anchorMs =
-      opts.until !== undefined ? Date.parse(toOdataDateTime(opts.until)) : Date.now();
+      opts.until !== undefined
+        ? Date.parse(toOdataDateTime(opts.until))
+        : Date.now();
     let collected: TransactionLogEntry[] = [];
     let scannedFromMs = anchorMs;
     for (const windowMs of TXLOG_BACKFILL_WINDOWS_MS) {
@@ -367,15 +407,27 @@ export class ServerService {
         // from queryTransactionLog) is expected and just stops widening — but we
         // stopped short of exhausting the span, so coverage is partial.
         rethrowIfSystemicOrDenied(err);
-        return { entries: collected, coverage: "partial", scannedFrom: epochToOData(scannedFromMs) };
+        return {
+          entries: collected,
+          coverage: "partial",
+          scannedFrom: epochToOData(scannedFromMs),
+        };
       }
       scannedFromMs = floorMs;
       collected = entries;
       if (entries.length >= top) {
-        return { entries, coverage: "partial", scannedFrom: epochToOData(floorMs) };
+        return {
+          entries,
+          coverage: "partial",
+          scannedFrom: epochToOData(floorMs),
+        };
       }
     }
-    return { entries: collected, coverage: "complete", scannedFrom: epochToOData(scannedFromMs) };
+    return {
+      entries: collected,
+      coverage: "complete",
+      scannedFrom: epochToOData(scannedFromMs),
+    };
   }
 
   /**
@@ -493,12 +545,17 @@ export class ServerService {
    * chronological newest-first. Filters (processName, since, top) are applied
    * client-side.
    */
-  async listErrorLogFiles(opts: { processName?: string | undefined; since?: string | undefined; top?: number | undefined } = {}): Promise<ErrorLogFile[]> {
+  async listErrorLogFiles(
+    opts: {
+      processName?: string | undefined;
+      since?: string | undefined;
+      top?: number | undefined;
+    } = {},
+  ): Promise<ErrorLogFile[]> {
     const top = opts.top ?? 50;
-    const response = await this.http.request<{ value: Array<{ Filename?: string }> }>(
-      "GET",
-      "/api/v1/ErrorLogFiles",
-    );
+    const response = await this.http.request<{
+      value: Array<{ Filename?: string }>;
+    }>("GET", "/api/v1/ErrorLogFiles");
     let entries = response.value
       .map((e): ErrorLogFile => ({ filename: e.Filename ?? "" }))
       .filter((e) => e.filename);
@@ -522,12 +579,16 @@ export class ServerService {
       const sinceCompact = opts.since.replace(/[^0-9]/g, "").slice(0, 14);
       if (sinceCompact.length >= 8) {
         entries = entries.filter((e) => {
-          const m = e.filename.match(/(?:TM1ProcessError_|_)(\d{14})/) ?? e.filename.match(/_(\d{8,14})\.log$/i);
+          const m =
+            e.filename.match(/(?:TM1ProcessError_|_)(\d{14})/) ??
+            e.filename.match(/_(\d{8,14})\.log$/i);
           return m ? m[1]! >= sinceCompact.slice(0, m[1]!.length) : true;
         });
       }
     }
-    entries.sort((a, b) => (a.filename < b.filename ? 1 : a.filename > b.filename ? -1 : 0));
+    entries.sort((a, b) =>
+      a.filename < b.filename ? 1 : a.filename > b.filename ? -1 : 0,
+    );
     return entries.slice(0, top);
   }
 

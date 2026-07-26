@@ -125,7 +125,10 @@ for (const t of transforms) {
   const full = path.join(root, t.file);
   const src = fs.readFileSync(full, "utf8");
   if (!src.includes(t.find)) {
-    failed.push({ file: t.file, reason: "find pattern not present (already converted or drift)" });
+    failed.push({
+      file: t.file,
+      reason: "find pattern not present (already converted or drift)",
+    });
     continue;
   }
   const next = src.replace(t.find, t.replace);
@@ -138,7 +141,9 @@ for (const t of transforms) {
   }
 }
 
-console.log(`\n${APPLY ? "Applied" : "Would modify"}: ${modified}/${transforms.length}`);
+console.log(
+  `\n${APPLY ? "Applied" : "Would modify"}: ${modified}/${transforms.length}`,
+);
 if (failed.length > 0) {
   console.log(`Failed: ${failed.length}`);
   for (const f of failed) console.log(`  ${f.file} — ${f.reason}`);

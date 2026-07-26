@@ -3,7 +3,10 @@
 import type pino from "pino";
 import type { TM1Config } from "../config.js";
 import type { SessionManager } from "../session-manager.js";
-import { createConnectionProfile, type ConnectionProfile } from "./connection/profile.js";
+import {
+  createConnectionProfile,
+  type ConnectionProfile,
+} from "./connection/profile.js";
 import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
 import { getTm1Dispatcher, tm1Fetch } from "./dispatcher.js";
@@ -41,7 +44,10 @@ export interface RequestOptions {
 // caller must invoke in `finally` to avoid leaking the listener after the
 // request resolves. If the external signal is already aborted, propagates the
 // reason immediately.
-function linkAbortSignals(local: AbortController, external?: AbortSignal): () => void {
+function linkAbortSignals(
+  local: AbortController,
+  external?: AbortSignal,
+): () => void {
   if (!external) return () => undefined;
   if (external.aborted) {
     local.abort(external.reason);
@@ -130,10 +136,20 @@ export class TM1HttpClient {
 
       try {
         const cookie = await this.sessionManager.ensureSession();
-        const response = await this.executeRequest(url, method, cookie, body, opts?.timeoutMs, opts?.signal);
+        const response = await this.executeRequest(
+          url,
+          method,
+          cookie,
+          body,
+          opts?.timeoutMs,
+          opts?.signal,
+        );
 
         if (response.status === 401) {
-          this.logger.warn({ endpoint: path }, "Received 401, re-authenticating");
+          this.logger.warn(
+            { endpoint: path },
+            "Received 401, re-authenticating",
+          );
           // Pass the cookie that got the 401 so a concurrent request that
           // already rotated the session short-circuits to the fresh cookie
           // instead of forcing another logout+login (staggered-401 churn).
@@ -221,7 +237,11 @@ export class TM1HttpClient {
    * Re-auths once on 401 like request().
    */
   /** @internal — for Service-layer use; not part of the public consumer API. */
-  public async requestRaw(method: string, path: string, opts?: RequestOptions): Promise<string> {
+  public async requestRaw(
+    method: string,
+    path: string,
+    opts?: RequestOptions,
+  ): Promise<string> {
     const url = `${this.config.baseUrl}${this.profile.resolveApiPath(path)}`;
     const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
     const cookie = await this.sessionManager.ensureSession();
@@ -237,7 +257,14 @@ export class TM1HttpClient {
     const response = await this.withReauth(
       (c) => {
         const hdrs = { ...headers, Cookie: `TM1SessionId=${c}` };
-        return this.sendOnce(url, method, hdrs, undefined, effectiveTimeout, opts?.signal);
+        return this.sendOnce(
+          url,
+          method,
+          hdrs,
+          undefined,
+          effectiveTimeout,
+          opts?.signal,
+        );
       },
       cookie,
       path,
@@ -246,7 +273,11 @@ export class TM1HttpClient {
 
     if (!response.ok) {
       let body = "";
-      try { body = await response.text(); } catch { /* ignore */ }
+      try {
+        body = await response.text();
+      } catch {
+        /* ignore */
+      }
       throw this.classifyHttpError(response.status, path, body || undefined);
     }
     const text = await response.text();
@@ -275,21 +306,22 @@ export class TM1HttpClient {
     const cookie = await this.sessionManager.ensureSession();
 
     const response = await this.withReauth(
-      (c) => this.sendOnce(
-        url,
-        method,
-        {
-          Cookie: `TM1SessionId=${c}`,
-          Accept: "application/json,*/*",
-          "Content-Type": contentType,
-          "User-Agent": USER_AGENT,
-          "TM1-SessionContext": USER_AGENT,
-          "TM1-Session-Context": USER_AGENT,
-        },
-        body,
-        effectiveTimeout,
-        opts?.signal,
-      ),
+      (c) =>
+        this.sendOnce(
+          url,
+          method,
+          {
+            Cookie: `TM1SessionId=${c}`,
+            Accept: "application/json,*/*",
+            "Content-Type": contentType,
+            "User-Agent": USER_AGENT,
+            "TM1-SessionContext": USER_AGENT,
+            "TM1-Session-Context": USER_AGENT,
+          },
+          body,
+          effectiveTimeout,
+          opts?.signal,
+        ),
       cookie,
       path,
       effectiveTimeout,
@@ -297,7 +329,11 @@ export class TM1HttpClient {
 
     if (!response.ok) {
       let errBody = "";
-      try { errBody = await response.text(); } catch { /* ignore */ }
+      try {
+        errBody = await response.text();
+      } catch {
+        /* ignore */
+      }
       throw this.classifyHttpError(response.status, path, errBody || undefined);
     }
     if (!isSafeHttpMethod(method)) {
@@ -319,7 +355,8 @@ export class TM1HttpClient {
   ): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(
-      () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
+      () =>
+        controller.abort(new DOMException("Request timed out", "TimeoutError")),
       timeoutMs,
     );
     const unlink = linkAbortSignals(controller, externalSignal);
@@ -354,7 +391,11 @@ export class TM1HttpClient {
       response = await send(initialCookie);
     } catch (err) {
       if (isTimeoutError(err)) {
-        throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
+        throw new TM1Error({
+          code: TM1ErrorCode.LOCK_TIMEOUT,
+          message: `Request to ${path} timed out after ${effectiveTimeout}ms`,
+          endpoint: path,
+        });
       }
       throw err;
     }
@@ -364,7 +405,11 @@ export class TM1HttpClient {
         response = await send(newCookie);
       } catch (err) {
         if (isTimeoutError(err)) {
-          throw new TM1Error({ code: TM1ErrorCode.LOCK_TIMEOUT, message: `Request to ${path} timed out after ${effectiveTimeout}ms`, endpoint: path });
+          throw new TM1Error({
+            code: TM1ErrorCode.LOCK_TIMEOUT,
+            message: `Request to ${path} timed out after ${effectiveTimeout}ms`,
+            endpoint: path,
+          });
         }
         throw err;
       }
@@ -389,17 +434,28 @@ export class TM1HttpClient {
       "TM1-Session-Context": USER_AGENT,
     };
 
-    const isWriteMethod = method === "POST" || method === "PUT" || method === "PATCH";
+    const isWriteMethod =
+      method === "POST" || method === "PUT" || method === "PATCH";
     if (body !== undefined || isWriteMethod) {
       headers["Content-Type"] = "application/json";
     }
 
     const serializedBody: string | undefined =
-      body !== undefined ? JSON.stringify(body) : isWriteMethod ? "" : undefined;
+      body !== undefined
+        ? JSON.stringify(body)
+        : isWriteMethod
+          ? ""
+          : undefined;
 
-    return this.sendOnce(url, method, headers, serializedBody, timeoutMs ?? this.config.requestTimeoutMs, externalSignal);
+    return this.sendOnce(
+      url,
+      method,
+      headers,
+      serializedBody,
+      timeoutMs ?? this.config.requestTimeoutMs,
+      externalSignal,
+    );
   }
-
 
   private async handleResponse<T>(
     response: Response,
@@ -434,7 +490,8 @@ export class TM1HttpClient {
       errorBody = await response.text();
       if (errorBody) {
         const parsed = JSON.parse(errorBody);
-        details = parsed?.error?.message?.value ?? parsed?.error?.message ?? errorBody;
+        details =
+          parsed?.error?.message?.value ?? parsed?.error?.message ?? errorBody;
       }
     } catch {
       /* ignore parse errors */
@@ -458,7 +515,12 @@ export class TM1HttpClient {
     // returns 400 {"error":{"code":"65","message":"ObjectSecurityNoReadRights"}}.
     // Classify by message so the caller gets PERMISSION_DENIED + its actionable
     // hint instead of a generic TM1_ERROR. Verified live with a cube-only user.
-    if (details && /No(Read|Write|Admin)Rights|ObjectSecurity|SecurityAccess|not\s+authori[sz]ed/i.test(details)) {
+    if (
+      details &&
+      /No(Read|Write|Admin)Rights|ObjectSecurity|SecurityAccess|not\s+authori[sz]ed/i.test(
+        details,
+      )
+    ) {
       return new TM1Error({
         code: TM1ErrorCode.PERMISSION_DENIED,
         message: details,

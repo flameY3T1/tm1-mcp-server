@@ -28,46 +28,71 @@ export interface DatasourceMembership {
 
 export interface MembershipDeps {
   getViewDefinition(cube: string, view: string): Promise<ViewDefinition>;
-  getSubset(dimension: string, hierarchy: string, subset: string): Promise<Subset>;
+  getSubset(
+    dimension: string,
+    hierarchy: string,
+    subset: string,
+  ): Promise<Subset>;
   /** C1 (opt-in): resolve a computed axis set to its concrete member names, already scoped to `dimension`. */
-  evaluateSetExpression?(cube: string, dimension: string, mdxSet: string): Promise<string[]>;
+  evaluateSetExpression?(
+    cube: string,
+    dimension: string,
+    mdxSet: string,
+  ): Promise<string[]>;
 }
 
 export async function buildDatasourceMembership(
   deps: MembershipDeps,
   dsList: DataSourceEntry[],
 ): Promise<DatasourceMembership> {
-  const byElement = new Map<string, Array<{ process: string; via: MembershipVia }>>();
+  const byElement = new Map<
+    string,
+    Array<{ process: string; via: MembershipVia }>
+  >();
   const computedByProcess = new Map<string, Map<string, Set<string>>>();
   const fetchErrors: DatasourceMembership["fetchErrors"] = [];
   // C1: per-run cache keyed by (cube, lowercased expression) — avoids re-evaluating a shared axis
   // (cosmetically-different-cased identical sets share the cache; members still added with real casing).
   const evalCache = new Map<string, string[]>();
 
-  const addMember = (process: string, dim: string, el: string, via: MembershipVia) => {
+  const addMember = (
+    process: string,
+    dim: string,
+    el: string,
+    via: MembershipVia,
+  ) => {
     const k = elementKey(dim, el);
     const arr = byElement.get(k) ?? [];
-    if (!arr.some((e) => e.process === process && e.via === via)) arr.push({ process, via });
+    if (!arr.some((e) => e.process === process && e.via === via))
+      arr.push({ process, via });
     byElement.set(k, arr);
   };
   /** dim: owning dimension of the computed selector, or "*" when it cannot be tied to one axis (whole-MDX-VIEW). */
   const addComputed = (process: string, dim: string, names: string[]) => {
     if (names.length === 0) return;
     const dimLc = dim.toLowerCase();
-    const byDim = computedByProcess.get(process) ?? new Map<string, Set<string>>();
+    const byDim =
+      computedByProcess.get(process) ?? new Map<string, Set<string>>();
     const set = byDim.get(dimLc) ?? new Set<string>();
     for (const n of names) set.add(n);
     byDim.set(dimLc, set);
     computedByProcess.set(process, byDim);
   };
-  const addMdx = (process: string, mdx: string, via: MembershipVia, dim: string) => {
+  const addMdx = (
+    process: string,
+    mdx: string,
+    via: MembershipVia,
+    dim: string,
+  ) => {
     const { members, computedSelectors } = extractMdxMemberRefs(mdx);
-    for (const ref of members) addMember(process, ref.dimension, ref.element, via);
+    for (const ref of members)
+      addMember(process, ref.dimension, ref.element, via);
     addComputed(process, dim, computedSelectors);
   };
   const applySubset = (process: string, sub: Subset) => {
     if (sub.elements.length > 0) {
-      for (const el of sub.elements) addMember(process, sub.dimensionName, el, "subset-static");
+      for (const el of sub.elements)
+        addMember(process, sub.dimensionName, el, "subset-static");
     } else if (sub.expression) {
       addMdx(process, sub.expression, "subset-mdx", sub.dimensionName);
     }
@@ -88,45 +113,83 @@ export async function buildDatasourceMembership(
           // ONLY the selected member — never expression/subsetName enumeration.
           for (const title of def.native.titles) {
             if (title.selectedElement && title.dimensionName) {
-              addMember(ds.name, title.dimensionName, title.selectedElement, "view-native-title");
+              addMember(
+                ds.name,
+                title.dimensionName,
+                title.selectedElement,
+                "view-native-title",
+              );
             }
           }
           // Columns/rows iterate their full axis — every member is read.
           const axes = [...def.native.columns, ...def.native.rows];
           for (const ax of axes) {
             if (ax.expression) {
-              const { members, computedSelectors } = extractMdxMemberRefs(ax.expression);
-              for (const ref of members) addMember(ds.name, ref.dimension, ref.element, "view-native-expr");
+              const { members, computedSelectors } = extractMdxMemberRefs(
+                ax.expression,
+              );
+              for (const ref of members)
+                addMember(
+                  ds.name,
+                  ref.dimension,
+                  ref.element,
+                  "view-native-expr",
+                );
               addComputed(ds.name, ax.dimensionName ?? "*", computedSelectors);
               // C1: if this axis is computed and a resolver is provided, resolve it exactly.
-              if (computedSelectors.length > 0 && deps.evaluateSetExpression && ax.dimensionName) {
+              if (
+                computedSelectors.length > 0 &&
+                deps.evaluateSetExpression &&
+                ax.dimensionName
+              ) {
                 const cacheKey = `${ds.sourceName.toLowerCase()} ${ax.expression.toLowerCase()}`;
                 let names = evalCache.get(cacheKey);
                 if (names === undefined) {
                   try {
-                    names = await deps.evaluateSetExpression(ds.sourceName, ax.dimensionName, ax.expression);
+                    names = await deps.evaluateSetExpression(
+                      ds.sourceName,
+                      ax.dimensionName,
+                      ax.expression,
+                    );
                     evalCache.set(cacheKey, names);
                   } catch (evalErr) {
                     if (evalErr instanceof TM1Error) rethrowIfSystemic(evalErr);
                     fetchErrors.push({
                       process: ds.name,
                       object: `eval ${ds.sourceName}/${ax.dimensionName}`,
-                      message: evalErr instanceof Error ? evalErr.message : String(evalErr),
+                      message:
+                        evalErr instanceof Error
+                          ? evalErr.message
+                          : String(evalErr),
                     });
                     names = undefined;
                   }
                 }
                 if (names) {
-                  for (const name of names) addMember(ds.name, ax.dimensionName, name, "view-native-computed");
+                  for (const name of names)
+                    addMember(
+                      ds.name,
+                      ax.dimensionName,
+                      name,
+                      "view-native-computed",
+                    );
                 }
               }
             } else if (ax.subsetName && ax.dimensionName) {
-              const sub = await deps.getSubset(ax.dimensionName, ax.hierarchyName ?? ax.dimensionName, ax.subsetName);
+              const sub = await deps.getSubset(
+                ax.dimensionName,
+                ax.hierarchyName ?? ax.dimensionName,
+                ax.subsetName,
+              );
               applySubset(ds.name, sub);
             }
           }
         }
-      } else if (ds.type === "TM1DimensionSubset" && ds.subset && ds.sourceName) {
+      } else if (
+        ds.type === "TM1DimensionSubset" &&
+        ds.subset &&
+        ds.sourceName
+      ) {
         const dim = ds.sourceName; // dataSourceNameForServer — the dimension (verify live, Task 4)
         const sub = await deps.getSubset(dim, dim, ds.subset);
         applySubset(ds.name, sub);
@@ -146,7 +209,11 @@ export async function buildDatasourceMembership(
         ds.type === "TM1CubeView"
           ? `view ${ds.sourceName}/${ds.view}`
           : `subset ${ds.sourceName}/${ds.subset}`;
-      fetchErrors.push({ process: ds.name, object, message: e instanceof Error ? e.message : String(e) });
+      fetchErrors.push({
+        process: ds.name,
+        object,
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 

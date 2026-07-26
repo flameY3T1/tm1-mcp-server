@@ -5,7 +5,10 @@ import type { TM1Client } from "../../src/tm1-client.js";
 import { ANNOTATION_MAP } from "../../src/tools/annotation-map.js";
 import { OUTPUT_SCHEMA_MAP } from "../../src/tools/output-schema-map.js";
 import { registerAllTools } from "../../src/tools/index.js";
-import { withAnnotations, deriveTitle } from "../../src/tools/with-annotations.js";
+import {
+  withAnnotations,
+  deriveTitle,
+} from "../../src/tools/with-annotations.js";
 
 const mockLogger = {
   info: vi.fn(),
@@ -33,7 +36,9 @@ function collectRegisteredNames(mode: "readwrite" | "readonly"): Set<string> {
     const original = server.registerTool.bind(server);
     server.registerTool = (...args: unknown[]) => {
       names.add(args[0] as string);
-      return (original as (...a: unknown[]) => unknown)(...args) as ReturnType<typeof server.registerTool>;
+      return (original as (...a: unknown[]) => unknown)(...args) as ReturnType<
+        typeof server.registerTool
+      >;
     };
     const wrapped = withAnnotations(server, mockLogger, mode);
     registerAllTools(wrapped, { version } as unknown as TM1Client);
@@ -177,7 +182,10 @@ describe("#8 readonly mode", () => {
       .filter(([, annot]) => !annot.readOnlyHint)
       .map(([name]) => name);
     for (const name of writeNames) {
-      expect(registered.has(name), `${name} should not be registered in readonly mode`).toBe(false);
+      expect(
+        registered.has(name),
+        `${name} should not be registered in readonly mode`,
+      ).toBe(false);
     }
   });
 });

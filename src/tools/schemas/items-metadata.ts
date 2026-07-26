@@ -53,7 +53,9 @@ export const ElementAttributeValueSchema = z.object({
 // per-element attribute *value* above. Used by tm1_list_element_attributes.
 export const ElementAttributeDefinitionSchema = z.object({
   name: z.string().describe("Attribute name"),
-  type: z.enum(["Numeric", "String", "Alias"]).describe("Attribute storage type"),
+  type: z
+    .enum(["Numeric", "String", "Alias"])
+    .describe("Attribute storage type"),
 });
 
 export const HierarchyElementSchema = z.object({
@@ -62,7 +64,9 @@ export const HierarchyElementSchema = z.object({
   level: z.number().int(),
   // parents/children omitted when caller passes compact=true to tm1_get_hierarchy.
   parents: z.array(z.string()).optional(),
-  children: z.array(z.object({ name: z.string(), weight: z.number() })).optional(),
+  children: z
+    .array(z.object({ name: z.string(), weight: z.number() }))
+    .optional(),
 });
 
 // tm1_get_hierarchy returns a bare hierarchy, not a Page<T>, so its paging
@@ -138,9 +142,7 @@ export const CubeStatsResultSchema = z
 
 export const AncestorsResultSchema = z.object({
   element: z.string(),
-  ancestors: z.array(
-    z.object({ name: z.string(), level: z.number().int() }),
-  ),
+  ancestors: z.array(z.object({ name: z.string(), level: z.number().int() })),
   paths: z.array(z.array(z.string())),
 });
 

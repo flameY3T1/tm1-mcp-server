@@ -20,45 +20,99 @@ const RECEIVERS = ["tm1Client", "client", "c"];
 
 const FLAT_METHODS = [
   // cubes
-  "getCubes", "createCube", "deleteCube", "clearCube", "unloadCube",
-  "getCubeRules", "getAllCubeRules", "updateCubeRules", "checkCubeRule",
+  "getCubes",
+  "createCube",
+  "deleteCube",
+  "clearCube",
+  "unloadCube",
+  "getCubeRules",
+  "getAllCubeRules",
+  "updateCubeRules",
+  "checkCubeRule",
   "getCubeDimensionNames",
   // dimensions
-  "getDimensions", "createDimension", "deleteDimension",
+  "getDimensions",
+  "createDimension",
+  "deleteDimension",
   // hierarchies
-  "getHierarchy", "getDescendants", "getAncestors",
-  "createHierarchy", "deleteHierarchy",
+  "getHierarchy",
+  "getDescendants",
+  "getAncestors",
+  "createHierarchy",
+  "deleteHierarchy",
   // elements
-  "createElement", "updateElement", "deleteElement", "moveElement",
-  "listElementAttributes", "createElementAttribute", "bulkUpsertElements",
-  "getElementAttributeValues", "updateElementAttributeValue",
+  "createElement",
+  "updateElement",
+  "deleteElement",
+  "moveElement",
+  "listElementAttributes",
+  "createElementAttribute",
+  "bulkUpsertElements",
+  "getElementAttributeValues",
+  "updateElementAttributeValue",
   // cells
-  "getCellValue", "executeMdx", "writeCells",
+  "getCellValue",
+  "executeMdx",
+  "writeCells",
   // views
-  "getView", "getViewDefinition", "listViews", "createMdxView", "deleteView",
+  "getView",
+  "getViewDefinition",
+  "listViews",
+  "createMdxView",
+  "deleteView",
   // subsets
-  "listSubsets", "getSubset", "createSubset", "updateSubset", "deleteSubset",
+  "listSubsets",
+  "getSubset",
+  "createSubset",
+  "updateSubset",
+  "deleteSubset",
   // processes
-  "getProcesses", "executeProcess", "getProcessParameters",
-  "createProcess", "copyProcess", "fetchProcessesForCallgraph",
-  "getAllProcessesCode", "getProcessCode", "updateProcessCode",
-  "getProcessDataSource", "updateProcessDataSource",
-  "getProcessVariables", "updateProcessVariables",
-  "updateProcessParameters", "deleteProcess",
-  "compileProcess", "checkProcessCode",
+  "getProcesses",
+  "executeProcess",
+  "getProcessParameters",
+  "createProcess",
+  "copyProcess",
+  "fetchProcessesForCallgraph",
+  "getAllProcessesCode",
+  "getProcessCode",
+  "updateProcessCode",
+  "getProcessDataSource",
+  "updateProcessDataSource",
+  "getProcessVariables",
+  "updateProcessVariables",
+  "updateProcessParameters",
+  "deleteProcess",
+  "compileProcess",
+  "checkProcessCode",
   // chores
-  "getChores", "toggleChoreActive", "executeChore",
-  "createChore", "updateChore", "deleteChore",
+  "getChores",
+  "toggleChoreActive",
+  "executeChore",
+  "createChore",
+  "updateChore",
+  "deleteChore",
   // security
-  "listClients", "getClient", "createClient", "updateClient", "deleteClient",
-  "listGroups", "assignClientGroup", "removeClientGroup",
+  "listClients",
+  "getClient",
+  "createClient",
+  "updateClient",
+  "deleteClient",
+  "listGroups",
+  "assignClientGroup",
+  "removeClientGroup",
   // server
-  "getServerInfo", "getMessageLog", "getTransactionLog",
-  "getErrorLogFiles", "getErrorLogContent",
+  "getServerInfo",
+  "getMessageLog",
+  "getTransactionLog",
+  "getErrorLogFiles",
+  "getErrorLogContent",
   // monitoring
-  "getThreads", "cancelThread", "getSessions",
+  "getThreads",
+  "cancelThread",
+  "getSessions",
   // files
-  "listFiles", "getFileContent",
+  "listFiles",
+  "getFileContent",
 ];
 
 const PATTERN = new RegExp(
@@ -76,7 +130,8 @@ const TRANSPORT_RE = /\.(request|requestRaw|requestBinary)\s*\(/g;
 
 function* walkTs(dir) {
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === "dist" || entry.startsWith(".")) continue;
+    if (entry === "node_modules" || entry === "dist" || entry.startsWith("."))
+      continue;
     const path = join(dir, entry);
     const s = statSync(path);
     if (s.isDirectory()) {
@@ -121,16 +176,24 @@ for (const root of ["src", "tests"]) {
 
 if (violations.length > 0 || transportViolations.length > 0) {
   if (violations.length > 0) {
-    console.error(`\n✖ Found ${violations.length} use(s) of deprecated flat TM1Client methods.`);
+    console.error(
+      `\n✖ Found ${violations.length} use(s) of deprecated flat TM1Client methods.`,
+    );
     console.error(`  Migrate to the service API (see docs/ARCHITECTURE.md).\n`);
     for (const v of violations) {
       console.error(`  ${v.file}:${v.lineNum}  ${v.receiver}.${v.method}(...)`);
     }
   }
   if (transportViolations.length > 0) {
-    console.error(`\n✖ Found ${transportViolations.length} raw transport call(s) under src/tools/.`);
-    console.error(`  Tools must go through a domain service, not .request()/.requestRaw()/.requestBinary().`);
-    console.error(`  Add or extend a service under src/tm1-client/services/ (see docs/ARCHITECTURE.md).\n`);
+    console.error(
+      `\n✖ Found ${transportViolations.length} raw transport call(s) under src/tools/.`,
+    );
+    console.error(
+      `  Tools must go through a domain service, not .request()/.requestRaw()/.requestBinary().`,
+    );
+    console.error(
+      `  Add or extend a service under src/tm1-client/services/ (see docs/ARCHITECTURE.md).\n`,
+    );
     for (const v of transportViolations) {
       console.error(`  ${v.file}:${v.lineNum}  .${v.method}(...)`);
     }
@@ -139,5 +202,7 @@ if (violations.length > 0 || transportViolations.length > 0) {
   process.exit(1);
 }
 
-console.log("✓ no deprecated flat TM1Client method calls outside src/tm1-client.ts");
+console.log(
+  "✓ no deprecated flat TM1Client method calls outside src/tm1-client.ts",
+);
 console.log("✓ no raw transport calls under src/tools/");

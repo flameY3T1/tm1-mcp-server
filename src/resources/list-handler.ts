@@ -47,7 +47,9 @@ export interface ResourceCatalog {
 export const DEFAULT_PAGE_SIZE = 200;
 
 function encodeCursor(offset: number): string {
-  return Buffer.from(JSON.stringify({ o: offset }), "utf8").toString("base64url");
+  return Buffer.from(JSON.stringify({ o: offset }), "utf8").toString(
+    "base64url",
+  );
 }
 
 // Returns offset >= 0 or 0 when the cursor is malformed / out-of-range.
@@ -114,25 +116,28 @@ export function installPaginatedListHandler(
   logger: pino.Logger,
   pageSize: number = DEFAULT_PAGE_SIZE,
 ): void {
-  server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
-    const cursorParam = request.params?.cursor;
-    const offset = decodeCursor(cursorParam ?? undefined);
-    const all = await resolveAll(catalog, logger);
+  server.server.setRequestHandler(
+    ListResourcesRequestSchema,
+    async (request) => {
+      const cursorParam = request.params?.cursor;
+      const offset = decodeCursor(cursorParam ?? undefined);
+      const all = await resolveAll(catalog, logger);
 
-    const slice = all.slice(offset, offset + pageSize);
-    const next = offset + slice.length;
-    const hasMore = next < all.length;
+      const slice = all.slice(offset, offset + pageSize);
+      const next = offset + slice.length;
+      const hasMore = next < all.length;
 
-    logger.debug(
-      { offset, returned: slice.length, total: all.length, hasMore },
-      "resources/list paginated",
-    );
+      logger.debug(
+        { offset, returned: slice.length, total: all.length, hasMore },
+        "resources/list paginated",
+      );
 
-    return {
-      resources: slice,
-      ...(hasMore ? { nextCursor: encodeCursor(next) } : {}),
-    };
-  });
+      return {
+        resources: slice,
+        ...(hasMore ? { nextCursor: encodeCursor(next) } : {}),
+      };
+    },
+  );
 }
 
 // Test-only exports.

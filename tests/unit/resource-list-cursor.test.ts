@@ -48,7 +48,11 @@ describe("R2-07: cursor encode/decode round-trip", () => {
 
   it("decodes garbage cursor as 0 (degrade to fresh listing)", () => {
     expect(__testing.decodeCursor("not-base64-at-all!!!")).toBe(0);
-    expect(__testing.decodeCursor(Buffer.from("not-json", "utf8").toString("base64url"))).toBe(0);
+    expect(
+      __testing.decodeCursor(
+        Buffer.from("not-json", "utf8").toString("base64url"),
+      ),
+    ).toBe(0);
   });
 
   it("decodes negative offset as 0", () => {
@@ -61,7 +65,10 @@ describe("R2-07: resolveAll", () => {
   it("merges statics and template results, sorted by URI", async () => {
     const catalog: ResourceCatalog = {
       entries: [
-        { kind: "static", resource: staticEntry("tm1://server/state", "state") },
+        {
+          kind: "static",
+          resource: staticEntry("tm1://server/state", "state"),
+        },
         {
           kind: "template",
           templateMetadata: { mimeType: "application/json" },
@@ -90,12 +97,20 @@ describe("R2-07: installPaginatedListHandler", () => {
     let handler: ((req: unknown) => Promise<unknown>) | undefined;
     const fakeServer = {
       server: {
-        setRequestHandler: (schema: unknown, h: (req: unknown) => Promise<unknown>) => {
+        setRequestHandler: (
+          schema: unknown,
+          h: (req: unknown) => Promise<unknown>,
+        ) => {
           if (schema === ListResourcesRequestSchema) handler = h;
         },
       },
     } as unknown as McpServer;
-    installPaginatedListHandler(fakeServer, makeCatalog(items), mockLogger, pageSize);
+    installPaginatedListHandler(
+      fakeServer,
+      makeCatalog(items),
+      mockLogger,
+      pageSize,
+    );
     if (!handler) throw new Error("handler not installed");
     return handler;
   }
@@ -108,14 +123,20 @@ describe("R2-07: installPaginatedListHandler", () => {
 
   it("returns all results in one page when total <= pageSize", async () => {
     const handler = setupHandler(items(50), 200);
-    const res = (await handler({ params: {} })) as { resources: CatalogResource[]; nextCursor?: string };
+    const res = (await handler({ params: {} })) as {
+      resources: CatalogResource[];
+      nextCursor?: string;
+    };
     expect(res.resources).toHaveLength(50);
     expect(res.nextCursor).toBeUndefined();
   });
 
   it("emits nextCursor when more results remain", async () => {
     const handler = setupHandler(items(500), 200);
-    const res = (await handler({ params: {} })) as { resources: CatalogResource[]; nextCursor?: string };
+    const res = (await handler({ params: {} })) as {
+      resources: CatalogResource[];
+      nextCursor?: string;
+    };
     expect(res.resources).toHaveLength(200);
     expect(res.nextCursor).toBeTypeOf("string");
   });
@@ -125,17 +146,26 @@ describe("R2-07: installPaginatedListHandler", () => {
     const all: CatalogResource[] = [];
     let cursor: string | undefined;
 
-    const p1 = (await handler({ params: {} })) as { resources: CatalogResource[]; nextCursor?: string };
+    const p1 = (await handler({ params: {} })) as {
+      resources: CatalogResource[];
+      nextCursor?: string;
+    };
     all.push(...p1.resources);
     cursor = p1.nextCursor;
     expect(cursor).toBeTypeOf("string");
 
-    const p2 = (await handler({ params: { cursor } })) as { resources: CatalogResource[]; nextCursor?: string };
+    const p2 = (await handler({ params: { cursor } })) as {
+      resources: CatalogResource[];
+      nextCursor?: string;
+    };
     all.push(...p2.resources);
     cursor = p2.nextCursor;
     expect(cursor).toBeTypeOf("string");
 
-    const p3 = (await handler({ params: { cursor } })) as { resources: CatalogResource[]; nextCursor?: string };
+    const p3 = (await handler({ params: { cursor } })) as {
+      resources: CatalogResource[];
+      nextCursor?: string;
+    };
     all.push(...p3.resources);
     expect(p3.nextCursor).toBeUndefined();
 

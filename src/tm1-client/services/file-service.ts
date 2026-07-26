@@ -11,7 +11,8 @@ import { rethrowIfSystemic } from "./fallback.js";
 // OData entity-key encoder: double single quotes per OData literal rules, then
 // percent-encode. Without the doubling a name containing ' breaks the key and
 // makes the object unreachable.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 // Split a user-supplied file path into segments, rejecting "." / ".." so a
 // crafted name cannot traverse outside the Contents root.
@@ -47,11 +48,17 @@ export class FileService {
       return url;
     };
     try {
-      const r = await this.http.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Files"));
+      const r = await this.http.request<{ value: Array<{ Name: string }> }>(
+        "GET",
+        buildUrl("Files"),
+      );
       return r.value.map((f) => f.Name);
     } catch (e) {
       rethrowIfSystemic(e);
-      const r = await this.http.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Blobs"));
+      const r = await this.http.request<{ value: Array<{ Name: string }> }>(
+        "GET",
+        buildUrl("Blobs"),
+      );
       return r.value.map((f) => f.Name);
     }
   }
@@ -88,7 +95,10 @@ export class FileService {
     const parts = splitPath(fileName);
     if (parts.length === 0) return false;
     const buildUrl = (root: string): string => {
-      const segs = parts.slice(0, -1).map((s) => `/Contents('${enc(s)}')`).join("");
+      const segs = parts
+        .slice(0, -1)
+        .map((s) => `/Contents('${enc(s)}')`)
+        .join("");
       // parts.length > 0 is guarded above
       const last = parts[parts.length - 1]!;
       return `/api/v1/Contents('${enc(root)}')${segs}/Contents('${enc(last)}')?$select=Name`;
@@ -116,16 +126,24 @@ export class FileService {
    * Subfolders only supported on TM1 v12. Caller must ensure parent folders
    * exist (folder-create not yet exposed).
    */
-  async upload(fileName: string, content: Uint8Array): Promise<{ created: boolean; root: "Files" | "Blobs" }> {
+  async upload(
+    fileName: string,
+    content: Uint8Array,
+  ): Promise<{ created: boolean; root: "Files" | "Blobs" }> {
     const parts = splitPath(fileName);
     if (parts.length === 0) {
       throw new Error("upload: empty file name");
     }
     // parts.length > 0 is guarded above
     const leaf = parts[parts.length - 1]!;
-    const parentSegs = parts.slice(0, -1).map((s) => `/Contents('${enc(s)}')`).join("");
+    const parentSegs = parts
+      .slice(0, -1)
+      .map((s) => `/Contents('${enc(s)}')`)
+      .join("");
 
-    const tryRoot = async (root: "Files" | "Blobs"): Promise<{ created: boolean; root: "Files" | "Blobs" }> => {
+    const tryRoot = async (
+      root: "Files" | "Blobs",
+    ): Promise<{ created: boolean; root: "Files" | "Blobs" }> => {
       const parentUrl = `/api/v1/Contents('${enc(root)}')${parentSegs}/Contents`;
       const contentUrl = `/api/v1/Contents('${enc(root)}')${parentSegs}/Contents('${enc(leaf)}')/Content`;
 
@@ -187,13 +205,20 @@ export class FileService {
     const escape = (s: string): string => s.replace(/'/g, "''");
     const filters: string[] = [];
     if (opts.startswith) {
-      filters.push(`startswith(tolower(Name),tolower('${escape(opts.startswith)}'))`);
+      filters.push(
+        `startswith(tolower(Name),tolower('${escape(opts.startswith)}'))`,
+      );
     }
     if (opts.contains && opts.contains.length > 0) {
-      const subs = opts.contains.map((s) => `contains(tolower(Name),tolower('${escape(s)}'))`);
+      const subs = opts.contains.map(
+        (s) => `contains(tolower(Name),tolower('${escape(s)}'))`,
+      );
       filters.push(`(${subs.join(` ${operator} `)})`);
     }
-    const filter = filters.length > 0 ? `&$filter=${encodeURIComponent(filters.join(" and "))}` : "";
+    const filter =
+      filters.length > 0
+        ? `&$filter=${encodeURIComponent(filters.join(" and "))}`
+        : "";
     const buildUrl = (root: string): string => {
       let url = `/api/v1/Contents('${enc(root)}')`;
       for (const seg of segments) url += `/Contents('${enc(seg)}')`;
@@ -201,11 +226,17 @@ export class FileService {
       return url;
     };
     try {
-      const r = await this.http.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Files"));
+      const r = await this.http.request<{ value: Array<{ Name: string }> }>(
+        "GET",
+        buildUrl("Files"),
+      );
       return r.value.map((f) => f.Name);
     } catch (e) {
       rethrowIfSystemic(e);
-      const r = await this.http.request<{ value: Array<{ Name: string }> }>("GET", buildUrl("Blobs"));
+      const r = await this.http.request<{ value: Array<{ Name: string }> }>(
+        "GET",
+        buildUrl("Blobs"),
+      );
       return r.value.map((f) => f.Name);
     }
   }

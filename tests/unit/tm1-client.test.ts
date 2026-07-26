@@ -38,8 +38,7 @@ function mockResponse(opts: {
   statusText?: string;
   body?: unknown;
 }): Response {
-  const bodyText =
-    opts.body !== undefined ? JSON.stringify(opts.body) : "";
+  const bodyText = opts.body !== undefined ? JSON.stringify(opts.body) : "";
   return {
     ok: opts.ok ?? true,
     status: opts.status ?? 200,
@@ -165,7 +164,10 @@ describe("TM1Client", () => {
         mockResponse({ ok: true, status: 204, body: undefined }),
       );
 
-      const result = await client.testRequest("DELETE", "/api/v1/Processes('Test')");
+      const result = await client.testRequest(
+        "DELETE",
+        "/api/v1/Processes('Test')",
+      );
       expect(result).toBeUndefined();
     });
   });
@@ -183,9 +185,9 @@ describe("TM1Client", () => {
         mockResponse({ ok: false, status: 401, statusText: "Unauthorized" }),
       );
 
-      await expect(
-        client.testRequest("GET", "/api/v1/Cubes"),
-      ).rejects.toThrow(TM1Error);
+      await expect(client.testRequest("GET", "/api/v1/Cubes")).rejects.toThrow(
+        TM1Error,
+      );
 
       try {
         await client.testRequest("GET", "/api/v1/Cubes");
@@ -239,7 +241,9 @@ describe("TM1Client", () => {
         mockResponse({
           ok: false,
           status: 400,
-          body: { error: { code: "65", message: "ObjectSecurityNoReadRights" } },
+          body: {
+            error: { code: "65", message: "ObjectSecurityNoReadRights" },
+          },
         }),
       );
 
@@ -260,7 +264,9 @@ describe("TM1Client", () => {
         mockResponse({
           ok: false,
           status: 400,
-          body: { error: { message: { value: "Syntax error in MDX statement" } } },
+          body: {
+            error: { message: { value: "Syntax error in MDX statement" } },
+          },
         }),
       );
 
@@ -403,7 +409,9 @@ describe("TM1Client", () => {
         mockResponse({ ok: true, body: { ok: true } }),
       );
 
-      await expect(client.testRequest("GET", "/api/v1/Cubes")).rejects.toThrow();
+      await expect(
+        client.testRequest("GET", "/api/v1/Cubes"),
+      ).rejects.toThrow();
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 

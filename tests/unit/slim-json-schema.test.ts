@@ -75,7 +75,11 @@ describe("slimJsonSchema", () => {
           items: {
             type: "object",
             properties: {
-              n: { type: "integer", minimum: SAFE_INT_MIN, maximum: SAFE_INT_MAX },
+              n: {
+                type: "integer",
+                minimum: SAFE_INT_MIN,
+                maximum: SAFE_INT_MAX,
+              },
             },
           },
         },

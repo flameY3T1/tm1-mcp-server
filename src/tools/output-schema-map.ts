@@ -98,8 +98,13 @@ const filePageShape = {
 const searchFilePageShape = {
   path: z.string().describe("Folder that was searched (echoes the input)"),
   startswith: z.string().nullable().describe("Prefix filter applied, or null"),
-  contains: z.array(z.string()).nullable().describe("Substring filters applied, or null"),
-  operator: z.enum(["and", "or"]).describe("How `contains` substrings were joined"),
+  contains: z
+    .array(z.string())
+    .nullable()
+    .describe("Substring filters applied, or null"),
+  operator: z
+    .enum(["and", "or"])
+    .describe("How `contains` substrings were joined"),
   ...pageShapeFor(FilenameItemSchema),
 };
 
@@ -124,7 +129,9 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
         anonymousCount: z.number().int(),
       })
       .optional()
-      .describe("Present only when compact=true: aggregate headcount, items[] is empty in that mode"),
+      .describe(
+        "Present only when compact=true: aggregate headcount, items[] is empty in that mode",
+      ),
   },
   tm1_list_element_attributes: pageShapeFor(ElementAttributeDefinitionSchema),
 
@@ -144,20 +151,41 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_get_process: asOutputSchema(GetProcessResultSchema),
   tm1_get_process_code: asOutputSchema(ProcessCodeSchema),
   tm1_get_process_datasource: asOutputSchema(DataSourceSchema),
-  tm1_get_cell_value: { value: CellValueSchema.describe("Cell value (string, number, or null)") },
+  tm1_get_cell_value: {
+    value: CellValueSchema.describe("Cell value (string, number, or null)"),
+  },
   tm1_get_all_cube_rules: {
-    count: z.number().int().describe("Total cubes matched before limit (lower bound if countIsExact=false)"),
-    countIsExact: z.boolean().describe("False when count is only a lower bound"),
+    count: z
+      .number()
+      .int()
+      .describe(
+        "Total cubes matched before limit (lower bound if countIsExact=false)",
+      ),
+    countIsExact: z
+      .boolean()
+      .describe("False when count is only a lower bound"),
     returned: z.number().int().describe("Cubes in this response after limit"),
     truncated: z.boolean().describe("True when limit dropped cubes"),
     cubes: z.array(CubeRulesSchema).describe("Per-cube rule bundles"),
   },
   tm1_get_all_processes_code: {
-    count: z.number().int().describe("Total processes matched before limit (lower bound if countIsExact=false)"),
-    countIsExact: z.boolean().describe("False when count is only a lower bound"),
-    returned: z.number().int().describe("Processes in this response after limit"),
+    count: z
+      .number()
+      .int()
+      .describe(
+        "Total processes matched before limit (lower bound if countIsExact=false)",
+      ),
+    countIsExact: z
+      .boolean()
+      .describe("False when count is only a lower bound"),
+    returned: z
+      .number()
+      .int()
+      .describe("Processes in this response after limit"),
     truncated: z.boolean().describe("True when limit dropped processes"),
-    processes: z.array(ProcessCodeBundleSchema).describe("Per-process code bundles"),
+    processes: z
+      .array(ProcessCodeBundleSchema)
+      .describe("Per-process code bundles"),
   },
   tm1_get_element_attribute_values: {
     dimensionName: z.string(),
@@ -234,7 +262,9 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   },
   tm1_get_transaction_log: {
     count: z.number().int(),
-    coverage: z.enum(["complete", "partial"]).describe("partial=hit top, more may exist earlier"),
+    coverage: z
+      .enum(["complete", "partial"])
+      .describe("partial=hit top, more may exist earlier"),
     scannedFrom: z.string().describe("earliest timestamp scanned"),
     entries: z.array(TransactionLogEntrySchema),
   },
@@ -244,7 +274,9 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   },
   // Items are ErrorLogFileSchema in the default file listing, or
   // ErrorLogGroupSchema when groupBy='process' returns the audit summary.
-  tm1_list_error_logs: pageShapeFor(z.union([ErrorLogFileSchema, ErrorLogGroupSchema])),
+  tm1_list_error_logs: pageShapeFor(
+    z.union([ErrorLogFileSchema, ErrorLogGroupSchema]),
+  ),
   tm1_get_error_log_content: asOutputSchema(ErrorLogContentResultSchema),
   tm1_get_file_content: asOutputSchema(FileContentResultSchema),
 
@@ -273,7 +305,9 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_delete_file: asOutputSchema(MutationResultSchema),
 
   // Bespoke shape: cleared/entriesBefore counters, no `success` field.
-  tm1_invalidate_callgraph_cache: asOutputSchema(InvalidateCallgraphCacheResultSchema),
+  tm1_invalidate_callgraph_cache: asOutputSchema(
+    InvalidateCallgraphCacheResultSchema,
+  ),
 
   // ── Phase 2i: hierarchy navigation, server snapshots, diagnostics ────────
   tm1_get_ancestors: asOutputSchema(AncestorsResultSchema),

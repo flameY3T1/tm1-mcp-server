@@ -45,7 +45,10 @@ function opaqueWrapperWithCause(code: string): Error {
  * MAX_NETWORK_RETRIES times on a network error (fetch called >1) and fails fast
  * on a non-network error (fetch called exactly once). Fake timers skip backoff.
  */
-async function fetchCallsFor(client: TM1HttpClient, err: unknown): Promise<number> {
+async function fetchCallsFor(
+  client: TM1HttpClient,
+  err: unknown,
+): Promise<number> {
   vi.useFakeTimers();
   try {
     const fetchSpy = vi.fn().mockRejectedValue(err);
@@ -87,12 +90,17 @@ describe("Watch-item #5: isNetworkError classifies via err.cause.code", () => {
   it("retries when only the cause carries the code (non-TypeError wrapper)", async () => {
     // Message has no legacy substring and it is not a TypeError, so the old
     // implementation would NOT have retried this — the cause-code path adds it.
-    const calls = await fetchCallsFor(client, opaqueWrapperWithCause("ETIMEDOUT"));
+    const calls = await fetchCallsFor(
+      client,
+      opaqueWrapperWithCause("ETIMEDOUT"),
+    );
     expect(calls).toBeGreaterThan(1);
   });
 
   it("retries when the error exposes `.code` directly (raw socket error)", async () => {
-    const raw = Object.assign(new Error("socket hang up"), { code: "ECONNRESET" });
+    const raw = Object.assign(new Error("socket hang up"), {
+      code: "ECONNRESET",
+    });
     const calls = await fetchCallsFor(client, raw);
     expect(calls).toBeGreaterThan(1);
   });
@@ -103,7 +111,10 @@ describe("Watch-item #5: isNetworkError classifies via err.cause.code", () => {
   });
 
   it("does NOT retry a non-network error (fails fast)", async () => {
-    const calls = await fetchCallsFor(client, new Error("boom: unexpected server state"));
+    const calls = await fetchCallsFor(
+      client,
+      new Error("boom: unexpected server state"),
+    );
     expect(calls).toBe(1);
   });
 });

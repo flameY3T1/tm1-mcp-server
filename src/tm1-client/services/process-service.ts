@@ -27,7 +27,8 @@ import {
 } from "./odata-page.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export interface ProcessListOpts extends NameFilterOpts {
   /** Set to slice server-side. Only legal when every active filter is in NameFilterOpts. */
@@ -75,7 +76,9 @@ export class ProcessService {
    * post-`$filter` total. `total` is undefined if the server omitted
    * `@odata.count` — fall back to an unpaged fetch then.
    */
-  async list(opts: ProcessListOpts & { page: PageOpts }): Promise<Paged<Process>>;
+  async list(
+    opts: ProcessListOpts & { page: PageOpts },
+  ): Promise<Paged<Process>>;
   async list(opts: ProcessListOpts = {}): Promise<Process[] | Paged<Process>> {
     // Filters are only emitted on the paged path; unpaged callers keep getting
     // the whole collection and filter in-process. The degraded Name-only
@@ -85,7 +88,10 @@ export class ProcessService {
       opts.page === undefined
         ? ""
         : `${filterClause(nameFilterPredicates(opts))}${pageClauses(opts.page)}`;
-    const wrap = (items: Process[], total: number | undefined): Process[] | Paged<Process> =>
+    const wrap = (
+      items: Process[],
+      total: number | undefined,
+    ): Process[] | Paged<Process> =>
       opts.page === undefined ? items : { items, total };
     // Parameters is a structural (complex) property, not a navigation property
     // — TM1 v11 rejects $expand=Parameters with a syntax error. Use $select
@@ -145,7 +151,9 @@ export class ProcessService {
     opts?: RequestOptions,
   ): Promise<ProcessResult> {
     const path = `/api/v1/Processes('${enc(processName)}')/tm1.ExecuteWithReturn`;
-    const body: { Parameters?: Array<{ Name: string; Value: string | number }> } = {};
+    const body: {
+      Parameters?: Array<{ Name: string; Value: string | number }>;
+    } = {};
     if (params && Object.keys(params).length > 0) {
       body.Parameters = Object.entries(params).map(([name, value]) => ({
         Name: name,
@@ -162,7 +170,8 @@ export class ProcessService {
         ProcessExecuteStatusCode?: string;
         ErrorLogFile?: { Filename?: string } | null;
       }>("POST", path, body, opts);
-      const status = response?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
+      const status =
+        response?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
       return {
         success: status === "CompletedSuccessfully",
         processErrorStatus: status,
@@ -193,7 +202,10 @@ export class ProcessService {
    * functions are removed in v12 (cloud engine persists automatically).
    * POST /api/v1/ExecuteProcessWithReturn
    */
-  async saveData(cubeName?: string, opts?: RequestOptions): Promise<ProcessResult> {
+  async saveData(
+    cubeName?: string,
+    opts?: RequestOptions,
+  ): Promise<ProcessResult> {
     const prolog =
       cubeName !== undefined
         ? `CubeSaveData('${cubeName.replace(/'/g, "''")}');`
@@ -215,7 +227,8 @@ export class ProcessService {
         ProcessExecuteStatusCode?: string;
         ErrorLogFile?: { Filename?: string } | null;
       }>("POST", "/api/v1/ExecuteProcessWithReturn", body, opts);
-      const status = response?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
+      const status =
+        response?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
       return {
         success: status === "CompletedSuccessfully",
         processErrorStatus: status,
@@ -285,7 +298,8 @@ export class ProcessService {
       );
       return true;
     } catch (e) {
-      if (e instanceof TM1Error && e.code === TM1ErrorCode.NOT_FOUND) return false;
+      if (e instanceof TM1Error && e.code === TM1ErrorCode.NOT_FOUND)
+        return false;
       throw e;
     }
   }
@@ -296,7 +310,10 @@ export class ProcessService {
    */
   async copy(sourceName: string, targetName: string): Promise<void> {
     const path = `/api/v1/Processes('${enc(sourceName)}')`;
-    const source = await this.http.request<Record<string, unknown>>("GET", path);
+    const source = await this.http.request<Record<string, unknown>>(
+      "GET",
+      path,
+    );
     delete source["@odata.context"];
     delete source["@odata.etag"];
     delete source["Attributes"];
@@ -310,15 +327,17 @@ export class ProcessService {
    * indexing. Single round trip; falls back through 4 OData variants for
    * older/strict TM1 versions.
    */
-  async fetchForCallgraph(includeControl = false): Promise<Array<{
-    name: string;
-    prolog: string;
-    metadata: string;
-    data: string;
-    epilog: string;
-    parameters: string[];
-    parameterDefaults: Map<string, string>;
-  }>> {
+  async fetchForCallgraph(includeControl = false): Promise<
+    Array<{
+      name: string;
+      prolog: string;
+      metadata: string;
+      data: string;
+      epilog: string;
+      parameters: string[];
+      parameterDefaults: Map<string, string>;
+    }>
+  > {
     const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
     const urls = [
       `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters${filter}`,
@@ -332,7 +351,11 @@ export class ProcessService {
       MetadataProcedure?: string;
       DataProcedure?: string;
       EpilogProcedure?: string;
-      Parameters?: Array<{ Name?: string; Value?: string | number; Type?: string | number }>;
+      Parameters?: Array<{
+        Name?: string;
+        Value?: string | number;
+        Type?: string | number;
+      }>;
     };
     let body: { value: Raw[] } | undefined;
     let lastErr: unknown;
@@ -344,27 +367,37 @@ export class ProcessService {
         lastErr = e;
       }
     }
-    if (!body) throw (lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "Processes fetch failed")));
-    return (body.value ?? []).map((p) => {
-      const parameters = (p.Parameters ?? [])
-        .map((x) => String(x.Name ?? ""))
-        .filter((n) => n !== "");
-      const parameterDefaults = new Map<string, string>();
-      for (const x of p.Parameters ?? []) {
-        if (x.Name && x.Value !== undefined && x.Value !== null && x.Value !== "") {
-          parameterDefaults.set(String(x.Name), String(x.Value));
+    if (!body)
+      throw lastErr instanceof Error
+        ? lastErr
+        : new Error(String(lastErr ?? "Processes fetch failed"));
+    return (body.value ?? [])
+      .map((p) => {
+        const parameters = (p.Parameters ?? [])
+          .map((x) => String(x.Name ?? ""))
+          .filter((n) => n !== "");
+        const parameterDefaults = new Map<string, string>();
+        for (const x of p.Parameters ?? []) {
+          if (
+            x.Name &&
+            x.Value !== undefined &&
+            x.Value !== null &&
+            x.Value !== ""
+          ) {
+            parameterDefaults.set(String(x.Name), String(x.Value));
+          }
         }
-      }
-      return {
-        name: String(p.Name ?? ""),
-        prolog: String(p.PrologProcedure ?? ""),
-        metadata: String(p.MetadataProcedure ?? ""),
-        data: String(p.DataProcedure ?? ""),
-        epilog: String(p.EpilogProcedure ?? ""),
-        parameters,
-        parameterDefaults,
-      };
-    }).filter((p) => p.name !== "");
+        return {
+          name: String(p.Name ?? ""),
+          prolog: String(p.PrologProcedure ?? ""),
+          metadata: String(p.MetadataProcedure ?? ""),
+          data: String(p.DataProcedure ?? ""),
+          epilog: String(p.EpilogProcedure ?? ""),
+          parameters,
+          parameterDefaults,
+        };
+      })
+      .filter((p) => p.name !== "");
   }
 
   /**
@@ -392,10 +425,16 @@ export class ProcessService {
     top?: number,
   ): Promise<
     | Array<ProcessCode & { name: string; hasSecurityAccess: boolean }>
-    | { items: Array<ProcessCode & { name: string; hasSecurityAccess: boolean }>; total: number | undefined }
+    | {
+        items: Array<
+          ProcessCode & { name: string; hasSecurityAccess: boolean }
+        >;
+        total: number | undefined;
+      }
   > {
     const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const cap = top !== undefined ? `&$orderby=Name&$top=${top}&$count=true` : "";
+    const cap =
+      top !== undefined ? `&$orderby=Name&$top=${top}&$count=true` : "";
     const path = `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,HasSecurityAccess${filter}${cap}`;
     const response = await this.http.request<{
       "@odata.count"?: number;
@@ -462,7 +501,10 @@ export class ProcessService {
    * Update one or more code tabs of a TI process (partial update).
    * PATCH /api/v1/Processes('{name}') with only the tabs to update.
    */
-  async updateCode(processName: string, code: Partial<ProcessCode>): Promise<void> {
+  async updateCode(
+    processName: string,
+    code: Partial<ProcessCode>,
+  ): Promise<void> {
     const path = `/api/v1/Processes('${enc(processName)}')`;
     const body: Record<string, string> = {};
     if (code.prolog !== undefined) body.PrologProcedure = code.prolog;
@@ -499,9 +541,14 @@ export class ProcessService {
    * Set HasSecurityAccess flag on process.
    * PATCH /api/v1/Processes('{name}') { HasSecurityAccess }.
    */
-  async updateSecurityAccess(processName: string, hasSecurityAccess: boolean): Promise<void> {
+  async updateSecurityAccess(
+    processName: string,
+    hasSecurityAccess: boolean,
+  ): Promise<void> {
     const path = `/api/v1/Processes('${enc(processName)}')`;
-    await this.http.request<void>("PATCH", path, { HasSecurityAccess: hasSecurityAccess });
+    await this.http.request<void>("PATCH", path, {
+      HasSecurityAccess: hasSecurityAccess,
+    });
   }
 
   /**
@@ -538,7 +585,12 @@ export class ProcessService {
     // downstream switch (e.g. the .pro serializer's type map). Pass it through
     // for forward-compat reads, but log so the gap is observable.
     const KNOWN_DATASOURCE_TYPES: ReadonlyArray<DataSource["type"]> = [
-      "None", "TM1CubeView", "TM1DimensionSubset", "ASCII", "ODBC", "TM1Process",
+      "None",
+      "TM1CubeView",
+      "TM1DimensionSubset",
+      "ASCII",
+      "ODBC",
+      "TM1Process",
     ];
     if (!KNOWN_DATASOURCE_TYPES.includes(ds.Type as DataSource["type"])) {
       this.http.logger.warn(
@@ -548,20 +600,40 @@ export class ProcessService {
     }
     return {
       type: ds.Type as DataSource["type"],
-      ...(ds.dataSourceNameForServer !== undefined ? { dataSourceNameForServer: ds.dataSourceNameForServer } : {}),
-      ...(ds.dataSourceNameForClient !== undefined ? { dataSourceNameForClient: ds.dataSourceNameForClient } : {}),
-      ...(ds.asciiDelimiterType !== undefined ? { asciiDelimiterType: ds.asciiDelimiterType } : {}),
-      ...(ds.asciiDelimiterChar !== undefined ? { asciiDelimiterChar: ds.asciiDelimiterChar } : {}),
-      ...(ds.asciiQuoteCharacter !== undefined ? { asciiQuoteCharacter: ds.asciiQuoteCharacter } : {}),
-      ...(ds.asciiHeaderRecords !== undefined ? { asciiHeaderRecords: ds.asciiHeaderRecords } : {}),
-      ...(ds.asciiDecimalSeparator !== undefined ? { asciiDecimalSeparator: ds.asciiDecimalSeparator } : {}),
-      ...(ds.asciiThousandSeparator !== undefined ? { asciiThousandSeparator: ds.asciiThousandSeparator } : {}),
+      ...(ds.dataSourceNameForServer !== undefined
+        ? { dataSourceNameForServer: ds.dataSourceNameForServer }
+        : {}),
+      ...(ds.dataSourceNameForClient !== undefined
+        ? { dataSourceNameForClient: ds.dataSourceNameForClient }
+        : {}),
+      ...(ds.asciiDelimiterType !== undefined
+        ? { asciiDelimiterType: ds.asciiDelimiterType }
+        : {}),
+      ...(ds.asciiDelimiterChar !== undefined
+        ? { asciiDelimiterChar: ds.asciiDelimiterChar }
+        : {}),
+      ...(ds.asciiQuoteCharacter !== undefined
+        ? { asciiQuoteCharacter: ds.asciiQuoteCharacter }
+        : {}),
+      ...(ds.asciiHeaderRecords !== undefined
+        ? { asciiHeaderRecords: ds.asciiHeaderRecords }
+        : {}),
+      ...(ds.asciiDecimalSeparator !== undefined
+        ? { asciiDecimalSeparator: ds.asciiDecimalSeparator }
+        : {}),
+      ...(ds.asciiThousandSeparator !== undefined
+        ? { asciiThousandSeparator: ds.asciiThousandSeparator }
+        : {}),
       ...(ds.usesUnicode !== undefined ? { usesUnicode: ds.usesUnicode } : {}),
       ...(ds.userName !== undefined ? { userName: ds.userName } : {}),
       // Never surface the ODBC datasource password to the caller/LLM — return a
       // presence marker so the field stays observable without leaking the credential.
-      ...(ds.password !== undefined ? { password: ds.password ? "[redacted]" : "" } : {}),
-      ...(ds.oDBCConnection !== undefined ? { oDBCConnection: ds.oDBCConnection } : {}),
+      ...(ds.password !== undefined
+        ? { password: ds.password ? "[redacted]" : "" }
+        : {}),
+      ...(ds.oDBCConnection !== undefined
+        ? { oDBCConnection: ds.oDBCConnection }
+        : {}),
       ...(ds.query !== undefined ? { query: ds.query } : {}),
       ...(ds.view !== undefined ? { view: ds.view } : {}),
       ...(ds.subset !== undefined ? { subset: ds.subset } : {}),
@@ -575,27 +647,50 @@ export class ProcessService {
    * that leave no CellGet in the code and so never reach the reference index.
    * GET /api/v1/Processes?$select=Name,DataSource
    */
-  async listDataSources(
-    includeControl = false,
-  ): Promise<Array<{ name: string; type: string; sourceName?: string; view?: string; subset?: string }>> {
+  async listDataSources(includeControl = false): Promise<
+    Array<{
+      name: string;
+      type: string;
+      sourceName?: string;
+      view?: string;
+      subset?: string;
+    }>
+  > {
     const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
     const path = `/api/v1/Processes?$select=Name,DataSource${filter}`;
     const response = await this.http.request<{
       value: Array<{
         Name?: string;
-        DataSource?: { Type?: string; dataSourceNameForServer?: string; view?: string; subset?: string };
+        DataSource?: {
+          Type?: string;
+          dataSourceNameForServer?: string;
+          view?: string;
+          subset?: string;
+        };
       }>;
     }>("GET", path);
     return response.value
-      .filter((p): p is { Name: string; DataSource?: { Type?: string; dataSourceNameForServer?: string; view?: string; subset?: string } } =>
-        typeof p.Name === "string",
+      .filter(
+        (
+          p,
+        ): p is {
+          Name: string;
+          DataSource?: {
+            Type?: string;
+            dataSourceNameForServer?: string;
+            view?: string;
+            subset?: string;
+          };
+        } => typeof p.Name === "string",
       )
       .map((p) => {
         const ds = p.DataSource;
         return {
           name: p.Name,
           type: ds?.Type ?? "None",
-          ...(ds?.dataSourceNameForServer !== undefined ? { sourceName: ds.dataSourceNameForServer } : {}),
+          ...(ds?.dataSourceNameForServer !== undefined
+            ? { sourceName: ds.dataSourceNameForServer }
+            : {}),
           ...(ds?.view !== undefined ? { view: ds.view } : {}),
           ...(ds?.subset !== undefined ? { subset: ds.subset } : {}),
         };
@@ -606,17 +701,28 @@ export class ProcessService {
    * Update the data source configuration of a TI process.
    * PATCH /api/v1/Processes('{name}') with DataSource object.
    */
-  async updateDataSource(processName: string, dataSource: DataSource): Promise<void> {
+  async updateDataSource(
+    processName: string,
+    dataSource: DataSource,
+  ): Promise<void> {
     const path = `/api/v1/Processes('${enc(processName)}')`;
     const dsBody: Record<string, unknown> = { Type: dataSource.type };
-    if (dataSource.dataSourceNameForServer !== undefined) dsBody.dataSourceNameForServer = dataSource.dataSourceNameForServer;
-    if (dataSource.dataSourceNameForClient !== undefined) dsBody.dataSourceNameForClient = dataSource.dataSourceNameForClient;
-    if (dataSource.asciiDelimiterType !== undefined) dsBody.asciiDelimiterType = dataSource.asciiDelimiterType;
-    if (dataSource.asciiDelimiterChar !== undefined) dsBody.asciiDelimiterChar = dataSource.asciiDelimiterChar;
-    if (dataSource.asciiQuoteCharacter !== undefined) dsBody.asciiQuoteCharacter = dataSource.asciiQuoteCharacter;
-    if (dataSource.asciiHeaderRecords !== undefined) dsBody.asciiHeaderRecords = dataSource.asciiHeaderRecords;
-    if (dataSource.asciiDecimalSeparator !== undefined) dsBody.asciiDecimalSeparator = dataSource.asciiDecimalSeparator;
-    if (dataSource.asciiThousandSeparator !== undefined) dsBody.asciiThousandSeparator = dataSource.asciiThousandSeparator;
+    if (dataSource.dataSourceNameForServer !== undefined)
+      dsBody.dataSourceNameForServer = dataSource.dataSourceNameForServer;
+    if (dataSource.dataSourceNameForClient !== undefined)
+      dsBody.dataSourceNameForClient = dataSource.dataSourceNameForClient;
+    if (dataSource.asciiDelimiterType !== undefined)
+      dsBody.asciiDelimiterType = dataSource.asciiDelimiterType;
+    if (dataSource.asciiDelimiterChar !== undefined)
+      dsBody.asciiDelimiterChar = dataSource.asciiDelimiterChar;
+    if (dataSource.asciiQuoteCharacter !== undefined)
+      dsBody.asciiQuoteCharacter = dataSource.asciiQuoteCharacter;
+    if (dataSource.asciiHeaderRecords !== undefined)
+      dsBody.asciiHeaderRecords = dataSource.asciiHeaderRecords;
+    if (dataSource.asciiDecimalSeparator !== undefined)
+      dsBody.asciiDecimalSeparator = dataSource.asciiDecimalSeparator;
+    if (dataSource.asciiThousandSeparator !== undefined)
+      dsBody.asciiThousandSeparator = dataSource.asciiThousandSeparator;
     if (dataSource.usesUnicode !== undefined) {
       if (this.http.version === 11) {
         this.http.logger.warn(
@@ -627,9 +733,12 @@ export class ProcessService {
         dsBody.usesUnicode = dataSource.usesUnicode;
       }
     }
-    if (dataSource.userName !== undefined) dsBody.userName = dataSource.userName;
-    if (dataSource.password !== undefined) dsBody.password = dataSource.password;
-    if (dataSource.oDBCConnection !== undefined) dsBody.oDBCConnection = dataSource.oDBCConnection;
+    if (dataSource.userName !== undefined)
+      dsBody.userName = dataSource.userName;
+    if (dataSource.password !== undefined)
+      dsBody.password = dataSource.password;
+    if (dataSource.oDBCConnection !== undefined)
+      dsBody.oDBCConnection = dataSource.oDBCConnection;
     if (dataSource.query !== undefined) dsBody.query = dataSource.query;
     if (dataSource.view !== undefined) dsBody.view = dataSource.view;
     if (dataSource.subset !== undefined) dsBody.subset = dataSource.subset;
@@ -667,7 +776,10 @@ export class ProcessService {
    * Required after setting an ASCII DataSource.
    * PATCH /api/v1/Processes('{name}') with Variables array.
    */
-  async updateVariables(processName: string, vars: ProcessVariable[]): Promise<void> {
+  async updateVariables(
+    processName: string,
+    vars: ProcessVariable[],
+  ): Promise<void> {
     const path = `/api/v1/Processes('${enc(processName)}')`;
     const body = {
       Variables: vars.map((v) => ({
@@ -685,7 +797,10 @@ export class ProcessService {
    * Update the parameters of a TI process.
    * PATCH /api/v1/Processes('{name}') with Parameters array.
    */
-  async updateParameters(processName: string, params: ProcessParameter[]): Promise<void> {
+  async updateParameters(
+    processName: string,
+    params: ProcessParameter[],
+  ): Promise<void> {
     const path = `/api/v1/Processes('${enc(processName)}')`;
     const body = {
       Parameters: params.map(encodeParameter),
@@ -710,7 +825,11 @@ export class ProcessService {
     const path = `/api/v1/Processes('${enc(processName)}')/tm1.Compile`;
     try {
       const response = await this.http.request<{
-        value?: Array<{ LineNumber?: number; Procedure?: string; Message?: string }>;
+        value?: Array<{
+          LineNumber?: number;
+          Procedure?: string;
+          Message?: string;
+        }>;
       }>("POST", path, {});
       const errors = (response?.value ?? []).map((e) => ({
         lineNumber: e.LineNumber,
@@ -766,21 +885,30 @@ export class ProcessService {
     if (input.dataSource) {
       const ds = input.dataSource;
       const dsBody: Record<string, unknown> = { Type: ds.type };
-      if (ds.dataSourceNameForServer !== undefined) dsBody.dataSourceNameForServer = ds.dataSourceNameForServer;
-      if (ds.dataSourceNameForClient !== undefined) dsBody.dataSourceNameForClient = ds.dataSourceNameForClient;
-      if (ds.asciiDelimiterType !== undefined) dsBody.asciiDelimiterType = ds.asciiDelimiterType;
-      if (ds.asciiDelimiterChar !== undefined) dsBody.asciiDelimiterChar = ds.asciiDelimiterChar;
-      if (ds.asciiQuoteCharacter !== undefined) dsBody.asciiQuoteCharacter = ds.asciiQuoteCharacter;
-      if (ds.asciiHeaderRecords !== undefined) dsBody.asciiHeaderRecords = ds.asciiHeaderRecords;
-      if (ds.asciiDecimalSeparator !== undefined) dsBody.asciiDecimalSeparator = ds.asciiDecimalSeparator;
-      if (ds.asciiThousandSeparator !== undefined) dsBody.asciiThousandSeparator = ds.asciiThousandSeparator;
+      if (ds.dataSourceNameForServer !== undefined)
+        dsBody.dataSourceNameForServer = ds.dataSourceNameForServer;
+      if (ds.dataSourceNameForClient !== undefined)
+        dsBody.dataSourceNameForClient = ds.dataSourceNameForClient;
+      if (ds.asciiDelimiterType !== undefined)
+        dsBody.asciiDelimiterType = ds.asciiDelimiterType;
+      if (ds.asciiDelimiterChar !== undefined)
+        dsBody.asciiDelimiterChar = ds.asciiDelimiterChar;
+      if (ds.asciiQuoteCharacter !== undefined)
+        dsBody.asciiQuoteCharacter = ds.asciiQuoteCharacter;
+      if (ds.asciiHeaderRecords !== undefined)
+        dsBody.asciiHeaderRecords = ds.asciiHeaderRecords;
+      if (ds.asciiDecimalSeparator !== undefined)
+        dsBody.asciiDecimalSeparator = ds.asciiDecimalSeparator;
+      if (ds.asciiThousandSeparator !== undefined)
+        dsBody.asciiThousandSeparator = ds.asciiThousandSeparator;
       // usesUnicode: same v11 quirk as updateDataSource — drop on TM1 11.x.
       if (ds.usesUnicode !== undefined && this.http.version !== 11) {
         dsBody.usesUnicode = ds.usesUnicode;
       }
       if (ds.userName !== undefined) dsBody.userName = ds.userName;
       if (ds.password !== undefined) dsBody.password = ds.password;
-      if (ds.oDBCConnection !== undefined) dsBody.oDBCConnection = ds.oDBCConnection;
+      if (ds.oDBCConnection !== undefined)
+        dsBody.oDBCConnection = ds.oDBCConnection;
       if (ds.query !== undefined) dsBody.query = ds.query;
       if (ds.view !== undefined) dsBody.view = ds.view;
       if (ds.subset !== undefined) dsBody.subset = ds.subset;
@@ -791,7 +919,11 @@ export class ProcessService {
 
     try {
       const response = await this.http.request<{
-        value?: Array<{ LineNumber?: number; Procedure?: string; Message?: string }>;
+        value?: Array<{
+          LineNumber?: number;
+          Procedure?: string;
+          Message?: string;
+        }>;
       }>("POST", path, { Process: processBody });
       const errors = (response?.value ?? []).map((e) => ({
         lineNumber: e.LineNumber,

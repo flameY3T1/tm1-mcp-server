@@ -3,7 +3,13 @@ import { classifyAccess } from "../../src/lib/callgraph/callGraph.js";
 
 describe("classifyAccess", () => {
   it("classifies cube cell writes", () => {
-    for (const f of ["CellPutN", "CellPutS", "CellIncrementN", "CubeClearData", "ViewZeroOut"]) {
+    for (const f of [
+      "CellPutN",
+      "CellPutS",
+      "CellIncrementN",
+      "CubeClearData",
+      "ViewZeroOut",
+    ]) {
       expect(classifyAccess(f, "process")).toBe("write");
     }
   });
@@ -15,25 +21,54 @@ describe("classifyAccess", () => {
   });
 
   it("classifies element/dimension attribute value writes", () => {
-    for (const f of ["AttrPutN", "AttrPutS", "ElementAttrPutN", "ElementAttrPutS", "CubeAttrPutN"]) {
+    for (const f of [
+      "AttrPutN",
+      "AttrPutS",
+      "ElementAttrPutN",
+      "ElementAttrPutS",
+      "CubeAttrPutN",
+    ]) {
       expect(classifyAccess(f, "process")).toBe("write");
     }
   });
 
   it("classifies element/dimension attribute value reads", () => {
-    for (const f of ["ATTRN", "ATTRS", "AttrNL", "AttrSL", "ElementAttrN", "ElementAttrS", "ElementAttrNL", "ElementAttrSL"]) {
+    for (const f of [
+      "ATTRN",
+      "ATTRS",
+      "AttrNL",
+      "AttrSL",
+      "ElementAttrN",
+      "ElementAttrS",
+      "ElementAttrNL",
+      "ElementAttrSL",
+    ]) {
       expect(classifyAccess(f, "process")).toBe("read");
     }
   });
 
   it("does not classify invented cube/view cell functions (no such TI fns)", () => {
-    for (const f of ["CubePutN", "CubePutS", "ViewPutN", "ViewPutS", "CubeGetN", "ViewGetN", "AttributeGet", "AttributePut"]) {
+    for (const f of [
+      "CubePutN",
+      "CubePutS",
+      "ViewPutN",
+      "ViewPutS",
+      "CubeGetN",
+      "ViewGetN",
+      "AttributeGet",
+      "AttributePut",
+    ]) {
       expect(classifyAccess(f, "process")).toBe("other");
     }
   });
 
   it("leaves attribute schema ops (insert/delete/create) unclassified", () => {
-    for (const f of ["AttrInsert", "AttrDelete", "AttributeCreate", "ElementAttrInsert"]) {
+    for (const f of [
+      "AttrInsert",
+      "AttrDelete",
+      "AttributeCreate",
+      "ElementAttrInsert",
+    ]) {
       expect(classifyAccess(f, "process")).toBe("other");
     }
   });

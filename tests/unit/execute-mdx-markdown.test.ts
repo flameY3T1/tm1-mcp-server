@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { renderMdxMarkdown } from "../../src/tools/celldata/execute-mdx.js";
 
 const member = (name: string, hierarchyName = "H") => ({ name, hierarchyName });
-const tuple = (...names: string[]) => ({ members: names.map((n) => member(n)) });
+const tuple = (...names: string[]) => ({
+  members: names.map((n) => member(n)),
+});
 const cell = (formattedValue: string, value: number | string | null = 0) => ({
   value,
   formattedValue,
@@ -37,7 +39,13 @@ describe("renderMdxMarkdown", () => {
       axes: [
         { tuples: [tuple("Jan"), tuple("Feb")] },
         { tuples: [tuple("Plan"), tuple("Actual")] },
-        { tuples: [{ members: [member("Actual", "Version"), member("EUR", "Currency")] }] },
+        {
+          tuples: [
+            {
+              members: [member("Actual", "Version"), member("EUR", "Currency")],
+            },
+          ],
+        },
       ],
       total: 4,
       count: 4,

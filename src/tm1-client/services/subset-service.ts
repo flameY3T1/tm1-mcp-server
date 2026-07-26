@@ -10,7 +10,8 @@ import type { TM1HttpClient } from "../http.js";
 import { rethrowIfSystemic } from "./fallback.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export class SubsetService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -21,7 +22,10 @@ export class SubsetService {
    */
   async list(dimensionName: string, hierarchyName: string): Promise<Subset[]> {
     const result: Subset[] = [];
-    const fetchScope = async (segment: "Subsets" | "PrivateSubsets", isPrivate: boolean) => {
+    const fetchScope = async (
+      segment: "Subsets" | "PrivateSubsets",
+      isPrivate: boolean,
+    ) => {
       try {
         const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/${segment}?$select=Name,Expression,Alias`;
         const response = await this.http.request<{
@@ -92,13 +96,18 @@ export class SubsetService {
     if (subset.expression && subset.elements && subset.elements.length > 0) {
       throw new TM1Error({
         code: TM1ErrorCode.VALIDATION_ERROR,
-        message: "Subset must be either MDX-based (expression) OR static (elements), not both.",
+        message:
+          "Subset must be either MDX-based (expression) OR static (elements), not both.",
       });
     }
-    if (!subset.expression && (!subset.elements || subset.elements.length === 0)) {
+    if (
+      !subset.expression &&
+      (!subset.elements || subset.elements.length === 0)
+    ) {
       throw new TM1Error({
         code: TM1ErrorCode.VALIDATION_ERROR,
-        message: "Subset requires either expression (MDX) or non-empty elements list.",
+        message:
+          "Subset requires either expression (MDX) or non-empty elements list.",
       });
     }
 
@@ -123,7 +132,11 @@ export class SubsetService {
     dimensionName: string,
     hierarchyName: string,
     subsetName: string,
-    update: { expression?: string | undefined; elements?: string[] | undefined; alias?: string | undefined },
+    update: {
+      expression?: string | undefined;
+      elements?: string[] | undefined;
+      alias?: string | undefined;
+    },
   ): Promise<void> {
     const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Subsets('${enc(subsetName)}')`;
     const body: Record<string, unknown> = {};

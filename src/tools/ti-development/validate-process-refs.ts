@@ -5,7 +5,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
-import { buildProcessEnv, type ProcessEnv } from "../../lib/callgraph/variableEnv.js";
+import {
+  buildProcessEnv,
+  type ProcessEnv,
+} from "../../lib/callgraph/variableEnv.js";
 
 interface RefIssue {
   kind: "cube" | "dimension";
@@ -24,21 +27,31 @@ const CUBE_ARG1_FNS =
 const DIM_ARG1_FNS =
   "DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DimIx|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN";
 
-const CUBE_FN_RE = new RegExp(`\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*'([^']+)'`, "gi");
+const CUBE_FN_RE = new RegExp(
+  `\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*'([^']+)'`,
+  "gi",
+);
 const DIM_FN_RE = new RegExp(`\\b(${DIM_ARG1_FNS})\\s*\\(\\s*'([^']+)'`, "gi");
 
 // Arg-1 passed as a bare identifier (sCube = 'x'; CellGetN(sCube, ...)) —
 // resolved through the per-process variable env; unresolvable identifiers
 // (params, datasource vars, reassigned or computed values) are skipped.
-const CUBE_FN_IDENT_RE = new RegExp(`\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*([A-Za-z_]\\w*)\\s*[,)]`, "gi");
-const DIM_FN_IDENT_RE = new RegExp(`\\b(${DIM_ARG1_FNS})\\s*\\(\\s*([A-Za-z_]\\w*)\\s*[,)]`, "gi");
+const CUBE_FN_IDENT_RE = new RegExp(
+  `\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*([A-Za-z_]\\w*)\\s*[,)]`,
+  "gi",
+);
+const DIM_FN_IDENT_RE = new RegExp(
+  `\\b(${DIM_ARG1_FNS})\\s*\\(\\s*([A-Za-z_]\\w*)\\s*[,)]`,
+  "gi",
+);
 
 // CellPutN/CellPutS/CellIncrementN/CellPutProportionalSpread take the value as
 // arg 1 and the cube as arg 2; AttrPutS/AttrPutN/ElementSecurityPut take the
 // dimension as arg 2. The value arg is an arbitrary expression (nested calls,
 // '|'-concat, multi-line), so these are resolved with a paren/quote walker
 // (secondArgText) instead of a regex skip.
-const CUBE_ARG2_FN_RE = /\b(?:CellPutN|CellPutS|CellIncrementN|CellPutProportionalSpread)\s*\(/gi;
+const CUBE_ARG2_FN_RE =
+  /\b(?:CellPutN|CellPutS|CellIncrementN|CellPutProportionalSpread)\s*\(/gi;
 
 const DIM_ARG2_FN_RE = /\b(?:AttrPutS|AttrPutN|ElementSecurityPut)\s*\(/gi;
 
@@ -148,20 +161,41 @@ function scanArg2(
     const name = quotedLiteral(argText) ?? identLiteral(argText, env);
     if (!name || found.has(name)) continue;
     const line = text.slice(0, m.index).split("\n").length;
-    found.set(name, { tab, line, context: lines[line - 1]!.trim().slice(0, 200) });
+    found.set(name, {
+      tab,
+      line,
+      context: lines[line - 1]!.trim().slice(0, 200),
+    });
   }
   return found;
 }
 
-export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Client) {
+export function registerValidateProcessRefs(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_validate_process_refs",
     "Scan a TI process (live, by name, or from .pro) for cube/dimension references in well-known TI functions (CellGetN/S, CellPutN/S, ViewCreate, DimensionElementInsertDirect, AttrPutS, etc.) and verify each name resolves on the server. TM1 lets syntactically valid code reference non-existent objects — this catches the gap between compile and runtime.",
     {
-      processName: z.string().optional().describe("Validate an installed process by name"),
-      filePath: z.string().optional().describe("Validate a .pro file (absolute host path). Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline."),
+      processName: z
+        .string()
+        .optional()
+        .describe("Validate an installed process by name"),
+      filePath: z
+        .string()
+        .optional()
+        .describe(
+          "Validate a .pro file (absolute host path). Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline.",
+        ),
       content: z.string().optional().describe("Validate raw .pro content"),
-      includeControl: z.boolean().optional().default(true).describe("Include control objects ('}'-prefixed) as valid targets. Default true."),
+      includeControl: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Include control objects ('}'-prefixed) as valid targets. Default true.",
+        ),
     },
     async ({ processName, filePath, content, includeControl }) => {
       if (!processName && !filePath && !content) {
@@ -171,7 +205,12 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         });
       }
 
-      let code: { prolog: string; metadata: string; data: string; epilog: string };
+      let code: {
+        prolog: string;
+        metadata: string;
+        data: string;
+        epilog: string;
+      };
       let resolvedName = processName ?? "";
       if (processName) {
         code = await tm1Client.processes.getCode(processName);
@@ -197,15 +236,26 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
       const env = buildProcessEnv(TABS.map((t) => code[t]).join("\n"), []);
       const resolveIdent = (raw: string) => identLiteral(raw, env);
 
-      const cubeRefs = new Map<string, { tab: Tab; line: number; context: string }>();
-      const dimRefs = new Map<string, { tab: Tab; line: number; context: string }>();
+      const cubeRefs = new Map<
+        string,
+        { tab: Tab; line: number; context: string }
+      >();
+      const dimRefs = new Map<
+        string,
+        { tab: Tab; line: number; context: string }
+      >();
       for (const tab of TABS) {
         const c = code[tab];
         if (!c) continue;
         for (const [name, info] of scanCode(c, tab, CUBE_FN_RE)) {
           if (!cubeRefs.has(name)) cubeRefs.set(name, info);
         }
-        for (const [name, info] of scanCode(c, tab, CUBE_FN_IDENT_RE, resolveIdent)) {
+        for (const [name, info] of scanCode(
+          c,
+          tab,
+          CUBE_FN_IDENT_RE,
+          resolveIdent,
+        )) {
           if (!cubeRefs.has(name)) cubeRefs.set(name, info);
         }
         for (const [name, info] of scanArg2(c, tab, CUBE_ARG2_FN_RE, env)) {
@@ -214,7 +264,12 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         for (const [name, info] of scanCode(c, tab, DIM_FN_RE)) {
           if (!dimRefs.has(name)) dimRefs.set(name, info);
         }
-        for (const [name, info] of scanCode(c, tab, DIM_FN_IDENT_RE, resolveIdent)) {
+        for (const [name, info] of scanCode(
+          c,
+          tab,
+          DIM_FN_IDENT_RE,
+          resolveIdent,
+        )) {
           if (!dimRefs.has(name)) dimRefs.set(name, info);
         }
         for (const [name, info] of scanArg2(c, tab, DIM_ARG2_FN_RE, env)) {
@@ -222,12 +277,19 @@ export function registerValidateProcessRefs(server: McpServer, tm1Client: TM1Cli
         }
       }
 
-      const [cubes, dims] = await Promise.all([tm1Client.cubes.list(), tm1Client.dimensions.list()]);
+      const [cubes, dims] = await Promise.all([
+        tm1Client.cubes.list(),
+        tm1Client.dimensions.list(),
+      ]);
       const cubeNames = new Set(
-        cubes.filter((c) => includeControl || !c.name.startsWith("}")).map((c) => c.name.toLowerCase()),
+        cubes
+          .filter((c) => includeControl || !c.name.startsWith("}"))
+          .map((c) => c.name.toLowerCase()),
       );
       const dimNames = new Set(
-        dims.filter((d) => includeControl || !d.name.startsWith("}")).map((d) => d.name.toLowerCase()),
+        dims
+          .filter((d) => includeControl || !d.name.startsWith("}"))
+          .map((d) => d.name.toLowerCase()),
       );
 
       const issues: RefIssue[] = [];

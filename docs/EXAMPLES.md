@@ -2,7 +2,7 @@
 
 Working examples for every major feature. Snippets are JSON tool-call payloads — paste into any MCP-aware client (Claude Code, Claude Desktop, etc.). Defaults assume server name `tm1`.
 
-> Tip: every list_*/get_* tool now accepts `format: "json"|"markdown"`. Default is `json` (parsed into `structuredContent` by the server); use `"markdown"` when you want a readable table dropped straight into chat.
+> Tip: every list__/get__ tool now accepts `format: "json"|"markdown"`. Default is `json` (parsed into `structuredContent` by the server); use `"markdown"` when you want a readable table dropped straight into chat.
 
 ---
 
@@ -31,7 +31,11 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
 ```json
 {
   "tool": "tm1_list_dimensions",
-  "args": { "includeElementCount": true, "includeControl": false, "format": "markdown" }
+  "args": {
+    "includeElementCount": true,
+    "includeControl": false,
+    "format": "markdown"
+  }
 }
 ```
 
@@ -40,7 +44,11 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
 ```json
 {
   "tool": "tm1_list_processes_grouped",
-  "args": { "prefixSegments": 1, "minCount": 3, "excludePattern": "^Bedrock\\." }
+  "args": {
+    "prefixSegments": 1,
+    "minCount": 3,
+    "excludePattern": "^Bedrock\\."
+  }
 }
 ```
 
@@ -145,7 +153,9 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
     "name": "Load_Sales",
     "prolog": "DatasourceNameForServer = '|filename|';",
     "data": "CellPutN(NValue, 'Sales', vYear, vRegion, vProduct, 'Actual', 'Amount');",
-    "parameters": [{ "name": "filename", "type": "String", "defaultValue": "sales_2024.csv" }]
+    "parameters": [
+      { "name": "filename", "type": "String", "defaultValue": "sales_2024.csv" }
+    ]
   }
 }
 ```
@@ -157,7 +167,9 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
   "tool": "tm1_upsert_process",
   "args": {
     "name": "Load_Sales",
-    "parameters": [{ "name": "filename", "type": "String", "defaultValue": "sales.csv" }],
+    "parameters": [
+      { "name": "filename", "type": "String", "defaultValue": "sales.csv" }
+    ],
     "variables": [],
     "dataSource": { "type": "ASCII", "dataSourceNameForServer": "sales.csv" },
     "prolog": "...",
@@ -173,7 +185,10 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
 ```json
 {
   "tool": "tm1_diff_process_with_file",
-  "args": { "processName": "Load_Sales", "proFilePath": "/path/to/Load_Sales.pro" }
+  "args": {
+    "processName": "Load_Sales",
+    "proFilePath": "/path/to/Load_Sales.pro"
+  }
 }
 ```
 
@@ -182,7 +197,11 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
 ```json
 {
   "tool": "tm1_search_code",
-  "args": { "pattern": "ExecuteProcess.*Bedrock", "regex": true, "maxResults": 100 }
+  "args": {
+    "pattern": "ExecuteProcess.*Bedrock",
+    "regex": true,
+    "maxResults": 100
+  }
 }
 ```
 
@@ -226,7 +245,11 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
 ```json
 {
   "tool": "tm1_list_subsets",
-  "args": { "dimensionName": "Region", "hierarchyName": "Region", "format": "markdown" }
+  "args": {
+    "dimensionName": "Region",
+    "hierarchyName": "Region",
+    "format": "markdown"
+  }
 }
 ```
 
@@ -253,10 +276,16 @@ Working examples for every major feature. Snippets are JSON tool-call payloads �
     "cubeName": "Sales",
     "viewName": "v_Sales_Export",
     "rows": [{ "dimension": "Region", "subset": "EU_Countries" }],
-    "columns": [{ "dimension": "Month", "expression": "{TM1SUBSETALL([Month])}" }],
+    "columns": [
+      { "dimension": "Month", "expression": "{TM1SUBSETALL([Month])}" }
+    ],
     "titles": [
       { "dimension": "Version", "elements": ["Actual"], "selected": "Actual" },
-      { "dimension": "Year", "expression": "{TM1SUBSETALL([Year])}", "selected": "2026" }
+      {
+        "dimension": "Year",
+        "expression": "{TM1SUBSETALL([Year])}",
+        "selected": "2026"
+      }
     ],
     "suppressEmptyRows": true
   }
@@ -298,7 +327,10 @@ require `selected` — TM1 rejects title subsets without a selected element.
     "executionMode": "MultipleCommit",
     "frequency": { "days": 1, "hours": 0, "minutes": 0, "seconds": 0 },
     "steps": [
-      { "process": "Load_Sales", "parameters": [{ "name": "filename", "value": "sales.csv" }] },
+      {
+        "process": "Load_Sales",
+        "parameters": [{ "name": "filename", "value": "sales.csv" }]
+      },
       { "process": "Calc_KPIs", "parameters": [] }
     ]
   }
@@ -340,8 +372,14 @@ require `selected` — TM1 rejects title subsets without a selected element.
 
 ```json
 [
-  { "tool": "tm1_create_client", "args": { "name": "alice", "password": "..." } },
-  { "tool": "tm1_assign_client_group", "args": { "client": "alice", "group": "ADMIN" } }
+  {
+    "tool": "tm1_create_client",
+    "args": { "name": "alice", "password": "..." }
+  },
+  {
+    "tool": "tm1_assign_client_group",
+    "args": { "client": "alice", "group": "ADMIN" }
+  }
 ]
 ```
 
@@ -397,7 +435,14 @@ require `selected` — TM1 rejects title subsets without a selected element.
   "tool": "tm1_trace_cell_calculation",
   "args": {
     "cubeName": "Cube_PnL_Integration",
-    "elements": ["2026_01", "Budget", "CC_SAP", "ACC_GrossSalary", "EUR", "AmountGroup"],
+    "elements": [
+      "2026_01",
+      "Budget",
+      "CC_SAP",
+      "ACC_GrossSalary",
+      "EUR",
+      "AmountGroup"
+    ],
     "maxDepth": 3,
     "maxComponents": 10
   }
@@ -415,7 +460,14 @@ branches; re-run with that node's `tuple`/`cube` to drill deeper.
   "tool": "tm1_trace_feeders",
   "args": {
     "cubeName": "Cube_PnL_Integration",
-    "elements": ["2026_01", "Budget", "CC_SAP", "ACC_GrossSalary", "EUR", "AmountLocal"]
+    "elements": [
+      "2026_01",
+      "Budget",
+      "CC_SAP",
+      "ACC_GrossSalary",
+      "EUR",
+      "AmountLocal"
+    ]
   }
 }
 ```
@@ -508,17 +560,17 @@ Returns 2 static + N process-code templates (one per non-control TI) + M cube-ru
 
 ### Static resources
 
-| URI | Mime | Content |
-|---|---|---|
-| `tm1://server/info` | application/json | full TM1 server config (matches `tm1_get_server_info`) |
-| `tm1://server/state` | application/json | health snapshot: connected, version, object counts |
+| URI                  | Mime             | Content                                                |
+| -------------------- | ---------------- | ------------------------------------------------------ |
+| `tm1://server/info`  | application/json | full TM1 server config (matches `tm1_get_server_info`) |
+| `tm1://server/state` | application/json | health snapshot: connected, version, object counts     |
 
 ### Resource templates (dynamic)
 
-| Template | Mime | Content |
-|---|---|---|
+| Template                    | Mime             | Content                                   |
+| --------------------------- | ---------------- | ----------------------------------------- |
 | `tm1://process/{name}/code` | application/json | Prolog/Metadata/Data/Epilog of TI process |
-| `tm1://cube/{name}/rules` | text/plain | rules text (SKIPCHECK + FEEDERS) |
+| `tm1://cube/{name}/rules`   | text/plain       | rules text (SKIPCHECK + FEEDERS)          |
 
 ### Read example
 
@@ -541,13 +593,13 @@ Slash-command workflow templates surfaced by IDE clients. Each prompt briefs the
 
 ### Available prompts
 
-| Name | Args | Use case |
-|---|---|---|
-| `tm1_orientation` | — | First-call primer: how to navigate the model and which tool/prompt to reach for |
-| `tm1_diagnose_process` | `processName` | Root-cause failed TI: error logs → cascade → params → code → refs → callgraph |
-| `tm1_audit_cube` | `cubeName` | Read-only health audit: shape → rules → stats → object-usage → tx log |
-| `tm1_health_check` | — | Server snapshot: state, sessions, threads, error logs, message log |
-| `tm1_rules_review` | `cubeName` | Code-review rules: SKIPCHECK, FEEDERS, N/C splits, syntax check, deps |
+| Name                   | Args          | Use case                                                                        |
+| ---------------------- | ------------- | ------------------------------------------------------------------------------- |
+| `tm1_orientation`      | —             | First-call primer: how to navigate the model and which tool/prompt to reach for |
+| `tm1_diagnose_process` | `processName` | Root-cause failed TI: error logs → cascade → params → code → refs → callgraph   |
+| `tm1_audit_cube`       | `cubeName`    | Read-only health audit: shape → rules → stats → object-usage → tx log           |
+| `tm1_health_check`     | —             | Server snapshot: state, sessions, threads, error logs, message log              |
+| `tm1_rules_review`     | `cubeName`    | Code-review rules: SKIPCHECK, FEEDERS, N/C splits, syntax check, deps           |
 
 ### Get a prompt
 

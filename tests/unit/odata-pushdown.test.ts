@@ -31,7 +31,12 @@ function register(registrar: Registrar, client: TM1Client): ToolHandler {
   let captured: ToolHandler | null = null;
   let parser: z.ZodObject<ZodRawShape> | null = null;
   const server = {
-    tool: (_name: string, _desc: string, schema: ZodRawShape, handler: ToolHandler) => {
+    tool: (
+      _name: string,
+      _desc: string,
+      schema: ZodRawShape,
+      handler: ToolHandler,
+    ) => {
       parser = z.object(schema);
       captured = handler;
     },
@@ -50,7 +55,11 @@ function register(registrar: Registrar, client: TM1Client): ToolHandler {
  * predicate throws rather than being ignored — a silently dropped filter would
  * make a broken push-down look correct.
  */
-function fakeCollection(names: string[], paths: string[], opts?: { omitCount?: boolean }) {
+function fakeCollection(
+  names: string[],
+  paths: string[],
+  opts?: { omitCount?: boolean },
+) {
   return async (_method: string, path: string) => {
     paths.push(path);
     let rows = [...names];
@@ -59,43 +68,65 @@ function fakeCollection(names: string[], paths: string[], opts?: { omitCount?: b
       for (const predicate of filter.split(" and ")) {
         const control = /^not startswith\(Name,'\}'\)$/.exec(predicate);
         const exact = /^Name eq '(.*)'$/.exec(predicate);
-        const hasNot = /^not contains\(tolower\(Name\),'(.*)'\)$/.exec(predicate);
+        const hasNot = /^not contains\(tolower\(Name\),'(.*)'\)$/.exec(
+          predicate,
+        );
         const has = /^contains\(tolower\(Name\),'(.*)'\)$/.exec(predicate);
         if (control) rows = rows.filter((n) => !n.startsWith("}"));
-        else if (exact) rows = rows.filter((n) => n === exact[1]!.replace(/''/g, "'"));
-        else if (hasNot) rows = rows.filter((n) => !n.toLowerCase().includes(hasNot[1]!));
-        else if (has) rows = rows.filter((n) => n.toLowerCase().includes(has[1]!));
-        else throw new Error(`fake server cannot evaluate predicate: ${predicate}`);
+        else if (exact)
+          rows = rows.filter((n) => n === exact[1]!.replace(/''/g, "'"));
+        else if (hasNot)
+          rows = rows.filter((n) => !n.toLowerCase().includes(hasNot[1]!));
+        else if (has)
+          rows = rows.filter((n) => n.toLowerCase().includes(has[1]!));
+        else
+          throw new Error(
+            `fake server cannot evaluate predicate: ${predicate}`,
+          );
       }
     }
     const total = rows.length;
-    if (path.includes("$orderby=Name")) rows.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    if (path.includes("$orderby=Name"))
+      rows.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     const skip = Number(/\$skip=(\d+)/.exec(path)?.[1] ?? 0);
     const top = Number(/\$top=(\d+)/.exec(path)?.[1] ?? rows.length);
     rows = rows.slice(skip, skip + top);
     return {
-      ...(path.includes("$count=true") && opts?.omitCount !== true ? { "@odata.count": total } : {}),
+      ...(path.includes("$count=true") && opts?.omitCount !== true
+        ? { "@odata.count": total }
+        : {}),
       value: rows.map((Name) => ({ Name, Dimensions: [], Hierarchies: [] })),
     };
   };
 }
 
-const cubeClient = (names: string[], paths: string[], opts?: { omitCount?: boolean }): TM1Client =>
+const cubeClient = (
+  names: string[],
+  paths: string[],
+  opts?: { omitCount?: boolean },
+): TM1Client =>
   ({
-    cubes: new CubeService({ request: fakeCollection(names, paths, opts) } as never),
+    cubes: new CubeService({
+      request: fakeCollection(names, paths, opts),
+    } as never),
   }) as unknown as TM1Client;
 
 const processClient = (names: string[], paths: string[]): TM1Client =>
   ({
-    processes: new ProcessService({ request: fakeCollection(names, paths) } as never),
+    processes: new ProcessService({
+      request: fakeCollection(names, paths),
+    } as never),
   }) as unknown as TM1Client;
 
 const dimensionClient = (names: string[], paths: string[]): TM1Client =>
   ({
-    dimensions: new DimensionService({ request: fakeCollection(names, paths) } as never),
+    dimensions: new DimensionService({
+      request: fakeCollection(names, paths),
+    } as never),
   }) as unknown as TM1Client;
 
-const parse = (res: { content: Array<{ text: string }> }) => JSON.parse(res.content[0]!.text);
+const parse = (res: { content: Array<{ text: string }> }) =>
+  JSON.parse(res.content[0]!.text);
 
 const CUBES = ["Delta", "Alpha", "Charlie", "Bravo", "Echo", "}Stats"];
 
@@ -104,7 +135,10 @@ describe("list_* OData push-down", () => {
     it("pushes $orderby=Name + $top + $skip + $count=true in a single request", async () => {
       const paths: string[] = [];
       const page = parse(
-        await register(registerListCubes as Registrar, cubeClient(CUBES, paths))({
+        await register(
+          registerListCubes as Registrar,
+          cubeClient(CUBES, paths),
+        )({
           limit: 2,
           offset: 1,
         }),
@@ -116,7 +150,10 @@ describe("list_* OData push-down", () => {
       expect(paths[0]).toContain("$skip=1");
       expect(paths[0]).toContain("$count=true");
       expect(paths[0]).toContain("$filter=not startswith(Name,'}')");
-      expect(page.items.map((c: { name: string }) => c.name)).toEqual(["Bravo", "Charlie"]);
+      expect(page.items.map((c: { name: string }) => c.name)).toEqual([
+        "Bravo",
+        "Charlie",
+      ]);
       expect(page.total).toBe(5);
       expect(page.has_more).toBe(true);
     });
@@ -124,7 +161,10 @@ describe("list_* OData push-down", () => {
     it("falls back to a full scan when nameRegex keeps the filter client-side", async () => {
       const paths: string[] = [];
       const page = parse(
-        await register(registerListCubes as Registrar, cubeClient(CUBES, paths))({
+        await register(
+          registerListCubes as Registrar,
+          cubeClient(CUBES, paths),
+        )({
           limit: 2,
           nameRegex: "^[AB]",
         }),
@@ -134,7 +174,10 @@ describe("list_* OData push-down", () => {
       // while only 2 rows are reachable.
       expect(paths[0]).not.toContain("$top=");
       expect(paths[0]).not.toContain("$count=true");
-      expect(page.items.map((c: { name: string }) => c.name)).toEqual(["Alpha", "Bravo"]);
+      expect(page.items.map((c: { name: string }) => c.name)).toEqual([
+        "Alpha",
+        "Bravo",
+      ]);
       expect(page.total).toBe(2);
       expect(page.has_more).toBe(false);
     });
@@ -142,18 +185,26 @@ describe("list_* OData push-down", () => {
     it("pushes nameExact and nameContains down, preserving their precedence", async () => {
       const exactPaths: string[] = [];
       const exact = parse(
-        await register(registerListCubes as Registrar, cubeClient(CUBES, exactPaths))({
+        await register(
+          registerListCubes as Registrar,
+          cubeClient(CUBES, exactPaths),
+        )({
           nameExact: "Delta",
           nameContains: "unused-when-nameExact-set",
         }),
       );
       expect(exactPaths[0]).toContain("Name eq 'Delta'");
       expect(exactPaths[0]).not.toContain("unused-when-nameExact-set");
-      expect(exact.items.map((c: { name: string }) => c.name)).toEqual(["Delta"]);
+      expect(exact.items.map((c: { name: string }) => c.name)).toEqual([
+        "Delta",
+      ]);
 
       const containsPaths: string[] = [];
       const contains = parse(
-        await register(registerListCubes as Registrar, cubeClient(CUBES, containsPaths))({
+        await register(
+          registerListCubes as Registrar,
+          cubeClient(CUBES, containsPaths),
+        )({
           nameContains: "A",
         }),
       );
@@ -170,7 +221,10 @@ describe("list_* OData push-down", () => {
     it("bypasses push-down for fetchAll and for limit=0", async () => {
       for (const args of [{ fetchAll: true }, { limit: 0 }]) {
         const paths: string[] = [];
-        await register(registerListCubes as Registrar, cubeClient(CUBES, paths))(args);
+        await register(
+          registerListCubes as Registrar,
+          cubeClient(CUBES, paths),
+        )(args);
         expect(paths[0]).not.toContain("$top=");
       }
     });
@@ -188,16 +242,25 @@ describe("list_* OData push-down", () => {
       // request and slices it locally.
       expect(paths).toHaveLength(2);
       expect(paths[1]).not.toContain("$top=");
-      expect(page.items.map((c: { name: string }) => c.name)).toEqual(["Alpha", "Bravo"]);
+      expect(page.items.map((c: { name: string }) => c.name)).toEqual([
+        "Alpha",
+        "Bravo",
+      ]);
       expect(page.total).toBe(5);
     });
 
     it("orders identically whether the page came from the server or the fallback", async () => {
       const pushed = parse(
-        await register(registerListCubes as Registrar, cubeClient(CUBES, []))({ limit: 5 }),
+        await register(
+          registerListCubes as Registrar,
+          cubeClient(CUBES, []),
+        )({ limit: 5 }),
       );
       const scanned = parse(
-        await register(registerListCubes as Registrar, cubeClient(CUBES, []))({
+        await register(
+          registerListCubes as Registrar,
+          cubeClient(CUBES, []),
+        )({
           limit: 5,
           nameRegex: ".",
         }),
@@ -207,7 +270,10 @@ describe("list_* OData push-down", () => {
 
     it("reports has_more=false on a last page that is exactly `limit` long", async () => {
       const page = parse(
-        await register(registerListCubes as Registrar, cubeClient(CUBES, []))({
+        await register(
+          registerListCubes as Registrar,
+          cubeClient(CUBES, []),
+        )({
           limit: 2,
           offset: 3,
         }),
@@ -226,7 +292,10 @@ describe("list_* OData push-down", () => {
     it("pushes includeControl, nameContains and nameNotContains into $filter", async () => {
       const paths: string[] = [];
       const page = parse(
-        await register(registerListProcesses as Registrar, processClient(PROCS, paths))({
+        await register(
+          registerListProcesses as Registrar,
+          processClient(PROCS, paths),
+        )({
           limit: 10,
           nameContains: "LOAD",
           nameNotContains: "BUDGET",
@@ -237,14 +306,19 @@ describe("list_* OData push-down", () => {
       expect(paths[0]).toContain("contains(tolower(Name),'load')");
       expect(paths[0]).toContain("not contains(tolower(Name),'budget')");
       expect(paths[0]).toContain("$orderby=Name");
-      expect(page.items.map((p: { name: string }) => p.name)).toEqual(["load.actuals"]);
+      expect(page.items.map((p: { name: string }) => p.name)).toEqual([
+        "load.actuals",
+      ]);
       expect(page.total).toBe(1);
     });
 
     it("falls back to a full scan for nameRegex and for excludePattern", async () => {
       for (const args of [{ nameRegex: "^load" }, { excludePattern: "^zz" }]) {
         const paths: string[] = [];
-        await register(registerListProcesses as Registrar, processClient(PROCS, paths))({
+        await register(
+          registerListProcesses as Registrar,
+          processClient(PROCS, paths),
+        )({
           limit: 2,
           ...args,
         });
@@ -260,7 +334,10 @@ describe("list_* OData push-down", () => {
     it("pushes the outer /Dimensions window down", async () => {
       const paths: string[] = [];
       const page = parse(
-        await register(registerListDimensions as Registrar, dimensionClient(DIMS, paths))({
+        await register(
+          registerListDimensions as Registrar,
+          dimensionClient(DIMS, paths),
+        )({
           limit: 2,
         }),
       );
@@ -268,22 +345,28 @@ describe("list_* OData push-down", () => {
       expect(paths[0]).toContain("$orderby=Name");
       expect(paths[0]).toContain("$top=2");
       expect(paths[0]).toContain("$filter=not startswith(Name,'}')");
-      expect(page.items.map((d: { name: string }) => d.name)).toEqual(["Account", "Region"]);
+      expect(page.items.map((d: { name: string }) => d.name)).toEqual([
+        "Account",
+        "Region",
+      ]);
       expect(page.total).toBe(3);
       expect(page.has_more).toBe(true);
     });
 
     it("falls back to a full scan when changedSince filters client-side", async () => {
       const calls: string[] = [];
-      await register(registerListDimensions as Registrar, {
-        dimensions: {
-          list: async (opts?: unknown) => {
-            calls.push(JSON.stringify(opts ?? {}));
-            return [{ name: "Region", hierarchies: ["Region"] }];
+      await register(
+        registerListDimensions as Registrar,
+        {
+          dimensions: {
+            list: async (opts?: unknown) => {
+              calls.push(JSON.stringify(opts ?? {}));
+              return [{ name: "Region", hierarchies: ["Region"] }];
+            },
+            getLastUpdatedMap: async () => new Map<string, string>(),
           },
-          getLastUpdatedMap: async () => new Map<string, string>(),
-        },
-      } as unknown as TM1Client)({ limit: 2, changedSince: "2026-01-01" });
+        } as unknown as TM1Client,
+      )({ limit: 2, changedSince: "2026-01-01" });
 
       // changedSince joins }DimensionProperties client-side, so @odata.count
       // would over-report — the service must be called without a page.

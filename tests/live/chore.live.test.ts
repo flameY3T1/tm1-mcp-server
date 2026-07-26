@@ -13,7 +13,12 @@
 // fire on a schedule after the test. The bound process is harmless: prolog
 // `nX = 1;`, no data source. Teardown is idempotent (try/catch each).
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getHarness, LIVE_ENABLED, SANDBOX, type LiveHarness } from "./harness.js";
+import {
+  getHarness,
+  LIVE_ENABLED,
+  SANDBOX,
+  type LiveHarness,
+} from "./harness.js";
 
 const PROC = `${SANDBOX}_CHORE_PROC`;
 const CHORE = `${SANDBOX}_CHORE_A`;
@@ -80,17 +85,35 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
 
   it("toggle_chore flips active state", async () => {
     // Activate.
-    const on = await h.ok("tm1_toggle_chore", { choreName: CHORE, active: true });
-    expect(on.json).toMatchObject({ success: true, choreName: CHORE, active: true });
+    const on = await h.ok("tm1_toggle_chore", {
+      choreName: CHORE,
+      active: true,
+    });
+    expect(on.json).toMatchObject({
+      success: true,
+      choreName: CHORE,
+      active: true,
+    });
     const afterOn = await h.ok("tm1_list_chores", { fetchAll: true });
-    const onItem = afterOn.json.items.find((c: { name?: string }) => c?.name === CHORE);
+    const onItem = afterOn.json.items.find(
+      (c: { name?: string }) => c?.name === CHORE,
+    );
     expect(onItem.active).toBe(true);
 
     // Deactivate again (leave it OFF — schedule must never fire post-test).
-    const off = await h.ok("tm1_toggle_chore", { choreName: CHORE, active: false });
-    expect(off.json).toMatchObject({ success: true, choreName: CHORE, active: false });
+    const off = await h.ok("tm1_toggle_chore", {
+      choreName: CHORE,
+      active: false,
+    });
+    expect(off.json).toMatchObject({
+      success: true,
+      choreName: CHORE,
+      active: false,
+    });
     const afterOff = await h.ok("tm1_list_chores", { fetchAll: true });
-    const offItem = afterOff.json.items.find((c: { name?: string }) => c?.name === CHORE);
+    const offItem = afterOff.json.items.find(
+      (c: { name?: string }) => c?.name === CHORE,
+    );
     expect(offItem.active).toBe(false);
   });
 
@@ -104,7 +127,9 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
     // Verify it stuck. TM1 may render the StartTime in its own format/zone,
     // so assert the date portion rather than an exact string match.
     const after = await h.ok("tm1_list_chores", { fetchAll: true });
-    const item = after.json.items.find((c: { name?: string }) => c?.name === CHORE);
+    const item = after.json.items.find(
+      (c: { name?: string }) => c?.name === CHORE,
+    );
     expect(item).toBeTruthy();
     expect(String(item.startTime)).toContain("2099-06-15");
   });

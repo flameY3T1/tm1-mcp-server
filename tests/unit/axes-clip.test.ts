@@ -38,8 +38,16 @@ const ALL_CELLS = [
   { Value: 51, FormattedValue: "51" }, // C2,R5
 ];
 const RAW_AXES = [
-  { Tuples: COLS.map((n) => ({ Members: [{ Name: n, Hierarchy: { Name: "Cols" } }] })) },
-  { Tuples: ROWS.map((n) => ({ Members: [{ Name: n, Hierarchy: { Name: "Rows" } }] })) },
+  {
+    Tuples: COLS.map((n) => ({
+      Members: [{ Name: n, Hierarchy: { Name: "Cols" } }],
+    })),
+  },
+  {
+    Tuples: ROWS.map((n) => ({
+      Members: [{ Name: n, Hierarchy: { Name: "Rows" } }],
+    })),
+  },
 ];
 
 // Mock http.request that honours $top/$skip embedded in the Cells expand,
@@ -81,7 +89,9 @@ function mdxClient(): TM1Client {
   return { cells: new CellService(mockHttp()) } as unknown as TM1Client;
 }
 function viewClient(): TM1Client {
-  return { views: new ViewService(mockHttp() as never) } as unknown as TM1Client;
+  return {
+    views: new ViewService(mockHttp() as never),
+  } as unknown as TM1Client;
 }
 
 // ── clipAxesToWindow: the pure integrity core ────────────────────────────────
@@ -93,7 +103,10 @@ describe("clipAxesToWindow", () => {
     const r = clipAxesToWindow(axes(), 4, 0);
     expect(r.clipped).toBe(true);
     expect(r.axes[0]!.tuples).toHaveLength(2); // cols untouched
-    expect(r.axes[1]!.tuples.map((t) => t.members[0]!.name)).toEqual(["R1", "R2"]);
+    expect(r.axes[1]!.tuples.map((t) => t.members[0]!.name)).toEqual([
+      "R1",
+      "R2",
+    ]);
   });
 
   it("offset>0: clips to the index-stable prefix [0..maxRef]", () => {
@@ -102,18 +115,31 @@ describe("clipAxesToWindow", () => {
     const r = clipAxesToWindow(axes(), 4, 4);
     expect(r.clipped).toBe(true);
     expect(r.axes[0]!.tuples).toHaveLength(2); // cols still fully cycled
-    expect(r.axes[1]!.tuples.map((t) => t.members[0]!.name)).toEqual(["R1", "R2", "R3", "R4"]);
+    expect(r.axes[1]!.tuples.map((t) => t.members[0]!.name)).toEqual([
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+    ]);
   });
 
   it("does NOT clip a partially-referenced FAST axis when a slow axis is active", () => {
     // Pathological wrap: skip=13,count=3 over cols=10,rows=10 → ord 13..15.
     //  idx0 = ord mod 10 = {3,4,5} (partial) but idx1 = 1 (slow axis active).
     // Clipping cols would break `ord mod L0`; the guard must keep cols full.
-    const big = [ax([...Array(10)].map((_, i) => `A${i}`), "Ax0"),
-                 ax([...Array(10)].map((_, i) => `B${i}`), "Ax1")];
+    const big = [
+      ax(
+        [...Array(10)].map((_, i) => `A${i}`),
+        "Ax0",
+      ),
+      ax(
+        [...Array(10)].map((_, i) => `B${i}`),
+        "Ax1",
+      ),
+    ];
     const r = clipAxesToWindow(big, 3, 13);
     expect(r.axes[0]!.tuples).toHaveLength(10); // fast axis untouched (unsafe to clip)
-    expect(r.axes[1]!.tuples).toHaveLength(2);  // slow axis clips to prefix [B0,B1]
+    expect(r.axes[1]!.tuples).toHaveLength(2); // slow axis clips to prefix [B0,B1]
     expect(r.clipped).toBe(true);
   });
 
@@ -140,8 +166,11 @@ describe("tm1_execute_mdx axes clipping", () => {
     expect(env.total).toBe(10); // full cell count preserved
     expect(env.count).toBe(4);
     expect(env.axes[1].tuples).toHaveLength(2); // rows 5 → 2
-    expect(env.axes[1].tuples.map((t: { members: { name: string }[] }) => t.members[0].name))
-      .toEqual(["R1", "R2"]);
+    expect(
+      env.axes[1].tuples.map(
+        (t: { members: { name: string }[] }) => t.members[0].name,
+      ),
+    ).toEqual(["R1", "R2"]);
     expect(env.axes_clipped).toBe(true);
   });
 
@@ -168,7 +197,12 @@ describe("tm1_execute_mdx axes clipping", () => {
   it("clipped offset>0 page flat-decodes to the right tuples (integrity)", async () => {
     const { server, run } = fakeServer();
     registerExecuteMdx(server, mdxClient());
-    const res = await run({ mdx: "SELECT ...", limit: 4, offset: 4, format: "markdown" });
+    const res = await run({
+      mdx: "SELECT ...",
+      limit: 4,
+      offset: 4,
+      format: "markdown",
+    });
     const md = res.content[0]!.text;
     // ord 4..7 → C1/R3, C2/R3, C1/R4, C2/R4.
     expect(md).toContain("| C1 | R3 | 30 |");

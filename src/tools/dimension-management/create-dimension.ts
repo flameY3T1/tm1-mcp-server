@@ -3,7 +3,10 @@ import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { actionResponse } from "../format.js";
 
-export function registerCreateDimension(server: McpServer, tm1Client: TM1Client): void {
+export function registerCreateDimension(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_create_dimension",
     [

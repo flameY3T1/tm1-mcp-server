@@ -82,7 +82,10 @@ describe("TM1Client – Process Execution Methods", () => {
   describe("executeProcess()", () => {
     it("should POST tm1.ExecuteWithReturn and report success on CompletedSuccessfully", async () => {
       fetchSpy.mockResolvedValueOnce(
-        mockResponse({ ProcessExecuteStatusCode: "CompletedSuccessfully", ErrorLogFile: null }),
+        mockResponse({
+          ProcessExecuteStatusCode: "CompletedSuccessfully",
+          ErrorLogFile: null,
+        }),
       );
 
       const result = await client.processes.execute("ImportData");
@@ -94,7 +97,9 @@ describe("TM1Client – Process Execution Methods", () => {
       });
 
       const [url, opts] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/Processes('ImportData')/tm1.ExecuteWithReturn");
+      expect(url).toContain(
+        "/api/v1/Processes('ImportData')/tm1.ExecuteWithReturn",
+      );
       expect(opts.method).toBe("POST");
     });
 
@@ -113,7 +118,9 @@ describe("TM1Client – Process Execution Methods", () => {
 
       expect(result.success).toBe(false);
       expect(result.processErrorStatus).toBe("CompletedWithMinorErrors");
-      expect(result.errorLogFile).toBe("TM1ProcessError_20260718_ImportData.log");
+      expect(result.errorLogFile).toBe(
+        "TM1ProcessError_20260718_ImportData.log",
+      );
     });
 
     it("reports failure on an aborted run (HTTP 200 + Aborted status)", async () => {
@@ -185,7 +192,11 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should return failure when TM1 returns an error", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse(
-          { error: { message: { value: "Process aborted with error in Prolog" } } },
+          {
+            error: {
+              message: { value: "Process aborted with error in Prolog" },
+            },
+          },
           400,
         ),
       );
@@ -193,7 +204,9 @@ describe("TM1Client – Process Execution Methods", () => {
       const result = await client.processes.execute("BrokenProcess");
 
       expect(result.success).toBe(false);
-      expect(result.processErrorStatus).toContain("Process aborted with error in Prolog");
+      expect(result.processErrorStatus).toContain(
+        "Process aborted with error in Prolog",
+      );
     });
 
     it("should return failure when process is not found (404)", async () => {
@@ -216,7 +229,9 @@ describe("TM1Client – Process Execution Methods", () => {
       // {success:false} would invite the agent to re-run it (duplicate execution).
       fetchSpy.mockRejectedValueOnce(new Error("ECONNREFUSED 10.0.0.1:8010"));
 
-      await expect(client.processes.execute("LongRunningLoad")).rejects.toThrow();
+      await expect(
+        client.processes.execute("LongRunningLoad"),
+      ).rejects.toThrow();
     });
 
     it("should encode special characters in process name", async () => {
@@ -259,7 +274,12 @@ describe("TM1Client – Process Execution Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           value: [
-            { Name: "pFilePath", Type: "String", Value: "/data/input.csv", Prompt: "Enter file path" },
+            {
+              Name: "pFilePath",
+              Type: "String",
+              Value: "/data/input.csv",
+              Prompt: "Enter file path",
+            },
             { Name: "pYear", Type: "Numeric", Value: 2024 },
           ],
         }),
@@ -268,7 +288,12 @@ describe("TM1Client – Process Execution Methods", () => {
       const params = await client.processes.getParameters("ImportData");
 
       expect(params).toEqual([
-        { name: "pFilePath", type: "String", defaultValue: "/data/input.csv", prompt: "Enter file path" },
+        {
+          name: "pFilePath",
+          type: "String",
+          defaultValue: "/data/input.csv",
+          prompt: "Enter file path",
+        },
         { name: "pYear", type: "Numeric", defaultValue: 2024 },
       ]);
 
@@ -301,9 +326,7 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should omit prompt when not present in API response", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
-          value: [
-            { Name: "pParam", Type: "String", Value: "default" },
-          ],
+          value: [{ Name: "pParam", Type: "String", Value: "default" }],
         }),
       );
 
@@ -438,7 +461,9 @@ describe("TM1Client – Process Execution Methods", () => {
     it("getCodeBlob GETs Code/$value and returns raw text", async () => {
       const blob = "#region Prolog\r\nsX=1;\r\n#endregion";
       fetchSpy.mockResolvedValueOnce({
-        ok: true, status: 200, statusText: "OK",
+        ok: true,
+        status: 200,
+        statusText: "OK",
         headers: new Headers({ "content-type": "text/plain" }),
         text: vi.fn().mockResolvedValue(blob),
         json: vi.fn().mockRejectedValue(new Error("not json")),
@@ -493,8 +518,14 @@ describe("TM1Client – Process Execution Methods", () => {
 
       const url = String(fetchSpy.mock.calls[0][0]);
       expect(url).toContain("HasSecurityAccess");
-      expect(rows[0]).toMatchObject({ name: "proc.elevated", hasSecurityAccess: true });
-      expect(rows[1]).toMatchObject({ name: "proc.normal", hasSecurityAccess: false });
+      expect(rows[0]).toMatchObject({
+        name: "proc.elevated",
+        hasSecurityAccess: true,
+      });
+      expect(rows[1]).toMatchObject({
+        name: "proc.normal",
+        hasSecurityAccess: false,
+      });
     });
 
     it("defaults missing HasSecurityAccess to false", async () => {

@@ -5,7 +5,10 @@ import { withToolHint } from "../error-format.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 import { actionResponse } from "../format.js";
 
-export function registerDeleteFile(server: McpServer, tm1Client: TM1Client): void {
+export function registerDeleteFile(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_delete_file",
     [
@@ -16,9 +19,10 @@ export function registerDeleteFile(server: McpServer, tm1Client: TM1Client): voi
       "Safety: pass confirm=<file name verbatim>.",
     ].join(" "),
     {
-      fileName: z.string().min(1).describe(
-        "File name or path (e.g. 'data.csv' or 'imports/old.csv').",
-      ),
+      fileName: z
+        .string()
+        .min(1)
+        .describe("File name or path (e.g. 'data.csv' or 'imports/old.csv')."),
       ...CONFIRM_SCHEMA,
     },
     async ({ fileName, confirm }) => {

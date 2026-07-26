@@ -31,14 +31,29 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
       processNameContains: z
         .string()
         .optional()
-        .describe("Return only chores whose steps reference a process name containing this substring (case-insensitive)."),
+        .describe(
+          "Return only chores whose steps reference a process name containing this substring (case-insensitive).",
+        ),
     },
-    async ({ limit, offset, fetchAll, format, compact, processNameContains }) => {
+    async ({
+      limit,
+      offset,
+      fetchAll,
+      format,
+      compact,
+      processNameContains,
+    }) => {
       const chores = await tm1Client.chores.list();
       const filtered = (() => {
-        if (processNameContains === undefined || processNameContains.length === 0) return chores;
+        if (
+          processNameContains === undefined ||
+          processNameContains.length === 0
+        )
+          return chores;
         const needle = processNameContains.toLowerCase();
-        return chores.filter((c) => c.processes.some((p) => p.name.toLowerCase().includes(needle)));
+        return chores.filter((c) =>
+          c.processes.some((p) => p.name.toLowerCase().includes(needle)),
+        );
       })();
       const projected: Array<Chore | ChoreCompact> = compact
         ? filtered.map((c): ChoreCompact => ({
@@ -56,7 +71,13 @@ export function registerListChores(server: McpServer, tm1Client: TM1Client) {
         { header: "active", get: (c) => c.active },
         { header: "startTime", get: (c) => c.startTime },
         { header: "frequency", get: (c) => c.frequency },
-        { header: "processes", get: (c) => ("processes" in c ? c.processes.map((p) => p.name).join(", ") : `${c.processCount} (compact)`) },
+        {
+          header: "processes",
+          get: (c) =>
+            "processes" in c
+              ? c.processes.map((p) => p.name).join(", ")
+              : `${c.processCount} (compact)`,
+        },
       ];
       return pageResponse(page, format, { title: "Chores", columns });
     },

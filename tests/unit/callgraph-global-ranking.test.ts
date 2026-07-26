@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { globalRanking } from "../../src/tools/analysis/analyze-callgraph.js";
-import type { ReferenceIndex, TmReference } from "../../src/lib/callgraph/referenceIndex.js";
+import type {
+  ReferenceIndex,
+  TmReference,
+} from "../../src/lib/callgraph/referenceIndex.js";
 
 function procRef(source: string, target: string): TmReference {
   return {
@@ -58,7 +61,11 @@ describe("globalRanking", () => {
       ["Orchestrator", "A", "B", "C"],
     );
 
-    const res = globalRanking(index, { rankBy: "outgoing", topN: 50, includeSystem: false });
+    const res = globalRanking(index, {
+      rankBy: "outgoing",
+      topN: 50,
+      includeSystem: false,
+    });
 
     expect(res.ranking[0]!.process).toBe("Orchestrator");
     expect(res.ranking[0]!.outgoingCalls).toBe(3);
@@ -81,7 +88,11 @@ describe("globalRanking", () => {
       [procRef("X", "Hub"), procRef("Y", "Hub"), procRef("Hub", "Z")],
       ["X", "Y", "Hub", "Z"],
     );
-    const res = globalRanking(index, { rankBy: "incoming", topN: 50, includeSystem: false });
+    const res = globalRanking(index, {
+      rankBy: "incoming",
+      topN: 50,
+      includeSystem: false,
+    });
     expect(res.ranking[0]!.process).toBe("Hub");
     expect(res.ranking[0]!.incomingCalls).toBe(2);
     expect(res.ranking[0]!.incomingDistinct).toBe(2);
@@ -92,11 +103,19 @@ describe("globalRanking", () => {
       [procRef("}bedrock.server.wait", "A"), procRef("Real", "A")],
       ["}bedrock.server.wait", "Real", "A"],
     );
-    const off = globalRanking(index, { rankBy: "outgoing", topN: 50, includeSystem: false });
+    const off = globalRanking(index, {
+      rankBy: "outgoing",
+      topN: 50,
+      includeSystem: false,
+    });
     expect(off.ranking.some((r) => r.process.startsWith("}"))).toBe(false);
     expect(off.totalProcessesIndexed).toBe(2); // Real + A only
 
-    const on = globalRanking(index, { rankBy: "outgoing", topN: 50, includeSystem: true });
+    const on = globalRanking(index, {
+      rankBy: "outgoing",
+      topN: 50,
+      includeSystem: true,
+    });
     expect(on.ranking.some((r) => r.process.startsWith("}"))).toBe(true);
   });
 
@@ -109,7 +128,11 @@ describe("globalRanking", () => {
       for (let j = 0; j < 10 - i; j++) refs.push(procRef(`P${i}`, "Sink"));
     }
     names.push("Sink");
-    const res = globalRanking(mkIndex(refs, names), { rankBy: "outgoing", topN: 3, includeSystem: false });
+    const res = globalRanking(mkIndex(refs, names), {
+      rankBy: "outgoing",
+      topN: 3,
+      includeSystem: false,
+    });
     expect(res.ranking.length).toBe(3);
     expect(res.truncated).toBe(true);
     expect(res.ranking[0]!.process).toBe("P0");
@@ -118,7 +141,11 @@ describe("globalRanking", () => {
 
   it("counts self-recursive calls", () => {
     const index = mkIndex([procRef("Loop", "Loop")], ["Loop"]);
-    const res = globalRanking(index, { rankBy: "outgoing", topN: 50, includeSystem: false });
+    const res = globalRanking(index, {
+      rankBy: "outgoing",
+      topN: 50,
+      includeSystem: false,
+    });
     const loop = res.ranking.find((r) => r.process === "Loop")!;
     expect(loop.outgoingCalls).toBe(1);
     expect(loop.incomingCalls).toBe(1);

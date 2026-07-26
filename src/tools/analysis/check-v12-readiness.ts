@@ -1,7 +1,10 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { scanForDeprecatedTi, type ScanHit } from "../../lib/v12-compat/scanner.js";
+import {
+  scanForDeprecatedTi,
+  type ScanHit,
+} from "../../lib/v12-compat/scanner.js";
 
 const RULESET_SOURCE =
   "vscode-tm1-ti@cf73b93 / tiSignatures.ts (synced 2026-05-12)";
@@ -39,7 +42,10 @@ function toFinding(
   };
 }
 
-export function registerCheckV12Readiness(server: McpServer, tm1Client: TM1Client) {
+export function registerCheckV12Readiness(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_check_v12_readiness",
     [
@@ -52,7 +58,9 @@ export function registerCheckV12Readiness(server: McpServer, tm1Client: TM1Clien
         .enum(["processes", "rules", "all"])
         .optional()
         .default("all")
-        .describe("Restrict scan to TI processes, cube rules, or both (default 'all')."),
+        .describe(
+          "Restrict scan to TI processes, cube rules, or both (default 'all').",
+        ),
       includeControl: z
         .boolean()
         .optional()
@@ -65,7 +73,9 @@ export function registerCheckV12Readiness(server: McpServer, tm1Client: TM1Clien
         .max(5000)
         .optional()
         .default(500)
-        .describe("Cap on returned findings (default 500). Summary counters still reflect the full scan."),
+        .describe(
+          "Cap on returned findings (default 500). Summary counters still reflect the full scan.",
+        ),
     },
     async ({ scope, includeControl, maxFindings }) => {
       const findings: Finding[] = [];
@@ -76,8 +86,12 @@ export function registerCheckV12Readiness(server: McpServer, tm1Client: TM1Clien
       const wantRules = scope === "all" || scope === "rules";
 
       const [procCodes, cubeRules] = await Promise.all([
-        wantProcesses ? tm1Client.processes.getAllCode(includeControl) : Promise.resolve([]),
-        wantRules ? tm1Client.cubes.getAllRules(includeControl) : Promise.resolve([]),
+        wantProcesses
+          ? tm1Client.processes.getAllCode(includeControl)
+          : Promise.resolve([]),
+        wantRules
+          ? tm1Client.cubes.getAllRules(includeControl)
+          : Promise.resolve([]),
       ]);
 
       if (wantProcesses) {
@@ -131,7 +145,8 @@ export function registerCheckV12Readiness(server: McpServer, tm1Client: TM1Clien
 
       findings.sort((a, b) => {
         if (a.severity !== b.severity) return a.severity === "error" ? -1 : 1;
-        if (a.objectName !== b.objectName) return a.objectName.localeCompare(b.objectName);
+        if (a.objectName !== b.objectName)
+          return a.objectName.localeCompare(b.objectName);
         return a.line - b.line;
       });
 

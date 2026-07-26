@@ -73,8 +73,18 @@ describe("TM1Client – Metadata Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           value: [
-            { Name: "SalesCube", Dimensions: [{ Name: "Region" }, { Name: "Product" }, { Name: "Time" }] },
-            { Name: "PlanCube", Dimensions: [{ Name: "Account" }, { Name: "Time" }] },
+            {
+              Name: "SalesCube",
+              Dimensions: [
+                { Name: "Region" },
+                { Name: "Product" },
+                { Name: "Time" },
+              ],
+            },
+            {
+              Name: "PlanCube",
+              Dimensions: [{ Name: "Account" }, { Name: "Time" }],
+            },
           ],
         }),
       );
@@ -88,7 +98,9 @@ describe("TM1Client – Metadata Methods", () => {
 
       const [url] = fetchSpy.mock.calls[0];
       // Light path pins $select=Name so TM1 doesn't ship every cube's Rules blob.
-      expect(url).toContain("/api/v1/Cubes?$select=Name&$expand=Dimensions($select=Name)");
+      expect(url).toContain(
+        "/api/v1/Cubes?$select=Name&$expand=Dimensions($select=Name)",
+      );
       expect(String(url)).toContain("$select=Name");
     });
 
@@ -103,7 +115,11 @@ describe("TM1Client – Metadata Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           value: [
-            { Name: "SalesCube", Rules: "SKIPCHECK;\nFEEDERS;", Dimensions: [{ Name: "Region" }] },
+            {
+              Name: "SalesCube",
+              Rules: "SKIPCHECK;\nFEEDERS;",
+              Dimensions: [{ Name: "Region" }],
+            },
             { Name: "PlanCube", Rules: "", Dimensions: [{ Name: "Time" }] },
           ],
         }),
@@ -117,7 +133,9 @@ describe("TM1Client – Metadata Methods", () => {
       ]);
 
       const [url] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/Cubes?$select=Name,Rules&$expand=Dimensions($select=Name)");
+      expect(url).toContain(
+        "/api/v1/Cubes?$select=Name,Rules&$expand=Dimensions($select=Name)",
+      );
     });
   });
 
@@ -128,7 +146,10 @@ describe("TM1Client – Metadata Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           value: [
-            { Name: "Region", Hierarchies: [{ Name: "Region" }, { Name: "Country" }] },
+            {
+              Name: "Region",
+              Hierarchies: [{ Name: "Region" }, { Name: "Country" }],
+            },
             { Name: "Time", Hierarchies: [{ Name: "Time" }] },
           ],
         }),
@@ -142,7 +163,9 @@ describe("TM1Client – Metadata Methods", () => {
       ]);
 
       const [url] = fetchSpy.mock.calls[0];
-      expect(url).toContain("/api/v1/Dimensions?$expand=Hierarchies($select=Name)");
+      expect(url).toContain(
+        "/api/v1/Dimensions?$expand=Hierarchies($select=Name)",
+      );
     });
 
     it("should return empty array when no dimensions exist", async () => {
@@ -218,8 +241,18 @@ describe("TM1Client – Metadata Methods", () => {
           Name: "Account",
           Elements: [
             { Name: "Profit", Type: "Consolidated", Level: 1, Parents: [] },
-            { Name: "Revenue", Type: "Numeric", Level: 0, Parents: [{ Name: "Profit" }] },
-            { Name: "Costs", Type: "Numeric", Level: 0, Parents: [{ Name: "Profit" }] },
+            {
+              Name: "Revenue",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "Profit" }],
+            },
+            {
+              Name: "Costs",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "Profit" }],
+            },
           ],
         }),
       );
@@ -240,7 +273,9 @@ describe("TM1Client – Metadata Methods", () => {
       ]);
 
       const edgesUrl = String(fetchSpy.mock.calls[1][0]);
-      expect(edgesUrl).toContain("/Edges?$select=ParentName,ComponentName,Weight");
+      expect(edgesUrl).toContain(
+        "/Edges?$select=ParentName,ComponentName,Weight",
+      );
     });
 
     it("falls back to the TM1 default weight 1 for edges missing from the lookup", async () => {
@@ -249,7 +284,12 @@ describe("TM1Client – Metadata Methods", () => {
           Name: "Region",
           Elements: [
             { Name: "Europe", Type: "Consolidated", Level: 1, Parents: [] },
-            { Name: "Germany", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+            {
+              Name: "Germany",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "Europe" }],
+            },
           ],
         }),
       );
@@ -258,7 +298,9 @@ describe("TM1Client – Metadata Methods", () => {
 
       const hierarchy = await client.hierarchies.get("Region", "Region");
 
-      expect(hierarchy.elements[0].children).toEqual([{ name: "Germany", weight: 1 }]);
+      expect(hierarchy.elements[0].children).toEqual([
+        { name: "Germany", weight: 1 },
+      ]);
     });
 
     it("skips the Edges request entirely when no kept parent/child pair exists (leaf-only query)", async () => {
@@ -267,13 +309,25 @@ describe("TM1Client – Metadata Methods", () => {
           Name: "Region",
           Elements: [
             // level=0 narrow query: parents reference elements outside the result.
-            { Name: "Germany", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
-            { Name: "France", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+            {
+              Name: "Germany",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "Europe" }],
+            },
+            {
+              Name: "France",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "Europe" }],
+            },
           ],
         }),
       );
 
-      const hierarchy = await client.hierarchies.get("Region", "Region", { level: 0 });
+      const hierarchy = await client.hierarchies.get("Region", "Region", {
+        level: 0,
+      });
 
       expect(hierarchy.elements.map((e) => e.children)).toEqual([[], []]);
       expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -290,7 +344,10 @@ describe("TM1Client – Metadata Methods", () => {
               Type: "Consolidated",
               Level: 1,
               Parents: [],
-              Children: [{ Name: "Germany", Weight: 1 }, { Name: "France", Weight: 1 }],
+              Children: [
+                { Name: "Germany", Weight: 1 },
+                { Name: "France", Weight: 1 },
+              ],
             },
             {
               Name: "Germany",
@@ -335,9 +392,7 @@ describe("TM1Client – Metadata Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           Name: "Measures",
-          Elements: [
-            { Name: "Amount", Type: "Numeric", Level: 0 },
-          ],
+          Elements: [{ Name: "Amount", Type: "Numeric", Level: 0 }],
         }),
       );
 
@@ -360,24 +415,40 @@ describe("TM1Client – Metadata Methods", () => {
     });
 
     it("should push nameContains to OData $filter as contains()", async () => {
-      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ Name: "Region", Elements: [] }),
+      );
       await client.hierarchies.get("Region", "Region", { nameContains: "DE" });
       const [url] = fetchSpy.mock.calls[0];
-      expect(decodeURIComponent(url as string)).toContain("contains(Name, 'DE')");
+      expect(decodeURIComponent(url as string)).toContain(
+        "contains(Name, 'DE')",
+      );
     });
 
     it("should push nameStartsWith to OData $filter as startswith()", async () => {
-      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
-      await client.hierarchies.get("Region", "Region", { nameStartsWith: "FY24_" });
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ Name: "Region", Elements: [] }),
+      );
+      await client.hierarchies.get("Region", "Region", {
+        nameStartsWith: "FY24_",
+      });
       const [url] = fetchSpy.mock.calls[0];
-      expect(decodeURIComponent(url as string)).toContain("startswith(Name, 'FY24_')");
+      expect(decodeURIComponent(url as string)).toContain(
+        "startswith(Name, 'FY24_')",
+      );
     });
 
     it("should escape single quotes in OData name filters", async () => {
-      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
-      await client.hierarchies.get("Region", "Region", { nameContains: "Foo's" });
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ Name: "Region", Elements: [] }),
+      );
+      await client.hierarchies.get("Region", "Region", {
+        nameContains: "Foo's",
+      });
       const [url] = fetchSpy.mock.calls[0];
-      expect(decodeURIComponent(url as string)).toContain("contains(Name, 'Foo''s')");
+      expect(decodeURIComponent(url as string)).toContain(
+        "contains(Name, 'Foo''s')",
+      );
     });
 
     it("should apply nameRegex client-side and prune dangling parents", async () => {
@@ -386,19 +457,33 @@ describe("TM1Client – Metadata Methods", () => {
           Name: "Region",
           Elements: [
             { Name: "Europe", Type: "Consolidated", Level: 1, Parents: [] },
-            { Name: "DE_Bayern", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
-            { Name: "FR_Paris", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+            {
+              Name: "DE_Bayern",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "Europe" }],
+            },
+            {
+              Name: "FR_Paris",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "Europe" }],
+            },
           ],
         }),
       );
-      const hierarchy = await client.hierarchies.get("Region", "Region", { nameRegex: "^DE_" });
+      const hierarchy = await client.hierarchies.get("Region", "Region", {
+        nameRegex: "^DE_",
+      });
       expect(hierarchy.elements).toHaveLength(1);
       expect(hierarchy.elements[0].name).toBe("DE_Bayern");
       expect(hierarchy.elements[0].parents).toEqual([]);
     });
 
     it("should not push nameRegex to OData (client-side only)", async () => {
-      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ Name: "Region", Elements: [] }),
+      );
       await client.hierarchies.get("Region", "Region", { nameRegex: "^X" });
       const [url] = fetchSpy.mock.calls[0];
       expect(decodeURIComponent(url as string)).not.toContain("$filter");
@@ -416,7 +501,10 @@ describe("TM1Client – Metadata Methods", () => {
           ],
         }),
       );
-      const hierarchy = await client.hierarchies.get("Region", "Region", { nameRegex: "^DE_", topN: 2 });
+      const hierarchy = await client.hierarchies.get("Region", "Region", {
+        nameRegex: "^DE_",
+        topN: 2,
+      });
       const [url] = fetchSpy.mock.calls[0];
       expect(decodeURIComponent(url as string)).not.toContain("$top");
       expect(hierarchy.elements).toHaveLength(2);
@@ -430,8 +518,13 @@ describe("TM1Client – Metadata Methods", () => {
     });
 
     it("should combine server-side name filter with level filter via AND", async () => {
-      fetchSpy.mockResolvedValueOnce(mockResponse({ Name: "Region", Elements: [] }));
-      await client.hierarchies.get("Region", "Region", { nameStartsWith: "DE_", levelMax: 1 });
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({ Name: "Region", Elements: [] }),
+      );
+      await client.hierarchies.get("Region", "Region", {
+        nameStartsWith: "DE_",
+        levelMax: 1,
+      });
       const [url] = fetchSpy.mock.calls[0];
       const decoded = decodeURIComponent(url as string);
       expect(decoded).toContain("Level le 1");
@@ -452,36 +545,76 @@ describe("TM1Client – Metadata Methods", () => {
       Name: "Region",
       Elements: [
         { Name: "Total", Type: "Consolidated", Level: 3, Parents: [] },
-        { Name: "Europe", Type: "Consolidated", Level: 2, Parents: [{ Name: "Total" }] },
-        { Name: "DACH", Type: "Consolidated", Level: 1, Parents: [{ Name: "Europe" }] },
+        {
+          Name: "Europe",
+          Type: "Consolidated",
+          Level: 2,
+          Parents: [{ Name: "Total" }],
+        },
+        {
+          Name: "DACH",
+          Type: "Consolidated",
+          Level: 1,
+          Parents: [{ Name: "Europe" }],
+        },
         { Name: "DE", Type: "Numeric", Level: 0, Parents: [{ Name: "DACH" }] },
         { Name: "AT", Type: "Numeric", Level: 0, Parents: [{ Name: "DACH" }] },
-        { Name: "FR", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+        {
+          Name: "FR",
+          Type: "Numeric",
+          Level: 0,
+          Parents: [{ Name: "Europe" }],
+        },
       ],
     };
 
     it("should return all descendants of a consolidation", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
-      const result = await client.hierarchies.getDescendants("Region", "Region", "Europe");
+      const result = await client.hierarchies.getDescendants(
+        "Region",
+        "Region",
+        "Europe",
+      );
       const names = result.descendants.map((d) => d.name).sort();
       expect(names).toEqual(["AT", "DACH", "DE", "FR"]);
     });
 
     it("should respect depth limit", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
-      const result = await client.hierarchies.getDescendants("Region", "Region", "Europe", { depth: 1 });
-      expect(result.descendants.map((d) => d.name).sort()).toEqual(["DACH", "FR"]);
+      const result = await client.hierarchies.getDescendants(
+        "Region",
+        "Region",
+        "Europe",
+        { depth: 1 },
+      );
+      expect(result.descendants.map((d) => d.name).sort()).toEqual([
+        "DACH",
+        "FR",
+      ]);
     });
 
     it("should filter to leaves only when leavesOnly=true", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
-      const result = await client.hierarchies.getDescendants("Region", "Region", "Europe", { leavesOnly: true });
-      expect(result.descendants.map((d) => d.name).sort()).toEqual(["AT", "DE", "FR"]);
+      const result = await client.hierarchies.getDescendants(
+        "Region",
+        "Region",
+        "Europe",
+        { leavesOnly: true },
+      );
+      expect(result.descendants.map((d) => d.name).sort()).toEqual([
+        "AT",
+        "DE",
+        "FR",
+      ]);
     });
 
     it("should return empty descendants for leaf element", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(sampleHierarchy));
-      const result = await client.hierarchies.getDescendants("Region", "Region", "DE");
+      const result = await client.hierarchies.getDescendants(
+        "Region",
+        "Region",
+        "DE",
+      );
       expect(result.descendants).toEqual([]);
     });
 
@@ -507,12 +640,26 @@ describe("TM1Client – Metadata Methods", () => {
           Name: "Region",
           Elements: [
             { Name: "Total", Type: "Consolidated", Level: 2, Parents: [] },
-            { Name: "Europe", Type: "Consolidated", Level: 1, Parents: [{ Name: "Total" }] },
-            { Name: "DE", Type: "Numeric", Level: 0, Parents: [{ Name: "Europe" }] },
+            {
+              Name: "Europe",
+              Type: "Consolidated",
+              Level: 1,
+              Parents: [{ Name: "Total" }],
+            },
+            {
+              Name: "DE",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "Europe" }],
+            },
           ],
         }),
       );
-      const result = await client.hierarchies.getAncestors("Region", "Region", "DE");
+      const result = await client.hierarchies.getAncestors(
+        "Region",
+        "Region",
+        "DE",
+      );
       expect(result.ancestors.map((a) => a.name)).toEqual(["Europe", "Total"]);
       expect(result.paths).toEqual([["DE", "Europe", "Total"]]);
     });
@@ -523,15 +670,38 @@ describe("TM1Client – Metadata Methods", () => {
           Name: "Region",
           Elements: [
             { Name: "Total", Type: "Consolidated", Level: 2, Parents: [] },
-            { Name: "ByGeo", Type: "Consolidated", Level: 1, Parents: [{ Name: "Total" }] },
-            { Name: "ByCurrency", Type: "Consolidated", Level: 1, Parents: [{ Name: "Total" }] },
+            {
+              Name: "ByGeo",
+              Type: "Consolidated",
+              Level: 1,
+              Parents: [{ Name: "Total" }],
+            },
+            {
+              Name: "ByCurrency",
+              Type: "Consolidated",
+              Level: 1,
+              Parents: [{ Name: "Total" }],
+            },
             // DE rolls up under both ByGeo and ByCurrency (alternate consolidations)
-            { Name: "DE", Type: "Numeric", Level: 0, Parents: [{ Name: "ByGeo" }, { Name: "ByCurrency" }] },
+            {
+              Name: "DE",
+              Type: "Numeric",
+              Level: 0,
+              Parents: [{ Name: "ByGeo" }, { Name: "ByCurrency" }],
+            },
           ],
         }),
       );
-      const result = await client.hierarchies.getAncestors("Region", "Region", "DE");
-      expect(result.ancestors.map((a) => a.name).sort()).toEqual(["ByCurrency", "ByGeo", "Total"]);
+      const result = await client.hierarchies.getAncestors(
+        "Region",
+        "Region",
+        "DE",
+      );
+      expect(result.ancestors.map((a) => a.name).sort()).toEqual([
+        "ByCurrency",
+        "ByGeo",
+        "Total",
+      ]);
       expect(result.paths).toHaveLength(2);
       expect(result.paths).toContainEqual(["DE", "ByGeo", "Total"]);
       expect(result.paths).toContainEqual(["DE", "ByCurrency", "Total"]);
@@ -546,7 +716,11 @@ describe("TM1Client – Metadata Methods", () => {
           ],
         }),
       );
-      const result = await client.hierarchies.getAncestors("Region", "Region", "Total");
+      const result = await client.hierarchies.getAncestors(
+        "Region",
+        "Region",
+        "Total",
+      );
       expect(result.ancestors).toEqual([]);
       expect(result.paths).toEqual([["Total"]]);
     });
@@ -571,7 +745,12 @@ describe("TM1Client – Metadata Methods", () => {
             {
               Name: "ImportData",
               Parameters: [
-                { Name: "pFilePath", Type: "String", Value: "/data/input.csv", Prompt: "File path" },
+                {
+                  Name: "pFilePath",
+                  Type: "String",
+                  Value: "/data/input.csv",
+                  Prompt: "File path",
+                },
                 { Name: "pYear", Type: "Numeric", Value: 2024 },
               ],
             },
@@ -589,7 +768,12 @@ describe("TM1Client – Metadata Methods", () => {
         {
           name: "ImportData",
           parameters: [
-            { name: "pFilePath", type: "String", defaultValue: "/data/input.csv", prompt: "File path" },
+            {
+              name: "pFilePath",
+              type: "String",
+              defaultValue: "/data/input.csv",
+              prompt: "File path",
+            },
             { name: "pYear", type: "Numeric", defaultValue: 2024 },
           ],
         },
@@ -671,7 +855,10 @@ describe("TM1Client – Metadata Methods", () => {
           startTime: "2024-01-01T02:00:00",
           frequency: "P1D",
           processes: [
-            { name: "ImportData", parameters: { pFilePath: "/data/nightly.csv", pYear: 2024 } },
+            {
+              name: "ImportData",
+              parameters: { pFilePath: "/data/nightly.csv", pYear: 2024 },
+            },
             { name: "RunCalc", parameters: {} },
           ],
         },

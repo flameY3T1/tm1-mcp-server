@@ -111,7 +111,9 @@ async function main(): Promise<void> {
   }
 
   if (config.mode === "readonly") {
-    logger.info("TM1_MODE=readonly — write and destructive tools will not be registered");
+    logger.info(
+      "TM1_MODE=readonly — write and destructive tools will not be registered",
+    );
   }
 
   // Branch on transport. stdio is the default for local MCP-client setups
@@ -119,10 +121,20 @@ async function main(): Promise<void> {
   // (Streamable HTTP, stateless) is for remote/multi-client deploys and builds a
   // fresh server per request (single-use transport); binds to 127.0.0.1 by
   // default with DNS-rebinding protection per MCP spec recommendation.
-  const httpCloser = config.transport === "http"
-    ? await startHttpTransport(() => buildMcpServer(tm1Client, config, logger), config, logger)
-    : await startStdioTransport(buildMcpServer(tm1Client, config, logger), logger);
-  logger.info(`MCP server configured (mode: ${config.mode}, transport: ${config.transport})`);
+  const httpCloser =
+    config.transport === "http"
+      ? await startHttpTransport(
+          () => buildMcpServer(tm1Client, config, logger),
+          config,
+          logger,
+        )
+      : await startStdioTransport(
+          buildMcpServer(tm1Client, config, logger),
+          logger,
+        );
+  logger.info(
+    `MCP server configured (mode: ${config.mode}, transport: ${config.transport})`,
+  );
 
   // Graceful shutdown — ensure TM1 session is always cleaned up.
   let shuttingDown = false;
@@ -143,9 +155,15 @@ async function main(): Promise<void> {
     process.exit(exitCode);
   };
 
-  process.on("SIGINT", () => { void shutdown("SIGINT"); });
-  process.on("SIGTERM", () => { void shutdown("SIGTERM"); });
-  process.on("SIGHUP", () => { void shutdown("SIGHUP"); });
+  process.on("SIGINT", () => {
+    void shutdown("SIGINT");
+  });
+  process.on("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
+  process.on("SIGHUP", () => {
+    void shutdown("SIGHUP");
+  });
 
   // Parent process death — only meaningful on stdio (Claude spawns us as a
   // child). For http we ignore stdin events since the process lifecycle is
@@ -174,7 +192,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-   
   console.error("Fatal error starting TM1 MCP Server:", err);
   process.exit(1);
 });

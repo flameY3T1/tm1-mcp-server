@@ -46,26 +46,55 @@ function findMatchingBrace(text, openIdx) {
   let inBlock = false;
   for (let i = openIdx; i < text.length; i++) {
     const c = text[i];
-    if (escape) { escape = false; continue; }
-    if (inLine) { if (c === "\n") inLine = false; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (inLine) {
+      if (c === "\n") inLine = false;
+      continue;
+    }
     if (inBlock) {
-      if (c === "*" && text[i + 1] === "/") { inBlock = false; i++; }
+      if (c === "*" && text[i + 1] === "/") {
+        inBlock = false;
+        i++;
+      }
       continue;
     }
     if (inString) {
-      if (c === "\\") { escape = true; continue; }
+      if (c === "\\") {
+        escape = true;
+        continue;
+      }
       if (c === inString) inString = null;
       continue;
     }
     if (inTemplate) {
-      if (c === "\\") { escape = true; continue; }
+      if (c === "\\") {
+        escape = true;
+        continue;
+      }
       if (c === "`") inTemplate = false;
       continue;
     }
-    if (c === '"' || c === "'") { inString = c; continue; }
-    if (c === "`") { inTemplate = true; continue; }
-    if (c === "/" && text[i + 1] === "/") { inLine = true; i++; continue; }
-    if (c === "/" && text[i + 1] === "*") { inBlock = true; i++; continue; }
+    if (c === '"' || c === "'") {
+      inString = c;
+      continue;
+    }
+    if (c === "`") {
+      inTemplate = true;
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "/") {
+      inLine = true;
+      i++;
+      continue;
+    }
+    if (c === "/" && text[i + 1] === "*") {
+      inBlock = true;
+      i++;
+      continue;
+    }
     if (c === "{") depth++;
     else if (c === "}") {
       depth--;
@@ -95,7 +124,8 @@ function processFile(src) {
 
   const catchOpenIdx = lastCatch.index + lastCatch[0].length - 1;
   const catchCloseIdx = findMatchingBrace(src, catchOpenIdx);
-  if (catchCloseIdx < 0) return { changed: false, skipped: "unmatched catch brace" };
+  if (catchCloseIdx < 0)
+    return { changed: false, skipped: "unmatched catch brace" };
   const catchBody = src.slice(catchOpenIdx + 1, catchCloseIdx);
 
   // Boilerplate sanity: should contain `const msg` AND `isError: true`.
@@ -158,7 +188,8 @@ const skips = [];
 for (const file of walk(toolsDir)) {
   const src = fs.readFileSync(file, "utf8");
   const result = processFile(src);
-  if (result.skipped) skips.push({ file: path.relative(root, file), reason: result.skipped });
+  if (result.skipped)
+    skips.push({ file: path.relative(root, file), reason: result.skipped });
   if (!result.changed) continue;
   modified++;
   if (APPLY) {

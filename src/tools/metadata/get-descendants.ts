@@ -1,9 +1,17 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
+import {
+  FORMAT_SCHEMA,
+  payloadResponse,
+  renderTable,
+  type Column,
+} from "../format.js";
 
-export function registerGetDescendants(server: McpServer, tm1Client: TM1Client) {
+export function registerGetDescendants(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_get_descendants",
     [
@@ -16,26 +24,59 @@ export function registerGetDescendants(server: McpServer, tm1Client: TM1Client) 
     {
       dimensionName: z.string().describe("Name of the TM1 dimension"),
       hierarchyName: z.string().describe("Hierarchy within the dimension"),
-      elementName: z.string().describe("Start element (typically a consolidation). Numeric/leaf elements return empty descendants."),
-      depth: z.number().int().positive().optional()
+      elementName: z
+        .string()
+        .describe(
+          "Start element (typically a consolidation). Numeric/leaf elements return empty descendants.",
+        ),
+      depth: z
+        .number()
+        .int()
+        .positive()
+        .optional()
         .describe("Max depth below the start element. Omit for unlimited."),
-      leavesOnly: z.boolean().optional().default(false)
+      leavesOnly: z
+        .boolean()
+        .optional()
+        .default(false)
         .describe("Return only leaf elements (no consolidations)."),
-      topN: z.number().int().positive().optional().default(1000)
-        .describe("Max descendants returned (default 1000). Caps large subtrees; result sets truncated=true when the cap clipped the set. Raise to fetch more."),
+      topN: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .default(1000)
+        .describe(
+          "Max descendants returned (default 1000). Caps large subtrees; result sets truncated=true when the cap clipped the set. Raise to fetch more.",
+        ),
       ...FORMAT_SCHEMA,
     },
-    async ({ dimensionName, hierarchyName, elementName, depth, leavesOnly, topN, format }) => {
-      const full = await tm1Client.hierarchies.getDescendants(dimensionName, hierarchyName, elementName, {
-        ...(depth !== undefined ? { depth } : {}),
-        ...(leavesOnly !== undefined ? { leavesOnly } : {}),
-      });
+    async ({
+      dimensionName,
+      hierarchyName,
+      elementName,
+      depth,
+      leavesOnly,
+      topN,
+      format,
+    }) => {
+      const full = await tm1Client.hierarchies.getDescendants(
+        dimensionName,
+        hierarchyName,
+        elementName,
+        {
+          ...(depth !== undefined ? { depth } : {}),
+          ...(leavesOnly !== undefined ? { leavesOnly } : {}),
+        },
+      );
       // The traversal is client-side (BFS over the fetched hierarchy), so the
       // full descendant set is known here — truncated is exact, not a heuristic.
       const truncated = full.descendants.length > topN;
       const result = {
         element: full.element,
-        descendants: truncated ? full.descendants.slice(0, topN) : full.descendants,
+        descendants: truncated
+          ? full.descendants.slice(0, topN)
+          : full.descendants,
         truncated,
       };
       type Row = (typeof result.descendants)[number];
@@ -45,8 +86,11 @@ export function registerGetDescendants(server: McpServer, tm1Client: TM1Client) 
         { header: "level", get: (d) => d.level },
         { header: "depth", get: (d) => d.depth },
       ];
-      return payloadResponse(result, format, (r) =>
-        `## Descendants of ${r.element}\n\n${r.descendants.length} elements\n\n${renderTable(r.descendants, columns)}`,
+      return payloadResponse(
+        result,
+        format,
+        (r) =>
+          `## Descendants of ${r.element}\n\n${r.descendants.length} elements\n\n${renderTable(r.descendants, columns)}`,
       );
     },
   );

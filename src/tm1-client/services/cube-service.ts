@@ -18,7 +18,8 @@ import {
 } from "./odata-page.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export interface CubeListOpts extends NameFilterOpts {
   includeRules?: boolean;
@@ -53,13 +54,18 @@ export class CubeService {
     const select = opts.includeRules ? "Name,Rules" : "Name";
     // Filters are only emitted on the paged path. Unpaged callers still get the
     // whole collection and filter in-process, so their behaviour is unchanged.
-    const filter = opts.page === undefined ? "" : filterClause(nameFilterPredicates(opts));
+    const filter =
+      opts.page === undefined ? "" : filterClause(nameFilterPredicates(opts));
     const path =
       `/api/v1/Cubes?$select=${select}&$expand=Dimensions($select=Name)` +
       `${filter}${pageClauses(opts.page)}`;
     const response = await this.http.request<{
       "@odata.count"?: number;
-      value: Array<{ Name: string; Rules?: string; Dimensions: Array<{ Name: string }> }>;
+      value: Array<{
+        Name: string;
+        Rules?: string;
+        Dimensions: Array<{ Name: string }>;
+      }>;
     }>("GET", path);
     const items = response.value.map((c) => {
       const cube: Cube = {
@@ -71,7 +77,9 @@ export class CubeService {
       }
       return cube;
     });
-    return opts.page === undefined ? items : { items, total: readCount(response) };
+    return opts.page === undefined
+      ? items
+      : { items, total: readCount(response) };
   }
 
   /**
@@ -80,10 +88,10 @@ export class CubeService {
    */
   async getDimensionNames(cubeName: string): Promise<string[]> {
     const path = `/api/v1/Cubes('${enc(cubeName)}')?$expand=Dimensions($select=Name)`;
-    const response = await this.http.request<{ Name: string; Dimensions: Array<{ Name: string }> }>(
-      "GET",
-      path,
-    );
+    const response = await this.http.request<{
+      Name: string;
+      Dimensions: Array<{ Name: string }>;
+    }>("GET", path);
     return response.Dimensions.map((d) => d.Name);
   }
 
@@ -140,10 +148,14 @@ export class CubeService {
 
     try {
       // TM1 11.8 returns rules text in the "value" field (not "Text")
-      const response = await this.http.request<{
-        value?: string;
-        Text?: string;
-      } | undefined | null>("GET", path);
+      const response = await this.http.request<
+        | {
+            value?: string;
+            Text?: string;
+          }
+        | undefined
+        | null
+      >("GET", path);
       const rulesText = response?.value ?? response?.Text ?? "";
       if (rulesText === "") return empty();
       return {
@@ -152,7 +164,10 @@ export class CubeService {
         skipCheck: rulesText.toUpperCase().includes("SKIPCHECK"),
       };
     } catch (err) {
-      if (err instanceof TM1Error && (err.httpStatus === 404 || err.httpStatus === 204)) {
+      if (
+        err instanceof TM1Error &&
+        (err.httpStatus === 404 || err.httpStatus === 204)
+      ) {
         return empty();
       }
       throw err;
@@ -182,7 +197,8 @@ export class CubeService {
     top?: number,
   ): Promise<CubeRules[] | { items: CubeRules[]; total: number | undefined }> {
     const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const cap = top !== undefined ? `&$orderby=Name&$top=${top}&$count=true` : "";
+    const cap =
+      top !== undefined ? `&$orderby=Name&$top=${top}&$count=true` : "";
     const path = `/api/v1/Cubes?$select=Name,Rules${filter}${cap}`;
     const response = await this.http.request<{
       "@odata.count"?: number;
@@ -207,7 +223,11 @@ export class CubeService {
    * TM1 11.8 sets rules by PATCHing the Cube entity ({Rules: "...text..."}).
    * PATCH/POST on /Cubes('{name}')/Rules returns 400 "not supported".
    */
-  async updateRules(cubeName: string, rulesText: string, _skipCheck = true): Promise<void> {
+  async updateRules(
+    cubeName: string,
+    rulesText: string,
+    _skipCheck = true,
+  ): Promise<void> {
     const cubePath = `/api/v1/Cubes('${enc(cubeName)}')`;
     await this.http.request<void>("PATCH", cubePath, { Rules: rulesText });
   }
@@ -216,7 +236,10 @@ export class CubeService {
    * Validate cube rule syntax without applying. Empty array = valid.
    * POST /api/v1/Cubes('{name}')/tm1.CheckRules with { Rules: "..." }
    */
-  async checkRule(cubeName: string, ruleText: string): Promise<RuleSyntaxError[]> {
+  async checkRule(
+    cubeName: string,
+    ruleText: string,
+  ): Promise<RuleSyntaxError[]> {
     const path = `/api/v1/Cubes('${enc(cubeName)}')/tm1.CheckRules`;
     const response = await this.http.request<{
       value?: Array<{ Message: string; LineNumber?: number }>;
@@ -234,9 +257,15 @@ export class CubeService {
    * bedrock TI with `}bedrock.cube.data.clear`.
    * POST /api/v1/Cubes('{cube}')/tm1.Clear
    */
-  async clear(cubeName: string, dimensions: string[], tuples: string[][]): Promise<void> {
+  async clear(
+    cubeName: string,
+    dimensions: string[],
+    tuples: string[][],
+  ): Promise<void> {
     if (this.http.version === 11) {
-      const isFullClear = dimensions.every((_, i) => (tuples[i] ?? []).length === 0);
+      const isFullClear = dimensions.every(
+        (_, i) => (tuples[i] ?? []).length === 0,
+      );
       if (!isFullClear) {
         throw new TM1Error({
           code: TM1ErrorCode.UNSUPPORTED_OPERATION,
@@ -252,7 +281,8 @@ export class CubeService {
       Tuples: dimensions.map((dim, idx) => ({
         "Hierarchy@odata.bind": `Dimensions('${enc(dim)}')/Hierarchies('${enc(dim)}')`,
         "Members@odata.bind": (tuples[idx] ?? []).map(
-          (el) => `Dimensions('${enc(dim)}')/Hierarchies('${enc(dim)}')/Members('${enc(el)}')`,
+          (el) =>
+            `Dimensions('${enc(dim)}')/Hierarchies('${enc(dim)}')/Members('${enc(el)}')`,
         ),
       })),
     };
@@ -297,7 +327,9 @@ export class CubeService {
     });
 
     try {
-      const result = await this.http.request<{ ProcessExecuteStatusCode?: string }>(
+      const result = await this.http.request<{
+        ProcessExecuteStatusCode?: string;
+      }>(
         "POST",
         `/api/v1/Processes('${enc(procName)}')/tm1.ExecuteWithReturn`,
         {},
@@ -305,7 +337,8 @@ export class CubeService {
       // ExecuteWithReturn returns HTTP 200 even when the process aborts; the real
       // outcome is in ProcessExecuteStatusCode. Without this check an aborted
       // clear (e.g. lock, security) would be reported as a successful clear.
-      const status = result?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
+      const status =
+        result?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
       if (status !== "CompletedSuccessfully") {
         throw new TM1Error({
           code: TM1ErrorCode.TM1_ERROR,
@@ -315,7 +348,10 @@ export class CubeService {
       }
     } finally {
       try {
-        await this.http.request<void>("DELETE", `/api/v1/Processes('${enc(procName)}')`);
+        await this.http.request<void>(
+          "DELETE",
+          `/api/v1/Processes('${enc(procName)}')`,
+        );
       } catch (cleanupErr) {
         this.http.logger.warn(
           { proc: procName, err: String(cleanupErr) },

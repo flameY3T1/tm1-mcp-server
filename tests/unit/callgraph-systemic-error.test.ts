@@ -17,7 +17,10 @@ describe("buildReferenceIndex systemic-error handling (regression)", () => {
     // otherwise an outage looks like an empty server and gets cached as truth.
     const authFail = (): Promise<ProcessFetchResult[]> =>
       Promise.reject(
-        new TM1Error({ code: TM1ErrorCode.AUTH_FAILED, message: "session expired" })
+        new TM1Error({
+          code: TM1ErrorCode.AUTH_FAILED,
+          message: "session expired",
+        }),
       );
 
     await expect(
@@ -25,7 +28,7 @@ describe("buildReferenceIndex systemic-error handling (regression)", () => {
         fetchProcesses: authFail,
         fetchCubesWithRules: noCubes,
         fetchChores: noChores,
-      })
+      }),
     ).rejects.toThrow(TM1Error);
   });
 
@@ -34,7 +37,7 @@ describe("buildReferenceIndex systemic-error handling (regression)", () => {
     // (partial) index rather than failing the whole build.
     const notFound = (): Promise<CubeRulesFetchResult[]> =>
       Promise.reject(
-        new TM1Error({ code: TM1ErrorCode.NOT_FOUND, message: "no cubes" })
+        new TM1Error({ code: TM1ErrorCode.NOT_FOUND, message: "no cubes" }),
       );
 
     const index = await buildReferenceIndex({

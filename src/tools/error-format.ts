@@ -68,7 +68,11 @@ export function normalizeErrorResult(result: McpToolResult): McpToolResult {
   if (raw.startsWith("{")) {
     try {
       const candidate = JSON.parse(raw);
-      if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+      if (
+        candidate &&
+        typeof candidate === "object" &&
+        !Array.isArray(candidate)
+      ) {
         parsed = candidate as Record<string, unknown>;
       }
     } catch {

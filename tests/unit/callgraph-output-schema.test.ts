@@ -1,9 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { buildReferenceIndex, type ReferenceIndex, type CallParam } from "../../src/lib/callgraph/referenceIndex.js";
-import { buildCallGraph, type CallGraphNode, type EffectiveValue } from "../../src/lib/callgraph/callGraph.js";
+import {
+  buildReferenceIndex,
+  type ReferenceIndex,
+  type CallParam,
+} from "../../src/lib/callgraph/referenceIndex.js";
+import {
+  buildCallGraph,
+  type CallGraphNode,
+  type EffectiveValue,
+} from "../../src/lib/callgraph/callGraph.js";
 import { globalRanking } from "../../src/tools/analysis/analyze-callgraph.js";
 import { CallgraphResultSchema } from "../../src/tools/schemas/items.js";
-import { isSecretName, MASK, maskCodeLine } from "../../src/lib/mask-secrets.js";
+import {
+  isSecretName,
+  MASK,
+  maskCodeLine,
+} from "../../src/lib/mask-secrets.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The serializers (serializeNode / serializeCompact / summarize) live private
@@ -21,30 +33,44 @@ function maskParams(params: readonly CallParam[]): CallParam[] {
           ...p,
           valueRaw: MASK,
           resolution:
-            p.resolution.kind === "literal" ? { kind: "literal" as const, value: MASK } : p.resolution,
+            p.resolution.kind === "literal"
+              ? { kind: "literal" as const, value: MASK }
+              : p.resolution,
         }
       : p,
   );
 }
 
 function maskEffective(
-  eff: ReadonlyArray<{ name: string; effective: EffectiveValue; valueRaw: string }>,
+  eff: ReadonlyArray<{
+    name: string;
+    effective: EffectiveValue;
+    valueRaw: string;
+  }>,
 ): Array<{ name: string; effective: EffectiveValue; valueRaw: string }> {
   return eff.map((e) =>
     isSecretName(e.name)
       ? {
           ...e,
           valueRaw: MASK,
-          effective: e.effective.kind === "literal" ? { kind: "literal" as const, value: MASK } : e.effective,
+          effective:
+            e.effective.kind === "literal"
+              ? { kind: "literal" as const, value: MASK }
+              : e.effective,
         }
       : e,
   );
 }
 
-function maskEnv(env: Map<string, EffectiveValue>): Record<string, EffectiveValue> {
+function maskEnv(
+  env: Map<string, EffectiveValue>,
+): Record<string, EffectiveValue> {
   const out: Record<string, EffectiveValue> = {};
   for (const [k, v] of env.entries()) {
-    out[k] = isSecretName(k) && v.kind === "literal" ? { kind: "literal", value: MASK } : v;
+    out[k] =
+      isSecretName(k) && v.kind === "literal"
+        ? { kind: "literal", value: MASK }
+        : v;
   }
   return out;
 }
@@ -53,7 +79,13 @@ interface CompactNode {
   process: string;
   cycle?: boolean;
   depthLimitReached?: boolean;
-  unresolvedCalls?: Array<{ section: string; line: number; funcName: string; expr: string; reason: string }>;
+  unresolvedCalls?: Array<{
+    section: string;
+    line: number;
+    funcName: string;
+    expr: string;
+    reason: string;
+  }>;
   children: CompactNode[];
 }
 
@@ -88,8 +120,12 @@ function serializeNode(node: CallGraphNode, mask: boolean): unknown {
           section: node.incomingEdge.section,
           line: node.incomingEdge.line,
           funcName: node.incomingEdge.funcName,
-          snippet: mask ? maskCodeLine(node.incomingEdge.snippet) : node.incomingEdge.snippet,
-          params: mask ? maskParams(node.incomingEdge.params) : node.incomingEdge.params,
+          snippet: mask
+            ? maskCodeLine(node.incomingEdge.snippet)
+            : node.incomingEdge.snippet,
+          params: mask
+            ? maskParams(node.incomingEdge.params)
+            : node.incomingEdge.params,
           effectiveParams: node.incomingEdge.effectiveParams
             ? mask
               ? maskEffective(node.incomingEdge.effectiveParams)
@@ -97,7 +133,11 @@ function serializeNode(node: CallGraphNode, mask: boolean): unknown {
             : undefined,
         }
       : null,
-    env: node.env ? (mask ? maskEnv(node.env) : Object.fromEntries(node.env.entries())) : undefined,
+    env: node.env
+      ? mask
+        ? maskEnv(node.env)
+        : Object.fromEntries(node.env.entries())
+      : undefined,
     unresolvedCalls: node.unresolvedCalls
       ? node.unresolvedCalls.map((u) => ({
           section: u.section,
@@ -215,7 +255,13 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
   it("validates the full-tree payload (mode='full')", async () => {
     const index = await buildTestIndex();
     const tree = buildCallGraph(index, "Parent", { direction: "downstream" });
-    const payload = { start: "Parent", direction: "downstream", mode: "full", maskSecrets: false, tree: serializeNode(tree, false) };
+    const payload = {
+      start: "Parent",
+      direction: "downstream",
+      mode: "full",
+      maskSecrets: false,
+      tree: serializeNode(tree, false),
+    };
     const parsed = CallgraphResultSchema.safeParse(roundTrip(payload));
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
@@ -223,7 +269,13 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
   it("validates the full-tree payload with masking on", async () => {
     const index = await buildTestIndex();
     const tree = buildCallGraph(index, "Parent", { direction: "downstream" });
-    const payload = { start: "Parent", direction: "downstream", mode: "full", maskSecrets: true, tree: serializeNode(tree, true) };
+    const payload = {
+      start: "Parent",
+      direction: "downstream",
+      mode: "full",
+      maskSecrets: true,
+      tree: serializeNode(tree, true),
+    };
     const parsed = CallgraphResultSchema.safeParse(roundTrip(payload));
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
@@ -231,7 +283,12 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
   it("validates the compact-tree payload (mode='compact')", async () => {
     const index = await buildTestIndex();
     const tree = buildCallGraph(index, "Parent", { direction: "downstream" });
-    const payload = { start: "Parent", direction: "downstream", mode: "compact", tree: serializeCompact(tree) };
+    const payload = {
+      start: "Parent",
+      direction: "downstream",
+      mode: "compact",
+      tree: serializeCompact(tree),
+    };
     const parsed = CallgraphResultSchema.safeParse(roundTrip(payload));
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
@@ -239,7 +296,13 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
   it("validates the upstream full-tree payload (no env)", async () => {
     const index = await buildTestIndex();
     const tree = buildCallGraph(index, "Child", { direction: "upstream" });
-    const payload = { start: "Child", direction: "upstream", mode: "full", maskSecrets: false, tree: serializeNode(tree, false) };
+    const payload = {
+      start: "Child",
+      direction: "upstream",
+      mode: "full",
+      maskSecrets: false,
+      tree: serializeNode(tree, false),
+    };
     const parsed = CallgraphResultSchema.safeParse(roundTrip(payload));
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
@@ -247,14 +310,24 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
   it("validates the summary payload (mode='summary')", async () => {
     const index = await buildTestIndex();
     const tree = buildCallGraph(index, "Parent", { direction: "downstream" });
-    const payload = { start: "Parent", direction: "downstream", mode: "summary", maskSecrets: false, summary: summarize(tree) };
+    const payload = {
+      start: "Parent",
+      direction: "downstream",
+      mode: "summary",
+      maskSecrets: false,
+      summary: summarize(tree),
+    };
     const parsed = CallgraphResultSchema.safeParse(roundTrip(payload));
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
 
   it("validates the globalRanking payload (start omitted)", async () => {
     const index = await buildTestIndex();
-    const result = globalRanking(index, { rankBy: "outgoing", topN: 50, includeSystem: false });
+    const result = globalRanking(index, {
+      rankBy: "outgoing",
+      topN: 50,
+      includeSystem: false,
+    });
     const payload = { mode: "globalRanking", ...result };
     const parsed = CallgraphResultSchema.safeParse(roundTrip(payload));
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
@@ -262,7 +335,10 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
 
   it("validates the warning payload (process not found)", async () => {
     const index = await buildTestIndex();
-    const payload = { warning: `Process "Nope" not found in index.`, indexedProcessCount: index.processParams.size };
+    const payload = {
+      warning: `Process "Nope" not found in index.`,
+      indexedProcessCount: index.processParams.size,
+    };
     const parsed = CallgraphResultSchema.safeParse(roundTrip(payload));
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
@@ -274,7 +350,12 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
       direction: "downstream",
       mode: "full",
       maskSecrets: false,
-      tree: { process: "Parent", cycle: false, incomingEdge: null, children: "not-an-array" },
+      tree: {
+        process: "Parent",
+        cycle: false,
+        incomingEdge: null,
+        children: "not-an-array",
+      },
     };
     expect(CallgraphResultSchema.safeParse(roundTrip(bad)).success).toBe(false);
   });
@@ -354,7 +435,12 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
   it("REJECTS a wrongly-typed node field that both tree shapes declare", () => {
     const bad = {
       mode: "full",
-      tree: { process: "Parent", cycle: "yes", incomingEdge: null, children: [] },
+      tree: {
+        process: "Parent",
+        cycle: "yes",
+        incomingEdge: null,
+        children: [],
+      },
     };
     expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
   });
@@ -372,13 +458,25 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
     ],
     [
       "a stray key nested in children",
-      { mode: "compact", tree: { process: "P", children: [{ process: "C", children: [], junk: true }] } },
+      {
+        mode: "compact",
+        tree: {
+          process: "P",
+          children: [{ process: "C", children: [], junk: true }],
+        },
+      },
     ],
     [
       "a corrupt env value kind",
       {
         mode: "full",
-        tree: { process: "P", cycle: false, incomingEdge: null, env: { v: { kind: "nope" } }, children: [] },
+        tree: {
+          process: "P",
+          cycle: false,
+          incomingEdge: null,
+          env: { v: { kind: "nope" } },
+          children: [],
+        },
       },
     ],
     [
@@ -401,16 +499,28 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
         },
       },
     ],
-  ])("REJECTS %s instead of stripping it into the other union variant", (_label, bad) => {
-    expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
-  });
+  ])(
+    "REJECTS %s instead of stripping it into the other union variant",
+    (_label, bad) => {
+      expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
+    },
+  );
 
   it("still ACCEPTS well-formed nodes in both modes", () => {
     const full = {
       mode: "full",
-      tree: { process: "P", cycle: false, depthLimitReached: false, incomingEdge: null, children: [] },
+      tree: {
+        process: "P",
+        cycle: false,
+        depthLimitReached: false,
+        incomingEdge: null,
+        children: [],
+      },
     };
-    const compact = { mode: "compact", tree: { process: "P", children: [{ process: "C", children: [] }] } };
+    const compact = {
+      mode: "compact",
+      tree: { process: "P", children: [{ process: "C", children: [] }] },
+    };
     expect(CallgraphResultSchema.safeParse(full).success).toBe(true);
     expect(CallgraphResultSchema.safeParse(compact).success).toBe(true);
   });
@@ -425,17 +535,19 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("CallgraphResultSchema — serialized JSON Schema shape", () => {
   async function serialize(): Promise<Record<string, unknown>> {
-    const { normalizeObjectSchema } = await import(
-      "@modelcontextprotocol/sdk/server/zod-compat.js"
-    );
-    const { toJsonSchemaCompat } = await import(
-      "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js"
-    );
-    const { slimJsonSchema } = await import("../../src/lib/slim-json-schema.js");
+    const { normalizeObjectSchema } =
+      await import("@modelcontextprotocol/sdk/server/zod-compat.js");
+    const { toJsonSchemaCompat } =
+      await import("@modelcontextprotocol/sdk/server/zod-json-schema-compat.js");
+    const { slimJsonSchema } =
+      await import("../../src/lib/slim-json-schema.js");
     const normalized = normalizeObjectSchema(CallgraphResultSchema);
     expect(normalized).toBeDefined();
     // Same options McpServer passes in setToolRequestHandlers.
-    const raw = toJsonSchemaCompat(normalized!, { strictUnions: true, pipeStrategy: "output" });
+    const raw = toJsonSchemaCompat(normalized!, {
+      strictUnions: true,
+      pipeStrategy: "output",
+    });
     return slimJsonSchema(raw) as Record<string, unknown>;
   }
 
@@ -444,7 +556,9 @@ describe("CallgraphResultSchema — serialized JSON Schema shape", () => {
     const defs = json["definitions"] as Record<string, unknown> | undefined;
     expect(defs, "expected a definitions block").toBeDefined();
     // Named id (added deliberately) …
-    expect(Object.keys(defs!)).toEqual(expect.arrayContaining(["EffectiveValue"]));
+    expect(Object.keys(defs!)).toEqual(
+      expect.arrayContaining(["EffectiveValue"]),
+    );
     // … alongside the auto-named recursive node defs that always shipped.
     expect(Object.keys(defs!).some((k) => k.startsWith("__schema"))).toBe(true);
     // Ints stay inlined ON PURPOSE: slimJsonSchema() strips their safe-integer
@@ -473,6 +587,9 @@ describe("CallgraphResultSchema — serialized JSON Schema shape", () => {
     // shipped; `$ref` factoring plus slimJsonSchema() brought it to ~4770 with
     // zero validation loss. The ceiling leaves room for a genuine new field but
     // trips if the factoring is undone or a big block is added.
-    expect(bytes, `serialized CallgraphResultSchema = ${bytes} bytes`).toBeLessThanOrEqual(5000);
+    expect(
+      bytes,
+      `serialized CallgraphResultSchema = ${bytes} bytes`,
+    ).toBeLessThanOrEqual(5000);
   });
 });

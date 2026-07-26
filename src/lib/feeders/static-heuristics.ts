@@ -43,7 +43,9 @@ function pushElems(e: BracketEntry, out: Set<string>): void {
  */
 export function detectWildcardBracket(list: BracketList): boolean {
   if (list.entries.length === 0) return true;
-  return list.entries.every((e) => e.elem === undefined && e.elems === undefined);
+  return list.entries.every(
+    (e) => e.elem === undefined && e.elems === undefined,
+  );
 }
 
 /**

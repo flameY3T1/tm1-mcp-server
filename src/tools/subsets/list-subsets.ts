@@ -10,12 +10,24 @@ export function registerListSubsets(server: McpServer, tm1Client: TM1Client) {
     "List public + private subsets of a TM1 hierarchy. Returns names, scope (public/private), MDX expression preview, and alias. Paginated (default 50/page).",
     {
       dimensionName: z.string().describe("Dimension name"),
-      hierarchyName: z.string().describe("Hierarchy name (commonly equal to the dimension name)"),
+      hierarchyName: z
+        .string()
+        .describe("Hierarchy name (commonly equal to the dimension name)"),
       ...PAGINATION_SCHEMA,
       ...FORMAT_SCHEMA,
     },
-    async ({ dimensionName, hierarchyName, limit, offset, fetchAll, format }) => {
-      const subsets = await tm1Client.subsets.list(dimensionName, hierarchyName);
+    async ({
+      dimensionName,
+      hierarchyName,
+      limit,
+      offset,
+      fetchAll,
+      format,
+    }) => {
+      const subsets = await tm1Client.subsets.list(
+        dimensionName,
+        hierarchyName,
+      );
       const page = paginate(subsets, limit, offset, fetchAll);
       type Row = (typeof subsets)[number];
       const columns: Column<Row>[] = [
@@ -24,7 +36,10 @@ export function registerListSubsets(server: McpServer, tm1Client: TM1Client) {
         { header: "alias", get: (s) => s.alias ?? "" },
         { header: "expression", get: (s) => s.expression ?? "" },
       ];
-      return pageResponse(page, format, { title: `Subsets of ${dimensionName}/${hierarchyName}`, columns });
+      return pageResponse(page, format, {
+        title: `Subsets of ${dimensionName}/${hierarchyName}`,
+        columns,
+      });
     },
   );
 }

@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { extractMdxMemberRefs, membersFromAxis } from "../../src/lib/callgraph/mdxMembers.js";
+import {
+  extractMdxMemberRefs,
+  membersFromAxis,
+} from "../../src/lib/callgraph/mdxMembers.js";
 
 describe("extractMdxMemberRefs", () => {
   it("extracts a two-part [Dim].[Element] member", () => {
     const r = extractMdxMemberRefs("{ [Datenquellen].[SuDatenquellen_C] }");
-    expect(r.members).toEqual([{ dimension: "Datenquellen", element: "SuDatenquellen_C" }]);
+    expect(r.members).toEqual([
+      { dimension: "Datenquellen", element: "SuDatenquellen_C" },
+    ]);
     expect(r.computedSelectors).toEqual([]);
   });
 
@@ -14,13 +19,20 @@ describe("extractMdxMemberRefs", () => {
   });
 
   it("flags computed selectors and does NOT invent members for them", () => {
-    const r = extractMdxMemberRefs("{TM1FILTERBYLEVEL(TM1SUBSETALL([Datenquellen]),0)}");
+    const r = extractMdxMemberRefs(
+      "{TM1FILTERBYLEVEL(TM1SUBSETALL([Datenquellen]),0)}",
+    );
     expect(r.members).toEqual([]); // [Datenquellen] alone is a dimension ref, not a member
-    expect(r.computedSelectors.sort()).toEqual(["TM1FILTERBYLEVEL", "TM1SUBSETALL"]);
+    expect(r.computedSelectors.sort()).toEqual([
+      "TM1FILTERBYLEVEL",
+      "TM1SUBSETALL",
+    ]);
   });
 
   it("captures explicit members even alongside a computed selector", () => {
-    const r = extractMdxMemberRefs("{ DESCENDANTS([Zeit].[2026]) , [Datenquellen].[SuDatenquellen_C] }");
+    const r = extractMdxMemberRefs(
+      "{ DESCENDANTS([Zeit].[2026]) , [Datenquellen].[SuDatenquellen_C] }",
+    );
     expect(r.members).toEqual([
       { dimension: "Zeit", element: "2026" },
       { dimension: "Datenquellen", element: "SuDatenquellen_C" },
@@ -45,8 +57,18 @@ describe("membersFromAxis", () => {
       axes: [
         {
           tuples: [
-            { members: [{ name: "EMEA", hierarchyName: "Region" }, { name: "2026", hierarchyName: "Time" }] },
-            { members: [{ name: "APAC", hierarchyName: "Region" }, { name: "2027", hierarchyName: "Time" }] },
+            {
+              members: [
+                { name: "EMEA", hierarchyName: "Region" },
+                { name: "2026", hierarchyName: "Time" },
+              ],
+            },
+            {
+              members: [
+                { name: "APAC", hierarchyName: "Region" },
+                { name: "2027", hierarchyName: "Time" },
+              ],
+            },
           ],
         },
       ],
@@ -55,7 +77,11 @@ describe("membersFromAxis", () => {
   });
 
   it("matches the dimension case-insensitively", () => {
-    const res = { axes: [{ tuples: [{ members: [{ name: "EMEA", hierarchyName: "REGION" }] }] }] };
+    const res = {
+      axes: [
+        { tuples: [{ members: [{ name: "EMEA", hierarchyName: "REGION" }] }] },
+      ],
+    };
     expect(membersFromAxis(res, "region")).toEqual(["EMEA"]);
   });
 

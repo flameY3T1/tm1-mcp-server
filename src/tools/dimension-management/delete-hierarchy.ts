@@ -4,7 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 import { actionResponse } from "../format.js";
 
-export function registerDeleteHierarchy(server: McpServer, tm1Client: TM1Client): void {
+export function registerDeleteHierarchy(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_delete_hierarchy",
     "Delete a hierarchy from a dimension. The default (dimension-named) hierarchy cannot be deleted — use tm1_delete_dimension for that. Irreversible — pass confirm=<hierarchy name verbatim>.",

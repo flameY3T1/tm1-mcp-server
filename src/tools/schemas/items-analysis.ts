@@ -180,7 +180,9 @@ const CompactNodeBase = z.object({
   depthLimitReached: z.boolean().optional(),
   unresolvedCalls: z.array(UnresolvedCompactSchema).optional(),
 });
-type CompactNode = z.infer<typeof CompactNodeBase> & { children: CompactNode[] };
+type CompactNode = z.infer<typeof CompactNodeBase> & {
+  children: CompactNode[];
+};
 // Strict for the same reason as FullNodeSchema above — this is the variant that
 // used to swallow every stray key in the union.
 const CompactNodeSchema: z.ZodType<CompactNode> = CompactNodeBase.extend({
@@ -313,7 +315,9 @@ export const DataFlowResultSchema = z.object({
         z.object({
           process: z.string(),
           funcNames: z.array(z.string()),
-          access: z.array(z.enum(["source", "write", "zero-out", "indeterminate"])),
+          access: z.array(
+            z.enum(["source", "write", "zero-out", "indeterminate"]),
+          ),
           via: z.array(z.string()).optional(),
         }),
       ),
@@ -420,7 +424,9 @@ export const SearchRulesResultSchema = z
     has_more: z.boolean(),
     next_offset: z.number().int().nullable(),
     items: z.array(
-      z.object({ cube: z.string(), line: z.number().int(), text: z.string() }).passthrough(),
+      z
+        .object({ cube: z.string(), line: z.number().int(), text: z.string() })
+        .passthrough(),
     ),
   })
   .passthrough();
@@ -448,7 +454,9 @@ export const V12ReadinessResultSchema = z.object({
   summary: z.object({
     byCategory: z.record(z.string(), z.number().int()),
     bySeverity: z.record(z.string(), z.number().int()),
-    topFunctions: z.array(z.object({ function: z.string(), count: z.number().int() })),
+    topFunctions: z.array(
+      z.object({ function: z.string(), count: z.number().int() }),
+    ),
   }),
   findings: z.array(V12FindingSchema),
   rulesetSource: z.string(),

@@ -5,7 +5,12 @@
 // sources touching real cubes, no CubeClearData; just parameter/variable
 // assignment so compile + execute are guaranteed safe.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getHarness, LIVE_ENABLED, SANDBOX, type LiveHarness } from "./harness.js";
+import {
+  getHarness,
+  LIVE_ENABLED,
+  SANDBOX,
+  type LiveHarness,
+} from "./harness.js";
 
 const PROC_A = `${SANDBOX}_PROC_A`;
 const PROC_B = `${SANDBOX}_PROC_B`;
@@ -36,7 +41,10 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
   afterAll(async () => {
     for (const name of [PROC_A, PROC_B, PROC_BAD, PROC_GIT_SRC, PROC_GIT_DST]) {
       try {
-        await h.call("tm1_delete_process", { processName: name, confirm: name });
+        await h.call("tm1_delete_process", {
+          processName: name,
+          confirm: name,
+        });
       } catch {
         /* idempotent teardown — ignore missing */
       }
@@ -74,7 +82,11 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
 
   it("compile_process reports success for PROC_A", async () => {
     const r = await h.ok("tm1_compile_process", { processName: PROC_A });
-    expect(r.json).toMatchObject({ ok: true, processName: PROC_A, errorCount: 0 });
+    expect(r.json).toMatchObject({
+      ok: true,
+      processName: PROC_A,
+      errorCount: 0,
+    });
   });
 
   it("get_process_code returns the four tabs and the prolog back", async () => {
@@ -185,7 +197,9 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
       prolog: "nX = ThisFunctionDoesNotExist( ;",
       mode: "upsert",
     });
-    const compiled = await h.call("tm1_compile_process", { processName: PROC_BAD });
+    const compiled = await h.call("tm1_compile_process", {
+      processName: PROC_BAD,
+    });
     expect(compiled.isError).toBe(true);
     expect(compiled.json).toMatchObject({ ok: false });
     expect(compiled.json.errorCount).toBeGreaterThan(0);
@@ -233,7 +247,9 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
       });
 
       // 2. Export: hasSecurityAccess must be carried into the exported JSON.
-      const exp1 = await h.ok("tm1_export_process_to_git", { processName: PROC_GIT_SRC });
+      const exp1 = await h.ok("tm1_export_process_to_git", {
+        processName: PROC_GIT_SRC,
+      });
       expect(exp1.json.hasSecurityAccess).toBe(true);
 
       // 3. Retarget the exported JSON to a second process name and import
@@ -252,12 +268,17 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
 
       // 4. Re-export the second process: hasSecurityAccess must have survived
       // the second hop too.
-      const exp2 = await h.ok("tm1_export_process_to_git", { processName: PROC_GIT_DST });
+      const exp2 = await h.ok("tm1_export_process_to_git", {
+        processName: PROC_GIT_DST,
+      });
       expect(exp2.json.hasSecurityAccess).toBe(true);
     } finally {
       for (const name of [PROC_GIT_SRC, PROC_GIT_DST]) {
         try {
-          await h.call("tm1_delete_process", { processName: name, confirm: name });
+          await h.call("tm1_delete_process", {
+            processName: name,
+            confirm: name,
+          });
         } catch {
           /* idempotent teardown — ignore missing */
         }
@@ -282,7 +303,10 @@ describe.skipIf(!LIVE_ENABLED)("HasSecurityAccess read paths (live)", () => {
 
   afterAll(async () => {
     try {
-      await h.call("tm1_delete_process", { processName: PROC_SEC, confirm: PROC_SEC });
+      await h.call("tm1_delete_process", {
+        processName: PROC_SEC,
+        confirm: PROC_SEC,
+      });
     } catch {
       /* idempotent teardown — ignore missing */
     }

@@ -37,7 +37,8 @@ export const MDX_COMPUTED_FUNCS: ReadonlySet<string> = new Set([
 // One bracketed segment: [ ... ] where ]] is an escaped ]. A chain of >=2
 // segments separated by dots is a member path; a lone segment is a
 // dimension/hierarchy ref.
-const MEMBER_PATH_RE = /(\[(?:[^\]]|\]\])*\])(?:\s*\.\s*(\[(?:[^\]]|\]\])*\]))+/g;
+const MEMBER_PATH_RE =
+  /(\[(?:[^\]]|\]\])*\])(?:\s*\.\s*(\[(?:[^\]]|\]\])*\]))+/g;
 const SEGMENT_RE = /\[((?:[^\]]|\]\])*)\]/g;
 const FUNC_RE = /\b([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
 
@@ -84,7 +85,12 @@ export function extractMdxMemberRefs(mdx: string): MdxExtractResult {
     }
   }
 
-  return { members, computedSelectors: [...computedSelectors].sort((a, b) => a.localeCompare(b)) };
+  return {
+    members,
+    computedSelectors: [...computedSelectors].sort((a, b) =>
+      a.localeCompare(b),
+    ),
+  };
 }
 
 /**
@@ -95,7 +101,13 @@ export function extractMdxMemberRefs(mdx: string): MdxExtractResult {
  * just filters/flattens the response so that glue stays inline at the call site.
  */
 export function membersFromAxis(
-  res: { axes?: Array<{ tuples: Array<{ members: Array<{ name: string; hierarchyName?: string }> }> }> },
+  res: {
+    axes?: Array<{
+      tuples: Array<{
+        members: Array<{ name: string; hierarchyName?: string }>;
+      }>;
+    }>;
+  },
   dimension: string,
 ): string[] {
   const axis0 = res.axes?.[0];

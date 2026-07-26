@@ -1,9 +1,17 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { FORMAT_SCHEMA, payloadResponse, renderTable, type Column } from "../format.js";
+import {
+  FORMAT_SCHEMA,
+  payloadResponse,
+  renderTable,
+  type Column,
+} from "../format.js";
 
-export function registerGetProcessVariables(server: McpServer, tm1Client: TM1Client) {
+export function registerGetProcessVariables(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_get_process_variables",
     "Get the variables (column-name mapping for ASCII/ODBC sources) of a TurboIntegrator process",
@@ -22,8 +30,11 @@ export function registerGetProcessVariables(server: McpServer, tm1Client: TM1Cli
         { header: "startByte", get: (v) => v.startByte ?? "" },
         { header: "endByte", get: (v) => v.endByte ?? "" },
       ];
-      return payloadResponse(payload, format, (p) =>
-        `## Variables of ${p.processName}\n\n${renderTable(p.variables, columns)}`,
+      return payloadResponse(
+        payload,
+        format,
+        (p) =>
+          `## Variables of ${p.processName}\n\n${renderTable(p.variables, columns)}`,
       );
     },
   );

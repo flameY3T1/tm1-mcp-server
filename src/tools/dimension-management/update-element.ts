@@ -4,7 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { actionResponse } from "../format.js";
 const updateSchema = z.object({
   newName: z.string().optional().describe("New name for the element"),
-  type: z.enum(["Numeric", "String", "Consolidated"]).optional().describe("New element type"),
+  type: z
+    .enum(["Numeric", "String", "Consolidated"])
+    .optional()
+    .describe("New element type"),
   components: z
     .array(z.object({ name: z.string(), weight: z.number() }))
     .optional()
@@ -22,7 +25,12 @@ export function registerUpdateElement(server: McpServer, tm1Client: TM1Client) {
       update: updateSchema.describe("Fields to update on the element"),
     },
     async ({ dimensionName, hierarchyName, elementName, update }) => {
-      await tm1Client.elements.update(dimensionName, hierarchyName, elementName, update);
+      await tm1Client.elements.update(
+        dimensionName,
+        hierarchyName,
+        elementName,
+        update,
+      );
       return actionResponse({ success: true, elementName });
     },
   );

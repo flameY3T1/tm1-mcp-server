@@ -16,10 +16,7 @@ import {
 } from "./odata-page.js";
 
 export type DefaultMemberSource =
-  | "defined"
-  | "single_root"
-  | "first_root"
-  | "index_1";
+  "defined" | "single_root" | "first_root" | "index_1";
 
 export interface DefaultMemberResolution {
   dimension: string;
@@ -35,7 +32,8 @@ export interface DefaultMemberResolution {
 }
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 /**
  * Decode a TM1 `}DimensionProperties.LAST_TIME_UPDATED` cell — a 14-digit
@@ -43,7 +41,9 @@ const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "'
  * (no trailing `Z`, because the value carries no timezone). Returns null for
  * blank or non-conforming values.
  */
-export function decodeTm1Timestamp(raw: string | number | null | undefined): string | null {
+export function decodeTm1Timestamp(
+  raw: string | number | null | undefined,
+): string | null {
   if (raw === null || raw === undefined) return null;
   const s = String(raw).trim();
   if (!/^\d{14}$/.test(s)) return null;
@@ -100,7 +100,10 @@ export class DimensionService {
    * scales with total element count across all dimensions.
    * Takes precedence over includeElementCount when both are set.
    */
-  async list(opts?: { includeElementCount?: boolean; includeElementStats?: boolean }): Promise<Dimension[]>;
+  async list(opts?: {
+    includeElementCount?: boolean;
+    includeElementStats?: boolean;
+  }): Promise<Dimension[]>;
   /**
    * Paged variant: with `page` set the *outer* /Dimensions collection is
    * sliced server-side, which is the only lever that bounds the
@@ -111,8 +114,12 @@ export class DimensionService {
    * the win is proportional to how many dimensions the page holds, not
    * constant.
    */
-  async list(opts: DimensionListOpts & { page: PageOpts }): Promise<Paged<Dimension>>;
-  async list(opts: DimensionListOpts = {}): Promise<Dimension[] | Paged<Dimension>> {
+  async list(
+    opts: DimensionListOpts & { page: PageOpts },
+  ): Promise<Paged<Dimension>>;
+  async list(
+    opts: DimensionListOpts = {},
+  ): Promise<Dimension[] | Paged<Dimension>> {
     let expand: string;
     if (opts?.includeElementStats) {
       expand = "Hierarchies($select=Name;$expand=Elements($select=Type,Level))";
@@ -123,7 +130,8 @@ export class DimensionService {
     }
     // Filters are only emitted on the paged path; unpaged callers keep getting
     // the whole collection and filter in-process, so nothing changes for them.
-    const filter = opts.page === undefined ? "" : filterClause(nameFilterPredicates(opts));
+    const filter =
+      opts.page === undefined ? "" : filterClause(nameFilterPredicates(opts));
     const path = `/api/v1/Dimensions?$expand=${expand}${filter}${pageClauses(opts.page)}`;
     const response = await this.http.request<{
       "@odata.count"?: number;
@@ -157,7 +165,13 @@ export class DimensionService {
             }
             return [
               h.Name,
-              { total: elements.length, numeric, consolidated, string: stringCount, maxLevel },
+              {
+                total: elements.length,
+                numeric,
+                consolidated,
+                string: stringCount,
+                maxLevel,
+              },
             ];
           }),
         );
@@ -168,7 +182,9 @@ export class DimensionService {
       }
       return dim;
     });
-    return opts.page === undefined ? items : { items, total: readCount(response) };
+    return opts.page === undefined
+      ? items
+      : { items, total: readCount(response) };
   }
 
   /**
@@ -198,7 +214,10 @@ export class DimensionService {
    * DELETE /api/v1/Dimensions('{name}')
    */
   async delete(name: string): Promise<void> {
-    await this.http.request<void>("DELETE", `/api/v1/Dimensions('${enc(name)}')`);
+    await this.http.request<void>(
+      "DELETE",
+      `/api/v1/Dimensions('${enc(name)}')`,
+    );
   }
 
   /**
@@ -262,10 +281,9 @@ export class DimensionService {
 
     // Tier 1: explicit DefaultMember attribute.
     try {
-      const dm = await this.http.request<{ Name?: string; Level?: number } | undefined>(
-        "GET",
-        `${base}/DefaultMember?$select=Name,Level`,
-      );
+      const dm = await this.http.request<
+        { Name?: string; Level?: number } | undefined
+      >("GET", `${base}/DefaultMember?$select=Name,Level`);
       if (dm && dm.Name) {
         return {
           dimension: dimensionName,
@@ -277,16 +295,21 @@ export class DimensionService {
       }
     } catch (err) {
       // 404/204 = no default member set; fall through. Other errors bubble.
-      if (
-        !(err instanceof TM1Error && (err.httpStatus === 404 || err.httpStatus === 204))
-      ) {
+      if (!(
+        err instanceof TM1Error &&
+        (err.httpStatus === 404 || err.httpStatus === 204)
+      )) {
         throw err;
       }
     }
 
     // Tier 2 & 3: enumerate elements with parents and classify.
     const elementsResp = await this.http.request<{
-      value: Array<{ Name: string; Level: number; Parents?: Array<{ Name: string }> }>;
+      value: Array<{
+        Name: string;
+        Level: number;
+        Parents?: Array<{ Name: string }>;
+      }>;
     }>(
       "GET",
       `${base}/Elements?$select=Name,Level&$expand=Parents($select=Name)`,

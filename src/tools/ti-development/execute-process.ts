@@ -15,7 +15,10 @@ export function abortHint(version: 11 | 12): string {
   return `Request aborted by the client — the process was NOT confirmed failed and may still be executing. Use ${monitor} to check for it and ${cancel} to stop it. Do NOT blindly re-run: that risks a duplicate execution.`;
 }
 
-export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) {
+export function registerExecuteProcess(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_execute_process",
     [
@@ -36,7 +39,9 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
         .min(1000)
         .max(3600000)
         .optional()
-        .describe("Override the default 30s request timeout for this call (ms, 1000–3600000). Use for long-running TI runs."),
+        .describe(
+          "Override the default 30s request timeout for this call (ms, 1000–3600000). Use for long-running TI runs.",
+        ),
     },
     async ({ processName, parameters, timeoutMs }, extra) => {
       // R2-02: TM1 REST exposes no mid-run progress for tm1.Execute, so we
@@ -65,7 +70,10 @@ export function registerExecuteProcess(server: McpServer, tm1Client: TM1Client) 
       }
       try {
         const result = await withToolHint(
-          tm1Client.processes.execute(processName, parameters, { signal: extra?.signal, ...(timeoutMs ? { timeoutMs } : {}) }),
+          tm1Client.processes.execute(processName, parameters, {
+            signal: extra?.signal,
+            ...(timeoutMs ? { timeoutMs } : {}),
+          }),
           `Process '${processName}' failed at runtime. Inspect cascade with tm1_diagnose_process_error(processName='${processName}', includeRelated=true). Verify parameter shape via tm1_get_process_parameters; check syntax with tm1_compile_process before re-running.`,
         );
         return {

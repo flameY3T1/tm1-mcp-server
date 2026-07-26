@@ -10,10 +10,13 @@ import { registerValidateProcessRefs } from "../../src/tools/ti-development/vali
 // value in arg 1 of CellPutS was mis-captured as the cube name.
 type ToolCb = (
   args: { content?: string; processName?: string; includeControl?: boolean },
-  extra: Record<string, unknown>
+  extra: Record<string, unknown>,
 ) => Promise<{ content: Array<{ type: string; text: string }> }>;
 
-function captureHandler(opts: { cubes: string[]; dimensions: string[] }): ToolCb {
+function captureHandler(opts: {
+  cubes: string[];
+  dimensions: string[];
+}): ToolCb {
   let cb: ToolCb | undefined;
   const server = {
     tool: (_name: string, _desc: string, _schema: unknown, handler: ToolCb) => {
@@ -49,7 +52,7 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: [], dimensions: ["Konten"] });
     const payload = await run(
       cb,
-      "IF(DIMIX('Vertrieb_Positionen', vsKonten)=0);\n  itemskip;\nENDIF;"
+      "IF(DIMIX('Vertrieb_Positionen', vsKonten)=0);\n  itemskip;\nENDIF;",
     );
     expect(payload.dimensionRefsScanned).toBe(1);
     expect(payload.unresolved).toBe(1);
@@ -68,7 +71,7 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: ["Reporting"], dimensions: [] });
     const payload = await run(
       cb,
-      "CellIncrementN(vnWert, 'Planung_Vertrieb', psJahr, vsMonate, vsKonten);"
+      "CellIncrementN(vnWert, 'Planung_Vertrieb', psJahr, vsMonate, vsKonten);",
     );
     expect(payload.cubeRefsScanned).toBe(1);
     expect(payload.issues[0].name).toBe("Planung_Vertrieb");
@@ -77,14 +80,20 @@ describe("tm1_validate_process_refs reference extraction", () => {
 
   it("does not mis-capture a quoted CellPutS value as the cube name", async () => {
     const cb = captureHandler({ cubes: ["Reporting"], dimensions: [] });
-    const payload = await run(cb, "CellPutS('some text', 'Reporting', 'E1', 'E2');");
+    const payload = await run(
+      cb,
+      "CellPutS('some text', 'Reporting', 'E1', 'E2');",
+    );
     expect(payload.cubeRefsScanned).toBe(1);
     expect(payload.unresolved).toBe(0);
   });
 
   it("extracts the cube from arg 2 behind a '|'-concat value", async () => {
     const cb = captureHandler({ cubes: [], dimensions: [] });
-    const payload = await run(cb, "CellPutS(sPrefix | '_x', 'MissingCube', 'E1');");
+    const payload = await run(
+      cb,
+      "CellPutS(sPrefix | '_x', 'MissingCube', 'E1');",
+    );
     expect(payload.issues[0].name).toBe("MissingCube");
   });
 
@@ -92,7 +101,7 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: [], dimensions: ["SomeDim"] });
     const payload = await run(
       cb,
-      "CellPutN(ATTRN('SomeDim', vsEl, 'Faktor') * nScale, 'MissingCube', 'E1', 'E2');"
+      "CellPutN(ATTRN('SomeDim', vsEl, 'Faktor') * nScale, 'MissingCube', 'E1', 'E2');",
     );
     expect(payload.cubeRefsScanned).toBe(1);
     expect(payload.issues[0].name).toBe("MissingCube");
@@ -105,7 +114,7 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: [], dimensions: [] });
     const payload = await run(
       cb,
-      "CellPutS(SUBST(vsQuelle, 1, 2),\n  'It''s a Cube',\n  'E1', 'E2');"
+      "CellPutS(SUBST(vsQuelle, 1, 2),\n  'It''s a Cube',\n  'E1', 'E2');",
     );
     expect(payload.issues[0].name).toBe("It's a Cube");
   });
@@ -121,7 +130,7 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: ["Quelle"], dimensions: [] });
     const payload = await run(
       cb,
-      "AttrPutS(CellGetS('Quelle', 'a', 'b'), 'MissingDim', vsEl, 'Alias');"
+      "AttrPutS(CellGetS('Quelle', 'a', 'b'), 'MissingDim', vsEl, 'Alias');",
     );
     expect(payload.cubeRefsScanned).toBe(1);
     expect(payload.dimensionRefsScanned).toBe(1);
@@ -133,7 +142,7 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: [], dimensions: [] });
     const payload = await run(
       cb,
-      "sCube = 'MissingCube';\nnV = CellGetN(sCube, 'E1', 'E2');"
+      "sCube = 'MissingCube';\nnV = CellGetN(sCube, 'E1', 'E2');",
     );
     expect(payload.cubeRefsScanned).toBe(1);
     expect(payload.issues[0].name).toBe("MissingCube");
@@ -142,14 +151,20 @@ describe("tm1_validate_process_refs reference extraction", () => {
 
   it("resolves an arg-2 variable bound to a single literal", async () => {
     const cb = captureHandler({ cubes: [], dimensions: [] });
-    const payload = await run(cb, "sZiel = 'MissingCube';\nCellPutN(nX, sZiel, 'E1');");
+    const payload = await run(
+      cb,
+      "sZiel = 'MissingCube';\nCellPutN(nX, sZiel, 'E1');",
+    );
     expect(payload.cubeRefsScanned).toBe(1);
     expect(payload.issues[0].name).toBe("MissingCube");
   });
 
   it("resolves DIMIX with a literal-bound variable", async () => {
     const cb = captureHandler({ cubes: [], dimensions: ["Konten"] });
-    const payload = await run(cb, "sDim = 'GoneDim';\nnIx = DIMIX(sDim, 'KTO 1');");
+    const payload = await run(
+      cb,
+      "sDim = 'GoneDim';\nnIx = DIMIX(sDim, 'KTO 1');",
+    );
     expect(payload.dimensionRefsScanned).toBe(1);
     expect(payload.issues[0].name).toBe("GoneDim");
     expect(payload.issues[0].kind).toBe("dimension");
@@ -159,7 +174,7 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: [], dimensions: [] });
     const payload = await run(
       cb,
-      "sCube = 'CubeA';\nsCube = 'CubeB';\nnV = CellGetN(sCube, 'E1');"
+      "sCube = 'CubeA';\nsCube = 'CubeB';\nnV = CellGetN(sCube, 'E1');",
     );
     expect(payload.cubeRefsScanned).toBe(0);
     expect(payload.unresolved).toBe(0);
@@ -169,7 +184,7 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: ["Reporting"], dimensions: [] });
     const payload = await run(
       cb,
-      "ViewZeroOut('Reporting', 'zap');\nCubeClearData('GoneCube');"
+      "ViewZeroOut('Reporting', 'zap');\nCubeClearData('GoneCube');",
     );
     expect(payload.cubeRefsScanned).toBe(2);
     expect(payload.unresolved).toBe(1);

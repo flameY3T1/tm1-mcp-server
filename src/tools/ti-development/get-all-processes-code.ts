@@ -27,16 +27,27 @@ function summarize(p: {
   return {
     name: p.name,
     hasSecurityAccess: p.hasSecurityAccess,
-    totalLines: prolog.totalLines + metadata.totalLines + data.totalLines + epilog.totalLines,
+    totalLines:
+      prolog.totalLines +
+      metadata.totalLines +
+      data.totalLines +
+      epilog.totalLines,
     prologLines: prolog.totalLines,
     metadataLines: metadata.totalLines,
     dataLines: data.totalLines,
     epilogLines: epilog.totalLines,
-    commentLines: prolog.commentLines + metadata.commentLines + data.commentLines + epilog.commentLines,
+    commentLines:
+      prolog.commentLines +
+      metadata.commentLines +
+      data.commentLines +
+      epilog.commentLines,
   };
 }
 
-export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Client) {
+export function registerGetAllProcessesCode(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_get_all_processes_code",
     "Bulk-load source code (Prolog/Metadata/Data/Epilog) of every TI process in one call, plus each process's HasSecurityAccess elevation flag (hasSecurityAccess) for audit. Control objects (names starting with '}') excluded by default. Credential literals in the code are masked by default (maskSecrets). Full-code responses are capped at 50 processes by default (ordered by name; truncated=true when capped — raise limit or pass limit=0 for all). Set summary=true to drop the tab bodies and get per-process line metrics instead; summary mode surveys ALL processes by default. For keyword surveys prefer tm1_search_code — it avoids dumping every process body into context.",
@@ -45,7 +56,9 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
         .boolean()
         .optional()
         .default(false)
-        .describe("Include TM1 control processes whose names start with '}' (default: false)"),
+        .describe(
+          "Include TM1 control processes whose names start with '}' (default: false)",
+        ),
       limit: z
         .number()
         .int()
@@ -82,7 +95,10 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
       const fetched =
         cap > 0
           ? await tm1Client.processes.getAllCode(includeControl, cap + 1)
-          : { items: await tm1Client.processes.getAllCode(includeControl), total: undefined };
+          : {
+              items: await tm1Client.processes.getAllCode(includeControl),
+              total: undefined,
+            };
       const truncated = cap > 0 && fetched.items.length > cap;
       const kept = truncated ? fetched.items.slice(0, cap) : fetched.items;
       // An uncapped fetch saw everything and @odata.count is authoritative,
@@ -103,7 +119,18 @@ export function registerGetAllProcessesCode(server: McpServer, tm1Client: TM1Cli
             }))
           : kept;
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ count, countIsExact, returned: processes.length, truncated, processes }) }],
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              count,
+              countIsExact,
+              returned: processes.length,
+              truncated,
+              processes,
+            }),
+          },
+        ],
       };
     },
   );

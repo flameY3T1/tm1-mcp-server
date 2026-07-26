@@ -5,7 +5,14 @@ import type { Client } from "../../types.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 import { FORMAT_SCHEMA, pageResponse, type Column } from "../format.js";
 
-const FIELD_KEYS = ["name", "friendlyName", "type", "enabled", "groups", "groupCount"] as const;
+const FIELD_KEYS = [
+  "name",
+  "friendlyName",
+  "type",
+  "enabled",
+  "groups",
+  "groupCount",
+] as const;
 type FieldKey = (typeof FIELD_KEYS)[number];
 
 type ProjectedClient = Partial<Client> & { groupCount?: number };
@@ -34,7 +41,8 @@ function project(
   return clients.map((c) => {
     const out: ProjectedClient = {};
     if (want.has("name")) out.Name = c.Name;
-    if (want.has("friendlyName") && c.FriendlyName !== undefined) out.FriendlyName = c.FriendlyName;
+    if (want.has("friendlyName") && c.FriendlyName !== undefined)
+      out.FriendlyName = c.FriendlyName;
     if (want.has("type") && c.Type !== undefined) out.Type = c.Type;
     if (want.has("enabled") && c.Enabled !== undefined) out.Enabled = c.Enabled;
     if (want.has("groups") && c.Groups !== undefined) out.Groups = c.Groups;
@@ -73,7 +81,13 @@ export function registerListClients(server: McpServer, tm1Client: TM1Client) {
         { header: "FriendlyName", get: (c) => c.FriendlyName ?? "" },
         { header: "Type", get: (c) => c.Type ?? "" },
         { header: "Enabled", get: (c) => c.Enabled ?? "" },
-        { header: "Groups", get: (c) => (c.groupCount !== undefined ? `${c.groupCount} (count)` : (c.Groups ?? []).join(", ")) },
+        {
+          header: "Groups",
+          get: (c) =>
+            c.groupCount !== undefined
+              ? `${c.groupCount} (count)`
+              : (c.Groups ?? []).join(", "),
+        },
       ];
       return pageResponse(projectedPage, format, { title: "Clients", columns });
     },

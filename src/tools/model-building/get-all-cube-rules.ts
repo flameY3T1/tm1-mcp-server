@@ -40,7 +40,9 @@ function summarize(rulesText: string): CubeRuleSummary {
   const ruleCount = (cleanRules.match(/;/g) ?? []).length;
   const feederCount = (cleanFeeders.match(/=>/g) ?? []).length;
   const cubeRefs = new Set<string>();
-  for (const m of stripBlock(rulesText).matchAll(/\bDB\s*\(\s*['"]([^'"]+)['"]/gi)) {
+  for (const m of stripBlock(rulesText).matchAll(
+    /\bDB\s*\(\s*['"]([^'"]+)['"]/gi,
+  )) {
     cubeRefs.add(m[1]!);
   }
   return {
@@ -52,7 +54,10 @@ function summarize(rulesText: string): CubeRuleSummary {
   };
 }
 
-export function registerGetAllCubeRules(server: McpServer, tm1Client: TM1Client) {
+export function registerGetAllCubeRules(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_get_all_cube_rules",
     [
@@ -67,17 +72,23 @@ export function registerGetAllCubeRules(server: McpServer, tm1Client: TM1Client)
         .boolean()
         .optional()
         .default(false)
-        .describe("Include TM1 control cubes whose names start with '}' (default: false)"),
+        .describe(
+          "Include TM1 control cubes whose names start with '}' (default: false)",
+        ),
       onlyWithRules: z
         .boolean()
         .optional()
         .default(false)
-        .describe("Return only cubes that have non-empty rules text (default: false)"),
+        .describe(
+          "Return only cubes that have non-empty rules text (default: false)",
+        ),
       summary: z
         .boolean()
         .optional()
         .default(false)
-        .describe("Drop rulesText, return aggregate metrics per cube instead (default: false)"),
+        .describe(
+          "Drop rulesText, return aggregate metrics per cube instead (default: false)",
+        ),
       limit: z
         .number()
         .int()
@@ -100,7 +111,10 @@ export function registerGetAllCubeRules(server: McpServer, tm1Client: TM1Client)
       if (cap > 0 && !onlyWithRules) {
         // Server-side cap: $top=cap+1 sentinel detects truncation even if the
         // server omits @odata.count; $orderby=Name keeps the cut stable.
-        const { items, total } = await tm1Client.cubes.getAllRules(includeControl, cap + 1);
+        const { items, total } = await tm1Client.cubes.getAllRules(
+          includeControl,
+          cap + 1,
+        );
         truncated = items.length > cap;
         sliced = truncated ? items.slice(0, cap) : items;
         // Truncated without @odata.count only proves "more than cap" — then
@@ -112,7 +126,8 @@ export function registerGetAllCubeRules(server: McpServer, tm1Client: TM1Client)
         // must not count), so that path fetches all and caps client-side —
         // count/truncated then reflect the post-filter set, like before.
         let all = await tm1Client.cubes.getAllRules(includeControl);
-        if (onlyWithRules) all = all.filter((c) => c.rulesText.trim().length > 0);
+        if (onlyWithRules)
+          all = all.filter((c) => c.rulesText.trim().length > 0);
         count = all.length;
         countIsExact = true;
         truncated = cap > 0 && all.length > cap;
@@ -130,7 +145,18 @@ export function registerGetAllCubeRules(server: McpServer, tm1Client: TM1Client)
           }))
         : sliced;
       return {
-        content: [{ type: "text" as const, text: JSON.stringify({ count, countIsExact, returned: cubes.length, truncated, cubes }) }],
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              count,
+              countIsExact,
+              returned: cubes.length,
+              truncated,
+              cubes,
+            }),
+          },
+        ],
       };
     },
   );

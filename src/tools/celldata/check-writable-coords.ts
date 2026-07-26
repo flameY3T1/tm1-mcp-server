@@ -12,7 +12,10 @@ interface CoordCheck {
   isNLevel: boolean;
 }
 
-export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Client) {
+export function registerCheckWritableCoords(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_check_writable_coords",
     "Pre-flight check before CellPutN/CellPutS. Verifies (1) every coord element exists, (2) every element is N-Level (writes to Consolidated elements silent-fail), and (3) whether the target cube has rules that may overlap the coord. Returns per-coord status + a rule-overlap warning. Use before writing cells in a TI process or via tm1_write_cells.",
@@ -26,7 +29,9 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
     },
     async ({ cubeName, coords }) => {
       const cubes = await tm1Client.cubes.list();
-      const cubeMeta = cubes.find((c) => c.name.toLowerCase() === cubeName.toLowerCase());
+      const cubeMeta = cubes.find(
+        (c) => c.name.toLowerCase() === cubeName.toLowerCase(),
+      );
       if (!cubeMeta) {
         throw new TM1Error({
           code: TM1ErrorCode.NOT_FOUND,
@@ -82,7 +87,11 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
         }),
       );
 
-      let ruleOverlapWarn: { hasRules: boolean; ruleLines: number; note: string } = {
+      let ruleOverlapWarn: {
+        hasRules: boolean;
+        ruleLines: number;
+        note: string;
+      } = {
         hasRules: false,
         ruleLines: 0,
         note: "",
@@ -94,8 +103,7 @@ export function registerCheckWritableCoords(server: McpServer, tm1Client: TM1Cli
           ruleOverlapWarn = {
             hasRules: true,
             ruleLines: ruleText.split(/\r?\n/).length,
-            note:
-              "Cube has rules. CellPutN/S to a coord that the rule computes will be silently overridden by the rule. Inspect the rules manually for LHS pattern overlap with this coord.",
+            note: "Cube has rules. CellPutN/S to a coord that the rule computes will be silently overridden by the rule. Inspect the rules manually for LHS pattern overlap with this coord.",
           };
         }
       } catch (e) {

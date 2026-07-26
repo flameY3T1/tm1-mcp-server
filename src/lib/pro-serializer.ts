@@ -1,4 +1,8 @@
-import type { DataSource, ProcessParameter, ProcessVariable } from "../types.js";
+import type {
+  DataSource,
+  ProcessParameter,
+  ProcessVariable,
+} from "../types.js";
 
 export interface ProcessSerializeInput {
   name: string;
@@ -37,7 +41,8 @@ function serializeParameters(params: ProcessParameter[]): string[] {
   lines.push(`590,${params.length}`);
   for (const p of params) {
     const dv = p.defaultValue;
-    const valStr = typeof dv === "number" ? String(dv) : quote(String(dv ?? ""));
+    const valStr =
+      typeof dv === "number" ? String(dv) : quote(String(dv ?? ""));
     lines.push(`${p.name},${valStr}`);
   }
   // 637 = name,prompt
@@ -78,18 +83,26 @@ function serializeDataSource(ds: DataSource | undefined): string[] {
   } else if (ds.type === "TM1DimensionSubset") {
     lines.push(`570,${quote(ds.subset ?? "")}`);
   } else if (ds.type === "ASCII") {
-    if (ds.asciiDelimiterChar !== undefined) lines.push(`567,${quote(ds.asciiDelimiterChar)}`);
-    if (ds.asciiQuoteCharacter !== undefined) lines.push(`568,${quote(ds.asciiQuoteCharacter)}`);
-    if (ds.asciiHeaderRecords !== undefined) lines.push(`569,${ds.asciiHeaderRecords}`);
-    if (ds.asciiDecimalSeparator !== undefined) lines.push(`588,${quote(ds.asciiDecimalSeparator)}`);
-    if (ds.asciiThousandSeparator !== undefined) lines.push(`589,${quote(ds.asciiThousandSeparator)}`);
+    if (ds.asciiDelimiterChar !== undefined)
+      lines.push(`567,${quote(ds.asciiDelimiterChar)}`);
+    if (ds.asciiQuoteCharacter !== undefined)
+      lines.push(`568,${quote(ds.asciiQuoteCharacter)}`);
+    if (ds.asciiHeaderRecords !== undefined)
+      lines.push(`569,${ds.asciiHeaderRecords}`);
+    if (ds.asciiDecimalSeparator !== undefined)
+      lines.push(`588,${quote(ds.asciiDecimalSeparator)}`);
+    if (ds.asciiThousandSeparator !== undefined)
+      lines.push(`589,${quote(ds.asciiThousandSeparator)}`);
   } else if (ds.type === "ODBC") {
     if (ds.userName) lines.push(`564,${quote(ds.userName)}`);
   }
   return lines;
 }
 
-function serializeSection(code: "572" | "573" | "574" | "575", body: string | undefined): string[] {
+function serializeSection(
+  code: "572" | "573" | "574" | "575",
+  body: string | undefined,
+): string[] {
   const text = body ?? "";
   const out = [`${code},`];
   if (text.length > 0) {

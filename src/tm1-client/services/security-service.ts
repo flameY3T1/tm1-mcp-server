@@ -8,7 +8,8 @@ import type { Client, ClientCreate, ClientUpdate, Group } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 export class SecurityService {
   constructor(private readonly http: TM1HttpClient) {}
@@ -45,7 +46,8 @@ export class SecurityService {
       Name: payload.name,
     };
     if (payload.password !== undefined) body.Password = payload.password;
-    if (payload.friendlyName !== undefined) body.FriendlyName = payload.friendlyName;
+    if (payload.friendlyName !== undefined)
+      body.FriendlyName = payload.friendlyName;
     if (payload.groups !== undefined) {
       body["Groups@odata.bind"] = payload.groups.map(
         (g) => `Groups('${enc(g)}')`,
@@ -61,7 +63,8 @@ export class SecurityService {
   async updateClient(name: string, payload: ClientUpdate): Promise<void> {
     const body: Record<string, unknown> = {};
     if (payload.password !== undefined) body.Password = payload.password;
-    if (payload.friendlyName !== undefined) body.FriendlyName = payload.friendlyName;
+    if (payload.friendlyName !== undefined)
+      body.FriendlyName = payload.friendlyName;
     if (payload.enabled !== undefined) body.Enabled = payload.enabled;
     await this.http.request<void>(
       "PATCH",
@@ -75,10 +78,7 @@ export class SecurityService {
    * DELETE /api/v1/Users('{name}')
    */
   async deleteClient(name: string): Promise<void> {
-    await this.http.request<void>(
-      "DELETE",
-      `/api/v1/Users('${enc(name)}')`,
-    );
+    await this.http.request<void>("DELETE", `/api/v1/Users('${enc(name)}')`);
   }
 
   /**
@@ -89,10 +89,9 @@ export class SecurityService {
    * GET /api/v1/Groups?$expand=Users($select=Name)
    */
   async listGroups(): Promise<Group[]> {
-    const res = await this.http.request<{ value: Array<{ Name: string; Users?: Array<{ Name: string }> }> }>(
-      "GET",
-      "/api/v1/Groups?$expand=Users($select=Name)",
-    );
+    const res = await this.http.request<{
+      value: Array<{ Name: string; Users?: Array<{ Name: string }> }>;
+    }>("GET", "/api/v1/Groups?$expand=Users($select=Name)");
     return res.value.map((g) => ({
       Name: g.Name,
       Clients: g.Users ?? [],
@@ -103,7 +102,10 @@ export class SecurityService {
    * Assign a user to a group.
    * tm1py pattern: PATCH /Users('x') with Name + Groups@odata.bind.
    */
-  async assignClientGroup(clientName: string, groupName: string): Promise<void> {
+  async assignClientGroup(
+    clientName: string,
+    groupName: string,
+  ): Promise<void> {
     await this.http.request<void>(
       "PATCH",
       `/api/v1/Users('${enc(clientName)}')`,
@@ -118,7 +120,10 @@ export class SecurityService {
    * Remove a user from a group.
    * tm1py pattern: DELETE /Users('x')/Groups?$id=Groups('y').
    */
-  async removeClientGroup(clientName: string, groupName: string): Promise<void> {
+  async removeClientGroup(
+    clientName: string,
+    groupName: string,
+  ): Promise<void> {
     await this.http.request<void>(
       "DELETE",
       `/api/v1/Users('${enc(clientName)}')/Groups?$id=Groups('${enc(groupName)}')`,

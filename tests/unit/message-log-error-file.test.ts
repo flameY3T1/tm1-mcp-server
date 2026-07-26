@@ -21,7 +21,9 @@ describe("extractErrorFile", () => {
   });
 
   it("does not include the closing angle bracket in the result", () => {
-    const out = extractErrorFile("Fehlerdatei: <TM1ProcessError_20260615123045_42_LoadActuals.log>");
+    const out = extractErrorFile(
+      "Fehlerdatei: <TM1ProcessError_20260615123045_42_LoadActuals.log>",
+    );
     expect(out).toBe("TM1ProcessError_20260615123045_42_LoadActuals.log");
     expect(out?.endsWith(".log")).toBe(true);
   });

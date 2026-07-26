@@ -4,7 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 import { actionResponse } from "../format.js";
 
-export function registerDeleteView(server: McpServer, tm1Client: TM1Client): void {
+export function registerDeleteView(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_delete_view",
     "Delete a public view from a cube. Irreversible — pass confirm=<view name verbatim>.",

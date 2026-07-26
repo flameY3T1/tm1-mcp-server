@@ -152,7 +152,10 @@ export function registerAllResources(
           const procs = await tm1.processes.list();
           const lower = value.toLowerCase();
           return procs
-            .filter((p) => !p.name.startsWith("}") && p.name.toLowerCase().includes(lower))
+            .filter(
+              (p) =>
+                !p.name.startsWith("}") && p.name.toLowerCase().includes(lower),
+            )
             .map((p) => p.name)
             .slice(0, 100);
         },
@@ -166,7 +169,9 @@ export function registerAllResources(
     },
     async (uri, vars) => {
       const raw = vars.name;
-      const name = decodeURIComponent(Array.isArray(raw) ? raw[0]! : raw ?? '');
+      const name = decodeURIComponent(
+        Array.isArray(raw) ? raw[0]! : (raw ?? ""),
+      );
       const code = await tm1.processes.getCode(name);
       // Hard-mask credential literals unconditionally: resources take no
       // parameters, so unlike tm1_get_process_code there is no maskSecrets
@@ -229,7 +234,10 @@ export function registerAllResources(
           const cubes = await tm1.cubes.list();
           const lower = value.toLowerCase();
           return cubes
-            .filter((c) => !c.name.startsWith("}") && c.name.toLowerCase().includes(lower))
+            .filter(
+              (c) =>
+                !c.name.startsWith("}") && c.name.toLowerCase().includes(lower),
+            )
             .map((c) => c.name)
             .slice(0, 100);
         },
@@ -243,7 +251,9 @@ export function registerAllResources(
     },
     async (uri, vars) => {
       const raw = vars.name;
-      const name = decodeURIComponent(Array.isArray(raw) ? raw[0]! : raw ?? '');
+      const name = decodeURIComponent(
+        Array.isArray(raw) ? raw[0]! : (raw ?? ""),
+      );
       const rules = await tm1.cubes.getRules(name);
       return {
         contents: [

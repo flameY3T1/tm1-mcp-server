@@ -15,7 +15,9 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       filePath: z
         .string()
         .optional()
-        .describe("Absolute path to the .pro file on the MCP server host. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline."),
+        .describe(
+          "Absolute path to the .pro file on the MCP server host. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within that directory. Otherwise pass 'content' inline.",
+        ),
       content: z
         .string()
         .optional()
@@ -23,7 +25,9 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       processName: z
         .string()
         .optional()
-        .describe("Override process name. Default: name parsed from .pro (602,'Name')."),
+        .describe(
+          "Override process name. Default: name parsed from .pro (602,'Name').",
+        ),
       mode: z
         .enum(["create", "update", "upsert"])
         .optional()
@@ -33,9 +37,17 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         .boolean()
         .optional()
         .default(true)
-        .describe("Run tm1_check_process_code before applying. Abort on syntax errors. Default true."),
+        .describe(
+          "Run tm1_check_process_code before applying. Abort on syntax errors. Default true.",
+        ),
     },
-    async ({ filePath, content, processName: nameOverride, mode, preflight }) => {
+    async ({
+      filePath,
+      content,
+      processName: nameOverride,
+      mode,
+      preflight,
+    }) => {
       if (!filePath && !content) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
@@ -53,7 +65,8 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       if (!processName) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
-          message: "Process name not found in .pro (602,'Name') and no name override provided",
+          message:
+            "Process name not found in .pro (602,'Name') and no name override provided",
         });
       }
 
@@ -70,14 +83,25 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         });
         if (!check.success) {
           return {
-            content: [{ type: "text" as const, text: JSON.stringify({ stage: "preflight", processName, errors: check.errors }) }],
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  stage: "preflight",
+                  processName,
+                  errors: check.errors,
+                }),
+              },
+            ],
             isError: true,
           };
         }
       }
 
       const allProcs = await tm1Client.processes.list();
-      const exists = allProcs.some((p: { name: string }) => p.name === processName);
+      const exists = allProcs.some(
+        (p: { name: string }) => p.name === processName,
+      );
 
       if (mode === "create" && exists) {
         throw new TM1Error({

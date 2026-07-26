@@ -283,6 +283,9 @@ const REGISTRARS: ToolRegistrar[] = [
   registerRemoveClientGroup,
 ];
 
-export function registerAllTools(server: McpServer, tm1Client: TM1Client): void {
+export function registerAllTools(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   for (const register of REGISTRARS) register(server, tm1Client);
 }

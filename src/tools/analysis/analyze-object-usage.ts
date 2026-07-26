@@ -4,7 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { buildCubeOrDimUsages } from "../../lib/callgraph/callGraph.js";
 
-export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Client) {
+export function registerAnalyzeObjectUsage(
+  server: McpServer,
+  tm1Client: TM1Client,
+) {
   server.tool(
     "tm1_analyze_object_usage",
     [
@@ -13,44 +16,63 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
     ].join(" "),
     {
       kind: z.enum(["cube", "dimension"]).describe("Object kind to look up"),
-      objectName: z.string().describe("Cube or dimension name (case-insensitive)"),
+      objectName: z
+        .string()
+        .describe("Cube or dimension name (case-insensitive)"),
       accessMode: z
         .enum(["all", "read", "write"])
         .optional()
         .default("all")
         .describe(
           "Filter by access type. 'write': CellPut*/ViewZeroOut/CubeClearData/… (data-flow analysis). " +
-          "'read': CellGet*/DB()-rules (consumption analysis). 'all' (default): every reference.",
+            "'read': CellGet*/DB()-rules (consumption analysis). 'all' (default): every reference.",
         ),
       includeSystem: z
         .boolean()
         .optional()
         .default(false)
-        .describe("Include sources whose names start with '}' (control objects). Default: false."),
+        .describe(
+          "Include sources whose names start with '}' (control objects). Default: false.",
+        ),
       includeControl: z
         .boolean()
         .optional()
         .default(false)
-        .describe("Index control processes/cubes when building the index. Default: false."),
+        .describe(
+          "Index control processes/cubes when building the index. Default: false.",
+        ),
       limit: z
         .number()
         .int()
         .positive()
         .optional()
-        .describe("Cap the number of returned usages (or sources in summary mode). Omit for full bulk load (audit use-case)."),
+        .describe(
+          "Cap the number of returned usages (or sources in summary mode). Omit for full bulk load (audit use-case).",
+        ),
       mode: z
         .enum(["full", "summary"])
         .optional()
         .default("full")
         .describe(
           "'full' (default): individual usage lines with snippets. 'summary': aggregate per source " +
-          "({sourceKind, sourceName, accessTypes[], sections[], funcNames[], count}), sorted by count desc, " +
-          "snippets dropped. Use summary for compact data-flow overviews on heavily-referenced objects.",
+            "({sourceKind, sourceName, accessTypes[], sections[], funcNames[], count}), sorted by count desc, " +
+            "snippets dropped. Use summary for compact data-flow overviews on heavily-referenced objects.",
         ),
     },
-    async ({ kind, objectName, accessMode, includeSystem, includeControl, limit, mode }) => {
+    async ({
+      kind,
+      objectName,
+      accessMode,
+      includeSystem,
+      includeControl,
+      limit,
+      mode,
+    }) => {
       const index = await buildIndexFromTM1(tm1Client, { includeControl });
-      const all = buildCubeOrDimUsages(index, kind, objectName, { includeSystem, accessMode });
+      const all = buildCubeOrDimUsages(index, kind, objectName, {
+        includeSystem,
+        accessMode,
+      });
 
       if (mode === "summary") {
         // Aggregate per source (process or rule). Key by kind+name so a process
@@ -94,7 +116,10 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
             funcNames: [...s.funcNames].sort(),
             count: s.count,
           }))
-          .sort((a, b) => b.count - a.count || a.sourceName.localeCompare(b.sourceName));
+          .sort(
+            (a, b) =>
+              b.count - a.count || a.sourceName.localeCompare(b.sourceName),
+          );
         const sumTruncated = limit !== undefined && allSources.length > limit;
         const sources = sumTruncated ? allSources.slice(0, limit) : allSources;
         return {
@@ -122,7 +147,15 @@ export function registerAnalyzeObjectUsage(server: McpServer, tm1Client: TM1Clie
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ kind, name: objectName, accessMode, count: all.length, returned: usages.length, truncated, usages }),
+            text: JSON.stringify({
+              kind,
+              name: objectName,
+              accessMode,
+              count: all.length,
+              returned: usages.length,
+              truncated,
+              usages,
+            }),
           },
         ],
       };

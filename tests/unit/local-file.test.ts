@@ -22,17 +22,23 @@ describe("resolveLocalPath", () => {
   it("is disabled when TM1_LOCAL_FILE_ROOT is unset", () => {
     delete process.env.TM1_LOCAL_FILE_ROOT;
     expect(() => resolveLocalPath("/srv/pro-bundles/x.pro")).toThrow(TM1Error);
-    expect(() => resolveLocalPath("/srv/pro-bundles/x.pro")).toThrow(/Host-file access is disabled/);
+    expect(() => resolveLocalPath("/srv/pro-bundles/x.pro")).toThrow(
+      /Host-file access is disabled/,
+    );
   });
 
   it("is disabled when the root is blank/whitespace", () => {
     process.env.TM1_LOCAL_FILE_ROOT = "   ";
-    expect(() => resolveLocalPath("/srv/pro-bundles/x.pro")).toThrow(/disabled/);
+    expect(() => resolveLocalPath("/srv/pro-bundles/x.pro")).toThrow(
+      /disabled/,
+    );
   });
 
   it("returns the resolved path for a file inside the root", () => {
     process.env.TM1_LOCAL_FILE_ROOT = ROOT;
-    expect(resolveLocalPath(path.join(ROOT, "deploy", "load.pro"))).toBe(path.join(ROOT, "deploy", "load.pro"));
+    expect(resolveLocalPath(path.join(ROOT, "deploy", "load.pro"))).toBe(
+      path.join(ROOT, "deploy", "load.pro"),
+    );
   });
 
   it("allows the root directory itself (e.g. a bundle directory == root)", () => {
@@ -42,12 +48,16 @@ describe("resolveLocalPath", () => {
 
   it("rejects a relative path", () => {
     process.env.TM1_LOCAL_FILE_ROOT = ROOT;
-    expect(() => resolveLocalPath("deploy/load.pro")).toThrow(/must be absolute/);
+    expect(() => resolveLocalPath("deploy/load.pro")).toThrow(
+      /must be absolute/,
+    );
   });
 
   it("rejects traversal that escapes the root via ..", () => {
     process.env.TM1_LOCAL_FILE_ROOT = ROOT;
-    expect(() => resolveLocalPath(path.join(ROOT, "..", "secret", "id_rsa"))).toThrow(/escapes/);
+    expect(() =>
+      resolveLocalPath(path.join(ROOT, "..", "secret", "id_rsa")),
+    ).toThrow(/escapes/);
   });
 
   it("rejects an absolute path outside the root (e.g. /etc/passwd)", () => {
@@ -58,7 +68,9 @@ describe("resolveLocalPath", () => {
   it("rejects a sibling-prefix path that is not actually inside the root", () => {
     process.env.TM1_LOCAL_FILE_ROOT = ROOT;
     // /srv/pro-bundles-evil shares the string prefix but is a different dir
-    expect(() => resolveLocalPath("/srv/pro-bundles-evil/x.pro")).toThrow(/escapes/);
+    expect(() => resolveLocalPath("/srv/pro-bundles-evil/x.pro")).toThrow(
+      /escapes/,
+    );
   });
 });
 
@@ -89,12 +101,18 @@ describe("resolveLocalPath symlink confinement", () => {
   });
 
   it("rejects a write path through a symlink that escapes the root", () => {
-    expect(() => resolveLocalPath(path.join(root, "link", "evil.pro"))).toThrow(TM1Error);
-    expect(() => resolveLocalPath(path.join(root, "link", "evil.pro"))).toThrow(/escapes/);
+    expect(() => resolveLocalPath(path.join(root, "link", "evil.pro"))).toThrow(
+      TM1Error,
+    );
+    expect(() => resolveLocalPath(path.join(root, "link", "evil.pro"))).toThrow(
+      /escapes/,
+    );
   });
 
   it("rejects the symlink itself as a directory target", () => {
-    expect(() => resolveLocalPath(path.join(root, "link"), "directory")).toThrow(/escapes/);
+    expect(() =>
+      resolveLocalPath(path.join(root, "link"), "directory"),
+    ).toThrow(/escapes/);
   });
 
   it("still accepts a normal (not-yet-existing) path inside the root", () => {

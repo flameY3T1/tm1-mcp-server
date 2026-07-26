@@ -3,7 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { withToolHint } from "../error-format.js";
 
-export function registerCheckFeeders(server: McpServer, tm1Client: TM1Client): void {
+export function registerCheckFeeders(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_check_feeders",
     [
@@ -16,14 +19,18 @@ export function registerCheckFeeders(server: McpServer, tm1Client: TM1Client): v
       cubeName: z.string().describe("Name of the TM1 cube"),
       elements: z
         .array(z.string())
-        .describe("Element names for each dimension of the cube, in cube dimension order"),
+        .describe(
+          "Element names for each dimension of the cube, in cube dimension order",
+        ),
       timeoutMs: z
         .number()
         .int()
         .min(1000)
         .max(3600000)
         .optional()
-        .describe("Override the default request timeout (ms, 1000–3600000). Checks over deep consolidations can be slow."),
+        .describe(
+          "Override the default request timeout (ms, 1000–3600000). Checks over deep consolidations can be slow.",
+        ),
     },
     async ({ cubeName, elements, timeoutMs }, extra) => {
       const fedCells = await withToolHint(
@@ -38,7 +45,11 @@ export function registerCheckFeeders(server: McpServer, tm1Client: TM1Client): v
           {
             type: "text" as const,
             text: JSON.stringify(
-              { count: fedCells.length, unfedCount: fedCells.filter((c) => !c.fed).length, fedCells },
+              {
+                count: fedCells.length,
+                unfedCount: fedCells.filter((c) => !c.fed).length,
+                fedCells,
+              },
               null,
               2,
             ),

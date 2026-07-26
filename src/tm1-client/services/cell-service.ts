@@ -17,7 +17,8 @@ import { escapeMdxName } from "../../lib/mdx.js";
 import { freeCellset, transformCellsetResponse } from "./cellset-transform.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 // Build a fully-qualified MDX member reference for a write coordinate.
 // A caller may pass a pre-qualified ref to target an ALTERNATE hierarchy
@@ -28,7 +29,8 @@ const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "'
 function qualifyWriteMember(dim: string, element: string): string {
   const d = escapeMdxName(dim);
   if (element.startsWith("[") && element.includes("].[")) return element;
-  if (element.startsWith("[") && element.endsWith("]")) return `[${d}].[${d}].${element}`;
+  if (element.startsWith("[") && element.endsWith("]"))
+    return `[${d}].[${d}].${element}`;
   return `[${d}].[${d}].[${escapeMdxName(element)}]`;
 }
 
@@ -49,10 +51,10 @@ export class CellService {
     }
 
     const cubePath = `/api/v1/Cubes('${enc(cubeName)}')?$expand=Dimensions($select=Name)`;
-    const cubeMeta = await this.http.request<{ Name: string; Dimensions: Array<{ Name: string }> }>(
-      "GET",
-      cubePath,
-    );
+    const cubeMeta = await this.http.request<{
+      Name: string;
+      Dimensions: Array<{ Name: string }>;
+    }>("GET", cubePath);
     const dims = cubeMeta.Dimensions.map((d) => d.Name);
     if (elements.length !== dims.length) {
       throw new Error(
@@ -64,7 +66,8 @@ export class CellService {
       // Pre-qualified MDX member reference — pass through (caller owns escaping).
       if (element.startsWith("[") && element.includes("].[")) return element;
       // Single bracketed member like `[Foo]` — prepend dimension.
-      if (element.startsWith("[") && element.endsWith("]")) return `[${d}].${element}`;
+      if (element.startsWith("[") && element.endsWith("]"))
+        return `[${d}].${element}`;
       return `[${d}].[${escapeMdxName(element)}]`;
     };
     const qualified = dims.map((d, i) => qualify(d, elements[i]!));
@@ -80,7 +83,11 @@ export class CellService {
     const cellsetResponse = await this.http.request<{
       ID: string;
       Cells?: Array<{ Value: CellValue; FormattedValue: string }>;
-    }>("POST", "/api/v1/ExecuteMDX?$expand=Cells($select=Value,FormattedValue)", { MDX: mdx });
+    }>(
+      "POST",
+      "/api/v1/ExecuteMDX?$expand=Cells($select=Value,FormattedValue)",
+      { MDX: mdx },
+    );
 
     try {
       if (cellsetResponse.Cells && cellsetResponse.Cells.length > 0) {
@@ -115,7 +122,8 @@ export class CellService {
     }
     cellsExpand += ")";
 
-    const axesExpand = "Axes($expand=Tuples($expand=Members($select=Name;$expand=Hierarchy($select=Name))))";
+    const axesExpand =
+      "Axes($expand=Tuples($expand=Members($select=Name;$expand=Hierarchy($select=Name))))";
     const path = `/api/v1/ExecuteMDX?$expand=${cellsExpand},${axesExpand}`;
 
     const response = await this.http.request<{
@@ -175,8 +183,13 @@ export class CellService {
     }
 
     const cube = escapeMdxName(cubeName);
-    const writeOne = async (c: { elements: string[]; value: number | string }) => {
-      const memberRefs = c.elements.map((e, idx) => qualifyWriteMember(dimensions[idx]!, e));
+    const writeOne = async (c: {
+      elements: string[];
+      value: number | string;
+    }) => {
+      const memberRefs = c.elements.map((e, idx) =>
+        qualifyWriteMember(dimensions[idx]!, e),
+      );
       const colMember = memberRefs[0];
       const rowTuple = memberRefs.slice(1).join(",");
       const mdx =
@@ -228,7 +241,8 @@ export class CellService {
         } else {
           failed.push({
             elements: batch[j]!.elements,
-            error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+            error:
+              r.reason instanceof Error ? r.reason.message : String(r.reason),
           });
         }
       });
@@ -257,8 +271,13 @@ export class CellService {
    * (same name as the dimension) — alternate hierarchies are not supported
    * by these diagnostics tools.
    */
-  private async tupleBinds(cubeName: string, elements: string[]): Promise<string[]> {
-    const cubeMeta = await this.http.request<{ Dimensions: Array<{ Name: string }> }>(
+  private async tupleBinds(
+    cubeName: string,
+    elements: string[],
+  ): Promise<string[]> {
+    const cubeMeta = await this.http.request<{
+      Dimensions: Array<{ Name: string }>;
+    }>(
       "GET",
       `/api/v1/Cubes('${enc(cubeName)}')?$expand=Dimensions($select=Name)`,
     );
@@ -270,7 +289,8 @@ export class CellService {
       });
     }
     return dims.map(
-      (d, i) => `Dimensions('${enc(d)}')/Hierarchies('${enc(d)}')/Elements('${enc(elements[i]!)}')`,
+      (d, i) =>
+        `Dimensions('${enc(d)}')/Hierarchies('${enc(d)}')/Elements('${enc(elements[i]!)}')`,
     );
   }
 
@@ -346,7 +366,10 @@ export class CellService {
     const expandParts = ["Tuple($select=Name)"];
     for (let level = 1; level <= maxDepth; level++) {
       const prefix = "Components/".repeat(level);
-      expandParts.push(`${prefix}Tuple($select=Name)`, `${prefix}Cube($select=Name)`);
+      expandParts.push(
+        `${prefix}Tuple($select=Name)`,
+        `${prefix}Cube($select=Name)`,
+      );
     }
     const response = await this.http.request<RawCalcComponent>(
       "POST",
@@ -394,7 +417,8 @@ function mapCalcComponent(
   if (raw.Status !== undefined) node.status = raw.Status;
   if (raw.Cube?.Name !== undefined) node.cube = raw.Cube.Name;
   if (raw.Tuple !== undefined) node.tuple = raw.Tuple.map((t) => t.Name ?? "");
-  if (raw.Statements !== undefined && raw.Statements.length > 0) node.statements = raw.Statements;
+  if (raw.Statements !== undefined && raw.Statements.length > 0)
+    node.statements = raw.Statements;
 
   const children = raw.Components ?? [];
   if (children.length > 0) {
@@ -402,7 +426,9 @@ function mapCalcComponent(
       node.truncated = true;
     } else {
       const kept = children.slice(0, maxComponents);
-      node.components = kept.map((c) => mapCalcComponent(c, depthLeft - 1, maxComponents));
+      node.components = kept.map((c) =>
+        mapCalcComponent(c, depthLeft - 1, maxComponents),
+      );
       if (children.length > maxComponents) node.truncated = true;
     }
   }

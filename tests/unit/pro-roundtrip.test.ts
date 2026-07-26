@@ -1,9 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { parseProFile } from "../../src/lib/pro-parser.js";
-import { serializeToPro, type ProcessSerializeInput } from "../../src/lib/pro-serializer.js";
-import type { DataSource, ProcessParameter, ProcessVariable } from "../../src/types.js";
+import {
+  serializeToPro,
+  type ProcessSerializeInput,
+} from "../../src/lib/pro-serializer.js";
+import type {
+  DataSource,
+  ProcessParameter,
+  ProcessVariable,
+} from "../../src/types.js";
 
-function fixture(over: Partial<ProcessSerializeInput> = {}): ProcessSerializeInput {
+function fixture(
+  over: Partial<ProcessSerializeInput> = {},
+): ProcessSerializeInput {
   return {
     name: "MyProc",
     prolog: "sTest='hello';\nnX=1;",
@@ -12,7 +21,12 @@ function fixture(over: Partial<ProcessSerializeInput> = {}): ProcessSerializeInp
     epilog: "ProcessExit;",
     parameters: [
       { name: "pNum", type: "Numeric", defaultValue: 42, prompt: "a number" },
-      { name: "pStr", type: "String", defaultValue: "default", prompt: "a string" },
+      {
+        name: "pStr",
+        type: "String",
+        defaultValue: "default",
+        prompt: "a string",
+      },
     ],
     variables: [
       { name: "vCol1", type: "String", position: 1 },
@@ -62,8 +76,12 @@ describe("pro-serializer round-trip", () => {
     const input = fixture();
     const parsed = parseProFile(serializeToPro(input));
     expect(parsed.variables).toHaveLength(2);
-    const v1 = parsed.variables.find((v: ProcessVariable) => v.name === "vCol1");
-    const v2 = parsed.variables.find((v: ProcessVariable) => v.name === "vCol2");
+    const v1 = parsed.variables.find(
+      (v: ProcessVariable) => v.name === "vCol1",
+    );
+    const v2 = parsed.variables.find(
+      (v: ProcessVariable) => v.name === "vCol2",
+    );
     expect(v1).toMatchObject({ type: "String", position: 1 });
     expect(v2).toMatchObject({ type: "Numeric", position: 2 });
   });
@@ -82,7 +100,11 @@ describe("pro-serializer round-trip", () => {
       view: "MyView",
     };
     const parsed = parseProFile(serializeToPro(fixture({ dataSource: ds })));
-    expect(parsed.dataSource).toMatchObject({ type: "TM1CubeView", view: "MyView", dataSourceNameForServer: "Sales" });
+    expect(parsed.dataSource).toMatchObject({
+      type: "TM1CubeView",
+      view: "MyView",
+      dataSourceNameForServer: "Sales",
+    });
   });
 
   it("ASCII dataSource survives delimiter / quote / header records", () => {
@@ -108,7 +130,12 @@ describe("pro-serializer round-trip", () => {
   });
 
   it("empty parameters/variables produce a parseable file", () => {
-    const out = serializeToPro({ name: "Empty", parameters: [], variables: [], dataSource: { type: "None" } });
+    const out = serializeToPro({
+      name: "Empty",
+      parameters: [],
+      variables: [],
+      dataSource: { type: "None" },
+    });
     const parsed = parseProFile(out);
     expect(parsed.name).toBe("Empty");
     expect(parsed.parameters).toEqual([]);

@@ -1,6 +1,9 @@
 import type { TM1Config } from "./config.js";
 import { createLogger } from "./logger.js";
-import { createConnectionProfile, type ConnectionProfile } from "./tm1-client/connection/profile.js";
+import {
+  createConnectionProfile,
+  type ConnectionProfile,
+} from "./tm1-client/connection/profile.js";
 import { getTm1Dispatcher, tm1Fetch } from "./tm1-client/dispatcher.js";
 import { NAME, VERSION } from "./version.js";
 import type pino from "pino";
@@ -97,13 +100,19 @@ export class SessionManager {
       try {
         await this.logout();
       } catch (err) {
-        this.logger.warn({ err }, "Failed to logout existing session before re-auth");
+        this.logger.warn(
+          { err },
+          "Failed to logout existing session before re-auth",
+        );
       }
     }
 
     const loginReq = await this.profile.buildLoginRequest();
 
-    this.logger.info({ endpoint: loginReq.url, authMode: this.authMode() }, "Authenticating with TM1");
+    this.logger.info(
+      { endpoint: loginReq.url, authMode: this.authMode() },
+      "Authenticating with TM1",
+    );
 
     const response = await withTimeout(
       this.config.requestTimeoutMs,
@@ -130,17 +139,17 @@ export class SessionManager {
     if (!response.ok) {
       this.logger.error(
         { endpoint: loginReq.url, status: response.status },
-        "Authentication failed"
+        "Authentication failed",
       );
       throw new Error(
-        `Authentication failed with status ${response.status}: ${response.statusText}`
+        `Authentication failed with status ${response.status}: ${response.statusText}`,
       );
     }
 
     const cookie = this.extractSessionCookie(response);
     if (!cookie) {
       throw new Error(
-        "Authentication succeeded but no TM1SessionId cookie found in response"
+        "Authentication succeeded but no TM1SessionId cookie found in response",
       );
     }
 
@@ -193,7 +202,9 @@ export class SessionManager {
         // (via ensureSession) instead of serving the possibly-dead session and
         // eating a 401 round-trip under load. A keep-alive timeout is a strong
         // signal the session is no longer healthy.
-        this.logger.error("Keep-alive request timed out; clearing session to force re-auth");
+        this.logger.error(
+          "Keep-alive request timed out; clearing session to force re-auth",
+        );
         this.sessionCookie = null;
         return;
       }
@@ -214,10 +225,10 @@ export class SessionManager {
     if (!response.ok) {
       this.logger.error(
         { endpoint: url, status: response.status },
-        "Keep-alive request failed"
+        "Keep-alive request failed",
       );
       throw new Error(
-        `Keep-alive failed with status ${response.status}: ${response.statusText}`
+        `Keep-alive failed with status ${response.status}: ${response.statusText}`,
       );
     }
 
@@ -248,7 +259,7 @@ export class SessionManager {
 
     this.logger.info(
       { intervalMs: this.config.keepAliveIntervalMs },
-      "Starting keep-alive timer"
+      "Starting keep-alive timer",
     );
 
     this.keepAliveTimer = setInterval(() => {
@@ -327,7 +338,8 @@ export class SessionManager {
 
   /** Human-readable auth mode for logging (never logs the credential itself). */
   private authMode(): string {
-    if (this.config.version === 12) return `v12:${this.config.authMode ?? "s2s"}`;
+    if (this.config.version === 12)
+      return `v12:${this.config.authMode ?? "s2s"}`;
     if (this.config.camPassport) return "CAMPassport";
     if (this.config.namespace) return "CAMNamespace";
     return "Basic";
@@ -341,7 +353,6 @@ export class SessionManager {
     if (!setCookie) return null;
 
     const match = setCookie.match(/TM1SessionId=([^;]+)/);
-    return match ? match[1] ?? null : null;
+    return match ? (match[1] ?? null) : null;
   }
-
 }

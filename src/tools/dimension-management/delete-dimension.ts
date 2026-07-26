@@ -4,7 +4,10 @@ import type { TM1Client } from "../../tm1-client.js";
 import { actionResponse } from "../format.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 
-export function registerDeleteDimension(server: McpServer, tm1Client: TM1Client): void {
+export function registerDeleteDimension(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_delete_dimension",
     [

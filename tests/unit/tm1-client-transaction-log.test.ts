@@ -6,9 +6,15 @@ import { toOdataDateTime } from "../../src/tm1-client/services/server-service.js
 import type { TM1Config } from "../../src/config.js";
 
 const mockLogger = {
-  info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn(),
-  fatal: vi.fn(), trace: vi.fn(), child: vi.fn().mockReturnThis(),
-  level: "silent", flush: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+  debug: vi.fn(),
+  fatal: vi.fn(),
+  trace: vi.fn(),
+  child: vi.fn().mockReturnThis(),
+  level: "silent",
+  flush: vi.fn(),
 } as unknown as import("pino").Logger;
 
 function makeConfig(): TM1Config {
@@ -35,7 +41,12 @@ function mockResponse(body: unknown, status = 200): Response {
 }
 
 const ENTRY = (cube: string) => ({
-  TimeStamp: "2026-06-08T10:00:00Z", User: "admin", Cube: cube, Tuple: ["x"], OldValue: 1, NewValue: 2,
+  TimeStamp: "2026-06-08T10:00:00Z",
+  User: "admin",
+  Cube: cube,
+  Tuple: ["x"],
+  OldValue: 1,
+  NewValue: 2,
 });
 
 describe("toOdataDateTime", () => {
@@ -46,8 +57,12 @@ describe("toOdataDateTime", () => {
     expect(toOdataDateTime("2026-06-08")).toBe("2026-06-08T00:00:00Z");
   });
   it("leaves an already-zoned value untouched", () => {
-    expect(toOdataDateTime("2026-06-08T00:00:00Z")).toBe("2026-06-08T00:00:00Z");
-    expect(toOdataDateTime("2026-06-08T00:00:00+02:00")).toBe("2026-06-08T00:00:00+02:00");
+    expect(toOdataDateTime("2026-06-08T00:00:00Z")).toBe(
+      "2026-06-08T00:00:00Z",
+    );
+    expect(toOdataDateTime("2026-06-08T00:00:00+02:00")).toBe(
+      "2026-06-08T00:00:00+02:00",
+    );
   });
 });
 
@@ -141,7 +156,10 @@ describe("TM1Client – getTransactionLog()", () => {
       .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
       .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A")] })); // single query
 
-    const res = await client.server.getTransactionLog({ since: "2026-06-01", top: 10 });
+    const res = await client.server.getTransactionLog({
+      since: "2026-06-01",
+      top: 10,
+    });
 
     expect(res.coverage).toBe("complete");
     expect(res.scannedFrom).toContain("2026-06-01");
@@ -152,7 +170,10 @@ describe("TM1Client – getTransactionLog()", () => {
       .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
       .mockResolvedValueOnce(mockResponse({ value: [ENTRY("A")] })); // single query
 
-    await client.server.getTransactionLog({ since: "2026-06-08T00:00:00", top: 100 });
+    await client.server.getTransactionLog({
+      since: "2026-06-08T00:00:00",
+      top: 100,
+    });
 
     expect(fetchSpy).toHaveBeenCalledTimes(2); // probe + one query, no widening
     const url = decodeURIComponent(fetchSpy.mock.calls[1][0] as string);
@@ -164,7 +185,11 @@ describe("TM1Client – getTransactionLog()", () => {
       .mockResolvedValueOnce(mockResponse({ value: [] })) // probe
       .mockResolvedValueOnce(mockResponse({ value: [] })); // single query
 
-    await client.server.getTransactionLog({ since: "2026-06-01", until: "2026-06-08", top: 10 });
+    await client.server.getTransactionLog({
+      since: "2026-06-01",
+      until: "2026-06-08",
+      top: 10,
+    });
 
     const url = decodeURIComponent(fetchSpy.mock.calls[1][0] as string);
     expect(url).toContain("TimeStamp ge 2026-06-01T00:00:00Z");
@@ -173,7 +198,10 @@ describe("TM1Client – getTransactionLog()", () => {
 
   it("rethrows PERMISSION_DENIED from the probe and skips the query", async () => {
     fetchSpy.mockResolvedValueOnce(
-      mockResponse({ error: { code: "65", message: "ObjectSecurityNoReadRights" } }, 400),
+      mockResponse(
+        { error: { code: "65", message: "ObjectSecurityNoReadRights" } },
+        400,
+      ),
     );
 
     await expect(client.server.getTransactionLog({})).rejects.toMatchObject({
@@ -214,7 +242,10 @@ describe("TM1Client – getTransactionLog()", () => {
     fetchSpy
       .mockResolvedValueOnce(mockResponse({ value: [] })) // probe ok
       .mockResolvedValue(
-        mockResponse({ error: { code: "65", message: "ObjectSecurityNoReadRights" } }, 400),
+        mockResponse(
+          { error: { code: "65", message: "ObjectSecurityNoReadRights" } },
+          400,
+        ),
       ); // filtered window denied
 
     await expect(

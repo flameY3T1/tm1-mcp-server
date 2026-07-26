@@ -44,7 +44,10 @@ export const SampleCellsResultSchema = z.object({
       formattedValue: z.string(),
     }),
   ),
-  filtersApplied: z.record(z.string(), z.union([z.string(), z.array(z.string())])),
+  filtersApplied: z.record(
+    z.string(),
+    z.union([z.string(), z.array(z.string())]),
+  ),
   axisDimension: z.string(),
   rowDims: z.array(z.string()),
   whereDims: z.array(z.string()),

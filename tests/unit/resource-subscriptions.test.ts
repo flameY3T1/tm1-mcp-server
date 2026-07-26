@@ -28,7 +28,10 @@ function makeServer(): {
   const sendResourceUpdated = vi.fn().mockResolvedValue(undefined);
 
   const fakeLowLevel = {
-    setRequestHandler: (schema: unknown, handler: (req: unknown) => Promise<unknown>) => {
+    setRequestHandler: (
+      schema: unknown,
+      handler: (req: unknown) => Promise<unknown>,
+    ) => {
       handlers.set(schema, handler);
     },
     sendResourceUpdated,
@@ -90,11 +93,16 @@ describe("R2-05: SubscriptionRegistry", () => {
     await new Promise((r) => setImmediate(r));
 
     expect(sendResourceUpdated).toHaveBeenCalledOnce();
-    expect(sendResourceUpdated).toHaveBeenCalledWith({ uri: "tm1://server/state" });
+    expect(sendResourceUpdated).toHaveBeenCalledWith({
+      uri: "tm1://server/state",
+    });
   });
 
   it("does not notify URIs the client hasn't subscribed to", () => {
-    tm1Events.emit("mutation", { method: "DELETE", path: "/api/v1/Cubes('X')" });
+    tm1Events.emit("mutation", {
+      method: "DELETE",
+      path: "/api/v1/Cubes('X')",
+    });
     expect(sendResourceUpdated).not.toHaveBeenCalled();
   });
 
@@ -121,7 +129,10 @@ describe("R2-05: SubscriptionRegistry", () => {
     await subscribe({ params: { uri: "tm1://server/state" } });
 
     expect(() => {
-      tm1Events.emit("mutation", { method: "PUT", path: "/api/v1/Cubes('Sales')" });
+      tm1Events.emit("mutation", {
+        method: "PUT",
+        path: "/api/v1/Cubes('Sales')",
+      });
     }).not.toThrow();
     await new Promise((r) => setImmediate(r));
     expect(mockLogger.warn).toHaveBeenCalled();

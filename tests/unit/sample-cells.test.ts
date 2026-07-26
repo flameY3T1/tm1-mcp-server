@@ -128,7 +128,7 @@ describe("buildSampleCellsMdx", () => {
     ).toThrow(/Filter dimension 'Foo'/);
   });
 
-  it("includeStrings: swaps NON EMPTY for a <> \"\" FILTER on the pinned measure", () => {
+  it('includeStrings: swaps NON EMPTY for a <> "" FILTER on the pinned measure', () => {
     const r = buildSampleCellsMdx({
       cubeName: "Cube_X",
       dimensions: baseDims,
@@ -178,7 +178,11 @@ describe("transformSampleCells", () => {
         { value: 2, formattedValue: "2" },
       ],
       axes: [
-        { tuples: [{ members: [{ name: "Measure_A", hierarchyName: "Measure" }] }] },
+        {
+          tuples: [
+            { members: [{ name: "Measure_A", hierarchyName: "Measure" }] },
+          ],
+        },
         {
           tuples: [
             {

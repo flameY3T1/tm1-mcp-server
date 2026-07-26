@@ -38,7 +38,9 @@ describe("Property 1: Konfigurations-Roundtrip", () => {
           keepAliveInterval: fc.integer({ min: 1000, max: 300000 }),
           requestTimeout: fc.integer({ min: 1000, max: 120000 }),
           logLevel: fc.constantFrom(...validLogLevels),
-          logFile: fc.option(fc.string({ minLength: 1, maxLength: 100 }), { nil: undefined }),
+          logFile: fc.option(fc.string({ minLength: 1, maxLength: 100 }), {
+            nil: undefined,
+          }),
         }),
         (env) => {
           // Clean TM1_ vars for this iteration
@@ -49,7 +51,9 @@ describe("Property 1: Konfigurations-Roundtrip", () => {
           process.env.TM1_BASE_URL = env.baseUrl;
           process.env.TM1_USER = env.user;
           process.env.TM1_PASSWORD = env.password;
-          process.env.TM1_SSL_REJECT_UNAUTHORIZED = String(env.rejectUnauthorized);
+          process.env.TM1_SSL_REJECT_UNAUTHORIZED = String(
+            env.rejectUnauthorized,
+          );
           process.env.TM1_KEEP_ALIVE_INTERVAL = String(env.keepAliveInterval);
           process.env.TM1_REQUEST_TIMEOUT = String(env.requestTimeout);
           process.env.TM1_LOG_LEVEL = env.logLevel;
@@ -82,22 +86,27 @@ describe("Property 1: Konfigurations-Roundtrip", () => {
   it("missing required fields throw an error", () => {
     fc.assert(
       fc.property(
-        fc.record({
-          hasBaseUrl: fc.boolean(),
-          hasUser: fc.boolean(),
-          hasPassword: fc.boolean(),
-        }).filter((r) => !(r.hasBaseUrl && r.hasUser && r.hasPassword)),
+        fc
+          .record({
+            hasBaseUrl: fc.boolean(),
+            hasUser: fc.boolean(),
+            hasPassword: fc.boolean(),
+          })
+          .filter((r) => !(r.hasBaseUrl && r.hasUser && r.hasPassword)),
         (flags) => {
           // Clean TM1_ vars for this iteration
           Object.keys(process.env).forEach((key) => {
             if (key.startsWith("TM1_")) delete process.env[key];
           });
 
-          if (flags.hasBaseUrl) process.env.TM1_BASE_URL = "https://server:8010";
+          if (flags.hasBaseUrl)
+            process.env.TM1_BASE_URL = "https://server:8010";
           if (flags.hasUser) process.env.TM1_USER = "admin";
           if (flags.hasPassword) process.env.TM1_PASSWORD = "secret";
 
-          expect(() => loadConfig()).toThrow("Missing or empty required environment variables");
+          expect(() => loadConfig()).toThrow(
+            "Missing or empty required environment variables",
+          );
         },
       ),
       { numRuns: 100 },

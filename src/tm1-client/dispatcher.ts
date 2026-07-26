@@ -30,8 +30,5 @@ export function tm1Fetch(url: string, init: RequestInit): Promise<Response> {
   if (globalThis.fetch !== builtinFetch) {
     return globalThis.fetch(url, init);
   }
-  return undiciFetch(
-    url,
-    init as unknown as Parameters<typeof undiciFetch>[1],
-  );
+  return undiciFetch(url, init as unknown as Parameters<typeof undiciFetch>[1]);
 }

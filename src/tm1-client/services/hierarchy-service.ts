@@ -9,7 +9,8 @@ import type { TM1HttpClient } from "../http.js";
 import { pageClauseList, readNestedCount } from "./odata-page.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
-const enc = (s: string): string => encodeURIComponent(String(s).replace(/'/g, "''"));
+const enc = (s: string): string =>
+  encodeURIComponent(String(s).replace(/'/g, "''"));
 
 /**
  * A hierarchy plus the size of the element set the request selected, so
@@ -59,13 +60,18 @@ export class HierarchyService {
       nameRegex?: string;
     },
   ): Promise<HierarchyPage> {
-    const elementClauses: string[] = ["$select=Name,Type,Level", "$expand=Parents($select=Name)"];
+    const elementClauses: string[] = [
+      "$select=Name,Type,Level",
+      "$expand=Parents($select=Name)",
+    ];
     const filters: string[] = [];
     if (opts?.level !== undefined) filters.push(`Level eq ${opts.level}`);
     if (opts?.levelMax !== undefined) filters.push(`Level le ${opts.levelMax}`);
     const escapeOdata = (s: string) => s.replace(/'/g, "''");
-    if (opts?.nameContains) filters.push(`contains(Name, '${escapeOdata(opts.nameContains)}')`);
-    if (opts?.nameStartsWith) filters.push(`startswith(Name, '${escapeOdata(opts.nameStartsWith)}')`);
+    if (opts?.nameContains)
+      filters.push(`contains(Name, '${escapeOdata(opts.nameContains)}')`);
+    if (opts?.nameStartsWith)
+      filters.push(`startswith(Name, '${escapeOdata(opts.nameStartsWith)}')`);
     // elementType filter is applied client-side (TM1 OData rejects `Type eq 'Consolidated'`
     // — the property is an enum, not a string. Type filter happens before topN/server-side
     // filters because we cannot reliably express it in $filter without an enum-cast that
@@ -77,7 +83,8 @@ export class HierarchyService {
       regex = compileUserRegex(opts.nameRegex, undefined, "nameRegex");
     }
     const needsClientPostFilter = filterByType || regex !== undefined;
-    if (filters.length > 0) elementClauses.push(`$filter=${filters.join(" and ")}`);
+    if (filters.length > 0)
+      elementClauses.push(`$filter=${filters.join(" and ")}`);
     const skip = opts?.skip ?? 0;
     const topN = opts?.topN;
     // Push the window down only when nothing is filtered afterwards. With a
@@ -99,16 +106,24 @@ export class HierarchyService {
       }>;
     }>("GET", path);
     let filteredElements = rawResponse.Elements;
-    if (filterByType) filteredElements = filteredElements.filter((e) => e.Type === opts.elementType);
-    if (regex !== undefined) filteredElements = filteredElements.filter((e) => regex.test(e.Name));
+    if (filterByType)
+      filteredElements = filteredElements.filter(
+        (e) => e.Type === opts.elementType,
+      );
+    if (regex !== undefined)
+      filteredElements = filteredElements.filter((e) => regex.test(e.Name));
     // Total of everything the filters kept, before the window is applied.
     // Server-side count when it was pushed down; otherwise the post-filter
     // length, which is exact because we hold the whole filtered set.
     let totalElements = pushDown
-      ? (readNestedCount(rawResponse, "Elements") ?? skip + filteredElements.length)
+      ? (readNestedCount(rawResponse, "Elements") ??
+        skip + filteredElements.length)
       : filteredElements.length;
     if (!pushDown && (skip > 0 || topN !== undefined)) {
-      filteredElements = filteredElements.slice(skip, skip + (topN ?? filteredElements.length));
+      filteredElements = filteredElements.slice(
+        skip,
+        skip + (topN ?? filteredElements.length),
+      );
     }
     // A count below what we already hold means the hierarchy shrank between
     // count and slice — trust the rows in hand.
@@ -133,7 +148,11 @@ export class HierarchyService {
     if (hasKeptChildEdge) {
       const edgesPath = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Edges?$select=ParentName,ComponentName,Weight`;
       const edgesResponse = await this.http.request<{
-        value?: Array<{ ParentName: string; ComponentName: string; Weight: number }>;
+        value?: Array<{
+          ParentName: string;
+          ComponentName: string;
+          Weight: number;
+        }>;
       }>("GET", edgesPath);
       for (const edge of edgesResponse.value ?? []) {
         let byChild = weightByEdge.get(edge.ParentName);
@@ -145,12 +164,18 @@ export class HierarchyService {
       }
     }
 
-    const childrenByParent = new Map<string, Array<{ name: string; weight: number }>>();
+    const childrenByParent = new Map<
+      string,
+      Array<{ name: string; weight: number }>
+    >();
     for (const e of response.Elements) {
       for (const p of e.Parents ?? []) {
         if (!keptNames.has(p.Name)) continue;
         const list = childrenByParent.get(p.Name) ?? [];
-        list.push({ name: e.Name, weight: weightByEdge.get(p.Name)?.get(e.Name) ?? 1 });
+        list.push({
+          name: e.Name,
+          weight: weightByEdge.get(p.Name)?.get(e.Name) ?? 1,
+        });
         childrenByParent.set(p.Name, list);
       }
     }
@@ -159,7 +184,9 @@ export class HierarchyService {
       name: e.Name,
       type: e.Type as HierarchyElement["type"],
       level: e.Level,
-      parents: (e.Parents ?? []).filter((p) => keptNames.has(p.Name)).map((p) => p.Name),
+      parents: (e.Parents ?? [])
+        .filter((p) => keptNames.has(p.Name))
+        .map((p) => p.Name),
       children: childrenByParent.get(e.Name) ?? [],
     }));
 
@@ -184,7 +211,12 @@ export class HierarchyService {
     opts?: { depth?: number; leavesOnly?: boolean },
   ): Promise<{
     element: string;
-    descendants: Array<{ name: string; type: HierarchyElement["type"]; level: number; depth: number }>;
+    descendants: Array<{
+      name: string;
+      type: HierarchyElement["type"];
+      level: number;
+      depth: number;
+    }>;
   }> {
     const hierarchy = await this.get(dimensionName, hierarchyName);
     const byName = new Map<string, HierarchyElement>();
@@ -195,9 +227,16 @@ export class HierarchyService {
         message: `Element '${element}' not found in ${dimensionName}.${hierarchyName}`,
       });
     }
-    const out: Array<{ name: string; type: HierarchyElement["type"]; level: number; depth: number }> = [];
+    const out: Array<{
+      name: string;
+      type: HierarchyElement["type"];
+      level: number;
+      depth: number;
+    }> = [];
     const seen = new Set<string>([element]);
-    const queue: Array<{ name: string; depth: number }> = [{ name: element, depth: 0 }];
+    const queue: Array<{ name: string; depth: number }> = [
+      { name: element, depth: 0 },
+    ];
     while (queue.length > 0) {
       const cur = queue.shift()!;
       const node = byName.get(cur.name);
@@ -211,7 +250,12 @@ export class HierarchyService {
         if (!childNode) continue;
         const isLeaf = childNode.children.length === 0;
         if (!opts?.leavesOnly || isLeaf) {
-          out.push({ name: childNode.name, type: childNode.type, level: childNode.level, depth: nextDepth });
+          out.push({
+            name: childNode.name,
+            type: childNode.type,
+            level: childNode.level,
+            depth: nextDepth,
+          });
         }
         queue.push({ name: child.name, depth: nextDepth });
       }
@@ -244,7 +288,11 @@ export class HierarchyService {
     }
     const ancestorMap = new Map<string, number>();
     const paths: string[][] = [];
-    const walk = (name: string, currentPath: string[], visited: Set<string>) => {
+    const walk = (
+      name: string,
+      currentPath: string[],
+      visited: Set<string>,
+    ) => {
       const node = byName.get(name);
       if (!node) return;
       const parents = node.parents;

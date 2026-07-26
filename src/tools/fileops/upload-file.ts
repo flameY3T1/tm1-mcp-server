@@ -6,7 +6,10 @@ import { actionResponse } from "../format.js";
 
 const HARD_MAX_BYTES = 32 * 1024 * 1024;
 
-export function registerUploadFile(server: McpServer, tm1Client: TM1Client): void {
+export function registerUploadFile(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_upload_file",
     [
@@ -18,20 +21,30 @@ export function registerUploadFile(server: McpServer, tm1Client: TM1Client): voi
       `Hard max size: ${HARD_MAX_BYTES} bytes (32 MB).`,
     ].join(" "),
     {
-      fileName: z.string().min(1).describe(
-        "File name or path (e.g. 'data.csv' or 'imports/sales_2024.csv'). v11 = flat only.",
-      ),
-      content: z.string().describe(
-        "File content. Plain text by default, or base64 string when encoding='base64'.",
-      ),
-      encoding: z.enum(["text", "base64"]).optional().default("text").describe(
-        "Encoding of the `content` field. 'text' (default) for UTF-8 text, 'base64' for binary.",
-      ),
+      fileName: z
+        .string()
+        .min(1)
+        .describe(
+          "File name or path (e.g. 'data.csv' or 'imports/sales_2024.csv'). v11 = flat only.",
+        ),
+      content: z
+        .string()
+        .describe(
+          "File content. Plain text by default, or base64 string when encoding='base64'.",
+        ),
+      encoding: z
+        .enum(["text", "base64"])
+        .optional()
+        .default("text")
+        .describe(
+          "Encoding of the `content` field. 'text' (default) for UTF-8 text, 'base64' for binary.",
+        ),
     },
     async ({ fileName, content, encoding }) => {
-      const bytes = encoding === "base64"
-        ? Buffer.from(content, "base64")
-        : Buffer.from(content, "utf8");
+      const bytes =
+        encoding === "base64"
+          ? Buffer.from(content, "base64")
+          : Buffer.from(content, "utf8");
 
       if (bytes.byteLength > HARD_MAX_BYTES) {
         return {

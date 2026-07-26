@@ -11,12 +11,22 @@ import type { TM1Client } from "../../src/tm1-client.js";
 type ReadCb = (
   uri: URL,
   vars?: Record<string, string | string[]>,
-) => Promise<{ contents: Array<{ uri: string; mimeType?: string; text: string }> }>;
+) => Promise<{
+  contents: Array<{ uri: string; mimeType?: string; text: string }>;
+}>;
 
-function makeFakeServer(): { server: McpServer; readCallbacks: Map<string, ReadCb> } {
+function makeFakeServer(): {
+  server: McpServer;
+  readCallbacks: Map<string, ReadCb>;
+} {
   const readCallbacks = new Map<string, ReadCb>();
   const server = {
-    registerResource: (name: string, _uriOrTemplate: unknown, _meta: unknown, cb: ReadCb) => {
+    registerResource: (
+      name: string,
+      _uriOrTemplate: unknown,
+      _meta: unknown,
+      cb: ReadCb,
+    ) => {
       readCallbacks.set(name, cb);
     },
   } as unknown as McpServer;
@@ -53,7 +63,9 @@ describe("MCP resources – unconditional credential masking", () => {
 
     const cb = readCallbacks.get("process-code");
     expect(cb).toBeDefined();
-    const result = await cb!(new URL("tm1://process/My.Proc/code"), { name: "My.Proc" });
+    const result = await cb!(new URL("tm1://process/My.Proc/code"), {
+      name: "My.Proc",
+    });
     const text = result.contents[0]!.text;
     const payload = JSON.parse(text) as Record<string, string>;
 

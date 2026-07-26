@@ -2,7 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 
-export function registerCheckCubeRule(server: McpServer, tm1Client: TM1Client): void {
+export function registerCheckCubeRule(
+  server: McpServer,
+  tm1Client: TM1Client,
+): void {
   server.tool(
     "tm1_check_cube_rule",
     [
@@ -12,7 +15,11 @@ export function registerCheckCubeRule(server: McpServer, tm1Client: TM1Client): 
     ].join(" "),
     {
       cubeName: z.string().describe("Cube name (case-sensitive)"),
-      rules: z.string().describe("Full rules text to validate (must include SKIPCHECK; / FEEDERS; structure if used)"),
+      rules: z
+        .string()
+        .describe(
+          "Full rules text to validate (must include SKIPCHECK; / FEEDERS; structure if used)",
+        ),
     },
     async ({ cubeName, rules }) => {
       const errors = await tm1Client.cubes.checkRule(cubeName, rules);

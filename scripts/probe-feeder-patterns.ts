@@ -89,7 +89,9 @@ function classifyCube(cube: string, rulesText: string): CubePatterns | null {
       const dbCalls = extractDbCalls(line.trimmed);
       if (dbCalls.length > 0) feedersWithDb++;
 
-      const dimRefs = parseBracketDimRefs(line.trimmed.split("=>")[0] ?? line.trimmed);
+      const dimRefs = parseBracketDimRefs(
+        line.trimmed.split("=>")[0] ?? line.trimmed,
+      );
       const hasAnyElement = dimRefs.some((r) => r.elems.length > 0);
       const looksWildcard =
         dimRefs.length > 0 && dimRefs.every((r) => r.elems.length === 0);
@@ -97,7 +99,9 @@ function classifyCube(cube: string, rulesText: string): CubePatterns | null {
       if (looksWildcard) feedersWildcardish++;
 
       // New parser: positional + qualified + mixed coverage.
-      const newLists = extractBracketLists(line.trimmed.split("=>")[0] ?? line.trimmed);
+      const newLists = extractBracketLists(
+        line.trimmed.split("=>")[0] ?? line.trimmed,
+      );
       if (newLists.length > 0 && newLists[0]!.entries.length > 0) {
         feedersParsedNew++;
         const first = newLists[0]!;
@@ -152,13 +156,23 @@ async function main() {
     cubesWithFeeders: patterns.filter((p) => p.feedersLines > 0).length,
     cubesWithFeedstrings: patterns.filter((p) => p.hasFeedstrings).length,
     cubesWithSkipcheck: patterns.filter((p) => p.hasSkipcheck).length,
-    cubesWithoutSkipcheck: patterns.filter((p) => !p.hasSkipcheck && p.rulesLines > 0)
-      .length,
+    cubesWithoutSkipcheck: patterns.filter(
+      (p) => !p.hasSkipcheck && p.rulesLines > 0,
+    ).length,
     sumFeederLines: patterns.reduce((a, p) => a + p.feedersLines, 0),
-    sumConditionalFeeders: patterns.reduce((a, p) => a + p.conditionalFeeders, 0),
+    sumConditionalFeeders: patterns.reduce(
+      (a, p) => a + p.conditionalFeeders,
+      0,
+    ),
     sumFeedersWithDb: patterns.reduce((a, p) => a + p.feedersWithDb, 0),
-    sumFeedersWildcardish: patterns.reduce((a, p) => a + p.feedersWildcardish, 0),
-    sumFeedersWithElements: patterns.reduce((a, p) => a + p.feedersWithElements, 0),
+    sumFeedersWildcardish: patterns.reduce(
+      (a, p) => a + p.feedersWildcardish,
+      0,
+    ),
+    sumFeedersWithElements: patterns.reduce(
+      (a, p) => a + p.feedersWithElements,
+      0,
+    ),
     sumFeedersParsedNew: patterns.reduce((a, p) => a + p.feedersParsedNew, 0),
     sumFeedersPositional: patterns.reduce((a, p) => a + p.feedersPositional, 0),
     sumFeedersQualified: patterns.reduce((a, p) => a + p.feedersQualified, 0),
@@ -185,7 +199,10 @@ async function main() {
     .slice(0, 5);
 
   const conditionalRulesNoIfeed = patterns.filter(
-    (p) => p.conditionalRules > 0 && p.conditionalFeeders === 0 && p.feedersLines > 0,
+    (p) =>
+      p.conditionalRules > 0 &&
+      p.conditionalFeeders === 0 &&
+      p.feedersLines > 0,
   );
 
   const wildcardishHeavy = patterns
@@ -193,31 +210,33 @@ async function main() {
     .sort((a, b) => b.feedersWildcardish - a.feedersWildcardish)
     .slice(0, 5);
 
-  console.log(JSON.stringify(
-    {
-      totals,
-      parserCoverage,
-      totalNonMarkerFeederLines,
-      topByFeederCount,
-      conditionalRulesNoIfeedCount: conditionalRulesNoIfeed.length,
-      conditionalRulesNoIfeedSamples: conditionalRulesNoIfeed.slice(0, 5),
-      wildcardishHeavy,
-      bracketRefDemo: (() => {
-        const sample = patterns.find((p) => p.samplesFeeders.length > 0);
-        if (!sample) return null;
-        const line = sample.samplesFeeders[0]!;
-        return {
-          cube: sample.cube,
-          line,
-          dimRefs: parseBracketDimRefs(line),
-          extractBracketRefs: extractBracketRefs(line),
-          dbCalls: extractDbCalls(line),
-        };
-      })(),
-    },
-    null,
-    2,
-  ));
+  console.log(
+    JSON.stringify(
+      {
+        totals,
+        parserCoverage,
+        totalNonMarkerFeederLines,
+        topByFeederCount,
+        conditionalRulesNoIfeedCount: conditionalRulesNoIfeed.length,
+        conditionalRulesNoIfeedSamples: conditionalRulesNoIfeed.slice(0, 5),
+        wildcardishHeavy,
+        bracketRefDemo: (() => {
+          const sample = patterns.find((p) => p.samplesFeeders.length > 0);
+          if (!sample) return null;
+          const line = sample.samplesFeeders[0]!;
+          return {
+            cube: sample.cube,
+            line,
+            dimRefs: parseBracketDimRefs(line),
+            extractBracketRefs: extractBracketRefs(line),
+            dbCalls: extractDbCalls(line),
+          };
+        })(),
+      },
+      null,
+      2,
+    ),
+  );
 
   await tm1.disconnect();
 }
