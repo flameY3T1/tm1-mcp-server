@@ -282,10 +282,73 @@ tools.
 ## Development
 
 ```bash
-npm run dev      # tsx live-reload
-npm test         # vitest
-npm run lint     # tsc --noEmit
+npm run dev             # tsx live-reload
+npm test                # vitest
+npm run lint            # tsc --noEmit
+npm run coverage:check  # vitest --coverage + coverage ratchet gate
+npm run verify          # everything CI runs (typecheck + lint gates + coverage:check)
 ```
+
+## Coverage Policy
+
+Coverage is a **ratchet**: it may go up, it must not go down, and the floor is
+not allowed to fall behind reality.
+
+Floors live in one place — [`coverage-thresholds.json`](coverage-thresholds.json) —
+and are enforced twice:
+
+| Enforcer | Fails on |
+|----------|----------|
+| `vitest` (`test.coverage.thresholds`) | any metric **below** its floor |
+| `scripts/check-coverage-ratchet.mjs` | any metric below its floor, **or** more than `slack` points **above** it |
+
+The second half is the part that matters. A floor nobody raises stops protecting
+anything: this repo once ran with 22% floors while real coverage had already
+grown past 65% — a 40-point hole in which a large regression could land green.
+The gate now fails when coverage drifts more than `slack` (5) points above a
+floor, and prints the exact JSON to paste back:
+
+```
+▲ coverage ratchet: coverage grew more than 5 pts above the floor.
+  Lock the gain in — the floor exists to protect it.
+  - lines: 65.75% vs floor 30% (+35.75 pts)
+
+Fix: set "floors" in coverage-thresholds.json to:
+
+  "floors": { "lines": 63, "statements": 62, "functions": 55, "branches": 52 }
+```
+
+A new floor is set `headroomPoints` (2) below the measured value, so an
+unrelated refactor that shaves one covered line does not red the build.
+
+**Current floors / targets:**
+
+| Metric | Floor | Target |
+|--------|-------|--------|
+| Lines | 63% | 75% |
+| Statements | 62% | 75% |
+| Functions | 55% | 70% |
+| Branches | 52% | 62% |
+
+`target` is informational and never fails a build — it is the next milestone,
+reached by writing tests and then ratcheting.
+
+**Rules:**
+
+- **Never lower a floor to make a red build green.** Add tests instead. If a
+  drop is genuinely intentional (e.g. deleting a well-tested subsystem), say so
+  explicitly in the PR description.
+- Raising a floor is a normal, welcome edit — the gate hands you the numbers.
+- Scope: `src/**/*.ts`, minus `src/index.ts` (process entrypoint, exercised by
+  the live suite) and `**/*.d.ts`. `tests/`, `scripts/`, `dist/` and
+  `node_modules/` are outside the measured set by construction.
+- Provider `v8`. Reports: `text-summary` (CI log), `json-summary`
+  (`coverage/coverage-summary.json`, read by the gate), `html`
+  (`coverage/index.html`, local drill-down). `coverage/` is gitignored.
+- Re-run the gate alone against an existing report: `npm run coverage:ratchet`.
+
+There is deliberately **no coverage badge** — a badge needs an external service
+and a token, and a failing build is a stronger signal than a green shield.
 
 ## Documentation
 

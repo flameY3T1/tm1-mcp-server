@@ -31,6 +31,8 @@
     "test:property": "vitest run tests/property",
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:coverage": "vitest run --coverage",
+    "coverage:check": "vitest run --coverage && node scripts/check-coverage-ratchet.mjs",
+    "coverage:ratchet": "node scripts/check-coverage-ratchet.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit && eslint .",
     "lint:no-flat-api": "node scripts/check-no-flat-tm1-methods.mjs",
@@ -40,7 +42,7 @@
     "lint:tool-registration": "node scripts/check-tool-registration.mjs",
     "lint:input-naming": "node scripts/check-no-bare-name-input.mjs",
     "lint:mutation-envelope": "node scripts/check-mutation-envelope.mjs",
-    "verify": "npm run typecheck && npm run lint:no-flat-api && npm run lint:annotations && npm run lint:output-schema && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:input-naming && npm run lint:mutation-envelope && npm run lint:eslint && npm test",
+    "verify": "npm run typecheck && npm run lint:no-flat-api && npm run lint:annotations && npm run lint:output-schema && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:input-naming && npm run lint:mutation-envelope && npm run lint:eslint && npm run coverage:check",
     "tools:list": "node scripts/gen-tool-list.mjs",
     "tools:update-readme": "node scripts/gen-tool-list.mjs --write-readme",
     "lint:eslint": "eslint ."

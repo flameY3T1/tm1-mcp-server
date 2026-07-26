@@ -46,7 +46,7 @@ This chains:
 | Input naming | `npm run lint:input-naming` | no tool takes a bare top-level `name` input (use `<entity>Name`) |
 | Envelope | `npm run lint:mutation-envelope` | mutation tools return via `actionResponse()`, not hand-rolled |
 | Lint | `npm run lint:eslint` | ESLint over the repo |
-| Tests | `npm test` | full `vitest` suite |
+| Tests + coverage | `npm run coverage:check` | full `vitest` suite under coverage, then the coverage ratchet gate |
 
 If your change adds, removes, or renames a tool, regenerate the README tool list:
 
@@ -74,6 +74,11 @@ npm run tools:update-readme
 - Unit tests: `tests/unit/`. Add coverage for new behaviour — prefer testing a
   pure function over an end-to-end mock where possible.
 - Run a single file: `npx vitest run tests/unit/<file>.test.ts`.
+- **Coverage is a ratchet.** Floors live in `coverage-thresholds.json` and are
+  enforced by `vitest` *and* by `scripts/check-coverage-ratchet.mjs`, which also
+  fails when coverage climbs well above the floor without the floor being
+  raised. Never lower a floor to turn a red build green — see
+  [Coverage Policy](README.md#coverage-policy).
 - Live (against a real TM1) is optional but encouraged for tool changes; note in
   the PR what you validated.
 

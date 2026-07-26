@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Coverage ratchet gate** (`npm run coverage:check`, wired into `npm run verify` and CI).
+  Coverage floors moved out of `vitest.config.ts` into `coverage-thresholds.json` — one source
+  of truth read by both `vitest` (hard thresholds) and the new
+  `scripts/check-coverage-ratchet.mjs`. The gate fails in **both** directions: below the floor,
+  and more than `slack` (5) points above it, printing the exact JSON to raise the floor with.
+  This closes a 40-point blind spot — the floors said 22% while real coverage had already grown
+  past 65%, so a large regression could have landed green. Floors baselined at the measured
+  level minus 2 points (lines 63 / statements 62 / functions 55 / branches 52); informational
+  targets 75/75/70/62. Coverage reporters switched to `text-summary` + `json-summary` + `html`,
+  and `**/*.d.ts` is excluded from the measured set. See "Coverage Policy" in the README.
+
 ### Changed
 
 - **Smaller `tools/list` payload — ~28.6KB (12%) off every session's context budget**, with no change to

@@ -56,8 +56,12 @@ jobs:
       - name: Lint (mutation envelope — actionResponse over hand-rolled)
         run: npm run lint:mutation-envelope
 
-      - name: Coverage (enforces vitest thresholds)
-        run: npm run test:coverage
+      # Runs the whole test suite under coverage, enforces the floors in
+      # coverage-thresholds.json (vitest), then runs the ratchet gate — which
+      # also fails when coverage has climbed well ABOVE the floor, so the floor
+      # gets raised instead of quietly rotting. See README "Coverage Policy".
+      - name: Tests + coverage ratchet
+        run: npm run coverage:check
 
       # Gate on what consumers actually install: the published package ships
       # only dist/ + runtime deps (files:["dist"]). Dev-only advisories (e.g.

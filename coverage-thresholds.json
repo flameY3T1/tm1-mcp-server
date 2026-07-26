@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "Coverage ratchet — single source of truth. Read by vitest.config.ts (which",
+    "enforces `floors` as hard vitest thresholds) and by scripts/check-coverage-ratchet.mjs",
+    "(which additionally fails when actual coverage has climbed more than `slack`",
+    "points above a floor, forcing the floor to be ratcheted up).",
+    "",
+    "Never lower a floor to make a red build green — add tests instead. Raising a",
+    "floor is the normal, expected edit: the ratchet gate prints the exact numbers.",
+    "",
+    "headroomPoints = how far below actual a freshly ratcheted floor sits. Small",
+    "buffer so an unrelated refactor that shaves a covered line does not red the build.",
+    "target = informational only, never fails a build."
+  ],
+  "floors": {
+    "lines": 63,
+    "statements": 62,
+    "functions": 55,
+    "branches": 52
+  },
+  "slack": 5,
+  "headroomPoints": 2,
+  "target": {
+    "lines": 75,
+    "statements": 75,
+    "functions": 70,
+    "branches": 62
+  }
+}
