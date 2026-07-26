@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-07-26
+
 ### Added
 
 - **Coverage ratchet gate** (`npm run coverage:check`, wired into `npm run verify` and CI).
@@ -463,7 +465,8 @@ Initial public release.
 - Quality gates: strict typecheck, ESLint, `lint:no-flat-api`,
   annotation-coverage, and tool-registration wiring.
 
-[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.4...v2.0.0
 [1.0.4]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.2...v1.0.3
