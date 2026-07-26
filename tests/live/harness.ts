@@ -98,8 +98,17 @@ async function build(): Promise<LiveHarness> {
     ) {
       registry.set(name, { inputSchema: cfg.inputSchema ?? {}, handler: cb });
     },
-    // wrapCb references server.server.sendLoggingMessage for slow-tool warnings.
-    server: { sendLoggingMessage: async () => undefined },
+    // Two things reach through to the low-level server:
+    //   sendLoggingMessage — wrapCb's slow-tool warnings
+    //   setRequestHandler  — installToolsListSlimming wraps the tools/list
+    //                        handler here. This harness calls tools straight
+    //                        out of `registry` and never issues tools/list, so
+    //                        a no-op suffices; it only has to exist, or
+    //                        withAnnotations throws on `.bind`.
+    server: {
+      sendLoggingMessage: async () => undefined,
+      setRequestHandler: () => undefined,
+    },
   } as unknown as McpServer;
 
   registerAllTools(withAnnotations(fakeServer, logger, "readwrite"), client);
