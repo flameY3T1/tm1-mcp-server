@@ -8,12 +8,15 @@
 import { z } from "zod";
 import type { Page } from "./pagination.js";
 
+// Terse by design — see the byte-cost note on PAGINATION_SCHEMA. The enum
+// members and the "json" default are emitted structurally by JSON Schema, so
+// the description only carries what they cannot: what picking "markdown" does.
 export const FORMAT_SCHEMA = {
   format: z
     .enum(["json", "markdown"])
     .optional()
     .default("json")
-    .describe("Output format: 'json' (default, structured) or 'markdown' table for human display."),
+    .describe("'markdown' = human-readable table."),
 };
 
 export type ResponseFormat = "json" | "markdown";

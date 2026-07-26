@@ -9,6 +9,11 @@
 // truly large collections (transaction log, message log).
 import { z } from "zod";
 
+// Descriptions are deliberately terse: this block is inlined into 19 tool input
+// schemas, so every byte is paid 19x in every `tools/list` payload. Anything
+// JSON Schema already emits structurally (`default`, `minimum`, `maximum`) is
+// NOT repeated in prose — only semantics the schema cannot express (0 = all,
+// fetchAll's payload cost) stay in the text.
 export const PAGINATION_SCHEMA = {
   limit: z
     .number()
@@ -17,19 +22,13 @@ export const PAGINATION_SCHEMA = {
     .max(500)
     .optional()
     .default(50)
-    .describe("Page size (default 50, max 500, 0 = all)."),
-  offset: z
-    .number()
-    .int()
-    .min(0)
-    .optional()
-    .default(0)
-    .describe("Items to skip (default 0)."),
+    .describe("Page size; 0 = all."),
+  offset: z.number().int().min(0).optional().default(0).describe("Items to skip."),
   fetchAll: z
     .boolean()
     .optional()
     .default(false)
-    .describe("Return all items, ignoring limit/offset. Large payload — prefer filters first."),
+    .describe("All items, ignoring limit/offset. Large payload."),
 };
 
 export interface Page<T> {
