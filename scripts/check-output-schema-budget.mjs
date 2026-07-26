@@ -9,8 +9,9 @@
 //
 // It measures the SHIPPED bytes, not an approximation: it reuses the SDK's own
 // `normalizeObjectSchema` + `toJsonSchemaCompat` (the exact functions McpServer
-// calls in setToolRequestHandlers) so the number matches the wire payload
-// byte-for-byte. That requires executing the Zod schemas, so it imports the
+// calls in setToolRequestHandlers), then applies the same `slimJsonSchema()`
+// the server runs on the way out of tools/list, so the number matches the wire
+// payload byte-for-byte. That requires executing the Zod schemas, so it imports the
 // BUILT map from dist/ (the coverage gate can regex src/; this one cannot).
 // If dist is missing it builds once, so `node scripts/check-output-schema-budget.mjs`
 // works standalone with no TM1 server.
@@ -23,18 +24,21 @@ import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-// Current total is ~78.6KB (114 schemas). Budget = round number a few % above
-// that, so ordinary additions pass but a runaway new schema (or a sloppy
-// .describe() spree) trips the gate. Re-baseline deliberately when a real
+// Current total is ~59.5KB (114 schemas), measured AFTER slimJsonSchema() —
+// i.e. these are the bytes that actually reach the wire. Budget = round number
+// a few % above that, so ordinary additions pass but a runaway new schema (or a
+// sloppy .describe() spree) trips the gate. Re-baseline deliberately when a real
 // feature needs it — e.g. G1 typed the recursive tm1_analyze_callgraph output
-// schema (was z.unknown()/passthrough, now ~6.3KB) to close the drift-guard
-// blind spot, which lifted the total past the previous 78KB baseline.
-const BUDGET_BYTES = 82_000;
+// schema (was z.unknown()/passthrough, now ~4.8KB) to close the drift-guard
+// blind spot, which had lifted the total past the earlier 78KB baseline; the
+// tools/list slimmer then took ~19KB back off.
+const BUDGET_BYTES = 65_000;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 
 const mapPath = join(root, "dist", "tools", "output-schema-map.js");
+const slimPath = join(root, "dist", "lib", "slim-json-schema.js");
 const sdkServerDir = join(
   root,
   "node_modules",
@@ -73,16 +77,16 @@ function build(reason) {
   }
 }
 
-if (!existsSync(mapPath)) {
+if (!existsSync(mapPath) || !existsSync(slimPath)) {
   build("dist not built");
 } else if (newestSrcMtimeMs() > statSync(mapPath).mtimeMs) {
   build("dist stale vs src");
 }
-if (!existsSync(mapPath)) {
-  console.error(
-    `check-output-schema-budget: expected ${mapPath} after build, not found.`,
-  );
-  process.exit(1);
+for (const p of [mapPath, slimPath]) {
+  if (!existsSync(p)) {
+    console.error(`check-output-schema-budget: expected ${p} after build, not found.`);
+    process.exit(1);
+  }
 }
 
 let normalizeObjectSchema, toJsonSchemaCompat;
@@ -103,6 +107,7 @@ try {
   process.exit(1);
 }
 const { OUTPUT_SCHEMA_MAP } = await import(pathToFileURL(mapPath).href);
+const { slimJsonSchema } = await import(pathToFileURL(slimPath).href);
 
 // Same options McpServer passes when it serializes outputSchema for tools/list.
 const JSON_SCHEMA_OPTS = { strictUnions: true, pipeStrategy: "output" };
@@ -111,7 +116,7 @@ const rows = [];
 let total = 0;
 for (const [name, schema] of Object.entries(OUTPUT_SCHEMA_MAP)) {
   const obj = normalizeObjectSchema(schema);
-  const jsonSchema = toJsonSchemaCompat(obj, JSON_SCHEMA_OPTS);
+  const jsonSchema = slimJsonSchema(toJsonSchemaCompat(obj, JSON_SCHEMA_OPTS));
   const bytes = Buffer.byteLength(JSON.stringify(jsonSchema), "utf8");
   rows.push({ name, bytes });
   total += bytes;

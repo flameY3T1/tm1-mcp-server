@@ -1,6 +1,8 @@
 import type pino from "pino";
 import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z, type ZodRawShape, type ZodTypeAny } from "zod";
+import { slimJsonSchema } from "../lib/slim-json-schema.js";
 import { ANNOTATION_MAP } from "./annotation-map.js";
 import { OUTPUT_SCHEMA_MAP } from "./output-schema-map.js";
 import {
@@ -39,17 +41,82 @@ function asZodSchema(entry: ZodRawShape | ZodTypeAny): ZodTypeAny {
   return isZodSchema(entry) ? entry : z.object(entry);
 }
 
+// Rewrite a tools/list response so every advertised schema is slimmed.
+function slimToolsListResult(result: unknown): unknown {
+  if (!result || typeof result !== "object") return result;
+  const listing = result as { tools?: unknown };
+  if (!Array.isArray(listing.tools)) return result;
+  return {
+    ...listing,
+    tools: listing.tools.map((entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const tool: Record<string, unknown> = { ...(entry as Record<string, unknown>) };
+      if (tool.inputSchema !== undefined) {
+        tool.inputSchema = slimJsonSchema(tool.inputSchema);
+      }
+      if (tool.outputSchema !== undefined) {
+        tool.outputSchema = slimJsonSchema(tool.outputSchema);
+      }
+      return tool;
+    }),
+  };
+}
+
+// SDK REACH — isolated here on purpose.
+//
+// The zod→JSON-Schema conversion happens inside the SDK: McpServer's
+// setToolRequestHandlers() serializes tool.inputSchema/outputSchema at
+// tools/list time, and it is installed lazily on the FIRST registerTool call.
+// There is no public hook between that conversion and the wire, so the only
+// place to slim the payload is the tools/list handler itself.
+//
+// Rather than dig into the handler registry (a private Map), we intercept the
+// SDK's own `setRequestHandler` call on the low-level Server and wrap the
+// handler it is trying to install. Public method, public request schema
+// (imported from the SDK, matched by reference — same module instance the SDK
+// itself imports), no private state touched. Must be installed BEFORE the first
+// tool registration, which is why it runs inside withAnnotations().
+//
+// If a future SDK stops routing tools/list through setRequestHandler, or hands
+// it a different schema object, this becomes a silent no-op — the sentinels
+// would simply reappear on the wire. tests/unit/slim-json-schema.test.ts does a
+// real end-to-end tools/list over an in-memory transport and fails loudly in
+// that case.
+function installToolsListSlimming(server: McpServer): void {
+  const lowLevel = server.server as unknown as {
+    setRequestHandler: (
+      schema: unknown,
+      handler: (...args: unknown[]) => unknown,
+    ) => void;
+  };
+  const originalSetRequestHandler = lowLevel.setRequestHandler.bind(lowLevel);
+  lowLevel.setRequestHandler = (schema, handler) => {
+    if (schema !== ListToolsRequestSchema) {
+      originalSetRequestHandler(schema, handler);
+      return;
+    }
+    originalSetRequestHandler(schema, async (...args: unknown[]) =>
+      slimToolsListResult(await handler(...args)),
+    );
+  };
+}
+
 // Wrap McpServer so every server.tool(name, desc, schema, cb) call:
 //   1) injects the matching annotation from ANNOTATION_MAP
 //   2) wraps the callback so thrown errors become uniform JSON results
 //      and existing isError results get reshaped to include `hint`
 //   3) when OUTPUT_SCHEMA_MAP has an entry for the tool, attaches outputSchema
 //   4) when mode="readonly", silently skips tools without readOnlyHint
+// Also installs the tools/list schema slimmer (see installToolsListSlimming) —
+// it has to be in place before the first registration triggers the SDK's lazy
+// handler setup.
 export function withAnnotations(
   server: McpServer,
   logger: pino.Logger,
   mode: "readwrite" | "readonly",
 ): McpServer {
+  installToolsListSlimming(server);
+
   const originalRegisterTool = server.registerTool.bind(server) as (
     ...args: unknown[]
   ) => unknown;
