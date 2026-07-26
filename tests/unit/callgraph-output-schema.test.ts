@@ -288,4 +288,141 @@ describe("CallgraphResultSchema — validates every emitted shape", () => {
     };
     expect(CallgraphResultSchema.safeParse(roundTrip(bad)).success).toBe(false);
   });
+
+  // ─── Strictness is NOT traded away for wire size ────────────────────────────
+  // The `Int` / `EffectiveValue` sub-schemas are emitted as `$ref`s to shrink
+  // the published schema. `$ref` is a serialization detail only — these assert
+  // the Zod-side checks still bite exactly as they did when inlined.
+  it("REJECTS a non-integer count (shared Int schema keeps .int())", () => {
+    const bad = {
+      mode: "summary",
+      summary: {
+        root: "Parent",
+        totalNodes: 2.5,
+        uniqueProcesses: 2,
+        maxDepth: 1,
+        cyclesDetected: 0,
+        depthLimitsHit: 0,
+        processes: [],
+      },
+    };
+    expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("REJECTS a non-integer ranking entry", () => {
+    const bad = {
+      mode: "globalRanking",
+      ranking: [
+        {
+          process: "Parent",
+          outgoingCalls: 1.5,
+          outgoingDistinct: 1,
+          incomingCalls: 0,
+          incomingDistinct: 0,
+        },
+      ],
+    };
+    expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("REJECTS a non-integer summary entry depth", () => {
+    const bad = {
+      mode: "summary",
+      summary: {
+        root: "Parent",
+        totalNodes: 2,
+        uniqueProcesses: 1,
+        maxDepth: 0,
+        cyclesDetected: 0,
+        depthLimitsHit: 0,
+        processes: [
+          {
+            process: "Parent",
+            depthMin: 0.5,
+            depthMax: 1,
+            occurrences: 1,
+            cycle: false,
+            depthLimitReached: false,
+            unresolvedCount: 0,
+          },
+        ],
+      },
+    };
+    expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("REJECTS a wrongly-typed node field that both tree shapes declare", () => {
+    // NOTE (pre-existing, not introduced by the $ref factoring): `tree` is a
+    // union of FullNode | CompactNode, and Zod objects STRIP unknown keys, so a
+    // full-mode node with a corrupt `incomingEdge`/`env` still parses — it just
+    // matches CompactNode with those keys stripped. Only fields CompactNode
+    // itself declares are actually enforced for `tree`; the FullNode detail is
+    // documentation for the client. This asserts the part that does bite.
+    const bad = {
+      mode: "full",
+      tree: { process: "Parent", cycle: "yes", incomingEdge: null, children: [] },
+    };
+    expect(CallgraphResultSchema.safeParse(bad).success).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wire-size guard. This is the largest published outputSchema; every session
+// pays for it in tools/list. It is serialized here EXACTLY as McpServer does
+// (same SDK functions + options as scripts/check-output-schema-budget.mjs) and
+// then put through the same `slimJsonSchema()` the tools/list handler applies,
+// so the byte number below is the shipped number, not an approximation.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("CallgraphResultSchema — serialized JSON Schema shape", () => {
+  async function serialize(): Promise<Record<string, unknown>> {
+    const { normalizeObjectSchema } = await import(
+      "@modelcontextprotocol/sdk/server/zod-compat.js"
+    );
+    const { toJsonSchemaCompat } = await import(
+      "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js"
+    );
+    const { slimJsonSchema } = await import("../../src/lib/slim-json-schema.js");
+    const normalized = normalizeObjectSchema(CallgraphResultSchema);
+    expect(normalized).toBeDefined();
+    // Same options McpServer passes in setToolRequestHandlers.
+    const raw = toJsonSchemaCompat(normalized!, { strictUnions: true, pipeStrategy: "output" });
+    return slimJsonSchema(raw) as Record<string, unknown>;
+  }
+
+  it("factors repeated sub-schemas into `definitions` + `$ref`", async () => {
+    const json = await serialize();
+    const defs = json["definitions"] as Record<string, unknown> | undefined;
+    expect(defs, "expected a definitions block").toBeDefined();
+    // Named id (added deliberately) …
+    expect(Object.keys(defs!)).toEqual(expect.arrayContaining(["EffectiveValue"]));
+    // … alongside the auto-named recursive node defs that always shipped.
+    expect(Object.keys(defs!).some((k) => k.startsWith("__schema"))).toBe(true);
+    // Ints stay inlined ON PURPOSE: slimJsonSchema() strips their safe-integer
+    // bounds, so an inline int is smaller than a $ref to a shared definition.
+    expect(Object.keys(defs!)).not.toContain("Int");
+
+    const wire = JSON.stringify(json);
+    // Nothing on the wire may carry the safe-integer sentinels any more.
+    expect(wire).not.toContain(`"minimum":-9007199254740991`);
+    expect(wire).not.toContain(`"maximum":9007199254740991`);
+    // EffectiveValue's body is emitted once; its two use sites (an edge's
+    // effectiveParams[].effective and a node's env values) are both `$ref`s.
+    expect(wire.split(`"const":"unknown"`).length - 1).toBe(1);
+    expect(wire.split(`#/definitions/EffectiveValue`).length - 1).toBe(2);
+    expect(wire).toContain(`{"$ref":"#/definitions/EffectiveValue"}`);
+    // The union must keep all three variants — refs must not become a pretext
+    // for collapsing EffectiveValue and CallParamResolution into one shape.
+    const effective = defs!["EffectiveValue"] as { oneOf?: unknown[] };
+    expect(effective.oneOf).toHaveLength(3);
+  });
+
+  it("stays inside its byte ceiling", async () => {
+    const bytes = Buffer.byteLength(JSON.stringify(await serialize()), "utf8");
+    // Was 6286 bytes (8% of the whole tools/list outputSchema payload) when
+    // every reused sub-schema was inlined and the safe-integer sentinels still
+    // shipped; `$ref` factoring plus slimJsonSchema() brought it to ~4770 with
+    // zero validation loss. The ceiling leaves room for a genuine new field but
+    // trips if the factoring is undone or a big block is added.
+    expect(bytes, `serialized CallgraphResultSchema = ${bytes} bytes`).toBeLessThanOrEqual(5000);
+  });
 });

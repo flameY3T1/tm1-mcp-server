@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Smaller `tools/list` payload — ~28.6KB (12%) off every session's context budget**, with no change to
+  input validation, output validation, or any tool's behaviour:
+  - Advertised JSON Schemas are slimmed on the way out: the `z.number().int()` safe-integer sentinels
+    (`minimum: -9007199254740991` / `maximum: 9007199254740991`) and the redundant `$schema` header are
+    stripped for both input and output schemas (~25.5KB). Real bounds (`limit` max 500, `offset` min 0)
+    are preserved; Zod still validates exactly as before.
+  - Shared pagination/format parameter descriptions no longer restate what the schema already emits as
+    `default` / `minimum` / `maximum` / `enum` — paid back across 33 tools (~2.8KB).
+  - `tm1_analyze_callgraph`'s output schema factors its repeated `EffectiveValue` sub-schema into
+    `definitions` + `$ref` (6.3KB → 4.8KB), keeping the typed drift guard intact.
+
 ## [2.0.0] - 2026-07-19
 
 ### Added

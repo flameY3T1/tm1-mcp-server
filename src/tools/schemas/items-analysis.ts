@@ -70,12 +70,34 @@ export const CalculationTraceResultSchema = z
 // globalRanking. Fields the serializers emit as `undefined` are dropped by the
 // JSON round-trip the guard performs, so they are modelled `.optional()`.
 
+// Wire-size note (this is by far the largest published outputSchema): the SDK
+// serializes outputSchemas with Zod 4's `toJSONSchema` (draft-7), which INLINES
+// a reused sub-schema at every use site — except when the sub-schema carries a
+// registry id via `.meta({ id })`, in which case it is emitted once under
+// `definitions` and referenced by `$ref`. `$ref`/`definitions` already ship in
+// this schema regardless (the recursive `children` cycle is emitted as
+// `#/definitions/__schema0`), so named ids add no new client requirement.
+// Ids only pay off for sub-schemas used MORE THAN ONCE — a single-use id makes
+// the payload bigger (def + ref > inline). Validation is untouched: `.meta()`
+// only annotates, it never changes parsing.
+
+// Zod 4 emits `z.number().int()` as {type:integer, minimum:-2^53+1, maximum:2^53-1}.
+// Those sentinel bounds no longer reach the wire — `slimJsonSchema()` strips them
+// at tools/list time — so an inlined int costs 18 bytes, LESS than the 28-byte
+// `$ref` a shared id would cost. Hence no id here (measured on the shipped,
+// slimmed payload: id-off 4770 vs id-on 5043 bytes). Re-add the id only if that
+// slimmer is ever removed. The EffectiveValue id below pays off either way.
+const IntSchema = z.number().int();
+
 // EffectiveValue: {kind:'literal';value}|{kind:'unknown';viaParam}|{kind:'dynamic'}
-const EffectiveValueSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("literal"), value: z.string() }),
-  z.object({ kind: z.literal("unknown"), viaParam: z.string() }),
-  z.object({ kind: z.literal("dynamic") }),
-]);
+// Used twice (edge.effectiveParams[].effective and node.env values) → id it.
+const EffectiveValueSchema = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("literal"), value: z.string() }),
+    z.object({ kind: z.literal("unknown"), viaParam: z.string() }),
+    z.object({ kind: z.literal("dynamic") }),
+  ])
+  .meta({ id: "EffectiveValue" });
 
 // CallParamResolution: {kind:'literal';value}|{kind:'passthrough';paramName}|{kind:'dynamic'}
 const CallParamResolutionSchema = z.discriminatedUnion("kind", [
@@ -103,7 +125,7 @@ const CallgraphEdgeSchema = z.object({
   caller: z.string(),
   callee: z.string(),
   section: z.string(),
-  line: z.number().int(),
+  line: IntSchema,
   funcName: z.string(),
   snippet: z.string(),
   params: z.array(CallParamSchema),
@@ -111,9 +133,12 @@ const CallgraphEdgeSchema = z.object({
 });
 
 // unresolvedCalls entry — full mode carries `snippet`, compact mode does not.
+// Kept as two shapes on purpose: merging them behind one `snippet?` schema
+// would save ~180 bytes but stop the guard noticing if full mode ever dropped
+// `snippet`, which is exactly the drift this schema exists to catch.
 const UnresolvedFullSchema = z.object({
   section: z.string(),
-  line: z.number().int(),
+  line: IntSchema,
   funcName: z.string(),
   expr: z.string(),
   snippet: z.string(),
@@ -121,7 +146,7 @@ const UnresolvedFullSchema = z.object({
 });
 const UnresolvedCompactSchema = z.object({
   section: z.string(),
-  line: z.number().int(),
+  line: IntSchema,
   funcName: z.string(),
   expr: z.string(),
   reason: z.string(),
@@ -156,30 +181,30 @@ const CompactNodeSchema: z.ZodType<CompactNode> = CompactNodeBase.extend({
 // summarize() result.
 const SummaryEntrySchema = z.object({
   process: z.string(),
-  depthMin: z.number().int(),
-  depthMax: z.number().int(),
-  occurrences: z.number().int(),
+  depthMin: IntSchema,
+  depthMax: IntSchema,
+  occurrences: IntSchema,
   cycle: z.boolean(),
   depthLimitReached: z.boolean(),
-  unresolvedCount: z.number().int(),
+  unresolvedCount: IntSchema,
 });
 const CallgraphSummarySchema = z.object({
   root: z.string(),
-  totalNodes: z.number().int(),
-  uniqueProcesses: z.number().int(),
-  maxDepth: z.number().int(),
-  cyclesDetected: z.number().int(),
-  depthLimitsHit: z.number().int(),
+  totalNodes: IntSchema,
+  uniqueProcesses: IntSchema,
+  maxDepth: IntSchema,
+  cyclesDetected: IntSchema,
+  depthLimitsHit: IntSchema,
   processes: z.array(SummaryEntrySchema),
 });
 
 // globalRanking() RankEntry.
 const RankEntrySchema = z.object({
   process: z.string(),
-  outgoingCalls: z.number().int(),
-  outgoingDistinct: z.number().int(),
-  incomingCalls: z.number().int(),
-  incomingDistinct: z.number().int(),
+  outgoingCalls: IntSchema,
+  outgoingDistinct: IntSchema,
+  incomingCalls: IntSchema,
+  incomingDistinct: IntSchema,
 });
 
 // One permissive top-level object whose optional fields are now precisely
@@ -190,7 +215,7 @@ const RankEntrySchema = z.object({
 export const CallgraphResultSchema = z.object({
   // shape 1: warning (process not found)
   warning: z.string().optional(),
-  indexedProcessCount: z.number().int().optional(),
+  indexedProcessCount: IntSchema.optional(),
   // shared across the traversal shapes
   start: z.string().optional(),
   direction: z.string().optional(),
@@ -202,9 +227,9 @@ export const CallgraphResultSchema = z.object({
   tree: z.union([FullNodeSchema, CompactNodeSchema]).optional(),
   // shape 5: global-ranking (start omitted)
   rankBy: z.string().optional(),
-  totalProcessesIndexed: z.number().int().optional(),
-  processesWithEdges: z.number().int().optional(),
-  totalCallEdges: z.number().int().optional(),
+  totalProcessesIndexed: IntSchema.optional(),
+  processesWithEdges: IntSchema.optional(),
+  totalCallEdges: IntSchema.optional(),
   truncated: z.boolean().optional(),
   ranking: z.array(RankEntrySchema).optional(),
 });
