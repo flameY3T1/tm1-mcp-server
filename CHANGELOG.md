@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.1.0] - 2026-07-26
 
+### Security
+
+- **`fast-uri` pinned to `^3.1.4` via `overrides`.** GHSA-v2hh-gcrm-f6hx and GHSA-4c8g-83qw-93j6
+  (host confusion via a literal backslash authority delimiter, and via failed IDN canonicalization)
+  affect `fast-uri` 3.0.0–3.1.3. It reaches us as a *runtime* dependency through
+  `@modelcontextprotocol/sdk` → `ajv`, so it ships to consumers rather than being a dev-only
+  advisory. The patched 3.1.4 sits inside `ajv`'s own `^3.0.1` range, so the override is not a
+  semver escape. No SDK release carries the fix yet — 1.29.0 is current.
+
 ### Added
 
 - **Coverage ratchet gate** (`npm run coverage:check`, wired into `npm run verify` and CI).
