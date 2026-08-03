@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `tm1_bulk_upsert_elements` now folds its element writes into OData `$batch` requests instead of one HTTP call per element: an upsert of N elements costs four batched passes (create, type-probe, type-patch, consolidation components) rather than N round-trips, with each pass split into chunks of at most 200 sub-requests. Servers without a usable `$batch` endpoint transparently fall back to the previous per-request path, and the tool's inputs, outputs and error behaviour are unchanged. Live-validated against TM1 v11 11.8 and v12 / Planning Analytics Engine 12.5.9.
+
 ## [2.1.0] - 2026-07-26
 
 ### Security

@@ -14,6 +14,8 @@ import type {
   ElementUpdate,
 } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
+import { BatchUnsupportedError } from "./batch-service.js";
+import type { BatchRequest, BatchService, BatchSubResult } from "./batch-service.js";
 import type { CellService } from "./cell-service.js";
 import { rethrowIfSystemic } from "./fallback.js";
 
@@ -58,10 +60,35 @@ function normalizeElementType(t: number | string): string {
   }
 }
 
+/**
+ * Reject with the first failure in ELEMENT order (not response order), so the
+ * error a caller sees is the same one the per-request path would surface.
+ * Successful sub-requests in the same batch stay committed — TM1's $batch is
+ * non-atomic — exactly as the concurrent per-request path already leaves
+ * earlier writes committed when a later one fails.
+ */
+function throwFirstFailure(results: BatchSubResult[], indexOf: (id: string) => number): void {
+  let firstIndex = Number.POSITIVE_INFINITY;
+  let firstError: TM1Error | undefined;
+  for (const r of results) {
+    if (r.ok) continue;
+    const i = indexOf(r.id);
+    if (i < firstIndex) {
+      firstIndex = i;
+      firstError = r.error;
+    }
+  }
+  if (firstError) throw firstError;
+}
+
 export class ElementService {
   constructor(
     private readonly http: TM1HttpClient,
     private readonly cells: CellService,
+    // Optional so a caller (and the existing unit tests) can build an
+    // ElementService that only ever uses the per-request path. Production wires
+    // it, which turns bulkUpsert's N round-trips into a handful of $batch calls.
+    private readonly batch?: BatchService,
   ) {}
 
   /**
@@ -218,14 +245,175 @@ export class ElementService {
    * before consolidations reference them: pass 1 creates/upserts every element
    * (PATCH on 409), pass 2 sets Components for Consolidated elements.
    * POST/PATCH /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Elements(...)
+   *
+   * Prefers OData `$batch` (a handful of round-trips) and falls back to the
+   * per-request fan-out when the server has no `$batch` endpoint. Both paths
+   * produce the identical result and the identical throw-on-any-failure
+   * contract; only the number of HTTP calls differs.
    */
   async bulkUpsert(
     dimensionName: string,
     hierarchyName: string,
     elements: ElementCreate[],
-  ): Promise<{
-    typeChanges: Array<{ name: string; from: string; to: string }>;
-  }> {
+  ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
+    if (this.batch && !this.batch.isKnownUnsupported) {
+      try {
+        return await this.bulkUpsertViaBatch(dimensionName, hierarchyName, elements);
+      } catch (err) {
+        // ONLY "this server has no $batch" falls through. A sub-request failure
+        // is not an exception here (it is reported per item and rethrown as the
+        // element error), and a systemic transport/auth error propagates from
+        // BatchService — neither may silently re-drive the writes.
+        //
+        // Restarting on the per-request path cannot duplicate or lose work —
+        // but NOT because nothing was committed. TM1's $batch is non-atomic
+        // (verified live), so an envelope that fails mid-way leaves the
+        // sub-requests it already processed in place. What makes the restart
+        // safe is WHICH sub-requests those can be: BatchService raises
+        // BatchUnsupportedError only before the first successful batch on the
+        // connection, and the only pass that can run before that is pass 1a —
+        // create-only. Re-creating an element the failed batch already created
+        // just takes the "already exists" upsert branch, sees the type it was
+        // created with, and patches nothing.
+        //
+        // The destructive passes are unreachable here by construction: pass 1c
+        // (Type PATCH) and pass 2 (Components) only run after pass 1a returned
+        // a valid envelope, which sets supported=true and disables this
+        // fallback. A batch that fails AFTER one has succeeded (flaky gateway
+        // mid-chunk) propagates as a real error instead — which matters,
+        // because replaying an already-applied Type PATCH would re-probe, see
+        // the new type, and report no typeChange for a conversion that did
+        // discard leaf values.
+        //
+        // tests/unit/batch-fallback-safety.test.ts pins both halves of this.
+        if (!(err instanceof BatchUnsupportedError)) throw err;
+      }
+    }
+    return this.bulkUpsertPerRequest(dimensionName, hierarchyName, elements);
+  }
+
+  /**
+   * `$batch` implementation of bulkUpsert: four PASSES regardless of element
+   * count — create-all, read-type-of-the-ones-that-existed,
+   * patch-the-types-that-differ, then the consolidation Components patches.
+   * Each pass is one round-trip per BATCH_MAX_REQUESTS sub-requests (they are
+   * chunked inside BatchService), so N elements cost roughly 4 * ceil(N/200)
+   * calls instead of N.
+   */
+  private async bulkUpsertViaBatch(
+    dimensionName: string,
+    hierarchyName: string,
+    elements: ElementCreate[],
+  ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
+    const batch = this.batch!;
+    const baseUrl = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements`;
+    // Correlate by element INDEX, not name: names are caller-supplied and could
+    // repeat, which would collapse two sub-responses onto one id.
+    const idOf = (i: number): string => `e${i}`;
+    const indexOf = (id: string): number => Number(id.slice(1));
+
+    // Pass 1a — create every element. TM1 runs the batch in payload order and
+    // continues past failures, so one response comes back per element.
+    const created = await batch.execute(
+      elements.map((el, i): BatchRequest => ({
+        id: idOf(i),
+        method: "POST",
+        path: baseUrl,
+        body: { Name: el.name, Type: el.type },
+      })),
+    );
+
+    // Split the failures: "already exists" is the upsert path, anything else is
+    // a genuine error that must abort the whole op (same contract as the
+    // per-request path). Keep element order so the thrown error is the first
+    // failure in element order, not the first to be noticed.
+    const existing: number[] = [];
+    for (const r of created) {
+      if (r.ok) continue;
+      const i = indexOf(r.id);
+      if (isAlreadyExists(r.error)) existing.push(i);
+      else throw r.error;
+    }
+
+    // Pass 1b — read the current Type of the elements that already existed, so
+    // a type change can be reported (and skipped when it is a no-op). A failed
+    // probe means "type unreadable" and falls through to the unconditional
+    // PATCH below, matching the per-request path's behaviour on a NOT_FOUND.
+    const probed = await batch.execute(
+      existing.map((i): BatchRequest => ({
+        id: idOf(i),
+        method: "GET",
+        path: `${baseUrl}('${enc(elements[i]!.name)}')?$select=Type`,
+      })),
+    );
+    const typeById = new Map<number, string | null>();
+    for (const r of probed) {
+      // A transport/auth outage must NOT collapse into "type unreadable": that
+      // would silently PATCH the type below and discard the element's leaf cell
+      // values on a network blip or an expired session — and report nothing in
+      // typeChanges, because an unreadable prior type yields no entry. Same
+      // guard the per-request path applies to its probe; only a genuine,
+      // non-systemic failure (e.g. NOT_FOUND) may degrade to null.
+      if (!r.ok) rethrowIfSystemic(r.error);
+      const raw = r.ok ? (r.body as { Type?: number | string } | null)?.Type : undefined;
+      typeById.set(indexOf(r.id), raw === undefined || raw === null ? null : normalizeElementType(raw));
+    }
+
+    // Pass 1c — patch the types that actually differ, plus the unreadable ones.
+    const typeChanges: Array<{ name: string; from: string; to: string }> = [];
+    const patches: BatchRequest[] = [];
+    for (const i of existing) {
+      const el = elements[i]!;
+      const from = typeById.get(i) ?? null;
+      if (from !== null && from === el.type) continue;
+      patches.push({
+        id: idOf(i),
+        method: "PATCH",
+        path: `${baseUrl}('${enc(el.name)}')`,
+        body: { Type: el.type },
+      });
+      // A Numeric->Consolidated / Numeric->String conversion discards the
+      // element's leaf cell values, so report it rather than let it happen
+      // silently. An unreadable prior type yields no entry, as before.
+      if (from !== null) typeChanges.push({ name: el.name, from, to: el.type });
+    }
+    throwFirstFailure(await batch.execute(patches), indexOf);
+
+    // Pass barrier: every leaf write above has settled before any consolidation
+    // references it via Components. Pass 1 already threw on any hard failure.
+    //
+    // Pass 2 — PATCH {Components:[...]} is FULL-REPLACE, not append (verified
+    // live vs TM1 v11). Consolidations with no/empty components are skipped, so
+    // an upsert that omits components leaves existing children intact.
+    const components: BatchRequest[] = [];
+    for (const [i, el] of elements.entries()) {
+      if (el.type !== "Consolidated" || !el.components || el.components.length === 0) continue;
+      components.push({
+        id: idOf(i),
+        method: "PATCH",
+        path: `${baseUrl}('${enc(el.name)}')`,
+        body: {
+          Components: el.components.map((c) => ({
+            "@odata.id": `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(c.name)}')`,
+            Weight: c.weight,
+          })),
+        },
+      });
+    }
+    throwFirstFailure(await batch.execute(components), indexOf);
+
+    return { typeChanges };
+  }
+
+  /**
+   * Per-request fallback for bulkUpsert, used when the server has no `$batch`.
+   * Fans the calls out with bounded concurrency.
+   */
+  private async bulkUpsertPerRequest(
+    dimensionName: string,
+    hierarchyName: string,
+    elements: ElementCreate[],
+  ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
     const baseUrl = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements`;
 
     // Pass 1: Create/upsert all elements without components. Same-type element

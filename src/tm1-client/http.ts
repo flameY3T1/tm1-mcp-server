@@ -510,6 +510,27 @@ export class TM1HttpClient {
     endpoint: string,
     details?: string,
   ): TM1Error {
+    return classifyHttpError(status, endpoint, details);
+  }
+
+  private isNetworkError(error: unknown): boolean {
+    return isNetworkErrorImpl(error);
+  }
+}
+
+/**
+ * Map an HTTP status + TM1 error text onto a TM1Error. Module-level (not just a
+ * TM1HttpClient method) because `$batch` sub-responses arrive as plain
+ * {status, body} records inside a 200 envelope — BatchService has to classify
+ * them itself, and must do it identically to a standalone request rather than
+ * with a drifting copy of these rules.
+ */
+export function classifyHttpError(
+  status: number,
+  endpoint: string,
+  details?: string,
+): TM1Error {
+  {
     // TM1 signals object-level security denial via the error MESSAGE, often
     // with HTTP 400 (not 403) — e.g. reading a control cube as a non-admin
     // returns 400 {"error":{"code":"65","message":"ObjectSecurityNoReadRights"}}.
@@ -572,8 +593,14 @@ export class TM1HttpClient {
         });
     }
   }
+}
 
-  private isNetworkError(error: unknown): boolean {
+/**
+ * Is this a transient transport failure worth retrying (as opposed to our own
+ * timeout, a caller cancellation, or an application-level error)?
+ */
+function isNetworkErrorImpl(error: unknown): boolean {
+  {
     // TimeoutError is our own request timeout — handled separately as LOCK_TIMEOUT,
     // never treated as a retryable network blip.
     if (error instanceof DOMException && error.name === "TimeoutError") {

@@ -77,9 +77,22 @@ class holds a single `TM1HttpClient` reference and exposes domain methods
 as plain async functions. The pattern follows TM1py's `RestService` +
 domain services (`CubeService`, `DimensionService`, `ProcessService`, …).
 
-The 13 services wired into `TM1Client`: `cubes`, `dimensions`, `hierarchies`,
-`cells`, `views`, `subsets`, `elements`, `processes`, `chores`, `security`,
-`server`, `monitoring`, `files`.
+The 14 services wired into `TM1Client`: `batch`, `cubes`, `dimensions`,
+`hierarchies`, `cells`, `views`, `subsets`, `elements`, `processes`, `chores`,
+`security`, `server`, `monitoring`, `files`.
+
+`batch` is the one service not scoped to a TM1 object type: it owns the OData
+`$batch` endpoint, so other services can fold many independent calls into one
+round-trip. Its sub-requests are **not** atomic (TM1 rejects `atomicityGroup`
+outright) and continue-on-error is the server default, so it reports each
+sub-request's outcome separately rather than collapsing them — callers keep
+their partial-success semantics. A server without `$batch` raises
+`BatchUnsupportedError`, which the caller catches to fall back to its
+per-request path; systemic transport/auth failures deliberately propagate
+instead, so a network blip never silently re-drives writes. That verdict is
+reached **only before the first successful batch on the connection** — after
+that nothing may be called "unsupported", because the caller's fallback would
+replay sub-requests that are already committed.
 
 ### Authoring a new service
 
@@ -134,11 +147,12 @@ cannot call raw REST — that is a `tsc` compile error, not merely a
 surface while tools never do.
 
 **Init order is load-bearing where one service depends on another.**
-`ElementService` takes `CellService` (`new ElementService(this, this.cells)`),
-so `this.cells` must be assigned first. TypeScript types the field as defined
-and will _not_ catch a reorder that leaves it `undefined` at construction time,
-so the constructor asserts `this.cells` before wiring `elements`. Keep
-dependency-bearing services after the ones they consume, or the assert throws.
+`ElementService` takes `CellService` and `BatchService`
+(`new ElementService(this.http, this.cells, this.batch)`), so both must be
+assigned first. TypeScript types the fields as defined and will _not_ catch a
+reorder that leaves one `undefined` at construction time, so the constructor
+asserts both before wiring `elements`. Keep dependency-bearing services after
+the ones they consume, or the assert throws.
 
 `TM1Client` holds **no** flat pass-through methods. Tools always reach TM1
 through a service (`client.cubes.list()`, `client.processes.execute()`, …).

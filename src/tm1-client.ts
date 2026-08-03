@@ -6,6 +6,7 @@ import type pino from "pino";
 import type { TM1Config } from "./config.js";
 import type { SessionManager } from "./session-manager.js";
 import { TM1HttpClient } from "./tm1-client/http.js";
+import { BatchService } from "./tm1-client/services/batch-service.js";
 import { CubeService } from "./tm1-client/services/cube-service.js";
 import { DimensionService } from "./tm1-client/services/dimension-service.js";
 import { HierarchyService } from "./tm1-client/services/hierarchy-service.js";
@@ -37,6 +38,7 @@ export class TM1Client {
   // Domain services. Init order matters when services depend on each other —
   // `cells` is created before `elements` because the latter holds a CellService
   // ref for the element-attribute-value methods that route through MDX/cellset.
+  readonly batch: BatchService;
   readonly cubes: CubeService;
   readonly dimensions: DimensionService;
   readonly hierarchies: HierarchyService;
@@ -64,21 +66,28 @@ export class TM1Client {
     // "mutation" notifications. Replaces the former import-time side-effect in
     // http.ts — now the coupling is a visible, idempotent call at construction.
     registerCallgraphCacheInvalidation();
+    this.batch = new BatchService(this.http);
     this.cubes = new CubeService(this.http);
     this.dimensions = new DimensionService(this.http);
     this.hierarchies = new HierarchyService(this.http);
     this.cells = new CellService(this.http);
     this.views = new ViewService(this.http);
     this.subsets = new SubsetService(this.http);
-    // ElementService depends on CellService — `cells` MUST be constructed above.
-    // Enforced at runtime so a future reorder fails loudly instead of injecting
-    // `undefined` (TS types it as defined, so the compiler won't catch a move).
+    // ElementService depends on CellService and BatchService — both MUST be
+    // constructed above. Enforced at runtime so a future reorder fails loudly
+    // instead of injecting `undefined` (TS types the fields as defined, so the
+    // compiler won't catch a move). `batch` is asserted too even though the
+    // constructor parameter is optional: an undefined batch degrades bulkUpsert
+    // silently back to N round-trips, with no error and no failing test.
     if (!this.cells) {
       throw new Error(
         "TM1Client init order: CellService must be constructed before ElementService",
       );
     }
-    this.elements = new ElementService(this.http, this.cells);
+    if (!this.batch) {
+      throw new Error("TM1Client init order: BatchService must be constructed before ElementService");
+    }
+    this.elements = new ElementService(this.http, this.cells, this.batch);
     this.processes = new ProcessService(this.http);
     this.chores = new ChoreService(this.http);
     this.security = new SecurityService(this.http);
