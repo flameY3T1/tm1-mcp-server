@@ -94,6 +94,12 @@ reached **only before the first successful batch on the connection** — after
 that nothing may be called "unsupported", because the caller's fallback would
 replay sub-requests that are already committed.
 
+Note what that bounds. Because `$batch` is non-atomic, a failed envelope can
+leave sub-requests committed even on the very first call, so the rule does not
+mean "nothing was written" — it means the replay is confined to the caller's
+FIRST pass. Callers must therefore keep that first pass replay-safe;
+`ElementService.bulkUpsert` does, because its first pass is create-only.
+
 ### Authoring a new service
 
 ```ts

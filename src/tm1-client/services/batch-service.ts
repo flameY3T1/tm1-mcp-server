@@ -189,7 +189,9 @@ export class BatchService {
   async execute(requests: BatchRequest[]): Promise<BatchSubResult[]> {
     if (requests.length === 0) return [];
     if (this.supported === false) {
-      throw new BatchUnsupportedError("a previous probe on this connection was rejected");
+      throw new BatchUnsupportedError(
+        "a previous probe on this connection was rejected",
+      );
     }
 
     const results: BatchSubResult[] = [];
@@ -219,7 +221,8 @@ export class BatchService {
     let envelope: unknown;
     try {
       envelope = await this.http.request<unknown>("POST", BATCH_PATH, payload, {
-        timeoutMs: BATCH_TIMEOUT_BASE_MS + chunk.length * BATCH_TIMEOUT_PER_REQUEST_MS,
+        timeoutMs:
+          BATCH_TIMEOUT_BASE_MS + chunk.length * BATCH_TIMEOUT_PER_REQUEST_MS,
       });
     } catch (err) {
       // A transport/auth/timeout failure is NOT evidence that $batch is
@@ -245,7 +248,9 @@ export class BatchService {
       // Treat as unsupported rather than guessing at the shape, but only if
       // $batch never worked here; mid-operation this is a hard error (see
       // markUnsupported).
-      const unsupported = this.markUnsupported(`response had no "responses" array`);
+      const unsupported = this.markUnsupported(
+        `response had no "responses" array`,
+      );
       if (unsupported) throw unsupported;
       throw new TM1Error({
         code: TM1ErrorCode.TM1_ERROR,
@@ -283,7 +288,11 @@ export class BatchService {
         id: req.id,
         status,
         ok: false,
-        error: classifyHttpError(status, req.path, extractErrorDetails(raw.body)),
+        error: classifyHttpError(
+          status,
+          req.path,
+          extractErrorDetails(raw.body),
+        ),
       };
     });
   }

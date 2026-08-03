@@ -25,14 +25,23 @@ interface FakeOpts {
 function makeService(opts: FakeOpts = {}): { svc: BatchService; sent: Sent[] } {
   const sent: Sent[] = [];
   const http = {
-    async request<T>(method: string, path: string, body?: unknown, o?: unknown): Promise<T> {
+    async request<T>(
+      method: string,
+      path: string,
+      body?: unknown,
+      o?: unknown,
+    ): Promise<T> {
       sent.push({ method, path, body, opts: o });
       if (opts.throwOnBatch) throw opts.throwOnBatch;
       const payload = body as { requests: Array<Record<string, unknown>> };
       if (opts.respond) return opts.respond(payload) as T;
       // Default: echo every sub-request back as a 200.
       return {
-        responses: payload.requests.map((r) => ({ id: r.id, status: 200, body: { echo: r.url } })),
+        responses: payload.requests.map((r) => ({
+          id: r.id,
+          status: 200,
+          body: { echo: r.url },
+        })),
       } as T;
     },
   } as unknown as TM1HttpClient;
@@ -60,7 +69,9 @@ describe("BatchService — payload construction", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]!.method).toBe("POST");
     expect(sent[0]!.path).toBe("/api/v1/$batch");
-    const payload = sent[0]!.body as { requests: Array<Record<string, unknown>> };
+    const payload = sent[0]!.body as {
+      requests: Array<Record<string, unknown>>;
+    };
     expect(payload.requests[0]).toEqual({
       id: "a",
       method: "POST",
@@ -74,9 +85,17 @@ describe("BatchService — payload construction", () => {
 
   it("omits body and Content-Type for bodyless requests", async () => {
     const { svc, sent } = makeService();
-    await svc.execute([req("a", { method: "DELETE", path: "/api/v1/Cubes('C')" })]);
-    const payload = sent[0]!.body as { requests: Array<Record<string, unknown>> };
-    expect(payload.requests[0]).toEqual({ id: "a", method: "DELETE", url: "Cubes('C')" });
+    await svc.execute([
+      req("a", { method: "DELETE", path: "/api/v1/Cubes('C')" }),
+    ]);
+    const payload = sent[0]!.body as {
+      requests: Array<Record<string, unknown>>;
+    };
+    expect(payload.requests[0]).toEqual({
+      id: "a",
+      method: "DELETE",
+      url: "Cubes('C')",
+    });
     expect(payload.requests[0]).not.toHaveProperty("body");
   });
 
@@ -97,14 +116,20 @@ describe("BatchService — chunking", () => {
   it(`splits into round-trips of at most ${BATCH_MAX_REQUESTS} sub-requests`, async () => {
     const { svc, sent } = makeService();
     const n = BATCH_MAX_REQUESTS * 2 + 3;
-    const results = await svc.execute(Array.from({ length: n }, (_, i) => req(String(i))));
+    const results = await svc.execute(
+      Array.from({ length: n }, (_, i) => req(String(i))),
+    );
 
     expect(sent).toHaveLength(3);
-    const sizes = sent.map((s) => (s.body as { requests: unknown[] }).requests.length);
+    const sizes = sent.map(
+      (s) => (s.body as { requests: unknown[] }).requests.length,
+    );
     expect(sizes).toEqual([BATCH_MAX_REQUESTS, BATCH_MAX_REQUESTS, 3]);
     // Results stay in request order across chunk boundaries.
     expect(results).toHaveLength(n);
-    expect(results.map((r) => r.id)).toEqual(Array.from({ length: n }, (_, i) => String(i)));
+    expect(results.map((r) => r.id)).toEqual(
+      Array.from({ length: n }, (_, i) => String(i)),
+    );
   });
 });
 
@@ -118,7 +143,12 @@ describe("BatchService — sub-response mapping", () => {
           {
             id: "1",
             status: 400,
-            body: { error: { code: "278", message: 'An element with name "seed" already exists.' } },
+            body: {
+              error: {
+                code: "278",
+                message: 'An element with name "seed" already exists.',
+              },
+            },
           },
           { id: "2", status: 201, body: { Name: "e2" } },
         ],
@@ -142,15 +172,28 @@ describe("BatchService — sub-response mapping", () => {
     const { svc } = makeService({
       respond: () => ({
         responses: [
-          { id: "0", status: 404, body: { error: { message: "'X' can not be found" } } },
+          {
+            id: "0",
+            status: 404,
+            body: { error: { message: "'X' can not be found" } },
+          },
           { id: "1", status: 409, body: { error: { message: "conflict" } } },
           // Security denial arrives as HTTP 400 with the reason in the message.
-          { id: "2", status: 400, body: { error: { message: "ObjectSecurityNoReadRights" } } },
+          {
+            id: "2",
+            status: 400,
+            body: { error: { message: "ObjectSecurityNoReadRights" } },
+          },
         ],
       }),
     });
-    const [notFound, conflict, denied] = await svc.execute([req("0"), req("1"), req("2")]);
-    if (notFound!.ok || conflict!.ok || denied!.ok) throw new Error("expected failures");
+    const [notFound, conflict, denied] = await svc.execute([
+      req("0"),
+      req("1"),
+      req("2"),
+    ]);
+    if (notFound!.ok || conflict!.ok || denied!.ok)
+      throw new Error("expected failures");
     expect(notFound!.error.code).toBe(TM1ErrorCode.NOT_FOUND);
     expect(conflict!.error.code).toBe(TM1ErrorCode.CONFLICT);
     expect(denied!.error.code).toBe(TM1ErrorCode.PERMISSION_DENIED);
@@ -159,7 +202,13 @@ describe("BatchService — sub-response mapping", () => {
   it("unwraps the nested OData message.value error shape", async () => {
     const { svc } = makeService({
       respond: () => ({
-        responses: [{ id: "0", status: 400, body: { error: { message: { value: "deep text" } } } }],
+        responses: [
+          {
+            id: "0",
+            status: 400,
+            body: { error: { message: { value: "deep text" } } },
+          },
+        ],
       }),
     });
     const [r] = await svc.execute([req("0")]);
@@ -175,7 +224,11 @@ describe("BatchService — sub-response mapping", () => {
     const { svc } = makeService({
       respond: () => ({
         responses: [
-          { id: "0", status: 400, body: { Message: 'An element with name "seed" already exists.' } },
+          {
+            id: "0",
+            status: 400,
+            body: { Message: 'An element with name "seed" already exists.' },
+          },
         ],
       }),
     });
@@ -221,21 +274,31 @@ describe("BatchService — unsupported-server detection and fallback signalling"
           httpStatus: status,
         }),
       });
-      await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(BatchUnsupportedError);
+      await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(
+        BatchUnsupportedError,
+      );
       expect(svc.isKnownUnsupported).toBe(true);
     });
   }
 
   it("treats a 200 that is not a batch envelope as unsupported", async () => {
-    const { svc } = makeService({ respond: () => ({ value: "some proxy page" }) });
-    await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(BatchUnsupportedError);
+    const { svc } = makeService({
+      respond: () => ({ value: "some proxy page" }),
+    });
+    await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(
+      BatchUnsupportedError,
+    );
     expect(svc.isKnownUnsupported).toBe(true);
   });
 
   it("remembers the verdict — no second probe on the same connection", async () => {
     const { svc, sent } = makeService({ respond: () => ({ nope: true }) });
-    await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(BatchUnsupportedError);
-    await expect(svc.execute([req("b")])).rejects.toBeInstanceOf(BatchUnsupportedError);
+    await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(
+      BatchUnsupportedError,
+    );
+    await expect(svc.execute([req("b")])).rejects.toBeInstanceOf(
+      BatchUnsupportedError,
+    );
     expect(sent).toHaveLength(1);
   });
 
@@ -243,17 +306,24 @@ describe("BatchService — unsupported-server detection and fallback signalling"
     ["AUTH_FAILED", TM1ErrorCode.AUTH_FAILED],
     ["CONNECTION_FAILED", TM1ErrorCode.CONNECTION_FAILED],
     ["LOCK_TIMEOUT", TM1ErrorCode.LOCK_TIMEOUT],
-  ])("propagates systemic %s instead of calling it unsupported", async (_label, code) => {
-    // Critical: a network blip must NOT be read as "no $batch here", or the
-    // caller's fallback would silently re-drive every write.
-    const boom = new TM1Error({ code, message: "transport down" });
-    const { svc } = makeService({ throwOnBatch: boom });
-    await expect(svc.execute([req("a")])).rejects.toBe(boom);
-    expect(svc.isKnownUnsupported).toBe(false);
-  });
+  ])(
+    "propagates systemic %s instead of calling it unsupported",
+    async (_label, code) => {
+      // Critical: a network blip must NOT be read as "no $batch here", or the
+      // caller's fallback would silently re-drive every write.
+      const boom = new TM1Error({ code, message: "transport down" });
+      const { svc } = makeService({ throwOnBatch: boom });
+      await expect(svc.execute([req("a")])).rejects.toBe(boom);
+      expect(svc.isKnownUnsupported).toBe(false);
+    },
+  );
 
   it("propagates a non-systemic, non-unsupported error unchanged", async () => {
-    const boom = new TM1Error({ code: TM1ErrorCode.TM1_ERROR, message: "teapot", httpStatus: 418 });
+    const boom = new TM1Error({
+      code: TM1ErrorCode.TM1_ERROR,
+      message: "teapot",
+      httpStatus: 418,
+    });
     const { svc } = makeService({ throwOnBatch: boom });
     await expect(svc.execute([req("a")])).rejects.toBe(boom);
     expect(svc.isKnownUnsupported).toBe(false);
@@ -270,10 +340,18 @@ describe("BatchService — unsupported-server detection and fallback signalling"
         if (call === 1) {
           const payload = body as { requests: Array<Record<string, unknown>> };
           return {
-            responses: payload.requests.map((r) => ({ id: r.id, status: 200, body: {} })),
+            responses: payload.requests.map((r) => ({
+              id: r.id,
+              status: 200,
+              body: {},
+            })),
           } as T;
         }
-        throw new TM1Error({ code: TM1ErrorCode.TM1_ERROR, message: "gateway hiccup", httpStatus: 400 });
+        throw new TM1Error({
+          code: TM1ErrorCode.TM1_ERROR,
+          message: "gateway hiccup",
+          httpStatus: 400,
+        });
       },
     } as unknown as TM1HttpClient;
     const svc = new BatchService(http);
@@ -293,7 +371,11 @@ describe("BatchService — unsupported-server detection and fallback signalling"
         if (call === 1) {
           const payload = body as { requests: Array<Record<string, unknown>> };
           return {
-            responses: payload.requests.map((r) => ({ id: r.id, status: 200, body: {} })),
+            responses: payload.requests.map((r) => ({
+              id: r.id,
+              status: 200,
+              body: {},
+            })),
           } as T;
         }
         return { value: "some proxy page" } as T;

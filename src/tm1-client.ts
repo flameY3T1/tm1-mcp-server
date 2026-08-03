@@ -85,7 +85,9 @@ export class TM1Client {
       );
     }
     if (!this.batch) {
-      throw new Error("TM1Client init order: BatchService must be constructed before ElementService");
+      throw new Error(
+        "TM1Client init order: BatchService must be constructed before ElementService",
+      );
     }
     this.elements = new ElementService(this.http, this.cells, this.batch);
     this.processes = new ProcessService(this.http);

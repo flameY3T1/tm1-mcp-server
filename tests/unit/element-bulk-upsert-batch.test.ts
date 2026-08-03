@@ -38,7 +38,9 @@ function makeService(opts: FakeOpts = {}): {
         const requests = (body as { requests: SubRequest[] }).requests;
         batches.push(requests);
         return {
-          responses: requests.map((r) => opts.onSub?.(r) ?? { id: r.id, status: 200, body: {} }),
+          responses: requests.map(
+            (r) => opts.onSub?.(r) ?? { id: r.id, status: 200, body: {} },
+          ),
         } as T;
       }
       perRequest.push({ method, path });
@@ -53,11 +55,17 @@ function makeService(opts: FakeOpts = {}): {
 const alreadyExists = (id: string): SubResponse => ({
   id,
   status: 400,
-  body: { error: { message: 'An element with name "x" already exists. Failed to create element.' } },
+  body: {
+    error: {
+      message:
+        'An element with name "x" already exists. Failed to create element.',
+    },
+  },
 });
 
 const isComponentsPatch = (r: SubRequest): boolean =>
-  r.method === "PATCH" && !!(r.body as { Components?: unknown } | undefined)?.Components;
+  r.method === "PATCH" &&
+  !!(r.body as { Components?: unknown } | undefined)?.Components;
 
 describe("ElementService.bulkUpsert — $batch path", () => {
   it("creates every element in ONE batch instead of one call each", async () => {
@@ -73,7 +81,9 @@ describe("ElementService.bulkUpsert — $batch path", () => {
     expect(perRequest).toHaveLength(0);
     const creates = batches.flat().filter((r) => r.method === "POST");
     expect(creates).toHaveLength(50);
-    expect(creates[0]!.url).toBe("Dimensions('Dim')/Hierarchies('Dim')/Elements");
+    expect(creates[0]!.url).toBe(
+      "Dimensions('Dim')/Hierarchies('Dim')/Elements",
+    );
     expect(creates[0]!.body).toEqual({ Name: "L0", Type: "Numeric" });
   });
 
@@ -82,19 +92,35 @@ describe("ElementService.bulkUpsert — $batch path", () => {
     const elements: ElementCreate[] = [
       { name: "L1", type: "Numeric" },
       { name: "L2", type: "Numeric" },
-      { name: "C1", type: "Consolidated", components: [{ name: "L1", weight: 1 }] },
-      { name: "C2", type: "Consolidated", components: [{ name: "L2", weight: -1 }] },
+      {
+        name: "C1",
+        type: "Consolidated",
+        components: [{ name: "L1", weight: 1 }],
+      },
+      {
+        name: "C2",
+        type: "Consolidated",
+        components: [{ name: "L2", weight: -1 }],
+      },
     ];
     await svc.bulkUpsert("Dim", "Dim", elements);
 
     const flat = batches.flat();
-    const lastPost = flat.reduce((acc, r, i) => (r.method === "POST" ? i : acc), -1);
+    const lastPost = flat.reduce(
+      (acc, r, i) => (r.method === "POST" ? i : acc),
+      -1,
+    );
     const firstComponents = flat.findIndex(isComponentsPatch);
     expect(lastPost).toBeGreaterThanOrEqual(0);
     expect(firstComponents).toBeGreaterThan(lastPost);
     // Components arrive as OData refs with their weights.
-    expect((flat[firstComponents]!.body as { Components: unknown[] }).Components).toEqual([
-      { "@odata.id": "Dimensions('Dim')/Hierarchies('Dim')/Elements('L1')", Weight: 1 },
+    expect(
+      (flat[firstComponents]!.body as { Components: unknown[] }).Components,
+    ).toEqual([
+      {
+        "@odata.id": "Dimensions('Dim')/Hierarchies('Dim')/Elements('L1')",
+        Weight: 1,
+      },
     ]);
   });
 
@@ -111,7 +137,11 @@ describe("ElementService.bulkUpsert — $batch path", () => {
   it("reports type changes in element order and patches only what differs", async () => {
     // E1/E2/E3 all exist. E1 String->Numeric (change), E2 same type (no write),
     // E3 Numeric->String (change).
-    const existingType: Record<string, string> = { E1: "String", E2: "Numeric", E3: "Numeric" };
+    const existingType: Record<string, string> = {
+      E1: "String",
+      E2: "Numeric",
+      E3: "Numeric",
+    };
     const { svc, batches } = makeService({
       onSub: (r) => {
         if (r.method === "POST") return alreadyExists(r.id);
@@ -146,12 +176,18 @@ describe("ElementService.bulkUpsert — $batch path", () => {
       onSub: (r) => {
         if (r.method === "POST") return alreadyExists(r.id);
         if (r.method === "GET") {
-          return { id: r.id, status: 404, body: { error: { message: "not found" } } };
+          return {
+            id: r.id,
+            status: 404,
+            body: { error: { message: "not found" } },
+          };
         }
         return undefined;
       },
     });
-    const { typeChanges } = await svc.bulkUpsert("Dim", "Dim", [{ name: "E1", type: "Numeric" }]);
+    const { typeChanges } = await svc.bulkUpsert("Dim", "Dim", [
+      { name: "E1", type: "Numeric" },
+    ]);
     expect(typeChanges).toEqual([]);
     const patches = batches.flat().filter((r) => r.method === "PATCH");
     expect(patches).toHaveLength(1);
@@ -167,7 +203,11 @@ describe("ElementService.bulkUpsert — $batch path", () => {
       onSub: (r) => {
         if (r.method === "POST") return alreadyExists(r.id);
         if (r.method === "GET") {
-          return { id: r.id, status: 401, body: { error: { message: "Authentication failed" } } };
+          return {
+            id: r.id,
+            status: 401,
+            body: { error: { message: "Authentication failed" } },
+          };
         }
         return undefined;
       },
@@ -194,12 +234,15 @@ describe("ElementService.bulkUpsert — $batch path", () => {
             body: { Message: 'An element with name "E1" already exists.' },
           };
         }
-        if (r.method === "GET") return { id: r.id, status: 200, body: { Type: "Numeric" } };
+        if (r.method === "GET")
+          return { id: r.id, status: 200, body: { Type: "Numeric" } };
         return undefined;
       },
     });
 
-    await expect(svc.bulkUpsert("Dim", "Dim", [{ name: "E1", type: "Numeric" }])).resolves.toEqual({
+    await expect(
+      svc.bulkUpsert("Dim", "Dim", [{ name: "E1", type: "Numeric" }]),
+    ).resolves.toEqual({
       typeChanges: [],
     });
   });
@@ -219,10 +262,18 @@ describe("ElementService.bulkUpsert — $batch path", () => {
       onSub: (r) => {
         const name = (r.body as { Name?: string } | undefined)?.Name;
         if (name === "L2") {
-          return { id: r.id, status: 400, body: { error: { message: "Invalid element type L2" } } };
+          return {
+            id: r.id,
+            status: 400,
+            body: { error: { message: "Invalid element type L2" } },
+          };
         }
         if (name === "L3") {
-          return { id: r.id, status: 400, body: { error: { message: "Invalid element type L3" } } };
+          return {
+            id: r.id,
+            status: 400,
+            body: { error: { message: "Invalid element type L3" } },
+          };
         }
         return undefined;
       },
@@ -233,7 +284,11 @@ describe("ElementService.bulkUpsert — $batch path", () => {
         { name: "L1", type: "Numeric" },
         { name: "L2", type: "Numeric" },
         { name: "L3", type: "Numeric" },
-        { name: "C1", type: "Consolidated", components: [{ name: "L1", weight: 1 }] },
+        {
+          name: "C1",
+          type: "Consolidated",
+          components: [{ name: "L1", weight: 1 }],
+        },
       ]),
     ).rejects.toMatchObject({ message: expect.stringContaining("L2") });
 
@@ -245,13 +300,21 @@ describe("ElementService.bulkUpsert — $batch path", () => {
     const { svc } = makeService({
       onSub: (r) =>
         isComponentsPatch(r)
-          ? { id: r.id, status: 400, body: { error: { message: "bad component ref" } } }
+          ? {
+              id: r.id,
+              status: 400,
+              body: { error: { message: "bad component ref" } },
+            }
           : undefined,
     });
     await expect(
       svc.bulkUpsert("Dim", "Dim", [
         { name: "L1", type: "Numeric" },
-        { name: "C1", type: "Consolidated", components: [{ name: "L1", weight: 1 }] },
+        {
+          name: "C1",
+          type: "Consolidated",
+          components: [{ name: "L1", weight: 1 }],
+        },
       ]),
     ).rejects.toMatchObject({ message: "bad component ref" });
   });
@@ -269,7 +332,11 @@ describe("ElementService.bulkUpsert — fallback to the per-request path", () =>
 
     const { typeChanges } = await svc.bulkUpsert("Dim", "Dim", [
       { name: "L1", type: "Numeric" },
-      { name: "C1", type: "Consolidated", components: [{ name: "L1", weight: 1 }] },
+      {
+        name: "C1",
+        type: "Consolidated",
+        components: [{ name: "L1", weight: 1 }],
+      },
     ]);
 
     expect(typeChanges).toEqual([]);
@@ -284,12 +351,20 @@ describe("ElementService.bulkUpsert — fallback to the per-request path", () =>
       async request<T>(_method: string, path: string): Promise<T> {
         if (path === "/api/v1/$batch") {
           batchAttempts++;
-          throw new TM1Error({ code: TM1ErrorCode.NOT_FOUND, message: "nope", httpStatus: 404 });
+          throw new TM1Error({
+            code: TM1ErrorCode.NOT_FOUND,
+            message: "nope",
+            httpStatus: 404,
+          });
         }
         return undefined as T;
       },
     } as unknown as TM1HttpClient;
-    const svc = new ElementService(http, {} as unknown as CellService, new BatchService(http));
+    const svc = new ElementService(
+      http,
+      {} as unknown as CellService,
+      new BatchService(http),
+    );
 
     await svc.bulkUpsert("Dim", "Dim", [{ name: "L1", type: "Numeric" }]);
     await svc.bulkUpsert("Dim", "Dim", [{ name: "L2", type: "Numeric" }]);
@@ -297,15 +372,24 @@ describe("ElementService.bulkUpsert — fallback to the per-request path", () =>
   });
 
   it("does NOT fall back on a systemic transport failure (no silent re-drive of writes)", async () => {
-    const boom = new TM1Error({ code: TM1ErrorCode.CONNECTION_FAILED, message: "socket died" });
+    const boom = new TM1Error({
+      code: TM1ErrorCode.CONNECTION_FAILED,
+      message: "socket died",
+    });
     const { svc, perRequest } = makeService({ throwOnBatch: boom });
-    await expect(svc.bulkUpsert("Dim", "Dim", [{ name: "L1", type: "Numeric" }])).rejects.toBe(boom);
+    await expect(
+      svc.bulkUpsert("Dim", "Dim", [{ name: "L1", type: "Numeric" }]),
+    ).rejects.toBe(boom);
     expect(perRequest).toHaveLength(0);
   });
 
   it("does NOT fall back on a sub-request failure — that is a real element error", async () => {
     const { svc, perRequest } = makeService({
-      onSub: (r) => ({ id: r.id, status: 400, body: { error: { message: "Invalid element type" } } }),
+      onSub: (r) => ({
+        id: r.id,
+        status: 400,
+        body: { error: { message: "Invalid element type" } },
+      }),
     });
     await expect(
       svc.bulkUpsert("Dim", "Dim", [{ name: "L1", type: "Numeric" }]),
@@ -328,11 +412,15 @@ describe("ElementService.bulkUpsert — fallback to the per-request path", () =>
   });
 
   it("BatchUnsupportedError never escapes bulkUpsert", async () => {
-    const { svc } = makeService({ throwOnBatch: new BatchUnsupportedError("synthetic") });
+    const { svc } = makeService({
+      throwOnBatch: new BatchUnsupportedError("synthetic"),
+    });
     // A BatchUnsupportedError thrown by the transport stub is not a TM1Error, so
     // it propagates out of BatchService untouched — bulkUpsert must still treat
     // it as "no batch" and complete via the fallback.
-    await expect(svc.bulkUpsert("Dim", "Dim", [{ name: "L1", type: "Numeric" }])).resolves.toEqual({
+    await expect(
+      svc.bulkUpsert("Dim", "Dim", [{ name: "L1", type: "Numeric" }]),
+    ).resolves.toEqual({
       typeChanges: [],
     });
   });

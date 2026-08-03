@@ -15,7 +15,11 @@ import type {
 } from "../../types.js";
 import type { TM1HttpClient } from "../http.js";
 import { BatchUnsupportedError } from "./batch-service.js";
-import type { BatchRequest, BatchService, BatchSubResult } from "./batch-service.js";
+import type {
+  BatchRequest,
+  BatchService,
+  BatchSubResult,
+} from "./batch-service.js";
 import type { CellService } from "./cell-service.js";
 import { rethrowIfSystemic } from "./fallback.js";
 
@@ -67,7 +71,10 @@ function normalizeElementType(t: number | string): string {
  * non-atomic — exactly as the concurrent per-request path already leaves
  * earlier writes committed when a later one fails.
  */
-function throwFirstFailure(results: BatchSubResult[], indexOf: (id: string) => number): void {
+function throwFirstFailure(
+  results: BatchSubResult[],
+  indexOf: (id: string) => number,
+): void {
   let firstIndex = Number.POSITIVE_INFINITY;
   let firstError: TM1Error | undefined;
   for (const r of results) {
@@ -255,10 +262,16 @@ export class ElementService {
     dimensionName: string,
     hierarchyName: string,
     elements: ElementCreate[],
-  ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
+  ): Promise<{
+    typeChanges: Array<{ name: string; from: string; to: string }>;
+  }> {
     if (this.batch && !this.batch.isKnownUnsupported) {
       try {
-        return await this.bulkUpsertViaBatch(dimensionName, hierarchyName, elements);
+        return await this.bulkUpsertViaBatch(
+          dimensionName,
+          hierarchyName,
+          elements,
+        );
       } catch (err) {
         // ONLY "this server has no $batch" falls through. A sub-request failure
         // is not an exception here (it is reported per item and rethrown as the
@@ -304,7 +317,9 @@ export class ElementService {
     dimensionName: string,
     hierarchyName: string,
     elements: ElementCreate[],
-  ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
+  ): Promise<{
+    typeChanges: Array<{ name: string; from: string; to: string }>;
+  }> {
     const batch = this.batch!;
     const baseUrl = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements`;
     // Correlate by element INDEX, not name: names are caller-supplied and could
@@ -355,8 +370,13 @@ export class ElementService {
       // guard the per-request path applies to its probe; only a genuine,
       // non-systemic failure (e.g. NOT_FOUND) may degrade to null.
       if (!r.ok) rethrowIfSystemic(r.error);
-      const raw = r.ok ? (r.body as { Type?: number | string } | null)?.Type : undefined;
-      typeById.set(indexOf(r.id), raw === undefined || raw === null ? null : normalizeElementType(raw));
+      const raw = r.ok
+        ? (r.body as { Type?: number | string } | null)?.Type
+        : undefined;
+      typeById.set(
+        indexOf(r.id),
+        raw === undefined || raw === null ? null : normalizeElementType(raw),
+      );
     }
 
     // Pass 1c — patch the types that actually differ, plus the unreadable ones.
@@ -387,7 +407,12 @@ export class ElementService {
     // an upsert that omits components leaves existing children intact.
     const components: BatchRequest[] = [];
     for (const [i, el] of elements.entries()) {
-      if (el.type !== "Consolidated" || !el.components || el.components.length === 0) continue;
+      if (
+        el.type !== "Consolidated" ||
+        !el.components ||
+        el.components.length === 0
+      )
+        continue;
       components.push({
         id: idOf(i),
         method: "PATCH",
@@ -413,7 +438,9 @@ export class ElementService {
     dimensionName: string,
     hierarchyName: string,
     elements: ElementCreate[],
-  ): Promise<{ typeChanges: Array<{ name: string; from: string; to: string }> }> {
+  ): Promise<{
+    typeChanges: Array<{ name: string; from: string; to: string }>;
+  }> {
     const baseUrl = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements`;
 
     // Pass 1: Create/upsert all elements without components. Same-type element
