@@ -93,7 +93,12 @@ describe("TM1_RESPONSE_MODE", () => {
     expect(res.content).toEqual([]);
   });
 
-  it("defaults to legacy when the argument is omitted", async () => {
+  // The PARAMETER default is legacy; the SHIPPED default is structured (set in
+  // config.ts and passed explicitly by the server). Direct callers — the live
+  // harness and these tests — read content[0].text to assert on, so the
+  // conservative parameter default keeps them working. Guarding it here keeps
+  // that divergence intentional and visible.
+  it("direct callers that omit the argument still get legacy", async () => {
     const res = (await captureWrapped()()) as { content: unknown[] };
     expect(res.content).toHaveLength(1);
   });

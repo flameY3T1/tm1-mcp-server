@@ -48,17 +48,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inside their parents' own semver ranges, so neither override is a semver escape.
   `npm audit --omit=dev --audit-level=high` — the CI gate — went from exit 1 to exit 0.
 
-### Added
+### Changed — BREAKING
 
-- **`TM1_RESPONSE_MODE` — opt out of double-serialised responses.** Every tool declares an
-  `outputSchema`, so the server parses each handler's JSON into `structuredContent`; in the
-  default `legacy` mode the identical JSON also stays in `content[0].text`, so **every** successful
-  response ships its body twice. `TM1_RESPONSE_MODE=structured` drops the duplicate text block,
-  roughly halving response size. Spec-legal because an `outputSchema` is declared
-  (`CallToolResult.content` may be empty then), but opt-in: the spec still recommends sending both
-  for backwards compatibility, and a client that reads `content[0]` while ignoring
-  `structuredContent` would see an empty result. `format: "markdown"` is unaffected — there the
-  text block is the rendered table rather than a duplicate, and it survives in both modes.
+- **Successful tool results no longer ship their payload twice; `structured` is the new default.**
+  Every tool declares an `outputSchema`, so the server parses each handler's JSON into
+  `structuredContent` — and previously left the identical JSON in `content[0].text` as well, so
+  **every** successful response carried its body twice. Measured on a real call:
+  **13898 B → 6612 B, a 52% cut.** Spec-legal because an `outputSchema` is declared
+  (`CallToolResult.content` "may be empty" then).
+
+  **Breaking for clients that read `content[0].text` and ignore `structuredContent`** — those now
+  see an empty result. `TM1_RESPONSE_MODE=legacy` restores the previous wire format; the escape
+  hatch stays because the MCP spec still recommends shipping both for backwards compatibility.
+  Verified working without it against Claude Code.
+
+  Unaffected in both modes: `format: "markdown"` (there the text block is the rendered table, not a
+  duplicate) and error results (they carry no `structuredContent`).
 
 ### Changed
 

@@ -39,16 +39,18 @@ export interface TM1Config {
   mode: "readwrite" | "readonly";
   // How a successful tool result is put on the wire.
   //
+  //   "structured" (default) — structuredContent only; the redundant text block
+  //                  is dropped. Spec-legal precisely because an outputSchema is
+  //                  declared: CallToolResult.content "may be empty" then.
+  //                  Measured on a real call: 13898 B -> 6612 B, a 52% cut.
   //   "legacy"     — the JSON body appears TWICE: once as content[0].text and
   //                  once as structuredContent. Every tool declares an
   //                  outputSchema, so this doubles every successful response.
-  //   "structured" — structuredContent only; the duplicate text block is
-  //                  dropped. Spec-legal precisely because an outputSchema is
-  //                  declared: CallToolResult.content "may be empty" then.
   //
-  // Default "legacy" because dropping content[0] breaks any client that reads
-  // the text block and ignores structuredContent. Flip to "structured" once the
-  // clients in use are known to handle it.
+  // "structured" is the default because it is what the payload should have been
+  // all along; "legacy" exists for clients that read content[0] and ignore
+  // structuredContent — they would see an EMPTY result otherwise, so the escape
+  // hatch stays. Verified against Claude Code (renders structuredContent).
   responseMode: "legacy" | "structured";
   // v12 (Planning Analytics Engine). version===12 selects the v12 connection
   // profile (URL reroot + POST /{instance}/auth/v1/session login). Selected
@@ -236,7 +238,7 @@ export function loadConfig(): TM1Config {
   // Same parse shape as TM1_MODE: case-insensitive, unknown value throws at
   // startup rather than silently picking a wire format the operator did not ask
   // for.
-  const responseModeRaw = (process.env.TM1_RESPONSE_MODE ?? "legacy")
+  const responseModeRaw = (process.env.TM1_RESPONSE_MODE ?? "structured")
     .trim()
     .toLowerCase();
   if (

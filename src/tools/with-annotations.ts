@@ -116,6 +116,11 @@ export function withAnnotations(
   server: McpServer,
   logger: pino.Logger,
   mode: "readwrite" | "readonly",
+  // NOTE: this parameter default is NOT the shipped default. The server passes
+  // config.responseMode, which defaults to "structured" (see config.ts). The
+  // conservative default here serves direct callers — the live harness and the
+  // unit tests read content[0].text to assert on and would go blind under
+  // "structured". Deliberate divergence, not drift.
   responseMode: "legacy" | "structured" = "legacy",
 ): McpServer {
   installToolsListSlimming(server);

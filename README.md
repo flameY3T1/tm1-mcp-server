@@ -139,16 +139,17 @@ its report, just redacted.
 ### Response size — `TM1_RESPONSE_MODE`
 
 Every tool declares an `outputSchema`, so the server parses each handler's JSON
-payload into `structuredContent`. In the default `legacy` mode the identical
-JSON **also** stays in `content[0].text`, so every successful response carries
-its body twice.
+payload into `structuredContent`. The default `structured` mode ships **only**
+that — measured on a real call, 13898 B dropped to 6612 B: a 52% cut on every
+successful response. This is spec-legal, because with an `outputSchema` declared
+`CallToolResult.content` may be empty.
 
-`TM1_RESPONSE_MODE=structured` drops the duplicate text block and roughly halves
-response size. This is spec-legal — with an `outputSchema` declared,
-`CallToolResult.content` may be empty — but the MCP spec still recommends
-shipping both for backwards compatibility, so it is **opt-in**: a client that
-reads `content[0]` and ignores `structuredContent` sees an empty result. Try it
-against your client before making it permanent.
+`TM1_RESPONSE_MODE=legacy` restores the previous behaviour, where the identical
+JSON **also** stays in `content[0].text`. Use it only if your client reads
+`content[0]` and ignores `structuredContent` — such a client sees an **empty
+result** under `structured`. The MCP spec still recommends shipping both for
+backwards compatibility, which is why the escape hatch exists; verified working
+without it against Claude Code.
 
 `format: "markdown"` is unaffected: there the text block is the rendered table,
 not a duplicate, and it is preserved in both modes.
