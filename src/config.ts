@@ -37,6 +37,19 @@ export interface TM1Config {
   // TM1_MODE=readwrite, so an unconfigured server cannot mutate or delete TM1
   // objects by accident.
   mode: "readwrite" | "readonly";
+  // How a successful tool result is put on the wire.
+  //
+  //   "legacy"     — the JSON body appears TWICE: once as content[0].text and
+  //                  once as structuredContent. Every tool declares an
+  //                  outputSchema, so this doubles every successful response.
+  //   "structured" — structuredContent only; the duplicate text block is
+  //                  dropped. Spec-legal precisely because an outputSchema is
+  //                  declared: CallToolResult.content "may be empty" then.
+  //
+  // Default "legacy" because dropping content[0] breaks any client that reads
+  // the text block and ignores structuredContent. Flip to "structured" once the
+  // clients in use are known to handle it.
+  responseMode: "legacy" | "structured";
   // v12 (Planning Analytics Engine). version===12 selects the v12 connection
   // profile (URL reroot + POST /{instance}/auth/v1/session login). Selected
   // when instance+database are set, or TM1_VERSION major is 12.
@@ -54,6 +67,7 @@ export interface TM1Config {
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 const VALID_TRANSPORTS = ["stdio", "http"] as const;
 const VALID_MODES = ["readwrite", "readonly"] as const;
+const VALID_RESPONSE_MODES = ["legacy", "structured"] as const;
 const VALID_AUTH_MODES = [
   "s2s",
   "basic",
@@ -219,6 +233,23 @@ export function loadConfig(): TM1Config {
   }
   const mode = modeRaw as TM1Config["mode"];
 
+  // Same parse shape as TM1_MODE: case-insensitive, unknown value throws at
+  // startup rather than silently picking a wire format the operator did not ask
+  // for.
+  const responseModeRaw = (process.env.TM1_RESPONSE_MODE ?? "legacy")
+    .trim()
+    .toLowerCase();
+  if (
+    !VALID_RESPONSE_MODES.includes(
+      responseModeRaw as (typeof VALID_RESPONSE_MODES)[number],
+    )
+  ) {
+    throw new Error(
+      `Invalid TM1_RESPONSE_MODE: "${process.env.TM1_RESPONSE_MODE}". Expected "legacy" or "structured".`,
+    );
+  }
+  const responseMode = responseModeRaw as TM1Config["responseMode"];
+
   // --- v12 (Planning Analytics Engine) connection ---------------------------
   const instance = process.env.TM1_INSTANCE || undefined;
   const database = process.env.TM1_DATABASE || undefined;
@@ -318,6 +349,7 @@ export function loadConfig(): TM1Config {
     httpAllowedOrigins,
     httpToken,
     mode,
+    responseMode,
     version,
     instance,
     database,

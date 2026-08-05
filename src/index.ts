@@ -80,7 +80,10 @@ function buildMcpServer(
   // annotation hint from ANNOTATION_MAP without editing call sites. In readonly
   // mode the proxy silently drops write/destructive tools so they never appear
   // in the tool listing — no autoApprove lists needed.
-  registerAllTools(withAnnotations(server, logger, config.mode), tm1Client);
+  registerAllTools(
+    withAnnotations(server, logger, config.mode, config.responseMode),
+    tm1Client,
+  );
   logger.debug(`All MCP tools registered (mode: ${config.mode})`);
 
   // Register MCP Resources (URI-addressable read-only views over TM1 objects).

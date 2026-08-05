@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inside their parents' own semver ranges, so neither override is a semver escape.
   `npm audit --omit=dev --audit-level=high` — the CI gate — went from exit 1 to exit 0.
 
+### Added
+
+- **`TM1_RESPONSE_MODE` — opt out of double-serialised responses.** Every tool declares an
+  `outputSchema`, so the server parses each handler's JSON into `structuredContent`; in the
+  default `legacy` mode the identical JSON also stays in `content[0].text`, so **every** successful
+  response ships its body twice. `TM1_RESPONSE_MODE=structured` drops the duplicate text block,
+  roughly halving response size. Spec-legal because an `outputSchema` is declared
+  (`CallToolResult.content` may be empty then), but opt-in: the spec still recommends sending both
+  for backwards compatibility, and a client that reads `content[0]` while ignoring
+  `structuredContent` would see an empty result. `format: "markdown"` is unaffected — there the
+  text block is the rendered table rather than a duplicate, and it survives in both modes.
+
 ### Fixed
 
 - **HTTP transport no longer leaks a listener per request.** Each request builds a fresh

@@ -116,6 +116,7 @@ export function withAnnotations(
   server: McpServer,
   logger: pino.Logger,
   mode: "readwrite" | "readonly",
+  responseMode: "legacy" | "structured" = "legacy",
 ): McpServer {
   installToolsListSlimming(server);
 
@@ -125,6 +126,22 @@ export function withAnnotations(
 
   type ToolCallback = (...cbArgs: unknown[]) => unknown;
 
+  // Handlers return their payload as a JSON string in content[0].text. Parsing
+  // it into structuredContent is what satisfies the declared outputSchema — but
+  // leaving the text block in place means the identical JSON crosses the wire
+  // TWICE. Every tool declares an outputSchema, so in "legacy" mode that
+  // doubling applies to every successful response.
+  //
+  // In "structured" mode the now-redundant text block is dropped. That is
+  // spec-legal only because an outputSchema is declared: CallToolResult.content
+  // "may be empty" then (see CallToolResultSchema in the SDK). It is NOT the
+  // default, because a client that reads content[0] and ignores
+  // structuredContent would see an empty result — the spec still recommends
+  // shipping both for backwards compatibility.
+  //
+  // A non-JSON text block (markdown mode, where the handler already attached
+  // structuredContent itself) is left alone in both modes: there the text is
+  // the point, not a duplicate.
   const attachStructured = (result: McpToolResult): McpToolResult => {
     const first = result.content?.[0];
     if (!first || first.type !== "text" || typeof first.text !== "string") {
@@ -134,7 +151,9 @@ export function withAnnotations(
     if (!raw.startsWith("{") && !raw.startsWith("[")) return result;
     try {
       const parsed = JSON.parse(raw);
-      return { ...result, structuredContent: parsed };
+      return responseMode === "structured"
+        ? { ...result, content: [], structuredContent: parsed }
+        : { ...result, structuredContent: parsed };
     } catch {
       return result;
     }

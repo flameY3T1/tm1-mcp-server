@@ -92,6 +92,7 @@ TM1_PASSWORD=your-password
 TM1_SSL_REJECT_UNAUTHORIZED=false
 TM1_VERSION=11.8
 TM1_MODE=readonly                   # readonly (default) | readwrite
+# TM1_RESPONSE_MODE=structured      # legacy (default) | structured — see below
 # TM1_LOCAL_FILE_ROOT=/srv/tm1-git  # optional; enables host-disk file params (see below)
 ```
 
@@ -102,6 +103,23 @@ CAMPassport`, no user/password needed). Native TM1 auth stays the default when
 neither is set.
 
 See [`.env.example`](.env.example) for the full set (CAM auth, timeouts, logging, HTTP transport).
+
+### Response size — `TM1_RESPONSE_MODE`
+
+Every tool declares an `outputSchema`, so the server parses each handler's JSON
+payload into `structuredContent`. In the default `legacy` mode the identical
+JSON **also** stays in `content[0].text`, so every successful response carries
+its body twice.
+
+`TM1_RESPONSE_MODE=structured` drops the duplicate text block and roughly halves
+response size. This is spec-legal — with an `outputSchema` declared,
+`CallToolResult.content` may be empty — but the MCP spec still recommends
+shipping both for backwards compatibility, so it is **opt-in**: a client that
+reads `content[0]` and ignores `structuredContent` sees an empty result. Try it
+against your client before making it permanent.
+
+`format: "markdown"` is unaffected: there the text block is the rendered table,
+not a duplicate, and it is preserved in both modes.
 
 > **Safe by default:** the server starts in `TM1_MODE=readonly` — only read
 > tools are registered, so it cannot mutate or delete anything. To enable the

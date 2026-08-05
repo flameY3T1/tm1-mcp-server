@@ -36,6 +36,7 @@ function makeConfig(port: number, token?: string): TM1Config {
     httpAllowedOrigins: [],
     httpToken: token,
     mode: "readonly",
+    responseMode: "legacy",
   };
 }
 
