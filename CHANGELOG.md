@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`fast-uri` override raised to `^3.1.5`, `ip-address` pinned to `^10.4.0`.** Both reach us as
+  _runtime_ dependencies through `@modelcontextprotocol/sdk` (via `ajv` and `express-rate-limit`),
+  so they ship to consumers. GHSA-7p8r-x3mc-p8w7 (host confusion via a backslash authority
+  introducer) covers `fast-uri` `>=3.0.0 <3.1.5` — the range grew past the `^3.1.4` override this
+  project shipped in 2.1.0, which silently stopped being sufficient. `ip-address` `<=10.3.0`
+  carries GHSA-4xrf-jv44-h6hh and GHSA-22jq-vg5j-6vgg (CIDR-suffix and IPv4-mapped/NAT64
+  misclassification that can bypass SSRF and trust-boundary checks). Both fixed versions sit
+  inside their parents' own semver ranges, so neither override is a semver escape.
+  `npm audit --omit=dev --audit-level=high` — the CI gate — went from exit 1 to exit 0.
+
 ### Changed
 
 - `tm1_bulk_upsert_elements` now folds its element writes into OData `$batch` requests instead of one HTTP call per element: an upsert of N elements costs four batched passes (create, type-probe, type-patch, consolidation components) rather than N round-trips, with each pass split into chunks of at most 200 sub-requests. Servers without a usable `$batch` endpoint transparently fall back to the previous per-request path, and the tool's inputs, outputs and error behaviour are unchanged. Live-validated against TM1 v11 11.8 and v12 / Planning Analytics Engine 12.5.9.
