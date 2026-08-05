@@ -3,6 +3,8 @@ import { createServer } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import pino from "pino";
 import { startHttpTransport } from "../../src/http-transport.js";
+import { SubscriptionRegistry } from "../../src/resources/subscriptions.js";
+import { tm1Events } from "../../src/lib/tm1-events.js";
 import type { TM1Config } from "../../src/config.js";
 
 // Grab a free ephemeral port by binding :0, reading it back, then releasing.
@@ -38,11 +40,16 @@ function makeConfig(port: number, token?: string): TM1Config {
 }
 
 // Minimal MCP server — no TM1 client needed. initialize is answered by the SDK.
-function buildServer(): McpServer {
-  return new McpServer(
-    { name: "test-server", version: "0.0.0" },
-    { capabilities: { logging: {} } },
-  );
+// Shaped like the real src/index.ts builder: {server, dispose}. The transport
+// owns calling dispose() on teardown, so the seam has to exist in the fake too.
+function buildServer(): { server: McpServer; dispose: () => void } {
+  return {
+    server: new McpServer(
+      { name: "test-server", version: "0.0.0" },
+      { capabilities: { logging: {} } },
+    ),
+    dispose: () => {},
+  };
 }
 
 const INIT = {
@@ -108,6 +115,44 @@ describe("startHttpTransport (stateless, per-request)", () => {
 
     const r3 = await post(port, INIT);
     expect(r3.status).toBe(200);
+  });
+
+  // K1 regression. The stateless transport builds a fresh McpServer per request,
+  // and buildMcpServer attaches a SubscriptionRegistry listener to the
+  // PROCESS-GLOBAL tm1Events emitter. server.close() cannot detach that — it
+  // knows nothing about tm1Events — so before the fix every request left one
+  // listener (and the server graph it retained) behind: an unbounded leak that
+  // also fanned every TM1 mutation out across all historical registries.
+  //
+  // Asserting on listenerCount rather than on "dispose was called" is deliberate:
+  // it fails if the wiring is right but the disposer is a no-op.
+  it("leaves no tm1Events listener behind after each request (K1 regression)", async () => {
+    const port = await freePort();
+    const before = tm1Events.listenerCount("mutation");
+
+    close = await startHttpTransport(
+      () => {
+        const server = new McpServer(
+          { name: "test-server", version: "0.0.0" },
+          { capabilities: { logging: {}, resources: { subscribe: true } } },
+        );
+        const subscriptions = new SubscriptionRegistry(server, silentLogger);
+        subscriptions.install();
+        return { server, dispose: () => subscriptions.dispose() };
+      },
+      makeConfig(port),
+      silentLogger,
+    );
+
+    for (let i = 0; i < 3; i++) {
+      const res = await post(port, INIT);
+      expect(res.status).toBe(200);
+    }
+
+    // res.on("close") fires after the body is flushed; give the loop one turn.
+    await new Promise((r) => setImmediate(r));
+
+    expect(tm1Events.listenerCount("mutation")).toBe(before);
   });
 
   it("rejects a request with a missing/wrong bearer token", async () => {

@@ -124,9 +124,9 @@ Key conventions:
 | Method names       | Domain-scoped — `list()`, not `listCubes()`. Prefix is implicit |
 | Long-running calls | Accept `opts?: { timeoutMs?: number }` and pass to `request()`  |
 | Logging            | Use `this.http.logger` for warnings only — keep services quiet  |
-| Version branches   | `if (this.http.tm1Version.startsWith("11"))`                    |
+| Version branches   | `if (this.http.version === 11)` — numeric major, not string     |
 | Helpers            | Private methods on the service (e.g. `clearViaTI`)              |
-| State              | None. Services are stateless wrappers.                          |
+| State              | None by default; `BatchService` is the deliberate exception     |
 
 ### Wiring a service into TM1Client
 

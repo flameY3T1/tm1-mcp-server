@@ -4,14 +4,23 @@
 // SDK's 5-arg overload (name, desc, schema, annotations, cb).
 //
 // Categorization rules:
-//   READ_ONLY         GET / list / search / analyze / validate / compile / diff
-//   IDEMPOTENT_WRITE  PUT-style updates: same input -> same end state
-//   WRITE             POST-style creates / non-idempotent (toggle, write_cells)
-//   DESTRUCTIVE       delete / clear / unload / cancel / remove /
-//                     execute (TI side effects)
+//   READ_ONLY              GET / list / search / analyze / validate / compile / diff
+//   IDEMPOTENT_WRITE       PUT-style updates: same input -> same end state, and
+//                          nothing pre-existing is thrown away
+//   IDEMPOTENT_DESTRUCTIVE same input -> same end state, but the call REPLACES
+//                          something unrecoverable (whole rule file, whole child
+//                          set of a consolidation)
+//   WRITE                  POST-style creates / non-idempotent (toggle)
+//   DESTRUCTIVE            delete / clear / unload / cancel / remove /
+//                          execute (TI side effects) / cell overwrite
+//
+// The line that matters is "does a failed guess cost the user data", not
+// "does this call delete an object" — see IDEMPOTENT_DESTRUCTIVE in
+// annotations.ts for why that distinction was wrong before.
 import {
   READ_ONLY,
   IDEMPOTENT_WRITE,
+  IDEMPOTENT_DESTRUCTIVE,
   WRITE,
   DESTRUCTIVE,
   withVersion,
@@ -45,10 +54,16 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_get_view: READ_ONLY,
   tm1_get_view_definition: READ_ONLY,
   tm1_sample_cells: READ_ONLY,
-  tm1_write_cells: WRITE,
+  // Overwrites prior cell values with no undo — destructive in the MCP sense
+  // even though nothing is "deleted". Not idempotent-tagged: the repo treats a
+  // cell write as POST-shaped.
+  tm1_write_cells: DESTRUCTIVE,
 
   // dimension-management
-  tm1_bulk_upsert_elements: IDEMPOTENT_WRITE,
+  // A non-empty components list replaces a consolidation's ENTIRE child set,
+  // and an in-place type change discards the element's leaf cell values. The
+  // tool description says so; the annotation used to contradict it.
+  tm1_bulk_upsert_elements: IDEMPOTENT_DESTRUCTIVE,
   tm1_create_dimension: WRITE,
   tm1_create_element_attribute: WRITE,
   tm1_create_element: WRITE,
@@ -90,7 +105,9 @@ export const ANNOTATION_MAP: Record<string, Tm1ToolAnnotations> = {
   tm1_get_cube_stats: READ_ONLY,
   tm1_search_rules: READ_ONLY,
   tm1_unload_cube: DESTRUCTIVE,
-  tm1_set_cube_rules: IDEMPOTENT_WRITE,
+  // Replaces the cube's whole rule file; the previous rules are not recoverable
+  // through this API.
+  tm1_set_cube_rules: IDEMPOTENT_DESTRUCTIVE,
 
   // operations
   tm1_diagnose_process_error: READ_ONLY,

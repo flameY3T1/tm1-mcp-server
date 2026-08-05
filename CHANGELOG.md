@@ -19,7 +19,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inside their parents' own semver ranges, so neither override is a semver escape.
   `npm audit --omit=dev --audit-level=high` — the CI gate — went from exit 1 to exit 0.
 
+### Fixed
+
+- **HTTP transport no longer leaks a listener per request.** Each request builds a fresh
+  `McpServer`, and that build attaches a `SubscriptionRegistry` listener to the process-global
+  `tm1Events` emitter. `server.close()` cannot detach it — it knows nothing about that emitter —
+  so every request left one listener plus the server graph it retained behind, and every TM1
+  mutation fanned out across all historical registries. `buildMcpServer` now returns
+  `{server, dispose}` and every transport teardown path calls `dispose()`. Regression test asserts
+  the listener count is unchanged after repeated requests.
+
+- **The callgraph cache can no longer publish a pre-mutation index.** `invalidateCallgraphCache()`
+  cleared the map but could not reach a build that was already in flight: that build finished
+  afterwards and wrote its stale snapshot back with a fresh timestamp, serving it as current for a
+  full 60s TTL. Builds now capture a generation counter and refuse to publish if an invalidation
+  happened while they ran. The in-flight caller still receives its result.
+
+- **`tm1_sample_cells` no longer reports `truncated: true` for an exact-size result.** It asks TM1
+  for one cell more than requested and decides truncation from that sentinel instead of inferring
+  it from a full page; the extra row is dropped, so the response contract is unchanged.
+
+- **Timestamp inputs are validated instead of being decorated.** `since`/`until` used to get a
+  bare `"Z"` appended to whatever arrived, so `"yesterday"` became `"yesterdayZ"` inside an OData
+  `$filter` and TM1 answered with a parse error naming neither the parameter nor the value. Input
+  is now checked against ISO-8601 and rejected with both. Ambiguous locale formats such as
+  `08/06/2026` are rejected too rather than silently resolving to 6 August.
+
 ### Changed
+
+- **Annotations: irreversible overwrites now declare `destructiveHint: true`.** The taxonomy had
+  come to mean "deletes an object", so full-replacement writes advertised `destructiveHint: false`
+  and a client's confirm-before-destructive prompt never fired for them. `tm1_write_cells` is now
+  `DESTRUCTIVE`; `tm1_set_cube_rules` (replaces the whole rule file) and `tm1_bulk_upsert_elements`
+  (a non-empty components list replaces a consolidation's entire child set) use a new
+  `IDEMPOTENT_DESTRUCTIVE` class — idempotent and destructive are orthogonal. No tool changed its
+  `readOnlyHint`, so `TM1_MODE=readonly` exposes exactly the same tools as before.
+
+- **`ViewService.list()` queries the public and private scopes in parallel** instead of serially.
+  Result order (public first) and error handling are unchanged. MDX stays in the `$select`:
+  `tm1_list_views` advertises it as part of the response, so dropping it would be a breaking
+  output change rather than an optimisation.
+
+- **CI now runs `npm run lint:format`.** `npm run verify` already ran `prettier --check` and the
+  README calls verify "everything CI runs" — without this step that was false in the direction
+  that hurts, with the local gate stricter than the one guarding main.
+
+- **`docs/ARCHITECTURE.md` service-conventions table corrected.** The version-branch idiom is
+  `this.http.version === 11` (numeric major), not the pre-v12 `tm1Version.startsWith("11")`, and
+  the "services hold no state" row now names `BatchService` as the deliberate exception.
 
 - `tm1_bulk_upsert_elements` now folds its element writes into OData `$batch` requests instead of one HTTP call per element: an upsert of N elements costs four batched passes (create, type-probe, type-patch, consolidation components) rather than N round-trips, with each pass split into chunks of at most 200 sub-requests. Servers without a usable `$batch` endpoint transparently fall back to the previous per-request path, and the tool's inputs, outputs and error behaviour are unchanged. Live-validated against TM1 v11 11.8 and v12 / Planning Analytics Engine 12.5.9.
 

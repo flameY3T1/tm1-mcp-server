@@ -41,11 +41,26 @@ async function startStdioTransport(
 //   logging — NOT auto-registered by the SDK; declaring it unlocks
 //     server.sendLoggingMessage() (delivered on stdio; HTTP stateless has no
 //     standing stream, so notifications are not pushed there).
+export interface BuiltMcpServer {
+  server: McpServer;
+  /**
+   * Detach everything this build attached to PROCESS-GLOBAL state — today the
+   * SubscriptionRegistry's `tm1Events` listener. `server.close()` does NOT do
+   * this: the registry holds its listener on an emitter the server knows
+   * nothing about, so closing the server leaves it subscribed forever.
+   *
+   * The stateless HTTP transport builds one server per request, so skipping
+   * this leaks a listener (and the whole server object graph it closes over)
+   * on every single call. Must be invoked by every transport teardown path.
+   */
+  dispose: () => void;
+}
+
 function buildMcpServer(
   tm1Client: TM1Client,
   config: TM1Config,
   logger: pino.Logger,
-): McpServer {
+): BuiltMcpServer {
   const server = new McpServer(
     {
       name: NAME,
@@ -84,7 +99,12 @@ function buildMcpServer(
   registerAllPrompts(server);
   logger.debug("All MCP resources and prompts registered");
 
-  return server;
+  return {
+    server,
+    dispose: () => {
+      subscriptions.dispose();
+    },
+  };
 }
 
 async function main(): Promise<void> {
@@ -121,6 +141,10 @@ async function main(): Promise<void> {
   // (Streamable HTTP, stateless) is for remote/multi-client deploys and builds a
   // fresh server per request (single-use transport); binds to 127.0.0.1 by
   // default with DNS-rebinding protection per MCP spec recommendation.
+  // stdio builds exactly one server for the process lifetime, so its disposer
+  // runs in shutdown(). http builds one per request and disposes each in the
+  // transport's own teardown — nothing process-scoped is left for us here.
+  let stdioDispose: (() => void) | undefined;
   const httpCloser =
     config.transport === "http"
       ? await startHttpTransport(
@@ -128,10 +152,11 @@ async function main(): Promise<void> {
           config,
           logger,
         )
-      : await startStdioTransport(
-          buildMcpServer(tm1Client, config, logger),
-          logger,
-        );
+      : await (async () => {
+          const built = buildMcpServer(tm1Client, config, logger);
+          stdioDispose = built.dispose;
+          return startStdioTransport(built.server, logger);
+        })();
   logger.info(
     `MCP server configured (mode: ${config.mode}, transport: ${config.transport})`,
   );
@@ -142,6 +167,11 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info({ signal }, "Shutting down TM1 MCP Server");
+    try {
+      stdioDispose?.();
+    } catch (err) {
+      logger.error({ err }, "Error disposing server subscriptions");
+    }
     try {
       await httpCloser?.();
     } catch (err) {

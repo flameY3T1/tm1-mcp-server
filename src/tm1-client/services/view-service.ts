@@ -32,33 +32,42 @@ export class ViewService {
    * GET /api/v1/Cubes('{c}')/Views + /PrivateViews
    */
   async list(cubeName: string): Promise<CubeView[]> {
-    const result: CubeView[] = [];
-    try {
-      const pub = await this.http.request<{
-        value: Array<{ Name: string; MDX?: string }>;
-      }>("GET", `/api/v1/Cubes('${enc(cubeName)}')/Views?$select=Name,MDX`);
-      result.push(
-        ...pub.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: false })),
-      );
-    } catch (e) {
-      rethrowIfSystemic(e);
-      // no public views
-    }
-    try {
-      const priv = await this.http.request<{
-        value: Array<{ Name: string; MDX?: string }>;
-      }>(
-        "GET",
-        `/api/v1/Cubes('${enc(cubeName)}')/PrivateViews?$select=Name,MDX`,
-      );
-      result.push(
-        ...priv.value.map((v) => ({ name: v.Name, mdx: v.MDX, private: true })),
-      );
-    } catch (e) {
-      rethrowIfSystemic(e);
-      // no private views
-    }
-    return result;
+    // Public and private scopes are independent collections — issue both at
+    // once instead of paying two serial round-trips. Each keeps its own
+    // rethrowIfSystemic/swallow behaviour, and the results are concatenated in
+    // the original order (public first), so callers see no change but the wait.
+    //
+    // MDX stays in the $select: tm1_list_views advertises it as part of the
+    // response, so dropping it to save bytes would be a breaking output change,
+    // not an optimisation.
+    const fetchScope = async (
+      collection: "Views" | "PrivateViews",
+      isPrivate: boolean,
+    ): Promise<CubeView[]> => {
+      try {
+        const res = await this.http.request<{
+          value: Array<{ Name: string; MDX?: string }>;
+        }>(
+          "GET",
+          `/api/v1/Cubes('${enc(cubeName)}')/${collection}?$select=Name,MDX`,
+        );
+        return res.value.map((v) => ({
+          name: v.Name,
+          mdx: v.MDX,
+          private: isPrivate,
+        }));
+      } catch (e) {
+        rethrowIfSystemic(e);
+        // scope absent or not readable — omit it
+        return [];
+      }
+    };
+
+    const [pub, priv] = await Promise.all([
+      fetchScope("Views", false),
+      fetchScope("PrivateViews", true),
+    ]);
+    return [...pub, ...priv];
   }
 
   /**

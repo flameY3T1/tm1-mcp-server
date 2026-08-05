@@ -77,6 +77,26 @@ export function toOdataDateTime(input: string): string {
   let t = input.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) t = `${t}T00:00:00`;
   if (!/[zZ]$/.test(t) && !/[+-]\d{2}:\d{2}$/.test(t)) t = `${t}Z`;
+  // Validate before it reaches a $filter. Appending "Z" to whatever arrived
+  // turned "yesterday" into "yesterdayZ" and shipped it to TM1, which answers
+  // with an opaque OData parse error naming neither the parameter nor the bad
+  // value. Rejecting here names both.
+  //
+  // Shape check FIRST, then Date.parse — Date.parse alone is too permissive to
+  // be a gate. It accepts V8's legacy formats, so "08/06/2026" parses happily
+  // as 6 August; a caller who meant 8 June would silently get a different day
+  // and a plausible-looking, wrong result. Ambiguous input must fail loudly.
+  const ISO_DATETIME =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+  if (!ISO_DATETIME.test(t) || Number.isNaN(Date.parse(t))) {
+    throw new TM1Error({
+      code: TM1ErrorCode.VALIDATION_ERROR,
+      message:
+        `Not a usable timestamp: '${input}'. Expected ISO-8601 — ` +
+        `'2026-06-08', '2026-06-08T14:30:00', or with a zone ` +
+        `('...Z' / '...+02:00'). A value without a zone is read as UTC.`,
+    });
+  }
   return t;
 }
 

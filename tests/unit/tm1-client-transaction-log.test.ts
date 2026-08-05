@@ -64,6 +64,20 @@ describe("toOdataDateTime", () => {
       "2026-06-08T00:00:00+02:00",
     );
   });
+
+  // S10: the function used to append "Z" to anything at all, so "yesterday"
+  // became "yesterdayZ" and went straight into a $filter. TM1 then returned an
+  // opaque OData parse error mentioning neither the parameter nor the value.
+  it.each(["yesterday", "", "not-a-date", "2026-13-45", "08/06/2026"])(
+    "rejects unparseable input %o instead of shipping it to OData",
+    (bad) => {
+      expect(() => toOdataDateTime(bad)).toThrow(/Not a usable timestamp/);
+    },
+  );
+
+  it("names the offending value in the error", () => {
+    expect(() => toOdataDateTime("yesterday")).toThrow(/'yesterday'/);
+  });
 });
 
 describe("TM1Client – getTransactionLog()", () => {

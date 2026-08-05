@@ -54,6 +54,25 @@ export const WRITE: ToolAnnotations = {
   openWorldHint: true,
 };
 
+// Idempotent, but overwrites something that re-running the call cannot bring
+// back: set_cube_rules replaces the whole rule file, write_cells replaces the
+// prior cell values, bulk_upsert_elements' component lists replace a
+// consolidation's entire child set.
+//
+// Splitting this out closes a real taxonomy hole: "destructive" had come to mean
+// "deletes an object", so full-replacement writes advertised
+// destructiveHint:false and a client's confirm-before-destructive prompt never
+// fired for them. Per MCP spec destructiveHint asks whether the tool "may
+// perform destructive updates to its environment" — an irreversible overwrite
+// qualifies. Idempotence is orthogonal (same input, same end state; it says
+// nothing about what the first call overwrote).
+export const IDEMPOTENT_DESTRUCTIVE: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: true,
+  openWorldHint: true,
+};
+
 // delete_*, clear_*, unload_*, cancel_*, remove_*, execute_* (TI side effects).
 // Note: "destructive" per MCP spec = "may perform destructive updates to its
 // environment". This covers two distinct shapes in TM1:

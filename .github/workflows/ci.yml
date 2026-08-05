@@ -36,6 +36,14 @@ jobs:
       - name: Lint (ESLint)
         run: npm run lint:eslint
 
+      # `npm run verify` runs prettier --check and the README calls verify
+      # "everything CI runs". Without this step that claim was false in the
+      # direction that hurts: the local gate was STRICTER than the one guarding
+      # main, so a formatting-only diff could land green here and then red on
+      # the next contributor's machine.
+      - name: Lint (formatting)
+        run: npm run lint:format
+
       - name: Build
         run: npm run build
 

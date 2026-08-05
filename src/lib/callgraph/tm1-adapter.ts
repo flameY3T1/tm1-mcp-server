@@ -7,14 +7,33 @@ import {
   type ChoreFetchResult,
   type ChoreTaskRef,
 } from "./referenceIndex.js";
-import { tm1Events } from "../tm1-events.js";
+import { tm1Events, type Tm1MutationEvent } from "../tm1-events.js";
 import { rethrowIfSystemic } from "../../tm1-client/services/fallback.js";
 
 // Cache-invalidation listener. Wired EXPLICITLY via
 // registerCallgraphCacheInvalidation() at client construction — no import-time
 // side-effect. Keeping this a named, stable function reference lets the wiring
 // be idempotent (the registrar checks for it before re-adding).
-const invalidateOnMutation = (): void => {
+// Data-plane paths that can never change the reference graph. The index is
+// built from process definitions, chore definitions and cube rules; none of
+// these endpoints touches any of that.
+//
+// This matters more than it looks: `ExecuteMDX` is a POST, so the HTTP layer
+// classifies every ordinary MDX *read* as a mutation. Before this filter a
+// single tm1_execute_mdx call threw away the whole callgraph index and forced
+// a full rebuild on the next analysis call.
+//
+// Deliberately an allowlist of known-inert paths, not a denylist of
+// code-relevant ones: anything unrecognised keeps invalidating, so a new
+// mutating endpoint is stale-safe by default.
+const INERT_PATHS = [/\/ExecuteMDX/i, /\/Cellsets/i, /tm1\.Update/i];
+
+function affectsReferenceGraph(path: string): boolean {
+  return !INERT_PATHS.some((re) => re.test(path));
+}
+
+const invalidateOnMutation = (e: Tm1MutationEvent): void => {
+  if (!affectsReferenceGraph(e.path)) return;
   invalidateCallgraphCache();
 };
 
@@ -48,9 +67,22 @@ const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<ReferenceIndex>>();
 
+// Monotonic counter bumped on every invalidation. Clearing `cache` alone is not
+// enough: a build that was already in flight when the mutation landed would
+// finish afterwards and write its PRE-mutation snapshot back with a FRESH
+// timestamp, republishing stale data for a full TTL. The build captures the
+// generation it started in and refuses to publish if that generation is gone.
+//
+// The in-flight caller still receives the index it asked for — it requested a
+// read that started before the mutation, so that result is merely old, not
+// wrong. What must not happen is that snapshot becoming the answer for everyone
+// else for the next 60 seconds.
+let generation = 0;
+
 export function invalidateCallgraphCache(): { cleared: number } {
   const n = cache.size;
   cache.clear();
+  generation++;
   return { cleared: n };
 }
 
@@ -89,8 +121,16 @@ export async function buildIndexFromTM1(
 
   const promise = (async (): Promise<ReferenceIndex> => {
     const start = Date.now();
+    const startGeneration = generation;
     const idx = await buildIndexInternal(tm1Client, includeControl);
-    cache.set(key, { index: idx, ts: Date.now(), buildMs: Date.now() - start });
+    // Only publish if no invalidation happened while we were building.
+    if (generation === startGeneration) {
+      cache.set(key, {
+        index: idx,
+        ts: Date.now(),
+        buildMs: Date.now() - start,
+      });
+    }
     return idx;
   })();
 

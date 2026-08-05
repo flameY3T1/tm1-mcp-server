@@ -69,10 +69,17 @@ export function registerSampleCells(server: McpServer, tm1Client: TM1Client) {
       const startedAt = Date.now();
       const dimensions = await tm1Client.cubes.getDimensionNames(cubeName);
 
+      // Sentinel row: ask TM1 for one cell MORE than requested, so `truncated`
+      // is decided by evidence instead of inferred from a full page.
+      // `cells.length >= maxCells` cannot tell "exactly maxCells cells exist"
+      // apart from "more exist" and reported truncation for both. The extra row
+      // is dropped below, so the response contract is unchanged.
+      // maxCells=0 means unlimited — no sentinel, nothing to truncate.
+      const requested = maxCells ?? 5;
       const built = buildSampleCellsMdx({
         cubeName,
         dimensions,
-        maxCells: maxCells ?? 5,
+        maxCells: requested > 0 ? requested + 1 : 0,
         filters,
         axisDimension,
         leavesOnly: leavesOnly ?? true,
@@ -87,7 +94,9 @@ export function registerSampleCells(server: McpServer, tm1Client: TM1Client) {
           if (typeof val === "string") whereCoords[dim] = val;
         }
       }
-      const cells = transformSampleCells({ result, whereCoords });
+      const sampled = transformSampleCells({ result, whereCoords });
+      const truncated = requested > 0 && sampled.length > requested;
+      const cells = truncated ? sampled.slice(0, requested) : sampled;
 
       const hint =
         cells.length === 0
@@ -97,7 +106,6 @@ export function registerSampleCells(server: McpServer, tm1Client: TM1Client) {
           : undefined;
 
       const elapsedMs = Date.now() - startedAt;
-      const truncated = (maxCells ?? 5) > 0 && cells.length >= (maxCells ?? 5);
 
       const payload = {
         cubeName,

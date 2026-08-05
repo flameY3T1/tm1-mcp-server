@@ -25,7 +25,7 @@ import type { TM1Config } from "./config.js";
 // Per MCP best practices: bind 127.0.0.1 by default and enable DNS-rebinding
 // protection. allowedHosts/Origins narrow what the transport accepts.
 export async function startHttpTransport(
-  buildServer: () => McpServer,
+  buildServer: () => { server: McpServer; dispose: () => void },
   config: TM1Config,
   logger: pino.Logger,
 ): Promise<() => Promise<void>> {
@@ -93,7 +93,7 @@ export async function startHttpTransport(
 
       // Fresh server + transport per request (stateless single-use); tear both down
       // once the response is fully written so nothing leaks between requests.
-      const server = buildServer();
+      const { server, dispose } = buildServer();
       const transport = new StreamableHTTPServerTransport({
         // sessionIdGenerator omitted → stateless mode (single-use per request)
         enableJsonResponse: true,
@@ -102,6 +102,12 @@ export async function startHttpTransport(
         allowedOrigins: config.httpAllowedOrigins,
       });
       res.on("close", () => {
+        // dispose() FIRST and synchronously: it detaches the per-build listener
+        // from the process-global tm1Events emitter, which server.close() has no
+        // knowledge of. Skipping it leaks one listener plus the server graph it
+        // retains on every request — the transport builds a fresh server each
+        // time, so the leak is unbounded, not one-off.
+        dispose();
         void transport.close();
         void server.close();
       });
