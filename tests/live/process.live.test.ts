@@ -134,6 +134,7 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
     const r = await h.ok("tm1_execute_process", {
       processName: PROC_A,
       parameters: { pAmount: 5 },
+      confirm: PROC_A,
     });
     expect(r.json).toMatchObject({
       success: true,

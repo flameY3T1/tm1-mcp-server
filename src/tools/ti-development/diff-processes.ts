@@ -6,7 +6,7 @@ import type {
   ProcessVariable,
   DataSource,
 } from "../../types.js";
-import { maskCode } from "../../lib/mask-secrets.js";
+import { maskCode, resolveMaskSecrets } from "../../lib/mask-secrets.js";
 
 // ── LCS line diff ─────────────────────────────────────────────────────────────
 
@@ -292,7 +292,9 @@ export function registerDiffProcesses(server: McpServer, tm1Client: TM1Client) {
     async ({ processA, processB, tabs, contextLines, maskSecrets }) => {
       const diffTabs: readonly Tab[] =
         tabs && tabs.length > 0 ? tabs : ALL_TABS;
-      const mask = maskSecrets ? maskCode : (s: string) => s;
+      const mask = resolveMaskSecrets(maskSecrets)
+        ? maskCode
+        : (s: string) => s;
 
       const [codeA, codeB, paramsA, paramsB, varsA, varsB, dsA, dsB] =
         await Promise.all([

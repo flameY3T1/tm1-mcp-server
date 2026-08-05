@@ -5,6 +5,7 @@ import { commentStats, stripCommentBlocks } from "../../lib/strip-comments.js";
 import {
   maskCode,
   maskConnectionString,
+  resolveMaskSecrets,
   MASK,
 } from "../../lib/mask-secrets.js";
 
@@ -76,9 +77,12 @@ export function registerGetProcess(server: McpServer, tm1Client: TM1Client) {
       includeVariables = true,
       includeDataSource = true,
       includeSecurityAccess = true,
-      maskSecrets = true,
+      maskSecrets: maskSecretsRequested = true,
       stripComments = false,
     }) => {
+      // A model-supplied `maskSecrets:false` only takes effect when the
+      // operator allowed it via TM1_ALLOW_UNMASKED_SECRETS.
+      const maskSecrets = resolveMaskSecrets(maskSecretsRequested);
       const payload: Record<string, unknown> = { name: processName };
       let hint: string | undefined;
 

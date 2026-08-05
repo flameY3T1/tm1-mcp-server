@@ -214,6 +214,7 @@ describe.skipIf(!LIVE_ENABLED)(
       const up = await h.ok("tm1_upload_file", {
         fileName: FILE_NAME,
         content: FILE_BODY,
+        confirm: FILE_NAME,
       });
       expect(up.json).toMatchObject({ success: true, fileName: FILE_NAME });
       expect(up.json.bytesUploaded).toBe(Buffer.byteLength(FILE_BODY, "utf8"));

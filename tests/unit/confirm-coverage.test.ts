@@ -59,6 +59,15 @@ const CONFIRM_REQUIRED = [
   "tm1_delete_client",
   "tm1_delete_file",
   "tm1_remove_client_group",
+  // K2/S9 (2026-08-05): the guard used to cover object DESTRUCTION only, so this
+  // list read as complete while irreversible writes and TI side-effects sat
+  // outside it. A tool that overwrites data, or runs code whose effects the
+  // caller cannot undo, belongs here just as much as a delete.
+  "tm1_execute_process",
+  "tm1_execute_chore",
+  "tm1_write_cells",
+  "tm1_set_cube_rules",
+  "tm1_upload_file",
 ];
 
 describe("confirmation-guard coverage", () => {

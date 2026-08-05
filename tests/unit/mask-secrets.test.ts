@@ -1,10 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   isSecretName,
   maskCode,
   maskCodeLine,
   maskConnectionString,
   maskDataSourceSecrets,
+  maskSecretValues,
+  resolveMaskSecrets,
   MASK,
 } from "../../src/lib/mask-secrets.js";
 
@@ -172,5 +174,89 @@ describe("v12 credential names", () => {
 
   it("does not mask the non-secret client id", () => {
     expect(isSecretName("clientId")).toBe(false);
+  });
+});
+
+// S6: ODBC brace-quotes a value precisely so it MAY contain the delimiter.
+// A value regex that stops at the first ';' masked "{abc" and left "def};"
+// in the output — a partial leak that looks masked.
+describe("maskConnectionString — brace-quoted values", () => {
+  it("masks a braced value containing the delimiter whole", () => {
+    const out = maskConnectionString("Driver={SQL};UID=admin;PWD={abc;def};");
+    expect(out).not.toContain("abc");
+    expect(out).not.toContain("def");
+    expect(out).toContain(`PWD=${MASK}`);
+  });
+
+  it("still masks the plain form", () => {
+    expect(maskConnectionString("PWD=hunter2;")).toBe(`PWD=${MASK};`);
+  });
+
+  it("leaves a non-credential braced value alone", () => {
+    expect(maskConnectionString("Driver={SQL Server};")).toContain(
+      "{SQL Server}",
+    );
+  });
+});
+
+// S4/S5: pino's redact is KEY-based, so it masks {password: "x"} but never a
+// credential embedded in a message string. Those strings are exactly what TM1
+// returns on an ODBC failure, and they went to the log and back to the client.
+describe("maskSecretValues — value-oriented masking of free text", () => {
+  it.each([
+    ["ODBC connect failed: PWD=hunter2", "hunter2"],
+    ["login rejected (UID=admin;PWD={a;b})", "a;b"],
+    ["auth error: token=abc123 rejected", "abc123"],
+    ["Password: 'geheim' was refused", "geheim"],
+  ])("removes the credential from %o", (input, secret) => {
+    const out = maskSecretValues(input);
+    expect(out).not.toContain(secret);
+    expect(out).toContain(MASK);
+  });
+
+  it("leaves ordinary error text untouched", () => {
+    const msg = "'CUBE_X' can not be found in collection of type 'Cube'.";
+    expect(maskSecretValues(msg)).toBe(msg);
+  });
+
+  it("is idempotent — masking twice changes nothing", () => {
+    const once = maskSecretValues("PWD=hunter2");
+    expect(maskSecretValues(once)).toBe(once);
+  });
+
+  it("handles empty input", () => {
+    expect(maskSecretValues("")).toBe("");
+  });
+});
+
+// S8: `maskSecrets:false` is a MODEL-controlled opt-out of a security control.
+// The operator has to allow it out-of-band; default is deny.
+describe("resolveMaskSecrets — the opt-out needs operator consent", () => {
+  const original = process.env.TM1_ALLOW_UNMASKED_SECRETS;
+  afterEach(() => {
+    if (original === undefined) delete process.env.TM1_ALLOW_UNMASKED_SECRETS;
+    else process.env.TM1_ALLOW_UNMASKED_SECRETS = original;
+  });
+
+  it("masks when asked to mask", () => {
+    expect(resolveMaskSecrets(true)).toBe(true);
+    expect(resolveMaskSecrets(undefined)).toBe(true);
+  });
+
+  it("masks ANYWAY when the model asks not to and the operator did not allow it", () => {
+    delete process.env.TM1_ALLOW_UNMASKED_SECRETS;
+    expect(resolveMaskSecrets(false)).toBe(true);
+  });
+
+  it("honours the opt-out only with explicit operator consent", () => {
+    process.env.TM1_ALLOW_UNMASKED_SECRETS = "true";
+    expect(resolveMaskSecrets(false)).toBe(false);
+    // …and still masks when nobody asked for raw output.
+    expect(resolveMaskSecrets(true)).toBe(true);
+  });
+
+  it("treats any value other than the exact string 'true' as deny", () => {
+    process.env.TM1_ALLOW_UNMASKED_SECRETS = "1";
+    expect(resolveMaskSecrets(false)).toBe(true);
   });
 });

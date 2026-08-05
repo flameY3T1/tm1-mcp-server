@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import { maskCode } from "../../lib/mask-secrets.js";
+import { maskCode, resolveMaskSecrets } from "../../lib/mask-secrets.js";
 import { commentStats } from "../../lib/strip-comments.js";
 
 // Default cap for full-code responses. Whole-model code dumps flood the
@@ -109,7 +109,7 @@ export function registerGetAllProcessesCode(
       // summary mode returns no code, so masking is moot — skip the work.
       const processes = summary
         ? kept.map(summarize)
-        : maskSecrets
+        : resolveMaskSecrets(maskSecrets)
           ? kept.map((p) => ({
               ...p,
               prolog: maskCode(p.prolog),

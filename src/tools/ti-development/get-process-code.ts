@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { commentStats, stripCommentBlocks } from "../../lib/strip-comments.js";
-import { maskCode } from "../../lib/mask-secrets.js";
+import { maskCode, resolveMaskSecrets } from "../../lib/mask-secrets.js";
 
 // A tab counts as comment-heavy (worth flagging for stripComments) only when it
 // is both long enough to matter and mostly comments.
@@ -95,7 +95,7 @@ export function registerGetProcessCode(
         }
       }
 
-      if (maskSecrets) {
+      if (resolveMaskSecrets(maskSecrets)) {
         for (const tab of TABS) code[tab] = maskCode(code[tab]);
       }
 

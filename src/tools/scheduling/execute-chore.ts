@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { actionResponse } from "../format.js";
+import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 
 export function registerExecuteChore(
   server: McpServer,
@@ -25,8 +26,12 @@ export function registerExecuteChore(
         .describe(
           "Override the default 30s request timeout for this call (ms, 1000–3600000). Use for chores running long TI chains.",
         ),
+      ...CONFIRM_SCHEMA,
     },
-    async ({ choreName, timeoutMs }, extra) => {
+    async ({ choreName, timeoutMs, confirm }, extra) => {
+      // Runs every chained process; undoing the call does not undo the writes.
+      // Guards against accidental invocation — not a security control.
+      requireConfirm(confirm, choreName, "chore");
       await tm1Client.chores.execute(choreName, {
         signal: extra?.signal,
         ...(timeoutMs ? { timeoutMs } : {}),

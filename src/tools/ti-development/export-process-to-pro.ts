@@ -5,7 +5,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeToPro } from "../../lib/pro-serializer.js";
-import { maskCode } from "../../lib/mask-secrets.js";
+import { maskCode, resolveMaskSecrets } from "../../lib/mask-secrets.js";
 
 export function registerExportProcessToPro(
   server: McpServer,
@@ -44,7 +44,9 @@ export function registerExportProcessToPro(
         tm1Client.processes.getDataSource(processName),
       ]);
 
-      const mask = maskSecrets ? maskCode : (s: string) => s;
+      const mask = resolveMaskSecrets(maskSecrets)
+        ? maskCode
+        : (s: string) => s;
       const proContent = serializeToPro({
         name: processName,
         prolog: mask(code.prolog),

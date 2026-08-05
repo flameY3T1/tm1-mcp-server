@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { compileUserRegex } from "../../lib/safe-regex.js";
-import { maskCodeLine } from "../../lib/mask-secrets.js";
+import { maskCodeLine, resolveMaskSecrets } from "../../lib/mask-secrets.js";
 import { FORMAT_SCHEMA, wrappedPageResponse, type Column } from "../format.js";
 import { PAGINATION_SCHEMA, paginate } from "../pagination.js";
 
@@ -189,7 +189,9 @@ export function registerSearchCode(server: McpServer, tm1Client: TM1Client) {
             const raw = lines[i]!;
             if (excludeCommented && COMMENT_RE.test(raw)) continue;
             if (regex.test(raw)) {
-              const text = (maskSecrets ? maskCodeLine(raw) : raw)
+              const text = (
+                resolveMaskSecrets(maskSecrets) ? maskCodeLine(raw) : raw
+              )
                 .trim()
                 .slice(0, 240);
               matches.push({ process: proc.name, tab, line: i + 1, text });

@@ -9,6 +9,7 @@
 // uniform shape, parsing existing JSON when present and falling back to
 // treating plain-text bodies as TM1_ERROR messages.
 import { TM1Error, TM1ErrorCode, hintForCode } from "../types.js";
+import { maskSecretValues } from "../lib/mask-secrets.js";
 
 interface UniformErrorPayload {
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents -- TM1ErrorCode | string is intentional: documents known codes while accepting arbitrary strings for forward-compat
@@ -28,22 +29,37 @@ interface McpToolResult {
 
 const DEFAULT_CODE: TM1ErrorCode = TM1ErrorCode.TM1_ERROR;
 
+// Second net on the error path. classifyHttpError already sanitizes whatever
+// TM1 said, but this envelope also carries errors that never went through it —
+// a driver message rethrown by a service, a third-party library's text. Those
+// reach the client here, so they get the same value-oriented masking.
+// Idempotent: masking an already-masked string is a no-op.
+function sanitize(payload: UniformErrorPayload): UniformErrorPayload {
+  return {
+    ...payload,
+    message: maskSecretValues(payload.message),
+    ...(payload.details !== undefined
+      ? { details: maskSecretValues(payload.details) }
+      : {}),
+  };
+}
+
 function payloadFromUnknown(err: unknown): UniformErrorPayload {
   if (err instanceof TM1Error) {
-    return err.toErrorPayload();
+    return sanitize(err.toErrorPayload());
   }
   if (err instanceof Error) {
-    return {
+    return sanitize({
       code: DEFAULT_CODE,
       message: err.message,
       hint: hintForCode(DEFAULT_CODE),
-    };
+    });
   }
-  return {
+  return sanitize({
     code: DEFAULT_CODE,
     message: String(err),
     hint: hintForCode(DEFAULT_CODE),
-  };
+  });
 }
 
 export function formatTm1ErrorResult(err: unknown): McpToolResult {

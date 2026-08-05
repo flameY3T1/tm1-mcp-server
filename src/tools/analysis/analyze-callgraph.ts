@@ -11,7 +11,12 @@ import type {
   CallParam,
   ReferenceIndex,
 } from "../../lib/callgraph/referenceIndex.js";
-import { isSecretName, MASK, maskCodeLine } from "../../lib/mask-secrets.js";
+import {
+  isSecretName,
+  MASK,
+  maskCodeLine,
+  resolveMaskSecrets,
+} from "../../lib/mask-secrets.js";
 
 function maskParams(params: readonly CallParam[]): CallParam[] {
   return params.map((p) =>
@@ -393,10 +398,13 @@ export function registerAnalyzeCallgraph(
       includeSystem,
       includeControl,
       mode,
-      maskSecrets,
+      maskSecrets: maskSecretsRequested,
       rankBy,
       topN,
     }) => {
+      // A model-supplied `maskSecrets:false` only takes effect when the
+      // operator allowed it via TM1_ALLOW_UNMASKED_SECRETS.
+      const maskSecrets = resolveMaskSecrets(maskSecretsRequested);
       const index = await buildIndexFromTM1(tm1Client, { includeControl });
 
       if (start === undefined || start === "") {

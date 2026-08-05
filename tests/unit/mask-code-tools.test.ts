@@ -23,6 +23,18 @@ type Handler = (
   extra: Record<string, unknown>,
 ) => Promise<{ content: Array<{ type: string; text: string }> }>;
 
+// S8 (2026-08-05): `maskSecrets:false` is a MODEL-controlled opt-out of a
+// security control, so it now requires operator consent out-of-band. The cases
+// below that assert RAW output grant that consent — they exercise each tool's
+// masking logic, not the gate. The gate itself is asserted once at the bottom
+// of this file and exhaustively in tests/unit/mask-secrets.test.ts.
+beforeEach(() => {
+  process.env.TM1_ALLOW_UNMASKED_SECRETS = "true";
+});
+afterEach(() => {
+  delete process.env.TM1_ALLOW_UNMASKED_SECRETS;
+});
+
 // Capture the raw zod shape + handler a register* fn passes to server.tool, then
 // run inputs through z.object(shape).parse to apply schema defaults (maskSecrets
 // defaults to true) exactly as the live SDK would before the handler runs.
@@ -578,5 +590,34 @@ describe("tm1_export_process_to_git masks the datasource conn-string in .json", 
       maskSecrets: false,
     });
     expect(text).toContain("Conn_Pw!");
+  });
+});
+
+// S8 end-to-end: the gate has to bite at the TOOL boundary, not only inside the
+// helper. Without operator consent a model asking for raw credentials gets
+// masked output anyway — and the call still succeeds, so an audit is degraded
+// rather than broken.
+describe("maskSecrets=false is ignored without operator consent (S8)", () => {
+  const codeClient = clientWith({
+    "Load.Sales": { prolog: ODBC("S3cr3t_Pw!") },
+  });
+
+  it("masks anyway when TM1_ALLOW_UNMASKED_SECRETS is unset", async () => {
+    delete process.env.TM1_ALLOW_UNMASKED_SECRETS;
+    const text = await run(registerGetProcessCode, codeClient, {
+      processName: "Load.Sales",
+      maskSecrets: false,
+    });
+    expect(text).not.toContain("S3cr3t_Pw!");
+    expect(text).toContain("***");
+  });
+
+  it("masks anyway when the variable holds anything other than 'true'", async () => {
+    process.env.TM1_ALLOW_UNMASKED_SECRETS = "yes";
+    const text = await run(registerGetProcessCode, codeClient, {
+      processName: "Load.Sales",
+      maskSecrets: false,
+    });
+    expect(text).not.toContain("S3cr3t_Pw!");
   });
 });

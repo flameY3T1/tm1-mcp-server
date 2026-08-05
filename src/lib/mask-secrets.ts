@@ -12,6 +12,50 @@ export function isSecretName(name: string): boolean {
   return SECRET_NAME_RE.test(name);
 }
 
+// Credential pair inside a connection string: `PWD=secret;`, `UID=admin;`.
+//
+// The value alternation is grammar-aware, and that is the whole point. ODBC
+// lets a value be brace-quoted precisely so it may contain the delimiter:
+// `PWD={abc;def};`. A plain `[^;]+` stops at the first inner `;`, masks `{abc`
+// and leaves `def};` sitting in the output as cleartext — a partial leak that
+// looks masked. Brace form is therefore matched FIRST and consumed whole.
+//
+// Both branches are single linear quantifiers over a negated class, so there is
+// no nested backtracking to exploit.
+export const CONN_CREDENTIAL_RE =
+  /\b(pwd|password|uid|user\s*id)(\s*=\s*)(\{[^}]*\}|[^;'"\r\n]*)/gi;
+
+// Value-oriented sanitizer for arbitrary free text — error messages, server
+// responses, log lines. Distinct from maskSecretsDeep, which is KEY-oriented
+// and therefore blind to a credential embedded in a string: pino's redact
+// config masks `{password: "x"}` but never
+// `err.message = "ODBC failed: PWD=hunter2"`.
+//
+// Deliberately narrow: only credential pairs with an explicit key. Guessing at
+// bare tokens would mangle legitimate error text and train readers to ignore
+// the mask.
+export function maskSecretValues(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(CONN_CREDENTIAL_RE, (_m, key, eq) => `${key}${eq}${MASK}`)
+    .replace(
+      /\b(pass(?:wd|word)?|secret|token|api[_-]?key|credential)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;)}\]]+)/gi,
+      (_m, key, sep) => `${key}${sep}${MASK}`,
+    );
+}
+
+// Whether a caller may switch credential masking OFF.
+//
+// `maskSecrets: false` is a MODEL-controlled opt-out of a security control —
+// the LLM can ask for raw credentials and, before this gate, got them. Now the
+// operator has to allow it out-of-band. Default is deny, so the tool parameter
+// degrades to "mask anyway" rather than failing the call: an audit that asked
+// for unmasked output still gets its report, just redacted.
+export function resolveMaskSecrets(requested: boolean | undefined): boolean {
+  if (requested !== false) return true;
+  return process.env.TM1_ALLOW_UNMASKED_SECRETS !== "true";
+}
+
 // Mask the 3rd argument of ODBCOpen(dsn, user, password) and the 3rd+ args of
 // ExecuteCommand variants where the password tends to live. Also mask any
 // quoted literal that follows a credential keyword.
@@ -41,10 +85,7 @@ export function maskCodeLine(line: string): string {
   // — no nested backtracking. Excluding \r\n keeps a trailing CR (CRLF line
   // ending) out of the match so masking a conn-string line never converts
   // CRLF→LF on the CRLF-sensitive .ti export.
-  out = out.replace(
-    /\b(pwd|password|uid|user\s*id)(\s*=\s*)([^;'"\r\n]+)/gi,
-    (_m, key, eq) => `${key}${eq}${MASK}`,
-  );
+  out = out.replace(CONN_CREDENTIAL_RE, (_m, key, eq) => `${key}${eq}${MASK}`);
 
   return out;
 }

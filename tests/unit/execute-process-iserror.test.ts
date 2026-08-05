@@ -9,7 +9,13 @@ import { registerExecuteProcess } from "../../src/tools/ti-development/execute-p
 // runs but reports success:false must be surfaced as an MCP error, not a
 // successful call carrying success:false.
 type ToolCb = (
-  args: { processName: string; parameters?: Record<string, string | number> },
+  args: {
+    processName: string;
+    parameters?: Record<string, string | number>;
+    // K2/S9: execute_process carries the confirmation guard, so every call has
+    // to repeat the process name — exactly as a real client would.
+    confirm: string;
+  },
   extra: Record<string, unknown>,
 ) => Promise<{
   isError?: boolean;
@@ -35,7 +41,10 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
       success: false,
       processErrorStatus: "DataSource error",
     }));
-    const result = await cb({ processName: "Failing.Process" }, {});
+    const result = await cb(
+      { processName: "Failing.Process", confirm: "Failing.Process" },
+      {},
+    );
     expect(result.isError).toBe(true);
     // Payload is preserved for diagnosis.
     expect(result.content[0]?.text).toContain("DataSource error");
@@ -49,7 +58,10 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
       processErrorStatus: "CompletedWithMinorErrors",
       errorLogFile: "TM1ProcessError_20260718_Partial.log",
     }));
-    const result = await cb({ processName: "Partial.Process" }, {});
+    const result = await cb(
+      { processName: "Partial.Process", confirm: "Partial.Process" },
+      {},
+    );
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain("CompletedWithMinorErrors");
     expect(result.content[0]?.text).toContain(
@@ -62,7 +74,10 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
       success: true,
       processErrorStatus: "CompletedSuccessfully",
     }));
-    const result = await cb({ processName: "Ok.Process" }, {});
+    const result = await cb(
+      { processName: "Ok.Process", confirm: "Ok.Process" },
+      {},
+    );
     expect(result.isError).toBeUndefined();
   });
 });
@@ -77,7 +92,10 @@ describe("tm1_execute_process abort handling (M2)", () => {
 
     let caught: unknown;
     try {
-      await cb({ processName: "Long.Process" }, { signal: controller.signal });
+      await cb(
+        { processName: "Long.Process", confirm: "Long.Process" },
+        { signal: controller.signal },
+      );
     } catch (e) {
       caught = e;
     }
@@ -99,7 +117,10 @@ describe("tm1_execute_process abort handling (M2)", () => {
 
     let caught: unknown;
     try {
-      await cb({ processName: "Broken.Process" }, {});
+      await cb(
+        { processName: "Broken.Process", confirm: "Broken.Process" },
+        {},
+      );
     } catch (e) {
       caught = e;
     }

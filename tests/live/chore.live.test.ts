@@ -136,7 +136,10 @@ describe.skipIf(!LIVE_ENABLED)("live: chore lifecycle", () => {
 
   it("execute_chore runs it once on demand", async () => {
     // Chore is deactivated; on-demand execute bypasses the schedule.
-    const r = await h.ok("tm1_execute_chore", { choreName: CHORE });
+    const r = await h.ok("tm1_execute_chore", {
+      choreName: CHORE,
+      confirm: CHORE,
+    });
     expect(r.json).toMatchObject({ success: true, choreName: CHORE });
   });
 

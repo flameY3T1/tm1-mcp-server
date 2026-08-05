@@ -11,6 +11,7 @@ import { TM1Error, TM1ErrorCode } from "../types.js";
 import { NAME, VERSION } from "../version.js";
 import { getTm1Dispatcher, tm1Fetch } from "./dispatcher.js";
 import { tm1Events } from "../lib/tm1-events.js";
+import { maskSecretValues } from "../lib/mask-secrets.js";
 
 const MAX_NETWORK_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
@@ -528,8 +529,19 @@ export class TM1HttpClient {
 export function classifyHttpError(
   status: number,
   endpoint: string,
-  details?: string,
+  rawDetails?: string,
 ): TM1Error {
+  // S4/S5: sanitize ONCE, here, where the server's own text enters our error
+  // model. Everything downstream reads the TM1Error this builds — the
+  // logger.error() in handleResponse and the MCP error envelope alike — so
+  // masking here covers both exits with no chance of one being forgotten.
+  //
+  // This is the gap key-based redaction cannot close: pino's `redact` masks a
+  // field NAMED password, but a TM1 failure such as
+  // "[ODBC Driver] login failed for PWD=hunter2" is a plain message string, and
+  // it went to the log and back to the client verbatim.
+  const details =
+    rawDetails === undefined ? undefined : maskSecretValues(rawDetails);
   {
     // TM1 signals object-level security denial via the error MESSAGE, often
     // with HTTP 400 (not 403) — e.g. reading a control cube as a non-admin

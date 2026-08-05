@@ -96,6 +96,7 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
       cubeName: C1,
       dimensions: [D1, D2],
       cells: [{ elements: [D1_PLAIN, D2_A], value: 42 }],
+      confirm: C1,
     });
     const r = await h.ok("tm1_get_cell_value", {
       cubeName: C1,
@@ -109,6 +110,7 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
       cubeName: C1,
       dimensions: [D1, D2],
       cells: [{ elements: [D1_QUOTE, D2_B], value: 7 }],
+      confirm: C1,
     });
     const r = await h.ok("tm1_get_cell_value", {
       cubeName: C1,
@@ -163,7 +165,7 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
 
   it("set_cube_rules then get_cube_rules reads the rule back", async () => {
     const rules = `SKIPCHECK;\n['${D1_PLAIN}'] = N: 1;\nFEEDERS;`;
-    await h.ok("tm1_set_cube_rules", { cubeName: C1, rules });
+    await h.ok("tm1_set_cube_rules", { cubeName: C1, rules, confirm: C1 });
     const r = await h.ok("tm1_get_cube_rules", { cubeName: C1 });
     const text = typeof r.json === "string" ? r.json : (r.json.rules ?? r.text);
     expect(String(text)).toContain("SKIPCHECK");

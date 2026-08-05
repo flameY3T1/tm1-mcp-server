@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { withToolHint } from "../error-format.js";
+import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 
 /**
  * Client-abort recovery hint, branched by TM1 major version: v11 exposes
@@ -42,8 +43,14 @@ export function registerExecuteProcess(
         .describe(
           "Override the default 30s request timeout for this call (ms, 1000–3600000). Use for long-running TI runs.",
         ),
+      ...CONFIRM_SCHEMA,
     },
-    async ({ processName, parameters, timeoutMs }, extra) => {
+    async ({ processName, parameters, timeoutMs, confirm }, extra) => {
+      // A TI run writes through to cubes, and undoing the call does not undo
+      // its effects. Guards against an auto-approve client firing it
+      // speculatively — NOT a security control: whatever can call the tool can
+      // also supply `confirm`.
+      requireConfirm(confirm, processName, "process");
       // R2-02: TM1 REST exposes no mid-run progress for tm1.Execute, so we
       // emit periodic heartbeat notifications (every 5s) instead. Keeps
       // client UI alive during long TI runs and lets users distinguish

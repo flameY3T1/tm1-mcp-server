@@ -104,6 +104,38 @@ neither is set.
 
 See [`.env.example`](.env.example) for the full set (CAM auth, timeouts, logging, HTTP transport).
 
+### Positioning — this is a single-user tool
+
+The server holds **one TM1 identity per process** and every call runs with it.
+That is the design, not a limitation to work around, and it has consequences
+worth stating plainly:
+
+- **The HTTP transport is single-tenant.** A bearer token authenticates the
+  _endpoint_, not a caller. Everyone who reaches it shares the same TM1
+  credential, session, caches and audit identity. The "fresh MCP server per
+  request" wording in the architecture notes describes request isolation inside
+  the process — it is not a security boundary between users.
+- **`TM1_MODE=readwrite` with an admin account is a developer configuration.**
+  It is not a production recommendation. In production, point the server at an
+  account whose TM1 rights already match what the agent should be able to do —
+  the server enforces no per-caller authorization of its own.
+- **The confirmation guards are misuse protection, not access control.**
+  Anything that can call a destructive tool can also supply its `confirm` value.
+  They exist so an auto-approving client cannot fire an irreversible action
+  without naming the target.
+
+If you need multi-user access with per-caller identity, run one process per
+identity behind your own front end rather than sharing one.
+
+### Secrets — `TM1_ALLOW_UNMASKED_SECRETS`
+
+Credential masking is on by default everywhere it applies. Several tools take a
+`maskSecrets` parameter, and a **model** can set it to `false` — an opt-out of a
+security control chosen by the thing being guarded against. That request is now
+ignored unless the operator sets `TM1_ALLOW_UNMASKED_SECRETS=true`. The default
+degrades to "mask anyway" rather than failing the call, so an audit still gets
+its report, just redacted.
+
 ### Response size — `TM1_RESPONSE_MODE`
 
 Every tool declares an `outputSchema`, so the server parses each handler's JSON

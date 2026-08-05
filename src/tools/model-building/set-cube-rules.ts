@@ -4,6 +4,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
 import { withToolHint } from "../error-format.js";
 import { actionResponse } from "../format.js";
+import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 
 export function registerSetCubeRules(
   server: McpServer,
@@ -31,8 +32,13 @@ export function registerSetCubeRules(
         .describe(
           "Enable SKIPCHECK for performance (default: true, recommended)",
         ),
+      ...CONFIRM_SCHEMA,
     },
-    async ({ cubeName, rules, skipCheck }) => {
+    async ({ cubeName, rules, skipCheck, confirm }) => {
+      // Replaces the cube's ENTIRE rule file; the previous text is not
+      // recoverable through this API. Guards against accidental invocation —
+      // not a security control.
+      requireConfirm(confirm, cubeName, "cube");
       await withToolHint(
         tm1Client.cubes.updateRules(cubeName, rules, skipCheck),
         `Pre-flight syntax with tm1_check_cube_rule(cubeName='${cubeName}', rules=...) before set_cube_rules. Inspect details for the offending line.`,

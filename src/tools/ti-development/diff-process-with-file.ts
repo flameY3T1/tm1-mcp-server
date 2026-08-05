@@ -10,7 +10,7 @@ import type {
 } from "../../types.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { parseProFile } from "../../lib/pro-parser.js";
-import { maskCode } from "../../lib/mask-secrets.js";
+import { maskCode, resolveMaskSecrets } from "../../lib/mask-secrets.js";
 
 interface TabDiff {
   tab: "prolog" | "metadata" | "data" | "epilog";
@@ -173,7 +173,9 @@ export function registerDiffProcessWithFile(
           tm1Client.processes.getDataSource(name),
         ]);
 
-      const mask = maskSecrets ? maskCode : (s: string) => s;
+      const mask = resolveMaskSecrets(maskSecrets)
+        ? maskCode
+        : (s: string) => s;
       const tabs = [
         tabDiff("prolog", mask(installedCode.prolog), mask(parsed.prolog)),
         tabDiff(

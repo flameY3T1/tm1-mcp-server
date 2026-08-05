@@ -6,7 +6,11 @@ import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeProcessToGit } from "../../lib/git-process.js";
-import { maskCode, maskDataSourceSecrets } from "../../lib/mask-secrets.js";
+import {
+  maskCode,
+  maskDataSourceSecrets,
+  resolveMaskSecrets,
+} from "../../lib/mask-secrets.js";
 
 export function registerExportProcessToGit(
   server: McpServer,
@@ -47,15 +51,14 @@ export function registerExportProcessToGit(
           tm1Client.processes.getDeployMeta(processName),
         ]);
 
-      const mask = maskSecrets ? maskCode : (s: string) => s;
+      const doMask = resolveMaskSecrets(maskSecrets);
+      const mask = doMask ? maskCode : (s: string) => s;
       const ti = mask(codeBlob);
       const { json, credentialsOmitted } = serializeProcessToGit({
         name: processName,
         parameters,
         variables,
-        dataSource: maskSecrets
-          ? maskDataSourceSecrets(dataSource)
-          : dataSource,
+        dataSource: doMask ? maskDataSourceSecrets(dataSource) : dataSource,
         hasSecurityAccess: deployMeta.hasSecurityAccess,
       });
 

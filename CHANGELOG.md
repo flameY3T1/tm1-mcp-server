@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Credential masking moved onto the error path.** Redaction was key-based: pino's `redact`
+  masks a field _named_ `password`, but never a credential inside a message string — and that is
+  exactly the shape TM1 returns on an ODBC failure (`login failed for PWD=hunter2`). Such text was
+  written to the log and returned to the client verbatim. `classifyHttpError` now sanitizes the
+  server's text once, where it enters the error model, so both exits are covered; the MCP error
+  envelope sanitizes again for errors that never went through it.
+
+- **ODBC masking is grammar-aware.** ODBC brace-quotes a value precisely so it may contain the
+  delimiter. The old `[^;]+` value pattern stopped at the first inner `;`, masking `{abc` and
+  leaving `def};` in the output — a partial leak that _looked_ masked. Brace-quoted values are now
+  matched and masked whole.
+
+- **`maskSecrets: false` requires operator consent.** That parameter let the **model** switch off
+  a security control and receive raw credentials. It is now ignored unless the operator sets
+  `TM1_ALLOW_UNMASKED_SECRETS=true`; the default degrades to "mask anyway" rather than failing, so
+  an audit still gets its report, redacted. Applies to all eleven tools exposing the parameter.
+
+- **Confirmation guards extended beyond deletes** to `tm1_execute_process`, `tm1_execute_chore`,
+  `tm1_write_cells`, `tm1_set_cube_rules` and `tm1_upload_file`. The guard previously covered
+  object _destruction_ only, so the coverage test read as complete while irreversible writes and TI
+  side-effects sat outside it. **Breaking:** these five tools now require `confirm` set to the
+  target's name. They are misuse protection, not access control — anything that can call the tool
+  can also supply `confirm`.
+
+- **Positioning documented (README).** One TM1 identity per process; the HTTP transport is
+  single-tenant and its bearer token authenticates the endpoint, not a caller; `readwrite` with an
+  admin account is a developer configuration, not a production recommendation. Stated explicitly so
+  nobody infers an isolation boundary that does not exist.
+
 - **`fast-uri` override raised to `^3.1.5`, `ip-address` pinned to `^10.4.0`.** Both reach us as
   _runtime_ dependencies through `@modelcontextprotocol/sdk` (via `ajv` and `express-rate-limit`),
   so they ship to consumers. GHSA-7p8r-x3mc-p8w7 (host confusion via a backslash authority

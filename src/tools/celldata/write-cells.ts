@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
 import { actionResponse } from "../format.js";
+import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 
 export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
   server.tool(
@@ -39,8 +40,13 @@ export function registerWriteCells(server: McpServer, tm1Client: TM1Client) {
         )
         .min(1)
         .describe("Cells to write"),
+      ...CONFIRM_SCHEMA,
     },
-    async ({ cubeName, dimensions, cells }) => {
+    async ({ cubeName, dimensions, cells, confirm }) => {
+      // Overwrites prior cell values with no undo. Guards against an
+      // auto-approve client firing this without intent — NOT a security
+      // control: anything that can call the tool can also supply `confirm`.
+      requireConfirm(confirm, cubeName, "cube");
       for (const c of cells) {
         if (c.elements.length !== dimensions.length) {
           throw new TM1Error({

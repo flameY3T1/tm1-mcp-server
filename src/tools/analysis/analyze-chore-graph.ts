@@ -8,7 +8,12 @@ import type {
   EffectiveValue,
 } from "../../lib/callgraph/callGraph.js";
 import type { CallParam } from "../../lib/callgraph/referenceIndex.js";
-import { isSecretName, MASK, maskCodeLine } from "../../lib/mask-secrets.js";
+import {
+  isSecretName,
+  MASK,
+  maskCodeLine,
+  resolveMaskSecrets,
+} from "../../lib/mask-secrets.js";
 
 function maskParams(params: readonly CallParam[]): CallParam[] {
   return params.map((p) =>
@@ -132,7 +137,15 @@ export function registerAnalyzeChoreGraph(
           "Redact param values whose name matches /pass|pwd|secret|token|key|credential|auth/i to '***'. Includes chore-task params, edge params, env, and snippet. Default: true.",
         ),
     },
-    async ({ choreName, includeSystem, includeControl, maskSecrets }) => {
+    async ({
+      choreName,
+      includeSystem,
+      includeControl,
+      maskSecrets: maskSecretsRequested,
+    }) => {
+      // A model-supplied `maskSecrets:false` only takes effect when the
+      // operator allowed it via TM1_ALLOW_UNMASKED_SECRETS.
+      const maskSecrets = resolveMaskSecrets(maskSecretsRequested);
       const index = await buildIndexFromTM1(tm1Client, { includeControl });
       const graph = buildChoreGraph(index, choreName, { includeSystem });
       if (!graph) {

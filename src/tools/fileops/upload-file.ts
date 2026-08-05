@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { TM1Client } from "../../tm1-client.js";
 import { withToolHint } from "../error-format.js";
 import { actionResponse } from "../format.js";
+import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 
 const HARD_MAX_BYTES = 32 * 1024 * 1024;
 
@@ -39,8 +40,12 @@ export function registerUploadFile(
         .describe(
           "Encoding of the `content` field. 'text' (default) for UTF-8 text, 'base64' for binary.",
         ),
+      ...CONFIRM_SCHEMA,
     },
-    async ({ fileName, content, encoding }) => {
+    async ({ fileName, content, encoding, confirm }) => {
+      // Silently replaces an existing server file of the same name. Guards
+      // against accidental invocation — not a security control.
+      requireConfirm(confirm, fileName, "file");
       const bytes =
         encoding === "base64"
           ? Buffer.from(content, "base64")
