@@ -4,6 +4,11 @@ import type { TM1Client } from "../../tm1-client.js";
 import { buildIndexFromTM1 } from "../../lib/callgraph/tm1-adapter.js";
 import { buildCubeOrDimUsages } from "../../lib/callgraph/callGraph.js";
 
+// Backstop for the bulk/audit path, mirroring UNBOUNDED_MAX_ITEMS in
+// pagination.ts. Usage rows are small, so this sits higher than the list-tool
+// cap — but it is a bound, which "omit limit for everything" was not.
+const USAGE_MAX_ITEMS = 5000;
+
 export function registerAnalyzeObjectUsage(
   server: McpServer,
   tm1Client: TM1Client,
@@ -45,9 +50,10 @@ export function registerAnalyzeObjectUsage(
         .number()
         .int()
         .positive()
+        .max(USAGE_MAX_ITEMS)
         .optional()
         .describe(
-          "Cap the number of returned usages (or sources in summary mode). Omit for full bulk load (audit use-case).",
+          `Cap the number of returned usages (or sources in summary mode). Omit for bulk load (audit use-case) — still bounded at ${USAGE_MAX_ITEMS}, truncated=true says the bound bit.`,
         ),
       mode: z
         .enum(["full", "summary"])
@@ -68,6 +74,12 @@ export function registerAnalyzeObjectUsage(
       limit,
       mode,
     }) => {
+      // An omitted `limit` used to mean "no limit at all" — on a large model
+      // that is a full-model dump into one response. It now means "as much as
+      // is still readable", and `truncated` says when that bound bit, so the
+      // audit use-case still gets bulk output without an unbounded worst case.
+      const effectiveLimit = limit ?? USAGE_MAX_ITEMS;
+
       const index = await buildIndexFromTM1(tm1Client, { includeControl });
       const all = buildCubeOrDimUsages(index, kind, objectName, {
         includeSystem,
@@ -120,8 +132,10 @@ export function registerAnalyzeObjectUsage(
             (a, b) =>
               b.count - a.count || a.sourceName.localeCompare(b.sourceName),
           );
-        const sumTruncated = limit !== undefined && allSources.length > limit;
-        const sources = sumTruncated ? allSources.slice(0, limit) : allSources;
+        const sumTruncated = allSources.length > effectiveLimit;
+        const sources = sumTruncated
+          ? allSources.slice(0, effectiveLimit)
+          : allSources;
         return {
           content: [
             {
@@ -141,8 +155,8 @@ export function registerAnalyzeObjectUsage(
           ],
         };
       }
-      const truncated = limit !== undefined && all.length > limit;
-      const usages = truncated ? all.slice(0, limit) : all;
+      const truncated = all.length > effectiveLimit;
+      const usages = truncated ? all.slice(0, effectiveLimit) : all;
       return {
         content: [
           {

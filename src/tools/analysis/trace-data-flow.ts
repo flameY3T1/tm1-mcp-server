@@ -9,6 +9,11 @@ import {
 } from "../../lib/callgraph/datasourceMembership.js";
 import { membersFromAxis } from "../../lib/callgraph/mdxMembers.js";
 
+// Per-direction ceiling. Flow rows carry a process name plus cube/element
+// arrays, so they are heavier than a list row — this sits well below the
+// list-tool cap on purpose.
+const FLOW_MAX_ITEMS = 500;
+
 export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_trace_data_flow",
@@ -71,6 +76,16 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
         .describe(
           "Element roles to include (default source+write+zero-out). Add 'indeterminate' to also list processes that build the subset but whose use we could not classify (NOT proof of no use).",
         ),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(FLOW_MAX_ITEMS)
+        .optional()
+        .default(FLOW_MAX_ITEMS)
+        .describe(
+          `Max entries per direction (default ${FLOW_MAX_ITEMS}). counts stay unclipped; truncated=true says the cap bit.`,
+        ),
     },
     async ({
       cubeName,
@@ -81,6 +96,7 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
       resolveDatasourceMembership,
       resolveComputed,
       elementAccess,
+      limit,
     }) => {
       if (element && !dimension) {
         return {
@@ -151,7 +167,24 @@ export function registerTraceDataFlow(server: McpServer, tm1Client: TM1Client) {
         ? `No data flow found for '${cubeName}'. Check the cube name, or set includeControl=true if it is touched only by control (}) processes.`
         : undefined;
 
-      const payload = { ...flow, ...(hint ? { hint } : {}) };
+      // This tool had no limit, offset or summary mode at all — on a large
+      // model it returned every reader and every writer of a cube in one
+      // response. Clip the two arrays but leave `counts` alone: the caller
+      // still sees the true totals, so a clipped answer is visibly partial
+      // rather than quietly wrong.
+      const clip = <T>(rows: T[] | undefined): T[] | undefined =>
+        rows && rows.length > limit ? rows.slice(0, limit) : rows;
+      const truncated =
+        (flow.upstream?.length ?? 0) > limit ||
+        (flow.downstream?.length ?? 0) > limit;
+
+      const payload = {
+        ...flow,
+        ...(flow.upstream ? { upstream: clip(flow.upstream) } : {}),
+        ...(flow.downstream ? { downstream: clip(flow.downstream) } : {}),
+        ...(truncated ? { truncated } : {}),
+        ...(hint ? { hint } : {}),
+      };
       return {
         content: [{ type: "text" as const, text: JSON.stringify(payload) }],
       };

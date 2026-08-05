@@ -327,6 +327,9 @@ export const DataFlowResultSchema = z.object({
       resolution: z.string(),
     })
     .optional(),
+  // True when `limit` clipped the upstream/downstream arrays. `counts` keeps
+  // the unclipped totals, so the caller can always see how much was left out.
+  truncated: z.boolean().optional(),
   hint: z.string().optional(),
 });
 

@@ -57,10 +57,14 @@ export function registerGetHierarchy(server: McpServer, tm1Client: TM1Client) {
         .number()
         .int()
         .positive()
+        // Ceiling, not a page size: without it a caller can ask for a whole
+        // 200k-element dimension in one response. `offset` exists precisely so
+        // large dimensions get walked rather than swallowed.
+        .max(10000)
         .optional()
         .default(1000)
         .describe(
-          "Page size — max elements returned after filter (default 1000). Combine with offset to walk past it; truncated/has_more say whether more remain.",
+          "Page size — max elements returned after filter (default 1000, max 10000). Combine with offset to walk past it; truncated/has_more say whether more remain.",
         ),
       offset: z
         .number()

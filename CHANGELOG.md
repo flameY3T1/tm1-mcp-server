@@ -31,6 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `structuredContent` would see an empty result. `format: "markdown"` is unaffected — there the
   text block is the rendered table rather than a duplicate, and it survives in both modes.
 
+### Changed
+
+- **The unbounded escape hatches are now bounded.** `fetchAll` and `limit=0` opt out of the page
+  _size_, not of every limit — a 200k-element dimension used to serialize 200k rows into a single
+  response. `paginate()` caps them at 5000 items and reports the remainder through the existing
+  `has_more`/`next_offset` fields, so a capped call is simply a first page the caller can walk on
+  from and `total` still shows what was left out. `tm1_get_hierarchy.topN` gains a 10000 ceiling
+  (`offset` exists for walking large dimensions), `tm1_analyze_object_usage` treats an omitted
+  `limit` as "bounded bulk" rather than "unbounded" with `truncated` reporting when the bound bit,
+  and `tm1_trace_data_flow` — which had **no** limit at all — gains one at 500 entries per
+  direction, with `counts` left unclipped so a partial answer is visibly partial.
+
 ### Fixed
 
 - **HTTP transport no longer leaks a listener per request.** Each request builds a fresh

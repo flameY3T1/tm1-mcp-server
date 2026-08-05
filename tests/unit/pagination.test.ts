@@ -4,6 +4,7 @@ import {
   paginate,
   pageFromServer,
   PAGINATION_SCHEMA,
+  UNBOUNDED_MAX_ITEMS,
 } from "../../src/tools/pagination.js";
 import { FORMAT_SCHEMA } from "../../src/tools/format.js";
 import {
@@ -72,6 +73,42 @@ describe("paginate", () => {
 // their serialized form is paid 19x in every tools/list payload. These pin the
 // contract two ways: the parse behaviour agents rely on (unchanged), and the
 // description budget (kept short on purpose — see the notes in the source).
+// K4/T2: fetchAll and limit=0 escape the PAGE SIZE, not every bound. Before
+// this cap a 200k-element dimension serialized 200k rows into one response.
+describe("paginate — unbounded modes stay bounded", () => {
+  const big = Array.from({ length: UNBOUNDED_MAX_ITEMS + 250 }, (_, i) => i);
+
+  it.each([
+    ["fetchAll", () => paginate(big, 50, 0, true)],
+    ["limit=0", () => paginate(big, 0, 0, false)],
+  ])("%s caps at UNBOUNDED_MAX_ITEMS and signals the rest", (_name, run) => {
+    const page = run();
+    expect(page.count).toBe(UNBOUNDED_MAX_ITEMS);
+    expect(page.items).toHaveLength(UNBOUNDED_MAX_ITEMS);
+    // total stays truthful, so the caller can see what was left out...
+    expect(page.total).toBe(big.length);
+    // ...and the normal envelope says how to get it.
+    expect(page.has_more).toBe(true);
+    expect(page.next_offset).toBe(UNBOUNDED_MAX_ITEMS);
+  });
+
+  it("resuming from next_offset reaches the remainder", () => {
+    const first = paginate(big, 0, 0, false);
+    const rest = paginate(big, 500, first.next_offset as number, false);
+    expect(rest.items[0]).toBe(UNBOUNDED_MAX_ITEMS);
+    expect(rest.count).toBe(250);
+    expect(rest.has_more).toBe(false);
+  });
+
+  it("a collection under the cap is unaffected", () => {
+    const small = Array.from({ length: 3 }, (_, i) => i);
+    const page = paginate(small, 0, 0, true);
+    expect(page.count).toBe(3);
+    expect(page.has_more).toBe(false);
+    expect(page.next_offset).toBeNull();
+  });
+});
+
 describe("shared paging/format input schemas", () => {
   const paging = z.object(PAGINATION_SCHEMA);
   const format = z.object(FORMAT_SCHEMA);
