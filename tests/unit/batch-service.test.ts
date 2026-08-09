@@ -4,6 +4,7 @@ import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 import {
   BATCH_MAX_PAYLOAD_BYTES,
   BATCH_MAX_REQUESTS,
+  BATCH_PROBE_ID,
   BatchService,
   BatchUnsupportedError,
 } from "../../src/tm1-client/services/batch-service.js";
@@ -55,6 +56,34 @@ const req = (id: string, extra: Partial<BatchRequest> = {}): BatchRequest => ({
   path: "/api/v1/Cubes",
   ...extra,
 });
+
+type Payload = { requests: Array<Record<string, unknown>> };
+
+/** The counter-probe envelope: exactly one sub-request, carrying the probe id. */
+const isProbePayload = (payload: Payload): boolean =>
+  payload.requests.length === 1 && payload.requests[0]!.id === BATCH_PROBE_ID;
+const isProbe = (s: Sent): boolean => isProbePayload(s.body as Payload);
+
+/** What a server WITH a working $batch answers the probe with. */
+const probeEnvelope = (): unknown => ({
+  responses: [
+    { id: BATCH_PROBE_ID, status: 200, body: { value: "11.8.02900.8" } },
+  ],
+});
+const echoEnvelope = (payload: Payload): unknown => ({
+  responses: payload.requests.map((r) => ({
+    id: r.id,
+    status: 200,
+    body: { echo: r.url },
+  })),
+});
+/** A 400 caused by the PAYLOAD, not by a missing endpoint. */
+const payload400 = (): TM1Error =>
+  new TM1Error({
+    code: TM1ErrorCode.TM1_ERROR,
+    message: "duplicate sub-request id",
+    httpStatus: 400,
+  });
 
 describe("BatchService — payload construction", () => {
   it("posts to $batch with service-root-relative sub-URLs", async () => {
@@ -487,6 +516,29 @@ describe("BatchService — unsupported-server detection and fallback signalling"
     expect(svc.isKnownUnsupported).toBe(false);
   });
 
+  it("does NOT counter-probe the unambiguous statuses", async () => {
+    // 404/405/501 are verdicts about the URL and the METHOD, both of which are
+    // constants here; 403 is a verdict about the caller's identity; 500 keeps
+    // the fallback because it can arrive mid-commit. None of them can be
+    // explained by "the payload was bad", so a probe could not change the
+    // answer — and must not cost a round-trip.
+    for (const status of [403, 404, 405, 500, 501]) {
+      const { svc, sent } = makeService({
+        throwOnBatch: new TM1Error({
+          code: TM1ErrorCode.TM1_ERROR,
+          message: "no such endpoint",
+          httpStatus: status,
+        }),
+      });
+      await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(
+        BatchUnsupportedError,
+      );
+      expect(svc.isKnownUnsupported).toBe(true);
+      expect(sent.filter(isProbe)).toHaveLength(0);
+      expect(sent).toHaveLength(1);
+    }
+  });
+
   it("treats a non-envelope 200 after a successful batch as a hard error", async () => {
     let call = 0;
     const http = {
@@ -511,6 +563,195 @@ describe("BatchService — unsupported-server detection and fallback signalling"
     const err = await svc.execute([req("b")]).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(TM1Error);
     expect(err).not.toBeInstanceOf(BatchUnsupportedError);
+    expect(svc.isKnownUnsupported).toBe(false);
+  });
+});
+
+// A 400 on POST /$batch has two incompatible causes, and before the first
+// success the service cannot tell them apart from the status alone:
+//   (a) a router/gateway that does not know the endpoint and answers
+//       "invalid URL" 400 -> $batch is genuinely unusable, fall back;
+//   (b) TM1 refusing THIS envelope (duplicate sub-request ids, atomicityGroup,
+//       a body over a proxy limit) -> $batch works fine, the payload was bad.
+// Reading every first-call 400 as (a) pins the connection to "no $batch" for
+// the rest of the session, and every later bulk write then silently takes the
+// N-times-slower per-request path — a wrong verdict that is never revisited.
+// The counter-probe settles it with one minimal, side-effect-free envelope.
+describe("BatchService — counter-probe on an ambiguous first-call 400", () => {
+  it("propagates the real error and keeps the connection usable when the probe succeeds", async () => {
+    const boom = payload400();
+    let realCalls = 0;
+    const { svc, sent } = makeService({
+      respond: (payload) => {
+        if (isProbePayload(payload)) return probeEnvelope();
+        realCalls++;
+        if (realCalls === 1) throw boom;
+        return echoEnvelope(payload);
+      },
+    });
+
+    // The caller's own error comes back verbatim — NOT BatchUnsupportedError,
+    // so the caller does not restart its writes on the per-request path.
+    const err = await svc.execute([req("a")]).catch((e: unknown) => e);
+    expect(err).toBe(boom);
+    expect(err).not.toBeInstanceOf(BatchUnsupportedError);
+    expect(svc.isKnownUnsupported).toBe(false);
+
+    // The probe is one bodyless GET of the same reachability read the v11 login
+    // uses, addressed service-root-relative so it also works against a v12
+    // database root.
+    const probes = sent.filter(isProbe);
+    expect(probes).toHaveLength(1);
+    expect(probes[0]!.path).toBe("/api/v1/$batch");
+    expect((probes[0]!.body as Payload).requests).toEqual([
+      {
+        id: BATCH_PROBE_ID,
+        method: "GET",
+        url: "Configuration/ProductVersion",
+      },
+    ]);
+
+    // And the verdict stuck: the next batch goes out over $batch as normal,
+    // with no second probe.
+    const results = await svc.execute([req("b"), req("c")]);
+    expect(results.map((r) => r.ok)).toEqual([true, true]);
+    expect(results.map((r) => r.id)).toEqual(["b", "c"]);
+    expect(sent.filter(isProbe)).toHaveLength(1);
+  });
+
+  it("still reports the caller's writes as unsupported when the probe also fails", async () => {
+    // Nothing here can serve $batch — the minimal envelope is refused too.
+    const { svc, sent } = makeService({
+      respond: () => {
+        throw payload400();
+      },
+    });
+
+    await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(
+      BatchUnsupportedError,
+    );
+    expect(svc.isKnownUnsupported).toBe(true);
+    expect(sent.filter(isProbe)).toHaveLength(1);
+    // And the remembered verdict short-circuits the next call with no HTTP.
+    await expect(svc.execute([req("b")])).rejects.toBeInstanceOf(
+      BatchUnsupportedError,
+    );
+    expect(sent).toHaveLength(2);
+  });
+
+  it("probes AT MOST ONCE per connection, even across several failing calls", async () => {
+    // The probe dies systemically, so no verdict can be drawn from it and
+    // `supported` stays undecided. The next 400 must NOT probe again — one
+    // failed bulk operation may never turn into a probe storm.
+    const down = new TM1Error({
+      code: TM1ErrorCode.CONNECTION_FAILED,
+      message: "transport down",
+    });
+    const { svc, sent } = makeService({
+      respond: (payload) => {
+        if (isProbePayload(payload)) throw down;
+        throw payload400();
+      },
+    });
+
+    await expect(svc.execute([req("a")])).rejects.toBe(down);
+    // Second call: 400 again, but the probe is spent -> today's behaviour.
+    await expect(svc.execute([req("b")])).rejects.toBeInstanceOf(
+      BatchUnsupportedError,
+    );
+    await expect(svc.execute([req("c")])).rejects.toBeInstanceOf(
+      BatchUnsupportedError,
+    );
+    expect(sent.filter(isProbe)).toHaveLength(1);
+    // real #1, probe, real #2 — the third call short-circuits on the verdict.
+    expect(sent).toHaveLength(3);
+  });
+
+  it("does not probe at all for a 400 AFTER a batch has already succeeded", async () => {
+    // Once $batch has demonstrably worked, "unsupported" is not a candidate
+    // explanation any more, so there is nothing to counter-probe.
+    const boom = payload400();
+    let realCalls = 0;
+    const { svc, sent } = makeService({
+      respond: (payload) => {
+        if (isProbePayload(payload)) return probeEnvelope();
+        realCalls++;
+        if (realCalls === 1) return echoEnvelope(payload);
+        throw boom;
+      },
+    });
+
+    await svc.execute([req("a")]);
+    await expect(svc.execute([req("b")])).rejects.toBe(boom);
+    expect(svc.isKnownUnsupported).toBe(false);
+    expect(sent.filter(isProbe)).toHaveLength(0);
+    expect(sent).toHaveLength(2);
+  });
+
+  it("surfaces a systemic probe failure and leaves the verdict undecided", async () => {
+    // A network blip during the probe proves nothing about $batch. It must not
+    // be read as "unsupported" (the caller would silently re-drive every write),
+    // and it must not be read as "supported" either.
+    for (const code of [
+      TM1ErrorCode.AUTH_FAILED,
+      TM1ErrorCode.CONNECTION_FAILED,
+      TM1ErrorCode.LOCK_TIMEOUT,
+    ]) {
+      const down = new TM1Error({ code, message: "probe blew up" });
+      const { svc } = makeService({
+        respond: (payload) => {
+          if (isProbePayload(payload)) throw down;
+          throw payload400();
+        },
+      });
+      const err = await svc.execute([req("a")]).catch((e: unknown) => e);
+      expect(err).toBe(down);
+      expect(err).not.toBeInstanceOf(BatchUnsupportedError);
+      // Undecided, not false: `isKnownUnsupported` stays false AND a later
+      // successful batch is still possible on this connection.
+      expect(svc.isKnownUnsupported).toBe(false);
+    }
+  });
+
+  it("counts a 200 non-envelope probe response as unsupported", async () => {
+    // A proxy page answering 200 on $batch is a look-alike endpoint, not a
+    // working one — the probe judges the ENVELOPE, exactly as executeChunk does.
+    const { svc, sent } = makeService({
+      respond: (payload) => {
+        if (isProbePayload(payload)) return { value: "some proxy page" };
+        throw payload400();
+      },
+    });
+    await expect(svc.execute([req("a")])).rejects.toBeInstanceOf(
+      BatchUnsupportedError,
+    );
+    expect(svc.isKnownUnsupported).toBe(true);
+    expect(sent.filter(isProbe)).toHaveLength(1);
+  });
+
+  it("treats a failing probe SUB-request as proof that $batch works", async () => {
+    // The probe asks whether the ENVELOPE is served, not whether the caller may
+    // read Configuration. A 403/404 inside a well-formed responses array still
+    // means $batch itself is alive — otherwise a locked-down account would be
+    // misdiagnosed as a server without $batch.
+    const boom = payload400();
+    const { svc } = makeService({
+      respond: (payload) => {
+        if (isProbePayload(payload)) {
+          return {
+            responses: [
+              {
+                id: BATCH_PROBE_ID,
+                status: 403,
+                body: { error: { message: "no rights" } },
+              },
+            ],
+          };
+        }
+        throw boom;
+      },
+    });
+    await expect(svc.execute([req("a")])).rejects.toBe(boom);
     expect(svc.isKnownUnsupported).toBe(false);
   });
 });

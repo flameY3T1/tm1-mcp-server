@@ -16,7 +16,10 @@
 // The other batch suites use stateless fakes and cannot express this.
 import { describe, it, expect } from "vitest";
 import { ElementService } from "../../src/tm1-client/services/element-service.js";
-import { BatchService } from "../../src/tm1-client/services/batch-service.js";
+import {
+  BATCH_PROBE_ID,
+  BatchService,
+} from "../../src/tm1-client/services/batch-service.js";
 import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 import type { CellService } from "../../src/tm1-client/services/cell-service.js";
 import type { ElementCreate } from "../../src/types.js";
@@ -34,6 +37,12 @@ interface Injection {
   envelope: number;
   /** Sub-requests to APPLY before throwing — these stay committed. */
   applyBefore: number;
+  /**
+   * Envelope-level status. 500 (the default) is the mid-commit case; 400 is the
+   * ambiguous one that makes BatchService counter-probe before it concludes
+   * anything.
+   */
+  status?: number;
 }
 
 /** Minimal stateful TM1 stand-in: elements, types, and destructive conversions. */
@@ -45,6 +54,8 @@ class StatefulFakeTM1 {
   readonly batchApplied: string[] = [];
   /** Kind of every call that went down the per-request path. */
   readonly perRequestApplied: string[] = [];
+  /** How many counter-probes BatchService fired. */
+  probes = 0;
   private envelopeSeq = 0;
 
   constructor(
@@ -117,7 +128,6 @@ class StatefulFakeTM1 {
           this.perRequestApplied.push(this.kind(method, body));
           return this.apply(method, path, body) as T;
         }
-        const seq = this.envelopeSeq++;
         const requests = (
           body as {
             requests: Array<{
@@ -128,6 +138,20 @@ class StatefulFakeTM1 {
             }>;
           }
         ).requests;
+        // BatchService's counter-probe: a single side-effect-free GET it sends
+        // to decide whether an ambiguous 400 meant "no $batch" or "bad
+        // payload". Answer it WITHOUT touching state or the envelope counter —
+        // it is not one of the caller's envelopes, and treating it as one would
+        // shift every later injection index.
+        if (requests.length === 1 && requests[0]!.id === BATCH_PROBE_ID) {
+          this.probes++;
+          return {
+            responses: [
+              { id: BATCH_PROBE_ID, status: 200, body: { value: "11.8" } },
+            ],
+          } as T;
+        }
+        const seq = this.envelopeSeq++;
         const responses: Array<{ id: string; status: number; body?: unknown }> =
           [];
         for (const [i, r] of requests.entries()) {
@@ -137,10 +161,11 @@ class StatefulFakeTM1 {
             i === this.inject.applyBefore
           ) {
             // Sub-requests 0..i-1 are ALREADY committed at this point.
+            const status = this.inject.status ?? 500;
             throw new TM1Error({
               code: TM1ErrorCode.TM1_ERROR,
-              httpStatus: 500,
-              message: `injected HTTP 500 on $batch envelope ${seq}`,
+              httpStatus: status,
+              message: `injected HTTP ${status} on $batch envelope ${seq}`,
             });
           }
           this.batchApplied.push(this.kind(r.method, r.body));
@@ -229,6 +254,27 @@ describe("bulkUpsert $batch fallback safety", () => {
     ]);
     expect(f.snapshot()).toEqual(ref.snapshot());
     expect(result.typeChanges).toEqual(refResult.typeChanges);
+  });
+
+  it("a first-envelope 400 whose counter-probe passes propagates instead of falling back", async () => {
+    // The other side of the coin: the first envelope fails 400, but $batch
+    // itself demonstrably works (the counter-probe gets a clean envelope back).
+    // The 400 was therefore about the payload, and treating it as "this server
+    // has no $batch" would drop the whole session onto the per-request path for
+    // a reason that will never be true again. It must surface as a real error —
+    // and, exactly as with the post-success case, must not silently re-drive
+    // the writes down the other path.
+    const f = new StatefulFakeTM1(SEED, {
+      envelope: 0,
+      applyBefore: 3,
+      status: 400,
+    });
+
+    await expect(
+      serviceFor(f, true).bulkUpsert("Dim", "Dim", ELEMENTS),
+    ).rejects.toThrow(TM1Error);
+    expect(f.perRequestApplied).toEqual([]);
+    expect(f.probes).toBe(1);
   });
 
   it("a failure after the first successful batch propagates instead of falling back", async () => {

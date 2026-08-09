@@ -27,6 +27,20 @@ import { rethrowIfSystemic } from "./fallback.js";
 
 const BATCH_PATH = "/api/v1/$batch";
 
+// The counter-probe's sub-request: the cheapest read in the API surface, and
+// the one this codebase already trusts as a reachability check — the v11 login
+// round-trip IS a GET of it (`connection/profile.ts`), and `ServerService`
+// reads the same scalar on v12 for the ProductVersion the Configuration body
+// omits. So it is known to exist and to be answerable on both versions, it
+// takes no arguments, and it mutates nothing.
+const BATCH_PROBE_PATH = "/api/v1/Configuration/ProductVersion";
+
+/**
+ * Correlation id of the counter-probe's single sub-request. Namespaced so it
+ * can never collide with a caller id, and recognisable in a server-side log.
+ */
+export const BATCH_PROBE_ID = "__tm1_mcp_batch_probe__";
+
 // Sub-requests per HTTP round-trip. TM1 accepts far larger batches (5000
 // element creates succeeded live) but processes them SEQUENTIALLY server-side,
 // so a huge batch just builds one very long request: 5000 creates took ~47s,
@@ -110,7 +124,41 @@ export class BatchUnsupportedError extends Error {
 // "unsupported" exclusively before the first successful batch on this
 // connection. Once `$batch` has demonstrably worked, a 400 means "your payload
 // was bad" and must propagate rather than silently re-drive the caller's writes.
+//
+// 400 is the one member of this set that is genuinely AMBIGUOUS even before the
+// first success, so it alone gets a counter-probe first (`counterProbe`). See
+// PROBE_STATUS below for why the others do not.
 const UNSUPPORTED_STATUSES = new Set([400, 403, 404, 405, 500, 501]);
+
+// The only status worth counter-probing. The other members of
+// UNSUPPORTED_STATUSES are unambiguous *given what this service controls*: the
+// URL and the method are constants (`POST /api/v1/$batch`), so nothing in the
+// caller's payload can produce them, and a probe could not come back with a
+// different answer than the chunk already got.
+//
+//   404 / 405 / 501 — verdicts about the URL and the METHOD. The endpoint is
+//     not routed, POST is refused there, or the feature is declared
+//     unimplemented. All three are payload-independent by construction.
+//   403 — a verdict about the caller's IDENTITY, not about the body. The
+//     identity is the same for the probe (same session, same cookie), so the
+//     probe would return 403 again by construction: a probe that cannot change
+//     its answer is pure cost.
+//   500 — ambiguous in the abstract, but deliberately excluded. Unlike a 400,
+//     a 500 can arrive AFTER the server already applied part of the envelope
+//     (`$batch` is non-atomic; see BatchUnsupportedError's docstring), and the
+//     per-request fallback is the path whose replay-safety the caller contract
+//     already guarantees. Marking the connection supported and hard-failing
+//     instead would trade a safe, slow recovery for an abort of unknown commit
+//     extent. A 500 is also frequently transient, so a passing probe would not
+//     even establish that the caller's payload was at fault.
+//
+// 400, by contrast, is doubly overloaded AND safe to be strict about: a
+// gateway that does not know the endpoint answers "invalid URL" 400, while TM1
+// answers 400 for a payload it refuses (duplicate sub-request ids,
+// `atomicityGroup`, a body past a proxy's limit). An envelope-level 400 means
+// the envelope was rejected as a whole, before any sub-request ran — so there
+// is no partial commit to protect, and propagating it is the honest outcome.
+const PROBE_STATUS = 400;
 
 interface RawSubResponse {
   id?: unknown;
@@ -230,6 +278,13 @@ export class BatchService {
   // server without $batch is probed once, not once per bulk operation.
   private supported: boolean | null = null;
 
+  // Whether the counter-probe has already been spent on this connection. Set
+  // BEFORE the probe goes out, so an inconclusive probe (systemic failure) is
+  // still counted: the bound is "at most once", not "once per undecided 400".
+  // Without it a bulk operation that keeps failing 400 would issue one extra
+  // round-trip per attempt — a probe storm on top of an already failing run.
+  private probeSpent = false;
+
   constructor(private readonly http: TM1HttpClient) {}
 
   /** True once a probe has established the server rejects `$batch` outright. */
@@ -255,12 +310,65 @@ export class BatchService {
    * destructive later passes (type PATCH, Components) out of the fallback
    * window entirely: they only ever run after a batch has already succeeded.
    *
+   * NOTE: for HTTP 400 the caller in `executeChunk` runs `counterProbe` BEFORE
+   * reaching here, so a payload-caused 400 never gets this far. This method
+   * still sees every other unsupported status directly.
+   *
    * Returns the error to throw, or `undefined` when the verdict was refused.
    */
   private markUnsupported(reason: string): BatchUnsupportedError | undefined {
     if (this.supported !== null) return undefined;
     this.supported = false;
     return new BatchUnsupportedError(reason);
+  }
+
+  /**
+   * Settle an ambiguous first-call 400 by asking the endpoint the simplest
+   * question there is: one minimal, side-effect-free GET in a well-formed
+   * envelope.
+   *
+   * Judges the ENVELOPE only, exactly as `executeChunk` does — a readable
+   * `responses` array means `$batch` is served here, whatever status the probe's
+   * own sub-request came back with. That distinction is load-bearing: a
+   * locked-down account may well be refused `Configuration/ProductVersion`
+   * (reported INSIDE the envelope), and reading that as "no $batch" would
+   * reintroduce the very misdiagnosis this probe exists to remove.
+   *
+   * Returns `true` when `$batch` demonstrably works, `false` when the endpoint
+   * refuses even this envelope. THROWS on a systemic transport/auth/timeout
+   * failure: that proves nothing either way, so the caller must draw no
+   * conclusion and the outage surfaces instead — same rule `executeChunk`
+   * already applies via `rethrowIfSystemic`.
+   *
+   * Does not go through `execute`/`executeChunk`, so it cannot recurse into
+   * itself or into the unsupported-detection path.
+   */
+  private async counterProbe(): Promise<boolean> {
+    const payload = {
+      requests: [
+        {
+          id: BATCH_PROBE_ID,
+          method: "GET",
+          url: toRelativeUrl(BATCH_PROBE_PATH),
+        },
+      ],
+    };
+    let envelope: unknown;
+    try {
+      envelope = await this.http.request<unknown>("POST", BATCH_PATH, payload, {
+        // Same budget a 1-request chunk gets. Deliberately not a short
+        // fail-fast timeout: a timeout maps to LOCK_TIMEOUT, which is systemic
+        // and would surface instead of the caller's 400 — turning a slow-but-
+        // working server into a hard failure where today it merely falls back.
+        timeoutMs: BATCH_TIMEOUT_BASE_MS + BATCH_TIMEOUT_PER_REQUEST_MS,
+      });
+    } catch (err) {
+      rethrowIfSystemic(err);
+      return false;
+    }
+    return Array.isArray(
+      (envelope as { responses?: unknown } | null)?.responses,
+    );
   }
 
   /**
@@ -314,6 +422,28 @@ export class BatchService {
         err.httpStatus !== undefined &&
         UNSUPPORTED_STATUSES.has(err.httpStatus)
       ) {
+        // A 400 before the first success is ambiguous: missing endpoint, or a
+        // payload this server refuses? Getting that wrong pins the connection
+        // to "no $batch" for the whole session and silently drops every later
+        // bulk write onto the N-times-slower per-request path. So counter-probe
+        // once — but only while the verdict is still open, and only for the one
+        // status where the answer can differ (see PROBE_STATUS).
+        if (
+          err.httpStatus === PROBE_STATUS &&
+          this.supported === null &&
+          !this.probeSpent
+        ) {
+          this.probeSpent = true;
+          if (await this.counterProbe()) {
+            // $batch works here; the 400 was about the caller's payload. Record
+            // that so no later failure ever reaches the fallback path, and let
+            // the original error through as the real failure it is. The
+            // caller's writes are NOT retried here — an envelope-level 400 was
+            // refused whole, and re-driving it would just fail again.
+            this.supported = true;
+            throw err;
+          }
+        }
         const unsupported = this.markUnsupported(
           `POST ${BATCH_PATH} returned HTTP ${err.httpStatus}`,
         );

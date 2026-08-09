@@ -98,6 +98,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   serial, deliberately: these are mutations, and overlapping envelopes would make "how much
   committed before the failure" unanswerable.
 
+- **An ambiguous first `$batch` failure is settled by a counter-probe instead of a guess.** HTTP 400
+  is overloaded: a gateway that does not route the endpoint answers "invalid URL" 400, and TM1
+  answers 400 for a payload it refuses. Reading the second as the first pinned the connection to
+  "no `$batch`" for the whole session, so every later bulk write silently took the per-request path
+  at N times the cost. On a 400 — and only while no batch has yet succeeded — the service now sends
+  one minimal, side-effect-free envelope. If that comes back readable, `$batch` works, the
+  connection is marked supported and the original error propagates as the real failure it is; the
+  caller's writes are not retried. If it does not, the fallback behaves exactly as before. The
+  probe runs at most once per connection and judges only the envelope, so an account that is
+  refused the probe's own read is not mistaken for a server without `$batch`. The other statuses in
+  the set are left alone deliberately: 404/405/501 are verdicts about a constant URL and method,
+  403 is about an identity the probe shares, and a 500 can arrive after part of a non-atomic
+  envelope was already applied — where the replay-safe fallback is the right answer.
+
 - **A failed element-type lookup is no longer cached forever.** The feeder audit's type cache
   stored `null` on any error with no TTL and no retry, so one transient timeout marked every
   element of that dimension "type unknown" for the rest of the run. Failures now leave the slot
