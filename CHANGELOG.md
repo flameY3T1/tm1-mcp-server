@@ -50,25 +50,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TM1_RESPONSE_MODE=legacy` to restore the old wire format. Verified against Claude Code.
   Unaffected: `format: "markdown"` and error results.
 
-- **A TI result now says whether the run committed.** `tm1.ExecuteWithReturn` answers HTTP 200
-  whatever happened, so the outcome lives entirely in `ProcessExecuteStatusCode` — and a missing
-  field defaulted to `CompletedSuccessfully`, so an unverified run reached the model as a clean one.
-  Results carry an `outcome` covering all six status codes, grouped by commit semantics measured
-  live on 11.8 (marker cell written in the Prolog, read back after each exit path):
-  `succeeded` (`CompletedSuccessfully`); `completed_with_errors` (`CompletedWithMessages`,
-  `QuitCalled`, `HasMinorErrors` — **the run's changes WERE committed; a blind retry can double-post
-  them**); `rolled_back` (`Aborted`, `RollbackCalled` — nothing committed); `indeterminate` (no
-  status code, a code this build does not know, or a call that errored mid-run). `ProcessResult`
-  became a discriminated union, so `{success: true, processErrorStatus: "Aborted"}` no longer
-  typechecks. `succeeded` is not proof the process ran to its intended end: `ProcessBreak` also
-  reports `CompletedSuccessfully` (verified live).
+- **A TI result now says whether the run committed.** `ExecuteWithReturn` answers HTTP 200 whatever
+  happened, so the outcome lives entirely in `ProcessExecuteStatusCode` — and a missing field
+  defaulted to success. Results now carry an `outcome` over all six codes, grouped by commit
+  semantics measured live on v11 11.8 and v12 12.5.9:
 
-  **Breaking in two narrow ways** for `tm1_execute_process` and `tm1_save_data`: results carry a new
-  required `outcome` field, and only `succeeded` keeps `success: true` — a status-less response now
-  yields `success: false` with `isError` set. A live v11/v12 server always sends the field, so that
-  case is the defensive branch, not the normal path. `tm1_clear_cube` shares the classifier: a
-  rolled-back or unconfirmed clear raises (with the two stated apart), a committed-with-messages
-  clear stands and logs, since the cube really is cleared.
+  - `succeeded` — `CompletedSuccessfully`
+  - `completed_with_errors` — `CompletedWithMessages`, `QuitCalled`, `HasMinorErrors`. **Changes
+    WERE committed; a blind retry can double-post them.**
+  - `rolled_back` — `Aborted`, `RollbackCalled`. Nothing committed.
+  - `indeterminate` — no status code, an unknown code, or a call that errored mid-run.
+
+  `ProcessResult` is a discriminated union, so `{success: true, processErrorStatus: "Aborted"}` no
+  longer typechecks. Note that `succeeded` is not proof the process reached its intended end —
+  `ProcessBreak` also reports `CompletedSuccessfully` (verified live).
+
+  **Breaking** for `tm1_execute_process` and `tm1_save_data`: new required `outcome` field, and only
+  `succeeded` keeps `success: true`, so a status-less response now yields `success: false` with
+  `isError`. Real servers always send the field, so that is the defensive branch.
+  `tm1_clear_cube` shares the classifier: a rolled-back or unconfirmed clear raises, a
+  committed-with-messages clear stands.
 
 ### Changed
 
@@ -110,18 +111,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **The callgraph's four-variant OData fallback no longer swallows the real error.**
-  `fetchForCallgraph()` tried up to four query shapes and caught _everything_, so an expired
-  session, a request timeout or a security denial each bought three more full `/Processes` scans —
-  roughly `4 × 30 s` before the caller learned anything — and a later shape that happened to answer
-  masked the first failure. Transport/auth/timeout failures and permission denials now surface
-  immediately; only TM1 refusing the query _shape_ (400/501) advances. The shape that worked is
-  remembered per connection, so the probe is paid once instead of once per callgraph build.
+  `fetchForCallgraph()` caught _everything_, so an expired session, a timeout or a denial each
+  bought three more full `/Processes` scans — about `4 × 30 s` — and a later shape that answered
+  masked the first failure. Systemic failures and denials now surface immediately; only TM1
+  refusing the query _shape_ (400/501) advances, and the working shape is cached per connection.
 
 - **A permission denial no longer reads as "this cube has no views".** `ViewService.list()` caught
   every per-scope error and returned an empty list, making "you may not see them" indistinguishable
-  from "there are none" — the same confusion `rethrowIfSystemicOrDenied` already fixed for the
-  transaction-log window. Denials propagate; a scope the server genuinely does not expose (404 on
-  `/PrivateViews`) is still skipped.
+  from "there are none". Denials propagate; a genuinely absent scope (404 on `/PrivateViews`) is
+  still skipped.
 
 - **`$batch` chunks are bounded by payload size, not just request count.** 200 sub-requests with
   long element names run to megabytes while the counter is still under its cap, and a body past a
