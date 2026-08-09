@@ -131,9 +131,23 @@ export function maskSecretsDeep(value: unknown): unknown {
 // without an import cycle. The password field is already redacted at the
 // service layer (ProcessService.getDataSource), so only oDBCConnection needs
 // handling here.
-export function maskDataSourceSecrets<
-  T extends { oDBCConnection?: string | undefined },
->(ds: T): T {
-  if (ds.oDBCConnection === undefined) return ds;
-  return { ...ds, oDBCConnection: maskConnectionString(ds.oDBCConnection) };
+//
+// The constraint is `object`, not `{ oDBCConnection?: string }`, on purpose.
+// An all-optional constraint is a WEAK TYPE: TypeScript then rejects any
+// object literal that shares no property with it — i.e. exactly the ordinary
+// datasource (a cube view, a CSV file) where this function is a no-op. The
+// only reason production compiled is that its callers pass a declared
+// DataSource whose type happens to list the optional field.
+//
+// Safety is preserved by narrowing in the body instead of in the signature:
+// `in` narrows T to `T & Record<"oDBCConnection", unknown>` (TS >= 4.9), and
+// the typeof check does the rest, so `conn` is a genuine `string` with no
+// cast. A non-string value under that key — impossible for a real DataSource,
+// possible for a caller now that the constraint is wider — falls through to
+// the untouched-input path rather than being stringified into the output.
+export function maskDataSourceSecrets<T extends object>(ds: T): T {
+  if (!("oDBCConnection" in ds)) return ds;
+  const conn: unknown = ds.oDBCConnection;
+  if (typeof conn !== "string") return ds;
+  return { ...ds, oDBCConnection: maskConnectionString(conn) };
 }
