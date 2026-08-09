@@ -35,6 +35,22 @@ const BATCH_PATH = "/api/v1/$batch";
 // natural progress boundaries, while still collapsing ~200 calls into one.
 export const BATCH_MAX_REQUESTS = 200;
 
+// Serialized bytes per HTTP round-trip. The request COUNT alone does not bound
+// the payload: 200 sub-requests carrying long element names, MDX, or a
+// Components list are easily megabytes, and the request counter is still
+// happily under its cap when the body hits a hard limit somewhere on the way.
+// The limit that bites first is almost never TM1's — it is whatever sits in
+// front of it: nginx caps request bodies at 1 MiB by default
+// (`client_max_body_size 1m`), and that is the smallest default in the usual
+// deployment shapes. A body over the limit comes back 400/413, which is in
+// UNSUPPORTED_STATUSES, so an oversized chunk would be misread as "this server
+// has no $batch" and silently re-drive every write down the caller's fallback
+// path. Budget 1_000_000 bytes: just under that 1 MiB floor, leaving ~48 KB of
+// headroom for request headers, the auth cookie and the envelope itself. Big
+// enough that ordinary bulk work (a 200-element create batch is ~25 KB) never
+// notices it, small enough to keep the pathological payload off the wire.
+export const BATCH_MAX_PAYLOAD_BYTES = 1_000_000;
+
 // A batch performs N operations in one HTTP call, so the per-call default
 // timeout is the wrong budget for it. Scale with the chunk size instead.
 const BATCH_TIMEOUT_BASE_MS = 30_000;
@@ -137,6 +153,78 @@ function toRelativeUrl(path: string): string {
   return path.replace(/^\/api\/v1\//, "");
 }
 
+/**
+ * One sub-request already in its wire shape, plus what it costs on the wire.
+ *
+ * Built once per `execute()` call and carried through chunking into the
+ * payload, so the same object is never serialized twice for measuring and then
+ * again for sending.
+ */
+interface PreparedSubRequest {
+  /** The caller's request, kept for id/endpoint correlation of the response. */
+  readonly request: BatchRequest;
+  /** Exactly the object that goes into the `requests` array. */
+  readonly sub: Record<string, unknown>;
+  /** UTF-8 byte cost of `sub` inside the envelope, incl. its separating comma. */
+  readonly bytes: number;
+}
+
+function prepare(request: BatchRequest): PreparedSubRequest {
+  const sub: Record<string, unknown> = {
+    id: request.id,
+    method: request.method,
+    // Sub-request URLs are relative to the batch endpoint's service root.
+    // Callers pass the same absolute `/api/v1/...` path they would give
+    // http.request(), so strip that prefix here — for v12 the profile
+    // reroots the `$batch` URL itself, and the relative sub-URL rides along.
+    url: toRelativeUrl(request.path),
+    ...(request.body === undefined
+      ? {}
+      : {
+          headers: { "Content-Type": "application/json" },
+          body: request.body,
+        }),
+  };
+  // Measure what actually goes on the wire — the whole sub-object, not just
+  // the raw body — and in BYTES: an element name in umlauts or CJK costs two
+  // to three times its `String.length`.
+  return {
+    request,
+    sub,
+    bytes: Buffer.byteLength(JSON.stringify(sub), "utf8") + 1,
+  };
+}
+
+/**
+ * Split prepared sub-requests into chunks bounded by BOTH caps: a chunk closes
+ * when one more sub-request would push it past the request count OR past the
+ * serialized byte budget.
+ *
+ * A sub-request larger than the entire budget still goes out — alone, in its
+ * own chunk. Dropping it would silently lose a write, and refusing to place it
+ * would spin forever; the `chunk.length > 0` guard is what buys both.
+ */
+function chunkRequests(prepared: PreparedSubRequest[]): PreparedSubRequest[][] {
+  const chunks: PreparedSubRequest[][] = [];
+  let chunk: PreparedSubRequest[] = [];
+  let bytes = 0;
+  for (const item of prepared) {
+    if (
+      chunk.length > 0 &&
+      (chunk.length >= BATCH_MAX_REQUESTS ||
+        bytes + item.bytes > BATCH_MAX_PAYLOAD_BYTES)
+    ) {
+      chunks.push(chunk);
+      chunk = [];
+      bytes = 0;
+    }
+    chunk.push(item);
+    bytes += item.bytes;
+  }
+  if (chunk.length > 0) chunks.push(chunk);
+  return chunks;
+}
+
 export class BatchService {
   // Tri-state support verdict, remembered for the lifetime of the client so a
   // server without $batch is probed once, not once per bulk operation.
@@ -195,28 +283,20 @@ export class BatchService {
     }
 
     const results: BatchSubResult[] = [];
-    for (let i = 0; i < requests.length; i += BATCH_MAX_REQUESTS) {
-      const chunk = requests.slice(i, i + BATCH_MAX_REQUESTS);
+    // Chunks stay SERIAL. These are mutations: overlapping envelopes would make
+    // "how much committed before the failure" unanswerable, and TM1 processes a
+    // batch sequentially server-side anyway, so there is nothing to win.
+    for (const chunk of chunkRequests(requests.map(prepare))) {
       results.push(...(await this.executeChunk(chunk)));
     }
     return results;
   }
 
-  private async executeChunk(chunk: BatchRequest[]): Promise<BatchSubResult[]> {
-    const payload = {
-      requests: chunk.map((r) => ({
-        id: r.id,
-        method: r.method,
-        // Sub-request URLs are relative to the batch endpoint's service root.
-        // Callers pass the same absolute `/api/v1/...` path they would give
-        // http.request(), so strip that prefix here — for v12 the profile
-        // reroots the `$batch` URL itself, and the relative sub-URL rides along.
-        url: toRelativeUrl(r.path),
-        ...(r.body === undefined
-          ? {}
-          : { headers: { "Content-Type": "application/json" }, body: r.body }),
-      })),
-    };
+  private async executeChunk(
+    chunk: PreparedSubRequest[],
+  ): Promise<BatchSubResult[]> {
+    // Sub-objects were built (and measured) once during chunking.
+    const payload = { requests: chunk.map((c) => c.sub) };
 
     let envelope: unknown;
     try {
@@ -266,7 +346,7 @@ export class BatchService {
       if (raw && raw.id !== undefined) byId.set(String(raw.id), raw);
     }
 
-    return chunk.map((req): BatchSubResult => {
+    return chunk.map(({ request: req }): BatchSubResult => {
       const raw = byId.get(req.id);
       if (!raw) {
         return {

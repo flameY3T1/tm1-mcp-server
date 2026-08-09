@@ -309,9 +309,9 @@ export class ElementService {
    * `$batch` implementation of bulkUpsert: four PASSES regardless of element
    * count — create-all, read-type-of-the-ones-that-existed,
    * patch-the-types-that-differ, then the consolidation Components patches.
-   * Each pass is one round-trip per BATCH_MAX_REQUESTS sub-requests (they are
-   * chunked inside BatchService), so N elements cost roughly 4 * ceil(N/200)
-   * calls instead of N.
+   * Each pass is chunked inside BatchService by request count AND serialized
+   * size, so N elements cost roughly 4 * ceil(N/200) calls instead of N —
+   * more when the sub-requests are large enough to hit the byte budget first.
    */
   private async bulkUpsertViaBatch(
     dimensionName: string,

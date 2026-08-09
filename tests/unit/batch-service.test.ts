@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { TM1Error, TM1ErrorCode } from "../../src/types.js";
 import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 import {
+  BATCH_MAX_PAYLOAD_BYTES,
   BATCH_MAX_REQUESTS,
   BatchService,
   BatchUnsupportedError,
@@ -130,6 +131,129 @@ describe("BatchService — chunking", () => {
     expect(results.map((r) => r.id)).toEqual(
       Array.from({ length: n }, (_, i) => String(i)),
     );
+  });
+});
+
+// A chunk bounded only by request COUNT can still exceed a reverse proxy's or
+// TM1's request-body limit (200 sub-requests with long element names is easily
+// megabytes). The resulting 400/413 would then be misread as "this server has
+// no $batch" and silently re-drive every write down the fallback path. So the
+// chunk builder has to close a chunk on EITHER cap.
+describe("BatchService — chunking by payload size", () => {
+  const sizes = (sent: Sent[]): number[] =>
+    sent.map((s) => (s.body as { requests: unknown[] }).requests.length);
+
+  /** One sub-request whose body dominates its serialized size. */
+  const bigReq = (id: string, chars: number, filler = "x"): BatchRequest =>
+    req(id, {
+      method: "POST",
+      path: "/api/v1/Dimensions('D')/Hierarchies('D')/Elements",
+      body: { blob: filler.repeat(chars) },
+    });
+
+  it("keeps the count cap in charge while the sub-requests are small", async () => {
+    const { svc, sent } = makeService();
+    // 250 tiny requests are nowhere near the byte budget, so the split must
+    // still happen exactly at the count cap.
+    await svc.execute(
+      Array.from({ length: BATCH_MAX_REQUESTS + 50 }, (_, i) =>
+        req(String(i), { method: "POST", body: { Name: `e${i}` } }),
+      ),
+    );
+    expect(sizes(sent)).toEqual([BATCH_MAX_REQUESTS, 50]);
+  });
+
+  it("closes a chunk early when the byte budget would be exceeded", async () => {
+    const { svc, sent } = makeService();
+    // ~40% of the budget each: two fit, a third would overshoot.
+    const chars = Math.floor(BATCH_MAX_PAYLOAD_BYTES * 0.4);
+    const results = await svc.execute(
+      Array.from({ length: 5 }, (_, i) => bigReq(String(i), chars)),
+    );
+
+    expect(sizes(sent)).toEqual([2, 2, 1]);
+    // Every chunk actually stayed under the budget on the wire.
+    for (const s of sent) {
+      expect(Buffer.byteLength(JSON.stringify(s.body), "utf8")).toBeLessThan(
+        BATCH_MAX_PAYLOAD_BYTES,
+      );
+    }
+    // The split points are where they are because of bytes, not count.
+    expect(results.map((r) => r.id)).toEqual(["0", "1", "2", "3", "4"]);
+  });
+
+  it("sends a single oversized sub-request alone rather than dropping it", async () => {
+    const { svc, sent } = makeService();
+    const monster = bigReq("big", BATCH_MAX_PAYLOAD_BYTES + 1_000);
+    const results = await svc.execute([req("before"), monster, req("after")]);
+
+    // It cannot share a chunk with anything, but it must still go out — and the
+    // builder must make progress rather than spin on a chunk it can never fill.
+    expect(sizes(sent)).toEqual([1, 1, 1]);
+    const middle = (sent[1]!.body as { requests: Array<{ id: string }> })
+      .requests;
+    expect(middle.map((r) => r.id)).toEqual(["big"]);
+    expect(results.map((r) => r.id)).toEqual(["before", "big", "after"]);
+    expect(results.every((r) => r.ok)).toBe(true);
+  });
+
+  it("counts BYTES, not characters, for multi-byte names", async () => {
+    // 30% of the budget in CHARACTERS: three of them fit by String.length but
+    // blow the budget by ~1.8x once the umlauts are UTF-8 encoded.
+    const chars = Math.floor(BATCH_MAX_PAYLOAD_BYTES * 0.3);
+
+    const ascii = makeService();
+    await ascii.svc.execute(
+      Array.from({ length: 3 }, (_, i) => bigReq(String(i), chars, "x")),
+    );
+    expect(sizes(ascii.sent)).toEqual([3]);
+
+    const utf8 = makeService();
+    await utf8.svc.execute(
+      Array.from({ length: 3 }, (_, i) => bigReq(String(i), chars, "ä")),
+    );
+    // Same character count, two bytes per character -> one per chunk.
+    expect(sizes(utf8.sent)).toEqual([1, 1, 1]);
+  });
+
+  it("keeps results in input order across a byte-driven split", async () => {
+    // Respond in reverse within every chunk: order must come from the input,
+    // never from the wire.
+    const { svc, sent } = makeService({
+      respond: (payload) => ({
+        responses: [...payload.requests].reverse().map((r) => ({
+          id: r.id,
+          status: 200,
+          body: { echo: r.id },
+        })),
+      }),
+    });
+    const chars = Math.floor(BATCH_MAX_PAYLOAD_BYTES * 0.4);
+    const results = await svc.execute(
+      Array.from({ length: 5 }, (_, i) => bigReq(`r${i}`, chars)),
+    );
+
+    expect(sizes(sent)).toEqual([2, 2, 1]);
+    expect(results.map((r) => r.id)).toEqual(["r0", "r1", "r2", "r3", "r4"]);
+    expect(results.map((r) => (r.ok ? r.body : null))).toEqual(
+      ["r0", "r1", "r2", "r3", "r4"].map((id) => ({ echo: id })),
+    );
+  });
+
+  it("scales each chunk's timeout with that chunk's own size", async () => {
+    // Chunks are variable-length now, so the per-chunk budget has to be derived
+    // per chunk — a fixed 200-request budget would be far too generous for the
+    // 1-request chunk a huge sub-request produces.
+    const { svc, sent } = makeService();
+    const chars = Math.floor(BATCH_MAX_PAYLOAD_BYTES * 0.4);
+    await svc.execute(
+      Array.from({ length: 5 }, (_, i) => bigReq(String(i), chars)),
+    );
+    expect(sent.map((s) => s.opts)).toEqual([
+      { timeoutMs: 30_000 + 2 * 200 },
+      { timeoutMs: 30_000 + 2 * 200 },
+      { timeoutMs: 30_000 + 1 * 200 },
+    ]);
   });
 });
 

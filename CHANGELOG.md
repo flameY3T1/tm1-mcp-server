@@ -87,6 +87,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`$batch` chunks are bounded by payload size, not just by request count.** The 200-requests-per-
+  round-trip cap said nothing about how large those requests were: 200 sub-requests carrying long
+  element names or a Components list are easily megabytes, and the counter is still under its cap
+  when the body hits a limit in front of TM1 — nginx defaults to 1 MiB. That comes back as 400/413,
+  a status the service reads as "this server has no `$batch`", so an oversized payload could
+  silently re-drive every write down the slow per-request fallback. A chunk now closes when either
+  cap would be exceeded, measured in UTF-8 bytes over the actual wire object. A single sub-request
+  larger than the whole budget still goes out, alone, rather than being dropped. Chunks stay
+  serial, deliberately: these are mutations, and overlapping envelopes would make "how much
+  committed before the failure" unanswerable.
+
 - **HTTP transport no longer leaks a listener per request.** Each request builds a fresh
   `McpServer`, and that build attaches a `SubscriptionRegistry` listener to the process-global
   `tm1Events` emitter. `server.close()` cannot detach it — it knows nothing about that emitter —
