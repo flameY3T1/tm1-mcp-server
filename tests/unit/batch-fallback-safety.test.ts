@@ -8,12 +8,56 @@
 // enforces — pull a destructive pass forward and the fallback silently starts
 // replaying it. These tests pin both halves so a reorder fails loudly.
 //
-// The fake below deliberately carries STATE and applies sub-requests as it
-// processes them, so the injected failure leaves earlier sub-requests
-// COMMITTED. That is not hypothetical: TM1's $batch is non-atomic (verified
-// live against 11.8 — a failing sub-request leaves its siblings committed), and
-// an ambiguous 500 can arrive after the server applied part of the envelope.
-// The other batch suites use stateless fakes and cannot express this.
+// The `StatefulElementBatchModel` below deliberately carries STATE and applies
+// sub-requests as it processes them, so the injected failure leaves earlier
+// sub-requests COMMITTED. That is not hypothetical: TM1's $batch is non-atomic
+// (verified live against 11.8 — a failing sub-request leaves its siblings
+// committed), and an ambiguous 500 can arrive after the server applied part of
+// the envelope. The other batch suites use stateless fakes and cannot express
+// this.
+//
+// ---------------------------------------------------------------------------
+// WHAT StatefulElementBatchModel MODELS — AND WHAT IT DOES NOT
+// ---------------------------------------------------------------------------
+// It is NOT a TM1 simulator. It is a narrow model of exactly the element and
+// $batch behaviours this suite's invariant depends on. Anything not listed
+// under "modelled" is absent, and a test that appears to exercise it is
+// exercising nothing.
+//
+// Modelled (deliberately, because the invariant needs it):
+//   - An element store keyed by name, each with `type` and `hasLeafData`.
+//   - POST create: rejects a duplicate name with a TM1Error carrying
+//     httpStatus 400 and the v11 wording `An element with name "X" already
+//     exists.` — v11 really does answer 400 here, not 409.
+//   - GET: returns the stored `Type` only.
+//   - PATCH `Type`: applied in place; a Numeric -> non-Numeric change on an
+//     element with `hasLeafData` is recorded in `destructive` and clears
+//     `hasLeafData` — this stands in for TM1 discarding leaf cell values on
+//     that conversion. Nothing else about cell data is modelled.
+//   - PATCH `Components`: stored verbatim, no validation of the component
+//     graph, no rollup, no circularity check.
+//   - $batch envelopes: sub-requests are applied IN ORDER and each one COMMITS
+//     as it is applied, so an injected failure at index N leaves 0..N-1
+//     committed — the non-atomicity that is the whole point of this file.
+//   - BatchService's counter-probe (`BATCH_PROBE_ID`): answered with a canned
+//     200 without touching state or the envelope counter.
+//   - Injected failures: one configurable (envelope index, sub-request index,
+//     status) throw, defaulting to 500.
+//
+// NOT modelled — do not read a passing test here as evidence about any of it:
+//   - Authentication, sessions, session expiry, CAM, keep-alive.
+//   - OData name escaping: element names are pulled out of the path with a
+//     plain regex, so a name containing a quote or a percent-encoded character
+//     is neither escaped nor round-tripped correctly.
+//   - Pagination, $top/$skip/$count, $filter, $select, $expand.
+//   - Real v11 error bodies: errors are TM1Error objects, not the OData
+//     `error.code`/`error.message` envelope the client parses in production.
+//     Error-shape parsing must be tested elsewhere.
+//   - The 32 KB request limit, chunking, or any transport-level concern.
+//   - Hierarchies, dimensions, attributes, subsets, views, cubes, cells.
+//   - Element deletion, renaming, or moving.
+//   - Concurrency, locking, or the TM1 transaction log.
+//   - $batch atomicity semantics of any server other than v11 11.8.
 import { describe, it, expect } from "vitest";
 import { ElementService } from "../../src/tm1-client/services/element-service.js";
 import {
@@ -46,7 +90,7 @@ interface Injection {
 }
 
 /** Minimal stateful TM1 stand-in: elements, types, and destructive conversions. */
-class StatefulFakeTM1 {
+class StatefulElementBatchModel {
   readonly elements = new Map<string, FakeElement>();
   /** Every Numeric -> non-Numeric conversion, i.e. every destructive write. */
   readonly destructive: string[] = [];
@@ -201,7 +245,10 @@ class StatefulFakeTM1 {
   }
 }
 
-function serviceFor(fake: StatefulFakeTM1, withBatch: boolean): ElementService {
+function serviceFor(
+  fake: StatefulElementBatchModel,
+  withBatch: boolean,
+): ElementService {
   const http = fake.http();
   const cells = {} as unknown as CellService;
   return withBatch
@@ -229,7 +276,7 @@ const ELEMENTS: ElementCreate[] = [
 describe("bulkUpsert $batch fallback safety", () => {
   it("a partially committed first envelope falls back without repeating destructive work", async () => {
     // Reference: what the per-request path alone produces.
-    const ref = new StatefulFakeTM1(SEED);
+    const ref = new StatefulElementBatchModel(SEED);
     const refResult = await serviceFor(ref, false).bulkUpsert(
       "Dim",
       "Dim",
@@ -240,7 +287,10 @@ describe("bulkUpsert $batch fallback safety", () => {
     ]);
 
     // Same workload, but the first envelope dies after committing 3 creates.
-    const f = new StatefulFakeTM1(SEED, { envelope: 0, applyBefore: 3 });
+    const f = new StatefulElementBatchModel(SEED, {
+      envelope: 0,
+      applyBefore: 3,
+    });
     const result = await serviceFor(f, true).bulkUpsert("Dim", "Dim", ELEMENTS);
 
     // Only creates can ever be in flight in the fallback-eligible window. If a
@@ -264,7 +314,7 @@ describe("bulkUpsert $batch fallback safety", () => {
     // a reason that will never be true again. It must surface as a real error —
     // and, exactly as with the post-success case, must not silently re-drive
     // the writes down the other path.
-    const f = new StatefulFakeTM1(SEED, {
+    const f = new StatefulElementBatchModel(SEED, {
       envelope: 0,
       applyBefore: 3,
       status: 400,
@@ -279,7 +329,10 @@ describe("bulkUpsert $batch fallback safety", () => {
 
   it("a failure after the first successful batch propagates instead of falling back", async () => {
     // Envelope 0 = creates, 1 = type probes, 2 = the destructive type PATCHes.
-    const f = new StatefulFakeTM1(SEED, { envelope: 2, applyBefore: 0 });
+    const f = new StatefulElementBatchModel(SEED, {
+      envelope: 2,
+      applyBefore: 0,
+    });
 
     await expect(
       serviceFor(f, true).bulkUpsert("Dim", "Dim", ELEMENTS),

@@ -54,7 +54,7 @@ interface FakeArgs {
   >;
 }
 
-function makeFakeTM1Client(args: FakeArgs) {
+function makeAuditComplexityClientStub(args: FakeArgs) {
   // Mirrors the real services, which apply $filter=not startswith(Name,'}')
   // server-side when includeControl=false.
   const isControl = (n: string) => n.startsWith("}");
@@ -89,7 +89,7 @@ describe("tm1_audit_complexity tool", () => {
     const fake = makeFakeServer();
     registerAuditComplexity(
       fake.server,
-      makeFakeTM1Client({ productVersion: "11.8" }),
+      makeAuditComplexityClientStub({ productVersion: "11.8" }),
     );
     expect(fake.getName()).toBe("tm1_audit_complexity");
   });
@@ -98,7 +98,7 @@ describe("tm1_audit_complexity tool", () => {
     const fake = makeFakeServer();
     registerAuditComplexity(
       fake.server,
-      makeFakeTM1Client({ productVersion: "11.8" }),
+      makeAuditComplexityClientStub({ productVersion: "11.8" }),
     );
     const out = parseResult(await fake.getHandler()({}));
     expect(out.status).toBe("pass");
@@ -108,7 +108,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("scans processes and reports topProcesses sorted by score", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         { name: "Trivial", prolog: "x=1;", metadata: "", data: "", epilog: "" },
@@ -130,7 +130,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("excludes control objects by default", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         {
@@ -151,7 +151,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("scans rules and lists cubes without skipcheck", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -170,7 +170,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("detects cross-process variable variants and type conflicts", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         { name: "Load_Sales", prolog: "", metadata: "", data: "", epilog: "" },
@@ -215,7 +215,10 @@ describe("tm1_audit_complexity tool", () => {
       data: "",
       epilog: "",
     }));
-    const tm1 = makeFakeTM1Client({ productVersion: "11.8", processes: procs });
+    const tm1 = makeAuditComplexityClientStub({
+      productVersion: "11.8",
+      processes: procs,
+    });
     registerAuditComplexity(fake.server, tm1);
     const out = parseResult(
       await fake.getHandler()({ scope: ["processes"], topN: 5 }),
@@ -227,7 +230,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("status=pass when only trivial processes exist and no consistency issues", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         { name: "Tiny", prolog: "x=1;", metadata: "", data: "", epilog: "" },
@@ -242,7 +245,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("status=fail when scoreThreshold>0 is met by topProcesses", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         {
@@ -273,7 +276,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("ranks by v1 score by default (branch-heavy process first)", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         {
@@ -299,7 +302,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("ranks by v2 score when rankBy=scoreV2 (loop-nesting process first)", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         {
@@ -342,11 +345,17 @@ describe("tm1_audit_complexity tool", () => {
       ],
     };
     const base = makeFakeServer();
-    registerAuditComplexity(base.server, makeFakeTM1Client(tm1Args));
+    registerAuditComplexity(
+      base.server,
+      makeAuditComplexityClientStub(tm1Args),
+    );
     const def = parseResult(await base.getHandler()({ scope: ["processes"] }));
 
     const tuned = makeFakeServer();
-    registerAuditComplexity(tuned.server, makeFakeTM1Client(tm1Args));
+    registerAuditComplexity(
+      tuned.server,
+      makeAuditComplexityClientStub(tm1Args),
+    );
     const out = parseResult(
       await tuned.getHandler()({
         scope: ["processes"],
@@ -360,7 +369,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("scoreThreshold filters low-score entries", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         { name: "Tiny", prolog: "x=1;", metadata: "", data: "", epilog: "" },
@@ -386,7 +395,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("scope=antipatterns reports findings and fails on an error-severity rule", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         {
@@ -411,7 +420,7 @@ describe("tm1_audit_complexity tool", () => {
 
   it("antipatterns is not scanned by default", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditComplexityClientStub({
       productVersion: "11.8",
       processes: [
         {
@@ -451,7 +460,7 @@ describe("tm1_audit_complexity tool", () => {
       let inFlight = 0;
       let maxInFlight = 0;
       const fake = makeFakeServer();
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditComplexityClientStub({
         productVersion: "11.8",
         processes,
         getVariablesImpl: async (name) => {
@@ -485,7 +494,7 @@ describe("tm1_audit_complexity tool", () => {
         proc("Gamma_Beta"),
       ];
       const fake = makeFakeServer();
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditComplexityClientStub({
         productVersion: "11.8",
         processes,
         getVariablesImpl: async (name) => {
@@ -510,7 +519,7 @@ describe("tm1_audit_complexity tool", () => {
     it("keeps fail-fast: a single getVariables rejection fails the tool call", async () => {
       const processes = Array.from({ length: 12 }, (_, i) => proc(`P${i}`));
       const fake = makeFakeServer();
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditComplexityClientStub({
         productVersion: "11.8",
         processes,
         getVariablesImpl: async (name) => {

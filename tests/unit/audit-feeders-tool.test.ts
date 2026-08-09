@@ -46,7 +46,7 @@ interface FakeArgs {
   cubeStats?: Record<string, Record<string, number>>;
 }
 
-function makeFakeTM1Client(args: FakeArgs) {
+function makeAuditFeedersClientStub(args: FakeArgs) {
   const isControl = (n: string) => n.startsWith("}");
   return {
     server: { getInfo: async () => ({ productVersion: args.productVersion }) },
@@ -106,14 +106,14 @@ describe("tm1_audit_feeders tool", () => {
     const fake = makeFakeServer();
     registerAuditFeeders(
       fake.server,
-      makeFakeTM1Client({ productVersion: "11.8" }),
+      makeAuditFeedersClientStub({ productVersion: "11.8" }),
     );
     expect(fake.getName()).toBe("tm1_audit_feeders");
   });
 
   it("returns pass when no cubes have feeders", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -136,7 +136,7 @@ describe("tm1_audit_feeders tool", () => {
     // works from rule text alone, so a dim resolver failure no longer
     // suppresses S1 (only the ratio fallback needs the dim count).
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -160,7 +160,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("flags feeder_broader_than_rule (S1) when feeder pins fewer dims than its rule", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       dims: { Sales: ["D1", "D2", "D3", "D4", "D5"] },
       rules: [
@@ -187,7 +187,7 @@ describe("tm1_audit_feeders tool", () => {
     // Real-world FP eliminated by rule-pairing: feeder pins 1 dim, rule
     // pins 1 dim — equal, so feeder is correctly sized.
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       dims: { Cap: ["D1", "D2", "D3", "D4", "D5", "D6"] },
       rules: [
@@ -214,7 +214,7 @@ describe("tm1_audit_feeders tool", () => {
     // orphan check can't see the matching rule there, so S6 must skip
     // these (S5 already covers DB-skipcheck risk).
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       dims: { Source: ["D1", "D2", "D3"] },
       rules: [
@@ -238,7 +238,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("skips S1 for cross-cube DB-feeders (rule lives in target cube)", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       dims: { Source: ["D1", "D2", "D3", "D4", "D5", "D6", "D7"] },
       rules: [
@@ -261,7 +261,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("flags db_feeder_without_skipcheck (S5) on DB() target lacking skipcheck", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -292,7 +292,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("does not flag db_feeder_without_skipcheck when target has skipcheck", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -319,7 +319,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("flags feeder_to_consolidated (S2) on consolidated LHS element", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       dims: { Sales: ["Region"] },
       elements: {
@@ -347,7 +347,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("flags orphan feeders whose elements don't appear in any rule (S6)", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -370,7 +370,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("flags wildcard brackets (S4)", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -392,7 +392,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("excludes control objects by default and includes them on opt-in", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -418,7 +418,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("respects the cubes whitelist filter", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -443,7 +443,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("honours topN cap and reports truncation", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -469,7 +469,7 @@ describe("tm1_audit_feeders tool", () => {
     // Real-world cubes split a feeder across two lines; the second starts
     // with `=>`. The continuation must not be counted as a separate feeder.
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -495,7 +495,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("severityThreshold='none' always returns status pass even with findings", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -515,7 +515,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("severityThreshold='evidence' returns pass when only hints are present", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -536,7 +536,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("severityThreshold='evidence' returns fail when runtime evidence present", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -563,7 +563,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("runtime mode skips static heuristics — emits only cube-level findings", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -596,7 +596,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("runtime mode flags cube_high_fed_ratio as evidence at ≥100x fed/populated", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -625,7 +625,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("flags fed/populated between 50x and 100x as hint (suspicious, not definite)", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -656,7 +656,7 @@ describe("tm1_audit_feeders tool", () => {
     // Community calibration (tm1forum/Cubewise): only ≥ 50x is suspicious,
     // ≥ 100x definite — 11x is normal feeder fan-out, not overfeeding.
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -686,7 +686,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("ratio is null when populatedNumeric is zero — cross-cube-fed cube, no false flag", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -711,7 +711,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("reports feederMemoryRatio as secondary signal without flagging", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -738,7 +738,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("runtime mode flags cube_high_memory above threshold", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -763,7 +763,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("mode both escalates static findings on cubes with runtime evidence", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -797,7 +797,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("runtime mode degrades gracefully when }StatsByCube fetch fails", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -818,7 +818,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("default mode static does not call }StatsByCube", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {
@@ -837,7 +837,7 @@ describe("tm1_audit_feeders tool", () => {
 
   it("uses positional element bag for orphan detection (real feeder style)", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditFeedersClientStub({
       productVersion: "11.8",
       rules: [
         {

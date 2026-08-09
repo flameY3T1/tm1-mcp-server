@@ -53,7 +53,7 @@ function makeFakeServer() {
   };
 }
 
-interface FakeTM1Args {
+interface AuditNamingClientStubArgs {
   productVersion: string;
   cubes?: Array<{ name: string }>;
   dimensions?: Array<{ name: string; hierarchies: string[] }>;
@@ -69,7 +69,7 @@ interface FakeTM1Args {
 const ELEMENTS_RE =
   /\/api\/v1\/Dimensions\('([^']+)'\)\/Hierarchies\('([^']+)'\)\/Elements\?(.*)$/;
 
-function makeFakeTM1Client(args: FakeTM1Args) {
+function makeAuditNamingClientStub(args: AuditNamingClientStubArgs) {
   const request = async (_method: string, path: string) => {
     const m = ELEMENTS_RE.exec(path);
     if (!m) throw new Error(`unexpected path: ${path}`);
@@ -141,14 +141,14 @@ function parseResult(raw: unknown): {
 describe("tm1_audit_naming tool", () => {
   it("registers under the expected name", () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({ productVersion: "11.8.01100" });
+    const tm1 = makeAuditNamingClientStub({ productVersion: "11.8.01100" });
     registerAuditNaming(fake.server, tm1);
     expect(fake.getName()).toBe("tm1_audit_naming");
   });
 
   it("returns pass when all objects are clean", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       cubes: [{ name: "Sales" }, { name: "Forecast" }],
       dimensions: [{ name: "Product", hierarchies: ["Product"] }],
@@ -164,7 +164,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("flags reserved char in cube name and control prefix", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       cubes: [{ name: "Bad;Cube" }, { name: "}Hidden" }],
     });
@@ -181,7 +181,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("excludes control objects by default and includes them on opt-in", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       cubes: [{ name: "}Stats" }, { name: "Sales" }],
     });
@@ -198,7 +198,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("applies v12-only TAB rule when server is v12", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "12.0.0",
       dimensions: [{ name: "Region", hierarchies: ["Region"] }],
       elementsByHier: { "Region/Region": ["North\tWest"] },
@@ -212,7 +212,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("does NOT flag TAB on v11 server even if elements contain it", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       dimensions: [{ name: "Region", hierarchies: ["Region"] }],
       elementsByHier: { "Region/Region": ["North\tWest"] },
@@ -225,7 +225,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("versionOverride='12' forces v12 rules on v11 server", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       dimensions: [{ name: "Region", hierarchies: ["Region"] }],
       elementsByHier: { "Region/Region": ["a\tb"] },
@@ -242,7 +242,7 @@ describe("tm1_audit_naming tool", () => {
   it("paginates element scan across multiple pages", async () => {
     const fake = makeFakeServer();
     const names = ["e1", "e2", "e3", "e4", "e5", "e6", "e7"];
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       dimensions: [{ name: "Big", hierarchies: ["Big"] }],
       elementsByHier: { "Big/Big": names },
@@ -306,7 +306,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("reports scanned.dimensions when only hierarchies are in scope", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       dimensions: [
         { name: "Product", hierarchies: ["Product", "ByBrand"] },
@@ -324,7 +324,7 @@ describe("tm1_audit_naming tool", () => {
   it("respects elementsPageSize for paginated reads", async () => {
     const fake = makeFakeServer();
     const names = Array.from({ length: 5 }, (_, i) => `valid_${i}`);
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       dimensions: [{ name: "Mini", hierarchies: ["Mini"] }],
       elementsByHier: { "Mini/Mini": names },
@@ -340,7 +340,7 @@ describe("tm1_audit_naming tool", () => {
     const fake = makeFakeServer();
     const big = Array.from({ length: 10 }, (_, i) => `e${i}`);
     const small = ["ok1", "ok2"];
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       dimensions: [
         { name: "Huge", hierarchies: ["Huge"] },
@@ -365,7 +365,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("flags invalid process variable identifiers", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       processes: [{ name: "Load" }],
       variables: {
@@ -387,7 +387,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("respects maxFindings cap and reports truncation", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       cubes: Array.from({ length: 5 }, (_, i) => ({ name: `Bad;${i}` })),
     });
@@ -400,7 +400,7 @@ describe("tm1_audit_naming tool", () => {
 
   it("scope subset of kinds skips unrelated calls", async () => {
     const fake = makeFakeServer();
-    const tm1 = makeFakeTM1Client({
+    const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       cubes: [{ name: "Bad;Cube" }],
       processes: [{ name: "Bad;Proc" }],
@@ -416,7 +416,7 @@ describe("tm1_audit_naming tool", () => {
     it("summary=true swaps findings[] for findingsByGroup[] and omits truncation", async () => {
       const fake = makeFakeServer();
       const elements = ["Bad;1", "Bad;2", "Bad;3", "Bad;4"];
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditNamingClientStub({
         productVersion: "11.8.01100",
         dimensions: [{ name: "Produkt", hierarchies: ["Produkt"] }],
         elementsByHier: { "Produkt/Produkt": elements },
@@ -444,7 +444,7 @@ describe("tm1_audit_naming tool", () => {
 
     it("summary aggregates rule counts per (objectKind, parent) group", async () => {
       const fake = makeFakeServer();
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditNamingClientStub({
         productVersion: "11.8.01100",
         dimensions: [
           { name: "DimA", hierarchies: ["DimA"] },
@@ -472,7 +472,7 @@ describe("tm1_audit_naming tool", () => {
     it("summary samples first 3 element names per group", async () => {
       const fake = makeFakeServer();
       const names = ["Bad;A", "Bad;B", "Bad;C", "Bad;D", "Bad;E"];
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditNamingClientStub({
         productVersion: "11.8.01100",
         dimensions: [{ name: "Big", hierarchies: ["Big"] }],
         elementsByHier: { "Big/Big": names },
@@ -488,7 +488,7 @@ describe("tm1_audit_naming tool", () => {
 
     it("summary groups non-element kinds under objectKind without parent", async () => {
       const fake = makeFakeServer();
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditNamingClientStub({
         productVersion: "11.8.01100",
         cubes: [{ name: "Bad;X" }, { name: "Bad;Y" }],
         processes: [{ name: "Bad;Proc" }],
@@ -517,7 +517,7 @@ describe("tm1_audit_naming tool", () => {
       const fake = makeFakeServer();
       const big = Array.from({ length: 10 }, (_, i) => `e${i}`);
       const small = ["ok1", "ok2"];
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditNamingClientStub({
         productVersion: "11.8.01100",
         dimensions: [
           { name: "Huge", hierarchies: ["Huge"] },
@@ -536,7 +536,7 @@ describe("tm1_audit_naming tool", () => {
 
     it("totalElementsInScope is 0 when elements not in scope", async () => {
       const fake = makeFakeServer();
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditNamingClientStub({
         productVersion: "11.8.01100",
         cubes: [{ name: "Sales" }],
       });
@@ -547,7 +547,7 @@ describe("tm1_audit_naming tool", () => {
 
     it("summary=false (default) keeps legacy findings[] response", async () => {
       const fake = makeFakeServer();
-      const tm1 = makeFakeTM1Client({
+      const tm1 = makeAuditNamingClientStub({
         productVersion: "11.8.01100",
         cubes: [{ name: "Bad;X" }],
       });

@@ -83,6 +83,43 @@ npm run tools:update-readme
 - Live (against a real TM1) is optional but encouraged for tool changes; note in
   the PR what you validated.
 
+### The four test classes
+
+The suite mixes four kinds of test that prove different things. Know which one
+you are writing, and say so in the PR — "I added tests" is not a claim until the
+class is named.
+
+| Class                    | Lives in                              | Asserts                                                      | Proves                                                            | Does **not** prove                                                                                           |
+| ------------------------ | ------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **behavioral/invariant** | `tests/unit/`, `tests/property/`      | our logic and its invariants, against hand-written mocks     | the code does what we intended, and keeps doing it under refactor | anything about TM1. The mock is our belief about TM1, restated                                               |
+| **recorded contract**    | _none yet_ — see below                | our parsing against captured real TM1 responses              | we can read what the server actually sends                        | that we send the right request, or that the capture is still current                                         |
+| **request-shape**        | `tests/unit/` (client/service suites) | the OData/HTTP request we build — URL, method, body, `$`-ops | the request is stable and does not silently change                | that TM1 accepts it. Source and mock can be changed together and stay green                                  |
+| **live**                 | `tests/live/`                         | real calls against a real server                             | the round trip works on that server, that version, that day       | anything in CI — the live suite never runs by default, and its harness stubs the transport/registration edge |
+
+Two consequences worth internalising:
+
+- **The aggregate test count is not a confidence number.** It sums four classes
+  that carry very different weight, and the largest class (behavioral) asserts
+  against mocks we wrote. Cite it as suite size, never as evidence of REST
+  correctness. If you quote it in a PR or release note, say which classes it
+  contains.
+- **The recorded-contract class is currently empty.** No sanitised TM1 responses
+  are checked in, so nothing in CI verifies our belief about IBM's wire format.
+  A coordinated wrong change to source _and_ mock passes every required job.
+  Closing this is tracked work, not a nice-to-have.
+
+Conventions for new tests, so the class is self-evident:
+
+- Live tests: file named `*.live.test.ts` under `tests/live/` (already enforced
+  by convention and the vitest config).
+- Request-shape tests: prefix the `describe` with `request shape:` — e.g.
+  `describe("request shape: DimensionService.list", ...)`. New tests only; the
+  existing ~12 client suites are not retrofitted.
+- Recorded-contract tests: when the first ones land, they go in
+  `tests/contract/` as `*.contract.test.ts`, with the captured payloads in
+  `tests/fixtures/` — sanitised, no real object or host names.
+- Everything else is behavioral/invariant by default; no marker needed.
+
 ## Commits & PRs
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/)
