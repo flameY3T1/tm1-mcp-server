@@ -750,7 +750,12 @@ describe("TM1Client – Cell Data Methods", () => {
       const c = newClient("11.8");
       fetchSpy
         .mockResolvedValueOnce(mock204()) // create process
-        .mockResolvedValueOnce(mock204()) // execute
+        // T-4: the execute must actually report CompletedSuccessfully. A body
+        // without ProcessExecuteStatusCode no longer counts as a confirmed
+        // clear — see the "unconfirmed clear" case below.
+        .mockResolvedValueOnce(
+          mockResponse({ ProcessExecuteStatusCode: "CompletedSuccessfully" }),
+        ) // execute
         .mockResolvedValueOnce(mock204()); // delete
 
       await c.cubes.clear("Sales", ["Time", "Region"], [[], []]);
@@ -768,6 +773,24 @@ describe("TM1Client – Cell Data Methods", () => {
       const [delUrl, delOpts] = fetchSpy.mock.calls[2];
       expect(delOpts.method).toBe("DELETE");
       expect(delUrl).toContain("/api/v1/Processes('");
+    });
+
+    it("11.x full clear: an execute with no status code is not a confirmed clear (T-4)", async () => {
+      // `?? "CompletedSuccessfully"` used to report an unverified clear as a
+      // successful one. For a destructive operation the unknown has to surface.
+      const c = newClient("11.8");
+      fetchSpy
+        .mockResolvedValueOnce(mock204()) // create process
+        .mockResolvedValueOnce(mock204()) // execute — no status code
+        .mockResolvedValueOnce(mock204()); // delete (cleanup still runs)
+
+      await expect(
+        c.cubes.clear("Sales", ["Time", "Region"], [[], []]),
+      ).rejects.toThrow(/no ProcessExecuteStatusCode/);
+
+      // The ephemeral process is still cleaned up.
+      const [, delOpts] = fetchSpy.mock.calls[2];
+      expect(delOpts.method).toBe("DELETE");
     });
 
     it("11.x partial clear: throws UNSUPPORTED_OPERATION", async () => {

@@ -6,6 +6,13 @@ import { z } from "zod";
 export const ELEMENT_TYPE = z.enum(["Numeric", "String", "Consolidated"]);
 export const PARAM_TYPE = z.enum(["String", "Numeric"]);
 
+// Outcome axis of a TI run — mirrors `ProcessOutcome` in src/types.ts.
+// "indeterminate" is the state that had no wire representation before: TM1
+// answered without a ProcessExecuteStatusCode, so whether the process ran is
+// unknown. It travels alongside `success: false` (fail-closed) and exists so a
+// caller can tell "we don't know" from a reported abort.
+export const PROCESS_OUTCOME = z.enum(["succeeded", "failed", "indeterminate"]);
+
 // Hoisted: shared by transaction-log entries and MDX/cell tools below.
 export const CellValueSchema = z.union([z.string(), z.number(), z.null()]);
 

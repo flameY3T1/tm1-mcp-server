@@ -94,6 +94,7 @@ describe("TM1Client – Process Execution Methods", () => {
 
       expect(result).toEqual({
         success: true,
+        outcome: "succeeded",
         processErrorStatus: "CompletedSuccessfully",
         errorLogFile: undefined,
       });
@@ -140,7 +141,11 @@ describe("TM1Client – Process Execution Methods", () => {
       expect(result.errorLogFile).toBe("TM1ProcessError_20260718_Broken.log");
     });
 
-    it("should return success when process completes with 200 empty body", async () => {
+    it("reports a 200 empty body as indeterminate, not as success (T-4)", async () => {
+      // A body with no ProcessExecuteStatusCode used to default to
+      // "CompletedSuccessfully" — an unverified run reported as a clean one.
+      // A live server always sends the field (tests/live/process.live.test.ts),
+      // so reaching this branch means we genuinely do not know the outcome.
       fetchSpy.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -151,8 +156,8 @@ describe("TM1Client – Process Execution Methods", () => {
 
       const result = await client.processes.execute("RunCalc");
 
-      expect(result.success).toBe(true);
-      expect(result.processErrorStatus).toBe("CompletedSuccessfully");
+      expect(result.success).toBe(false);
+      expect(result.outcome).toBe("indeterminate");
     });
 
     it("should send parameters in the request body", async () => {
@@ -358,6 +363,7 @@ describe("TM1Client – Process Execution Methods", () => {
 
       expect(result).toEqual({
         success: true,
+        outcome: "succeeded",
         processErrorStatus: "CompletedSuccessfully",
         errorLogFile: undefined,
       });

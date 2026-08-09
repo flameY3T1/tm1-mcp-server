@@ -337,12 +337,21 @@ export class CubeService {
       // ExecuteWithReturn returns HTTP 200 even when the process aborts; the real
       // outcome is in ProcessExecuteStatusCode. Without this check an aborted
       // clear (e.g. lock, security) would be reported as a successful clear.
-      const status =
-        result?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
+      //
+      // T-4: an ABSENT status code is not success either. The old
+      // `?? "CompletedSuccessfully"` made a body without the field report a
+      // clean clear; the honest answer is that the clear is unverified, and for
+      // a destructive operation that has to surface. A live v11/v12 server does
+      // send the field (see tests/live/process.live.test.ts), so this is the
+      // defensive branch, not the normal path.
+      const status = result?.ProcessExecuteStatusCode;
       if (status !== "CompletedSuccessfully") {
         throw new TM1Error({
           code: TM1ErrorCode.TM1_ERROR,
-          message: `Cube clear via TI did not complete for cube '${cubeName}' (status: ${status}).`,
+          message:
+            status === undefined || status === ""
+              ? `Cube clear via TI could not be confirmed for cube '${cubeName}': TM1 returned no ProcessExecuteStatusCode. The clear may or may not have run — check the cube before retrying.`
+              : `Cube clear via TI did not complete for cube '${cubeName}' (status: ${status}).`,
           endpoint: `/api/v1/Processes('${enc(procName)}')/tm1.ExecuteWithReturn`,
         });
       }

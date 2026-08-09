@@ -39,6 +39,7 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
   it("flags isError when the TI run reports success:false", async () => {
     const cb = captureHandler(async () => ({
       success: false,
+      outcome: "failed" as const,
       processErrorStatus: "DataSource error",
     }));
     const result = await cb(
@@ -55,6 +56,7 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
     // surface as success:false with the real status + error log attached.
     const cb = captureHandler(async () => ({
       success: false,
+      outcome: "failed" as const,
       processErrorStatus: "CompletedWithMinorErrors",
       errorLogFile: "TM1ProcessError_20260718_Partial.log",
     }));
@@ -69,10 +71,29 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
     );
   });
 
+  it("flags isError when the outcome is indeterminate (T-4)", async () => {
+    // "TM1 told us nothing" is not a successful call. Fail closed so an agent
+    // branching on the MCP error signal does not proceed on an unverified run,
+    // and keep the status text — it is what explains the uncertainty.
+    const cb = captureHandler(async () => ({
+      success: false as const,
+      outcome: "indeterminate" as const,
+      processErrorStatus:
+        "Unknown: TM1 returned no ProcessExecuteStatusCode — the run may have completed, partially completed, or never started.",
+    }));
+    const result = await cb(
+      { processName: "Silent.Process", confirm: "Silent.Process" },
+      {},
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("indeterminate");
+  });
+
   it("does not flag isError on a successful run", async () => {
     const cb = captureHandler(async () => ({
       success: true,
-      processErrorStatus: "CompletedSuccessfully",
+      outcome: "succeeded" as const,
+      processErrorStatus: "CompletedSuccessfully" as const,
     }));
     const result = await cb(
       { processName: "Ok.Process", confirm: "Ok.Process" },

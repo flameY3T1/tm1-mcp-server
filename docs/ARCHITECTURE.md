@@ -126,7 +126,15 @@ Key conventions:
 | Logging            | Use `this.http.logger` for warnings only — keep services quiet  |
 | Version branches   | `if (this.http.version === 11)` — numeric major, not string     |
 | Helpers            | Private methods on the service (e.g. `clearViaTI`)              |
-| State              | None by default; `BatchService` is the deliberate exception     |
+| State              | None by default; only cached capability verdicts (see below)    |
+
+**The one kind of state a service may hold** is a verdict about what _this_
+connection supports, cached so it is probed once rather than once per call.
+`BatchService.supported` (does this server have a usable `/$batch`?) and
+`ProcessService.callgraphShape` (which OData query shape does it answer?) both
+use the same tri-state `T | null`, where `null` means "not probed yet". Both
+also drop the verdict when a call that relied on it fails, so a genuinely
+changed server is re-probed instead of being pinned to a stale answer.
 
 ### Wiring a service into TM1Client
 

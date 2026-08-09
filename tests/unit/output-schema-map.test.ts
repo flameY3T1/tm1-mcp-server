@@ -306,6 +306,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
     },
     tm1_execute_process: {
       success: true,
+      outcome: "succeeded",
       processErrorStatus: "CompletedSuccessfully",
     },
     tm1_diff_process_with_file: {

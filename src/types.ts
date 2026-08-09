@@ -296,11 +296,63 @@ export interface DataSource {
   subset?: string | undefined;
 }
 
-export interface ProcessResult {
-  success: boolean;
-  processErrorStatus: string;
-  errorLogFile?: string | undefined;
-}
+/**
+ * What a TI run is known to have done. Three states, because there really are
+ * three: TM1's `tm1.ExecuteWithReturn` answers HTTP 200 whether the process
+ * completed, aborted, or (in the shape that motivated this) came back without
+ * a `ProcessExecuteStatusCode` at all.
+ *
+ * - `succeeded`     — the server reported `CompletedSuccessfully`.
+ * - `failed`        — the server reported any other status, or the call errored.
+ * - `indeterminate` — the server answered, but said nothing about the outcome.
+ *   The run may have completed, partially completed, or never started. This is
+ *   NOT success: defaulting it to `CompletedSuccessfully` (T-4) reported
+ *   unverified runs to the model as clean ones. It is grouped with
+ *   `success: false` so that fail-closed callers — the `isError` flags on
+ *   `tm1_execute_process` / `tm1_save_data` — treat "unknown" as "do not
+ *   assume it worked". Read `outcome` to tell it apart from a real failure.
+ */
+export type ProcessOutcome = "succeeded" | "failed" | "indeterminate";
+
+/**
+ * Result of a TI execution. A discriminated union rather than a flat record so
+ * the states the server cannot actually be in are not expressible: before this,
+ * `{success: true, processErrorStatus: "Aborted"}` typechecked, and nothing but
+ * a code comment kept `success` and the status in agreement.
+ *
+ * `success` and `outcome` are literal-typed per variant, so they cannot drift
+ * apart; either one narrows the union.
+ */
+export type ProcessResult =
+  | {
+      success: true;
+      outcome: "succeeded";
+      /** Pinned: the only status a successful run can carry. */
+      processErrorStatus: "CompletedSuccessfully";
+      errorLogFile?: string | undefined;
+    }
+  | {
+      success: false;
+      outcome: "failed";
+      /** TM1's status code, or the error text when the call itself failed. */
+      processErrorStatus: string;
+      errorLogFile?: string | undefined;
+    }
+  | {
+      success: false;
+      outcome: "indeterminate";
+      /** Says why the outcome is unknown — the only channel for that here. */
+      processErrorStatus: string;
+      errorLogFile?: string | undefined;
+    };
+
+/**
+ * Status text used when TM1 answers an execution without a
+ * `ProcessExecuteStatusCode`. Carries its own guidance because `ProcessResult`
+ * has no hint field and this string is what reaches the model.
+ */
+export const PROCESS_STATUS_UNKNOWN =
+  "Unknown: TM1 returned no ProcessExecuteStatusCode — the run may have completed, partially completed, or never started. Verify server state (error logs, target cube) before re-running.";
 
 export interface Chore {
   name: string;

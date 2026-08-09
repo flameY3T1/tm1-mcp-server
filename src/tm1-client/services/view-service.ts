@@ -17,7 +17,7 @@ import type {
 } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
 import { freeCellset, transformCellsetResponse } from "./cellset-transform.js";
-import { rethrowIfSystemic } from "./fallback.js";
+import { rethrowIfSystemicOrDenied } from "./fallback.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string =>
@@ -34,8 +34,8 @@ export class ViewService {
   async list(cubeName: string): Promise<CubeView[]> {
     // Public and private scopes are independent collections — issue both at
     // once instead of paying two serial round-trips. Each keeps its own
-    // rethrowIfSystemic/swallow behaviour, and the results are concatenated in
-    // the original order (public first), so callers see no change but the wait.
+    // rethrow/swallow behaviour, and the results are concatenated in the
+    // original order (public first), so callers see no change but the wait.
     //
     // MDX stays in the $select: tm1_list_views advertises it as part of the
     // response, so dropping it to save bytes would be a breaking output change,
@@ -57,8 +57,13 @@ export class ViewService {
           private: isPrivate,
         }));
       } catch (e) {
-        rethrowIfSystemic(e);
-        // scope absent or not readable — omit it
+        // T-9: an empty list here is indistinguishable from "this cube has no
+        // views", so a denial must NOT be swallowed — "you may not see them" is
+        // a different answer and the caller has to be told. Same reasoning the
+        // transaction-log window already uses. What stays swallowed is the case
+        // the catch was written for: a scope this server does not expose at all
+        // (404 on /PrivateViews), which really is "not there".
+        rethrowIfSystemicOrDenied(e);
         return [];
       }
     };

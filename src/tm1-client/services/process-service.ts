@@ -3,7 +3,7 @@
 // CompileProcess (server-side syntax check, with and without saving).
 //
 // See docs/ARCHITECTURE.md for the layering.
-import { TM1Error, TM1ErrorCode } from "../../types.js";
+import { PROCESS_STATUS_UNKNOWN, TM1Error, TM1ErrorCode } from "../../types.js";
 import type {
   CompileResult,
   DataSource,
@@ -15,7 +15,11 @@ import type {
   ProcessVariable,
 } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
-import { rethrowIfSystemic } from "./fallback.js";
+import {
+  isUnsupportedQueryShape,
+  rethrowIfSystemic,
+  rethrowIfSystemicOrDenied,
+} from "./fallback.js";
 import {
   filterClause,
   nameFilterPredicates,
@@ -59,7 +63,88 @@ function encodeParameter(p: ProcessParameter): Record<string, unknown> {
   };
 }
 
+/**
+ * Turn TM1's `ProcessExecuteStatusCode` into a `ProcessResult`.
+ *
+ * The single decision this centralises is the one T-4 named: an ABSENT status
+ * code is not success. The old `?? "CompletedSuccessfully"` on both execution
+ * paths meant a server that answered 200 with an empty body, or a body without
+ * the field, was reported to the caller as a clean run — fail-open on the one
+ * question the caller asked. It is now `indeterminate`, which travels as
+ * `success: false` so nothing downstream proceeds on an unverified run, while
+ * `outcome` keeps it distinguishable from a genuine abort.
+ */
+function classifyExecution(
+  statusCode: string | undefined,
+  errorLogFile: string | undefined,
+): ProcessResult {
+  if (statusCode === undefined || statusCode === "") {
+    return {
+      success: false,
+      outcome: "indeterminate",
+      processErrorStatus: PROCESS_STATUS_UNKNOWN,
+      errorLogFile,
+    };
+  }
+  if (statusCode === "CompletedSuccessfully") {
+    return {
+      success: true,
+      outcome: "succeeded",
+      processErrorStatus: "CompletedSuccessfully",
+      errorLogFile,
+    };
+  }
+  return {
+    success: false,
+    outcome: "failed",
+    processErrorStatus: statusCode,
+    errorLogFile,
+  };
+}
+
+/**
+ * The OData query shapes `fetchForCallgraph` will accept, richest first. Each
+ * later entry gives up something the previous one asked for, so a stricter or
+ * older TM1 that cannot parse one shape can still be served by the next.
+ *
+ * The list is a ladder of CAPABILITY, nothing else: walking down it is only
+ * ever a valid response to the server rejecting the query shape itself.
+ */
+const CALLGRAPH_QUERY_SHAPES: ReadonlyArray<(filter: string) => string> = [
+  (f) =>
+    `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters${f}`,
+  (f) =>
+    `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters&$expand=Parameters($select=Name,Value,Type)${f}`,
+  (f) => `/api/v1/Processes?$expand=Parameters${f}`,
+  // Last resort: no parameter metadata at all. Callgraph edges still resolve;
+  // parameter-default folding degrades.
+  (f) =>
+    `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure${f}`,
+];
+
+type RawCallgraphProcess = {
+  Name?: string;
+  PrologProcedure?: string;
+  MetadataProcedure?: string;
+  DataProcedure?: string;
+  EpilogProcedure?: string;
+  Parameters?: Array<{
+    Name?: string;
+    Value?: string | number;
+    Type?: string | number;
+  }>;
+};
+
 export class ProcessService {
+  /**
+   * Index into `CALLGRAPH_QUERY_SHAPES` that this connection answered, or
+   * `null` while unprobed — the same tri-state verdict `BatchService.supported`
+   * keeps, for the same reason. Probing costs up to four full `/Processes`
+   * scans, so it must be paid once per connection and not once per callgraph
+   * build (P7).
+   */
+  private callgraphShape: number | null = null;
+
   constructor(private readonly http: TM1HttpClient) {}
 
   /**
@@ -170,13 +255,10 @@ export class ProcessService {
         ProcessExecuteStatusCode?: string;
         ErrorLogFile?: { Filename?: string } | null;
       }>("POST", path, body, opts);
-      const status =
-        response?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
-      return {
-        success: status === "CompletedSuccessfully",
-        processErrorStatus: status,
-        errorLogFile: response?.ErrorLogFile?.Filename,
-      };
+      return classifyExecution(
+        response?.ProcessExecuteStatusCode,
+        response?.ErrorLogFile?.Filename,
+      );
     } catch (error) {
       // Systemic transport/auth failures (LOCK_TIMEOUT, CONNECTION_FAILED,
       // AUTH_FAILED) must propagate: a timed-out TI run is still executing
@@ -185,6 +267,7 @@ export class ProcessService {
       if (error instanceof TM1Error) {
         return {
           success: false,
+          outcome: "failed",
           processErrorStatus: error.details ?? error.message,
           errorLogFile: undefined,
         };
@@ -227,13 +310,10 @@ export class ProcessService {
         ProcessExecuteStatusCode?: string;
         ErrorLogFile?: { Filename?: string } | null;
       }>("POST", "/api/v1/ExecuteProcessWithReturn", body, opts);
-      const status =
-        response?.ProcessExecuteStatusCode ?? "CompletedSuccessfully";
-      return {
-        success: status === "CompletedSuccessfully",
-        processErrorStatus: status,
-        errorLogFile: response?.ErrorLogFile?.Filename,
-      };
+      return classifyExecution(
+        response?.ProcessExecuteStatusCode,
+        response?.ErrorLogFile?.Filename,
+      );
     } catch (error) {
       // Systemic transport/auth failures (LOCK_TIMEOUT, CONNECTION_FAILED,
       // AUTH_FAILED) must propagate: a timed-out TI run is still executing
@@ -242,6 +322,7 @@ export class ProcessService {
       if (error instanceof TM1Error) {
         return {
           success: false,
+          outcome: "failed",
           processErrorStatus: error.details ?? error.message,
           errorLogFile: undefined,
         };
@@ -323,9 +404,71 @@ export class ProcessService {
   }
 
   /**
+   * Run the callgraph fetch against the query shape this connection accepts,
+   * discovering it on first use.
+   *
+   * The discovery loop used to catch EVERY error and move on to the next,
+   * broader query. That turned an expired session, a request timeout or a
+   * security denial into three more full-collection scans (~4 × 30 s worst
+   * case, P7) and — worse — let a later shape that happened to answer mask the
+   * real first error (K6/T-9). Two guards now bound it:
+   *
+   *   - `rethrowIfSystemicOrDenied` — transport/auth/timeout failures and
+   *     permission denials leave immediately. A denial in particular must never
+   *     become an empty process list: the callgraph would cache "this model has
+   *     no processes" as truth.
+   *   - `isUnsupportedQueryShape` — of what is left, only TM1 refusing the
+   *     query shape justifies asking again in another form.
+   */
+  private async fetchCallgraphBody(
+    filter: string,
+  ): Promise<{ value: RawCallgraphProcess[] }> {
+    type Body = { value: RawCallgraphProcess[] };
+    const shapeAt = (i: number): string => {
+      const build = CALLGRAPH_QUERY_SHAPES[i];
+      if (build === undefined)
+        throw new Error(`No callgraph query shape at index ${i}`);
+      return build(filter);
+    };
+
+    if (this.callgraphShape !== null) {
+      try {
+        return await this.http.request<Body>(
+          "GET",
+          shapeAt(this.callgraphShape),
+        );
+      } catch (e) {
+        // A shape this server has already answered cannot suddenly be
+        // "unsupported" — mirrors BatchService, where a 400 after the first
+        // success means the request was bad, not the feature missing. Drop the
+        // verdict so a genuinely changed server is re-probed next call, and let
+        // the error surface instead of silently re-walking the ladder.
+        this.callgraphShape = null;
+        throw e;
+      }
+    }
+
+    let lastErr: unknown;
+    for (let i = 0; i < CALLGRAPH_QUERY_SHAPES.length; i++) {
+      try {
+        const body = await this.http.request<Body>("GET", shapeAt(i));
+        this.callgraphShape = i;
+        return body;
+      } catch (e) {
+        rethrowIfSystemicOrDenied(e);
+        if (!isUnsupportedQueryShape(e)) throw e;
+        lastErr = e;
+      }
+    }
+    throw lastErr instanceof Error
+      ? lastErr
+      : new Error(String(lastErr ?? "Processes fetch failed"));
+  }
+
+  /**
    * Fetch every TI process with code AND parameter metadata for callgraph
-   * indexing. Single round trip; falls back through 4 OData variants for
-   * older/strict TM1 versions.
+   * indexing. Single round trip once the connection's usable OData query shape
+   * is known — see `fetchCallgraphBody` for the discovery rules.
    */
   async fetchForCallgraph(includeControl = false): Promise<
     Array<{
@@ -339,38 +482,7 @@ export class ProcessService {
     }>
   > {
     const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
-    const urls = [
-      `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters${filter}`,
-      `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure,Parameters&$expand=Parameters($select=Name,Value,Type)${filter}`,
-      `/api/v1/Processes?$expand=Parameters${filter}`,
-      `/api/v1/Processes?$select=Name,PrologProcedure,MetadataProcedure,DataProcedure,EpilogProcedure${filter}`,
-    ];
-    type Raw = {
-      Name?: string;
-      PrologProcedure?: string;
-      MetadataProcedure?: string;
-      DataProcedure?: string;
-      EpilogProcedure?: string;
-      Parameters?: Array<{
-        Name?: string;
-        Value?: string | number;
-        Type?: string | number;
-      }>;
-    };
-    let body: { value: Raw[] } | undefined;
-    let lastErr: unknown;
-    for (const u of urls) {
-      try {
-        body = await this.http.request<{ value: Raw[] }>("GET", u);
-        break;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    if (!body)
-      throw lastErr instanceof Error
-        ? lastErr
-        : new Error(String(lastErr ?? "Processes fetch failed"));
+    const body = await this.fetchCallgraphBody(filter);
     return (body.value ?? [])
       .map((p) => {
         const parameters = (p.Parameters ?? [])

@@ -50,6 +50,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TM1_RESPONSE_MODE=legacy` to restore the old wire format. Verified against Claude Code.
   Unaffected: `format: "markdown"` and error results.
 
+- **A TI run TM1 reports no status for is no longer reported as a success.** `tm1.ExecuteWithReturn`
+  answers HTTP 200 whatever happened, so the outcome lives entirely in `ProcessExecuteStatusCode` —
+  and a missing field defaulted to `CompletedSuccessfully`. An unverified run therefore reached the
+  model as a clean one. It is now a third state: `outcome: "indeterminate"`, carried alongside
+  `success: false` so nothing proceeds on an unverified run, with a `processErrorStatus` that says
+  the run may have completed, partially completed, or never started. `ProcessResult` became a
+  discriminated union, so `{success: true, processErrorStatus: "Aborted"}` no longer typechecks.
+
+  **Breaking in two narrow ways** for `tm1_execute_process` and `tm1_save_data`: results carry a new
+  required `outcome` field (`succeeded` / `failed` / `indeterminate`), and a status-less response
+  now yields `success: false` with `isError` set, where it previously yielded `success: true`. A
+  live v11/v12 server always sends the field, so the second case is the defensive branch, not the
+  normal path. `tm1_clear_cube` follows the same rule: an unconfirmed clear raises rather than
+  reporting a clear that may not have happened.
+
 ### Changed
 
 - **The unbounded escape hatches are now bounded.** `fetchAll` and `limit=0` opt out of the page
@@ -88,6 +103,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no state" row now names `BatchService` as the deliberate exception.
 
 ### Fixed
+
+- **The callgraph's four-variant OData fallback no longer swallows the real error.**
+  `fetchForCallgraph()` tried up to four query shapes and caught _everything_, so an expired
+  session, a request timeout or a security denial each bought three more full `/Processes` scans —
+  roughly `4 × 30 s` before the caller learned anything — and a later shape that happened to answer
+  masked the first failure. Transport/auth/timeout failures and permission denials now surface
+  immediately; only TM1 refusing the query _shape_ (400/501) advances. The shape that worked is
+  remembered per connection, so the probe is paid once instead of once per callgraph build.
+
+- **A permission denial no longer reads as "this cube has no views".** `ViewService.list()` caught
+  every per-scope error and returned an empty list, making "you may not see them" indistinguishable
+  from "there are none" — the same confusion `rethrowIfSystemicOrDenied` already fixed for the
+  transaction-log window. Denials propagate; a scope the server genuinely does not expose (404 on
+  `/PrivateViews`) is still skipped.
 
 - **`$batch` chunks are bounded by payload size, not just request count.** 200 sub-requests with
   long element names run to megabytes while the counter is still under its cap, and a body past a

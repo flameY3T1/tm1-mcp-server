@@ -53,6 +53,37 @@ describe("Property 7: Prozessausführungs-Ergebnis", () => {
       fc.asyncProperty(
         fc.string({ minLength: 1, maxLength: 30 }),
         async (processName) => {
+          const body = JSON.stringify({
+            ProcessExecuteStatusCode: "CompletedSuccessfully",
+            ErrorLogFile: null,
+          });
+          const f = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            headers: new Headers(),
+            text: vi.fn().mockResolvedValue(body),
+            json: vi.fn().mockResolvedValue(JSON.parse(body)),
+          } as unknown as Response);
+          const client = makeClient(f);
+          const result = await client.processes.execute(processName);
+          expect(result.success).toBe(true);
+          expect(result.outcome).toBe("succeeded");
+          expect(result.processErrorStatus).toBe("CompletedSuccessfully");
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it("an execution TM1 did not report a status for is never success (T-4)", async () => {
+    // The property that replaced the old "empty body means success" one: a
+    // response carrying no ProcessExecuteStatusCode is indeterminate, whatever
+    // the process name.
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 1, maxLength: 30 }),
+        async (processName) => {
           const f = vi.fn().mockResolvedValue({
             ok: true,
             status: 204,
@@ -63,8 +94,8 @@ describe("Property 7: Prozessausführungs-Ergebnis", () => {
           } as unknown as Response);
           const client = makeClient(f);
           const result = await client.processes.execute(processName);
-          expect(result.success).toBe(true);
-          expect(result.processErrorStatus).toBe("CompletedSuccessfully");
+          expect(result.success).toBe(false);
+          expect(result.outcome).toBe("indeterminate");
         },
       ),
       { numRuns: 100 },

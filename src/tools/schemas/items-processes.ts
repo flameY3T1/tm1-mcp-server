@@ -2,7 +2,7 @@
 // get/execute/diff/upsert/copy results plus .pro & git import/export shapes.
 import { z } from "zod";
 
-import { PARAM_TYPE } from "./items-common.js";
+import { PARAM_TYPE, PROCESS_OUTCOME } from "./items-common.js";
 
 export const ProcessParameterSchema = z.object({
   name: z.string(),
@@ -111,8 +111,16 @@ export const ValidateProcessRefsResultSchema = z.object({
   issues: z.array(z.unknown()),
 });
 
+// Mirrors the `ProcessResult` union in src/types.ts. The wire schema stays a
+// flat object: an MCP outputSchema has to be a single JSON-Schema object, so
+// the success/outcome correlation cannot be expressed here (a oneOf would not
+// survive the SDK's object-shape requirement). TypeScript enforces the
+// invariant at the producing end; this schema's job is the strict-completeness
+// gate — `outcome` is a field the handler returns, so it must be listed or the
+// SDK rejects the payload at runtime.
 export const ProcessResultSchema = z.object({
   success: z.boolean(),
+  outcome: PROCESS_OUTCOME,
   processErrorStatus: z.string(),
   errorLogFile: z.string().optional(),
 });
