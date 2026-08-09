@@ -18,7 +18,9 @@ import {
   computeFedToPopulatedRatio,
   computeFeederMemoryRatio,
   fetchCubeStats,
+  CubeStatsUnavailableError,
   type CubeStatsItem,
+  type StatsUnavailableReason,
 } from "../../lib/cube-stats/fetcher.js";
 import { isControlName } from "../../lib/control-name.js";
 
@@ -53,12 +55,25 @@ interface RuntimeStats {
   error?: string;
 }
 
+/**
+ * Runtime evidence could not be gathered at all, for a reason that holds for
+ * the whole server (no `}Stats*` control cubes — TM1 v12) or the whole
+ * account (control-cube reads refused). Reported once instead of repeating
+ * the identical failure under every cube.
+ */
+interface RuntimeUnavailable {
+  reason: StatsUnavailableReason;
+  message: string;
+  cubes: number;
+}
+
 export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_audit_feeders",
     "Static heuristics (S1–S5) scan cube rules for overfeeding: wildcard brackets, feeders into consolidated " +
       "elements, over-broad feeders, DB() without skipcheck, orphan feeders. " +
-      "mode='runtime' returns StatsByCube fed/populated ratio + memory stats; mode='both' runs both and escalates static findings with runtime evidence.",
+      "mode='runtime' returns StatsByCube fed/populated ratio + memory stats; mode='both' runs both and escalates static findings with runtime evidence. " +
+      "Where }StatsByCube is absent (TM1 v12) or unreadable, runtime evidence is reported as `runtimeUnavailable` and the static half still runs.",
     {
       cubes: z
         .array(z.string())
@@ -291,6 +306,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       const runtimeStats: Record<string, RuntimeStats> = {};
       let runtimeAvailableCount = 0;
       let runtimeFailureCount = 0;
+      let runtimeUnavailable: RuntimeUnavailable | undefined;
 
       if (wantsRuntime && scannedCubeNames.length > 0) {
         // Cap in-flight }StatsByCube MDX calls so a large model can't flood TM1's
@@ -300,11 +316,25 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
           10,
           (name) => fetchCubeStats(tm1Client, name),
         );
+        // Tracks a failure that is about the server/account rather than the
+        // cube, so it can be reported once (see runtimeUnavailable below).
+        const unavailableReasons = new Set<StatsUnavailableReason>();
+        let unavailableSample: CubeStatsUnavailableError | undefined;
+        let unavailableCount = 0;
+
         for (let i = 0; i < settled.length; i++) {
           const cubeName = scannedCubeNames[i]!;
           const r = settled[i]!;
           if (r.status !== "fulfilled") {
             runtimeFailureCount++;
+            const err: unknown = r.reason;
+            const unavailable =
+              err instanceof CubeStatsUnavailableError ? err : null;
+            if (unavailable) {
+              unavailableReasons.add(unavailable.reason);
+              unavailableSample ??= unavailable;
+              unavailableCount++;
+            }
             runtimeStats[cubeName] = {
               available: false,
               memoryTotal: null,
@@ -313,7 +343,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
               populatedNumeric: null,
               fedToPopulatedRatio: null,
               feederMemoryRatio: null,
-              error: String(r.reason),
+              error: unavailable ? unavailable.message : String(r.reason),
             };
             continue;
           }
@@ -373,6 +403,22 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
               detail: `${memoryMb} MB`,
             });
           }
+        }
+
+        // Every cube failed the same server- or account-wide way: say it once
+        // and drop the N identical per-cube copies. The static half (mode
+        // 'both') is untouched — it needs no stats cube.
+        if (
+          unavailableSample &&
+          unavailableCount === scannedCubeNames.length &&
+          unavailableReasons.size === 1
+        ) {
+          runtimeUnavailable = {
+            reason: unavailableSample.reason,
+            message: unavailableSample.message,
+            cubes: unavailableCount,
+          };
+          for (const name of scannedCubeNames) delete runtimeStats[name];
         }
 
         // Escalate static findings on cubes with runtime evidence.
@@ -453,6 +499,7 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
                 summary: { byRule, bySeverity, byCube },
                 truncated: { findings: truncated },
                 findings: trimmed,
+                runtimeUnavailable,
                 runtimeStats: wantsRuntime ? runtimeStats : undefined,
                 rulesetSource:
                   "Static heuristics S1 (feeder_broader_than_rule), S2 (feeder_to_consolidated), " +

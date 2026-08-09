@@ -131,10 +131,19 @@ export const CubeStatsItemSchema = z
   })
   .passthrough();
 
+// Set only when EVERY requested cube failed the same server- or account-wide
+// way: `absent` = no }Stats* control cubes here (TM1 v12 ships none),
+// `denied` = they exist but this account may not read them.
+export const StatsUnavailableSchema = z.object({
+  reason: z.enum(["absent", "denied"]),
+  message: z.string(),
+});
+
 export const CubeStatsResultSchema = z
   .object({
     count: z.number().int(),
     items: z.array(CubeStatsItemSchema),
+    statsUnavailable: StatsUnavailableSchema.optional(),
   })
   .passthrough();
 

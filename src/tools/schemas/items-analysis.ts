@@ -400,6 +400,16 @@ export const AuditFeedersResultSchema = z
     productVersion: z.string().optional(),
     mode: z.string().optional(),
     scanned: z.unknown().optional(),
+    // Runtime half could not run at all: `absent` = this server has no
+    // }Stats* control cubes (TM1 v12), `denied` = this account may not read
+    // them. Static findings are still returned in mode 'both'.
+    runtimeUnavailable: z
+      .object({
+        reason: z.enum(["absent", "denied"]),
+        message: z.string(),
+        cubes: z.number().int(),
+      })
+      .optional(),
   })
   .passthrough();
 

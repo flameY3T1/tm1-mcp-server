@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { z, type ZodRawShape } from "zod";
 import { registerAuditFeeders } from "../../src/tools/analysis/audit-feeders.js";
+import { TM1Error, TM1ErrorCode } from "../../src/types.js";
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
 
@@ -44,11 +45,18 @@ interface FakeArgs {
   >;
   /** Map of cubeName -> }StatsByCube measure values (drives runtime mode). Throws on miss. */
   cubeStats?: Record<string, Record<string, number>>;
+  /** Connection major version, as TM1Client.version reports it. */
+  version?: 11 | 12;
+  /** When set, every }StatsByCube MDX rejects with this (server-wide failure). */
+  statsFailure?: unknown;
+  /** Answer of the structural existence probe `cubes.exists('}StatsByCube')`. */
+  statsCubeExists?: boolean;
 }
 
 function makeAuditFeedersClientStub(args: FakeArgs) {
   const isControl = (n: string) => n.startsWith("}");
   return {
+    version: args.version ?? 11,
     server: { getInfo: async () => ({ productVersion: args.productVersion }) },
     cubes: {
       getAllRules: async (includeControl = false) => {
@@ -60,6 +68,10 @@ function makeAuditFeedersClientStub(args: FakeArgs) {
         if (!dims) throw new Error(`no dims for ${cubeName}`);
         return dims;
       },
+      // Structural existence probe the fetcher runs when the stats MDX fails.
+      // Default true: a plain MDX failure is then a per-cube error, exactly as
+      // before this probe existed.
+      exists: async () => args.statsCubeExists !== false,
     },
     hierarchies: {
       getElementTypes: async (dim: string, hier: string) => {
@@ -70,6 +82,7 @@ function makeAuditFeedersClientStub(args: FakeArgs) {
     },
     cells: {
       executeMdx: async (mdx: string) => {
+        if (args.statsFailure !== undefined) throw args.statsFailure;
         // Extract cube name from `{[}PerfCubes].[}PerfCubes].[<name>]}`.
         const m = mdx.match(/\.\[}PerfCubes]\.\[([^\]]+)]/);
         if (!m) throw new Error(`fake executeMdx: cannot parse cube from MDX`);
@@ -855,5 +868,147 @@ describe("tm1_audit_feeders tool", () => {
     registerAuditFeeders(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({}));
     expect(out.summary.byRule.orphan_feeder).toBe(0);
+  });
+});
+
+// ── }StatsByCube unavailable (TM1 v12 has no }Stats* control cubes) ─────────
+// v12 12.5.9 ships only security and element-attribute control cubes, so the
+// runtime half of this audit has nothing to read. It must say so once, keep
+// the static half working, and never confuse "absent" with "denied".
+describe("tm1_audit_feeders when }StatsByCube is unavailable", () => {
+  // v12's own wording — deliberately NOT the v11 sentence, to prove nothing
+  // here depends on the prose. The verdict comes from `cubes.exists()`.
+  const V12_ABSENT = new TM1Error({
+    code: TM1ErrorCode.TM1_ERROR,
+    message: 'There is no cube named "}StatsByCube".',
+    httpStatus: 400,
+    endpoint: "/api/v1/ExecuteMDX",
+    details: 'There is no cube named "}StatsByCube".',
+  });
+  const DENIED = new TM1Error({
+    code: TM1ErrorCode.PERMISSION_DENIED,
+    message: "ObjectSecurityNoReadRights",
+    httpStatus: 400,
+    endpoint: "/api/v1/ExecuteMDX",
+    details: "ObjectSecurityNoReadRights",
+  });
+
+  const RULES = [
+    {
+      cubeName: "Wide",
+      rulesText: [
+        "skipcheck;",
+        "['A'] = N: 1;",
+        "feeders;",
+        "['A'] => ['B'];",
+      ].join("\n"),
+      skipCheck: true,
+    },
+    {
+      cubeName: "Wild",
+      rulesText: [
+        "skipcheck;",
+        "['A','B'] = N: 1;",
+        "feeders;",
+        "[] => ['B'];",
+      ].join("\n"),
+      skipCheck: true,
+    },
+  ];
+
+  it("mode=static keeps working untouched (it needs no stats cube)", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeAuditFeedersClientStub({
+      productVersion: "12.5.9",
+      version: 12,
+      rules: RULES,
+      statsFailure: V12_ABSENT,
+      statsCubeExists: false,
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "static" }));
+    expect(out.mode).toBe("static");
+    expect(out.runtimeUnavailable).toBeUndefined();
+    expect(out.scanned.cubes).toBe(2);
+    expect(out.scanned.runtimeFailures).toBe(0);
+  });
+
+  it("mode=runtime says runtime evidence is unavailable rather than failing", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeAuditFeedersClientStub({
+      productVersion: "12.5.9",
+      version: 12,
+      rules: RULES,
+      statsFailure: V12_ABSENT,
+      statsCubeExists: false,
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.runtimeUnavailable).toBeTruthy();
+    expect(out.runtimeUnavailable.reason).toBe("absent");
+    expect(out.runtimeUnavailable.cubes).toBe(2);
+    expect(out.runtimeUnavailable.message).toMatch(/v12|Planning Analytics/i);
+    expect(out.runtimeUnavailable.message).not.toMatch(/collection of type/i);
+    // The identical per-cube message is not repeated N times.
+    expect(out.runtimeStats).toEqual({});
+    expect(out.scanned.runtimeAvailable).toBe(0);
+  });
+
+  it("mode=both still returns the static findings", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeAuditFeedersClientStub({
+      productVersion: "12.5.9",
+      version: 12,
+      rules: RULES,
+      statsFailure: V12_ABSENT,
+      statsCubeExists: false,
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "both" }));
+    expect(out.runtimeUnavailable.reason).toBe("absent");
+    expect(out.summary.byRule.wildcard_bracket).toBeGreaterThan(0);
+    expect(out.findings.length).toBeGreaterThan(0);
+    expect(out.status).toBe("fail");
+  });
+
+  it("a security denial reads as a denial, not as a missing feature", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeAuditFeedersClientStub({
+      productVersion: "11.8",
+      version: 11,
+      rules: RULES,
+      statsFailure: DENIED,
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.runtimeUnavailable.reason).toBe("denied");
+    expect(out.runtimeUnavailable.message).toMatch(/permission|rights/i);
+    expect(out.runtimeUnavailable.message).not.toMatch(/v12/);
+  });
+
+  it("v11 runtime mode is unaffected — stats still produce findings", async () => {
+    const fake = makeFakeServer();
+    const tm1 = makeAuditFeedersClientStub({
+      productVersion: "11.8",
+      version: 11,
+      rules: RULES,
+      cubeStats: {
+        Wide: {
+          "Number of Fed Cells": 1_000_000,
+          "Number of Populated Numeric Cells": 10,
+          "Total Memory Used": 1024,
+        },
+        Wild: {
+          "Number of Fed Cells": 1,
+          "Number of Populated Numeric Cells": 1,
+          "Total Memory Used": 1024,
+        },
+      },
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({ mode: "runtime" }));
+    expect(out.runtimeUnavailable).toBeUndefined();
+    expect(out.scanned.runtimeAvailable).toBe(2);
+    expect(out.summary.byRule.cube_high_fed_ratio).toBe(1);
   });
 });

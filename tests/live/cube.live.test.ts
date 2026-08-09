@@ -149,11 +149,19 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
     expect(r.json.items.length).toBeGreaterThan(0);
   });
 
-  it("get_cube_stats returns metrics for the cube", async () => {
+  it("get_cube_stats returns metrics on v11, a clean 'absent' on v12", async () => {
+    // v12 (Planning Analytics Engine 12.5.9) ships no }Stats* control cubes,
+    // so there are no metrics to return there — only an honest verdict.
     const r = await h.ok("tm1_get_cube_stats", { cubeName: C1 });
     expect(r.json.count).toBe(1);
     expect(r.json.items[0].cubeName).toBe(C1);
-    expect(r.json.items[0].error).toBeUndefined();
+    if (h.client.version === 12) {
+      expect(r.json.statsUnavailable?.reason).toBe("absent");
+      expect(r.json.items[0].error).toBe(r.json.statsUnavailable.message);
+    } else {
+      expect(r.json.statsUnavailable).toBeUndefined();
+      expect(r.json.items[0].error).toBeUndefined();
+    }
   });
 
   it("check_cube_rule validates a trivial rule without applying it", async () => {

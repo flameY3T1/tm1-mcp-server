@@ -112,6 +112,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"This server keeps no statistics" no longer reads as "your model is broken".** TM1 v12 ships no
+  `}Stats*` control cubes (measured on 12.5.9: only security and element-attribute ones), so the
+  shared `}StatsByCube` fetcher handed the model a raw OData error and the user read it as a broken
+  model. The failure is now classified once, for both callers, keeping two cases apart: `absent`
+  (no statistics cubes here) versus `denied` (they exist, this account may not read them — TM1
+  answers that with HTTP 400 `ObjectSecurityNoReadRights`, not 403).
+
+  The classification is **structural, and reads no error text**. The same condition is worded three
+  ways across this project's own servers — `'}StatsByCube' can not be found in collection of type
+  'Cube'` (v11 en), `There is no cube named "}StatsByCube".` (v12), and
+  `Syntaxfehler bei oder in der Nähe von: …` (v11 on a German locale) — so a matcher over prose is
+  correct only on the machine it was written against and fails silently everywhere else. Instead
+  the denial is recognised by its untranslated identifier, and absence is answered by asking the
+  server: new `CubeService.exists()` (`GET Cubes('}StatsByCube')?$select=Name`, 404 → false), run
+  once per connection and only on the failure path. A 200 means the statistics cube is fine and
+  this one query was not, so the original error propagates untouched — a missing *user* cube stays
+  a per-cube error.
+
+  `tm1_get_cube_stats` returns `statsUnavailable {reason, message}` alongside its items;
+  `tm1_audit_feeders` returns `runtimeUnavailable` and still delivers the static findings in
+  `mode: "both"`. `mode: "static"` never touched the cube and is unchanged.
+
 - **The callgraph's four-variant OData fallback no longer swallows the real error.**
   `fetchForCallgraph()` caught _everything_, so an expired session, a timeout or a denial each
   bought three more full `/Processes` scans — about `4 × 30 s` — and a later shape that answered

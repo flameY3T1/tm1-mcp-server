@@ -234,6 +234,10 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
   });
 
   // ── get_cube_stats: real cube ───────────────────────────────────────────
+  // Version-dependent by construction: v11 11.8 carries all seven }Stats*
+  // control cubes, v12 12.5.9 carries none (measured — it has only security
+  // and element-attribute control cubes). Both outcomes are asserted; the v12
+  // branch is a real assertion on the degradation, not a skip.
   it("tm1_get_cube_stats: single real cube", async () => {
     expect(cubeNames.length).toBeGreaterThan(0);
     const r = await h.ok("tm1_get_cube_stats", { cubeName: cubeNames[0] });
@@ -243,6 +247,41 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
       items: expect.any(Array),
     });
     expect(r.json.items[0]).toMatchObject({ cubeName: expect.any(String) });
+
+    if (h.client.version === 12) {
+      // No }Stats* cubes on Planning Analytics Engine: the tool must say so
+      // in prose, not leak "'}StatsByCube' can not be found in collection…".
+      expect(r.json.statsUnavailable?.reason).toBe("absent");
+      expect(r.json.statsUnavailable.message).not.toMatch(/collection of type/);
+      expect(r.json.items[0].error).toBe(r.json.statsUnavailable.message);
+    } else {
+      expect(r.json.statsUnavailable).toBeUndefined();
+      expect(r.json.items[0].error).toBeUndefined();
+      // }StatsByCube answered: the raw measure map is populated.
+      expect(Object.keys(r.json.items[0].raw ?? {}).length).toBeGreaterThan(0);
+    }
+  });
+
+  // ── audit_feeders runtime evidence: present on v11, degraded on v12 ──────
+  it("tm1_audit_feeders: runtime mode reports evidence (v11) or its absence (v12)", async () => {
+    const r = await h.ok("tm1_audit_feeders", {
+      mode: "both",
+      topN: 5,
+      severityThreshold: "none",
+    });
+    expect(r.isError).toBe(false);
+    if (h.client.version === 12) {
+      expect(r.json.runtimeUnavailable?.reason).toBe("absent");
+      expect(r.json.runtimeUnavailable.message).not.toMatch(
+        /collection of type/,
+      );
+      // The static half still ran.
+      expect(r.json.scanned.cubes).toBeGreaterThan(0);
+      expect(r.json.status).toBe("pass"); // severityThreshold: none
+    } else {
+      expect(r.json.runtimeUnavailable).toBeUndefined();
+      expect(r.json.scanned.runtimeAvailable).toBeGreaterThan(0);
+    }
   });
 
   // ── get_cube_stats: negative path ───────────────────────────────────────

@@ -182,7 +182,10 @@ security notes and the `autoApprove` allowlist:
   `DataSource.usesUnicode`) are dropped when `TM1_VERSION` says `11.x`
 - TM1 12.5 / Planning Analytics Engine — via `TM1_INSTANCE` + `TM1_DATABASE`,
   live-validated with `s2s` auth only. `tm1_list_threads`, `tm1_cancel_thread`
-  and `tm1_save_data` are v11-only; `tm1_list_jobs` and `tm1_cancel_job` v12-only
+  and `tm1_save_data` are v11-only; `tm1_list_jobs` and `tm1_cancel_job` v12-only;
+  v12 ships no `}Stats*` control cubes, so `tm1_get_cube_stats` and
+  `tm1_audit_feeders` in `mode` `runtime`/`both` report the statistics as
+  unavailable instead of returning metrics (static feeder analysis is unaffected)
 
 <!-- TOOLS-AUTOGEN:START -->
 

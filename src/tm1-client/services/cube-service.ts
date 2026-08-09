@@ -97,6 +97,31 @@ export class CubeService {
   }
 
   /**
+   * Cheap existence probe: a single GET with $select=Name (404 → false)
+   * instead of list(), which pulls every cube plus its dimensions just to
+   * check one name. Rethrows anything that isn't NOT_FOUND — in particular a
+   * denial, which is "you may not look", not "it is not there".
+   *
+   * Structural on purpose. The alternative — reading existence out of the
+   * error sentence of a failed query — is wrong on any server whose version
+   * or locale words that sentence differently, and TM1 does both.
+   * GET /api/v1/Cubes('{name}')?$select=Name
+   */
+  async exists(cubeName: string): Promise<boolean> {
+    try {
+      await this.http.request<{ Name: string }>(
+        "GET",
+        `/api/v1/Cubes('${enc(cubeName)}')?$select=Name`,
+      );
+      return true;
+    } catch (e) {
+      if (e instanceof TM1Error && e.code === TM1ErrorCode.NOT_FOUND)
+        return false;
+      throw e;
+    }
+  }
+
+  /**
    * Create a new cube with the given dimensions (in order).
    * POST /api/v1/Cubes
    */
