@@ -34,11 +34,20 @@ accumulated `[Unreleased]` changes.
 4. **Refresh the tool list** if tools changed: `npm run tools:update-readme`
    (regenerates `docs/TOOLS.md` and the category table in `README.md`).
 5. **Push:** `git push --follow-tags origin main`.
-6. **Publish to npm:** `npm publish` — `prepublishOnly` runs `verify`, then
+6. **Smoke-test the tarball:** `npm run smoke:tarball` — packs the real tarball,
+   installs it into a throwaway project under `os.tmpdir()`, and drives the
+   installed binary. Tier 1 (always) checks the `bin` entry, the shebang, the
+   `files` allow-list and an unconfigured start; tier 2 (needs `tm1-test` in
+   `.mcp.json`) does a real MCP handshake in `TM1_MODE=readonly` and asserts the
+   structured-response contract. Exit codes: `1` tier 1, `5` tier 2, `4`
+   pack/install, `3` tier 2 skipped (nothing checked against a server — add
+   `--allow-skip` only if you accept that). This is the only check that touches
+   compiled `dist/`; `verify` and the live suite both run against source.
+7. **Publish to npm:** `npm publish` — `prepublishOnly` runs `verify`, then
    `prepack` does a clean `rm -rf dist && build`, so the tarball can never carry
    stale cruft. Sanity-check first with `npm pack --dry-run` (watch total files /
    size; no `dist.bak`, `.env`, `.mcp.json`, tests, or maps).
-7. **GitHub release:** create a release for the `vX.Y.Z` tag with the changelog
+8. **GitHub release:** create a release for the `vX.Y.Z` tag with the changelog
    section as the body (title style: `vX.Y.Z — <short theme>`).
 
 ## Guardrails already wired
@@ -48,7 +57,8 @@ accumulated `[Unreleased]` changes.
 - `prepublishOnly` (`npm run verify`) — publish aborts if the full gate
   (typecheck + lints + tests) is not green.
 - `files: ["dist", "!dist/**/*.map"]` — only compiled output ships; source,
-  tests, and secrets never do.
+  tests, and secrets never do. `smoke:tarball` asserts this held by listing the
+  real tarball, since a broken `files` entry is how credentials reach npm.
 
 ## When a release branch IS worth it
 
