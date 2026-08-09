@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-09
+
 ### Security
 
 - **Credential masking moved onto the error path.** pino's key-based `redact` masks a field _named_
@@ -655,7 +657,8 @@ Initial public release.
 - Quality gates: strict typecheck, ESLint, `lint:no-flat-api`,
   annotation-coverage, and tool-registration wiring.
 
-[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.1.0...v3.0.0
 [2.1.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.4...v2.0.0
 [1.0.4]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.3...v1.0.4
