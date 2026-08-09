@@ -9,78 +9,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **Credential masking moved onto the error path.** Redaction was key-based: pino's `redact`
-  masks a field _named_ `password`, but never a credential inside a message string — and that is
-  exactly the shape TM1 returns on an ODBC failure (`login failed for PWD=hunter2`). Such text was
-  written to the log and returned to the client verbatim. `classifyHttpError` now sanitizes the
-  server's text once, where it enters the error model, so both exits are covered; the MCP error
-  envelope sanitizes again for errors that never went through it.
+- **Credential masking moved onto the error path.** pino's key-based `redact` masks a field _named_
+  `password`, never a credential inside a message string — which is exactly what TM1 returns on an
+  ODBC failure (`login failed for PWD=hunter2`). `classifyHttpError` now sanitizes the server's
+  text where it enters the error model, covering both the log and the client exit.
 
-- **ODBC masking is grammar-aware.** ODBC brace-quotes a value precisely so it may contain the
-  delimiter. The old `[^;]+` value pattern stopped at the first inner `;`, masking `{abc` and
-  leaving `def};` in the output — a partial leak that _looked_ masked. Brace-quoted values are now
-  matched and masked whole.
+- **ODBC masking is grammar-aware.** The old `[^;]+` value pattern stopped at the first inner `;`,
+  masking `{abc` and leaving `def};` behind — a partial leak that _looked_ masked. Brace-quoted
+  values are now matched whole.
 
-- **`maskSecrets: false` requires operator consent.** That parameter let the **model** switch off
-  a security control and receive raw credentials. It is now ignored unless the operator sets
-  `TM1_ALLOW_UNMASKED_SECRETS=true`; the default degrades to "mask anyway" rather than failing, so
-  an audit still gets its report, redacted. Applies to all eleven tools exposing the parameter.
+- **`maskSecrets: false` requires operator consent.** The parameter let the **model** switch off a
+  security control. It is now ignored unless `TM1_ALLOW_UNMASKED_SECRETS=true`; the default masks
+  anyway rather than failing. Affects all eleven tools exposing it.
 
 - **Confirmation guards extended beyond deletes** to `tm1_execute_process`, `tm1_execute_chore`,
-  `tm1_write_cells`, `tm1_set_cube_rules` and `tm1_upload_file`. The guard previously covered
-  object _destruction_ only, so the coverage test read as complete while irreversible writes and TI
-  side-effects sat outside it. **Breaking:** these five tools now require `confirm` set to the
-  target's name. They are misuse protection, not access control — anything that can call the tool
-  can also supply `confirm`.
+  `tm1_write_cells`, `tm1_set_cube_rules` and `tm1_upload_file` — irreversible writes and TI
+  side-effects previously sat outside a guard that only covered object destruction. **Breaking:**
+  these five now require `confirm`. Misuse protection, not access control.
 
 - **Positioning documented (README).** One TM1 identity per process; the HTTP transport is
   single-tenant and its bearer token authenticates the endpoint, not a caller; `readwrite` with an
-  admin account is a developer configuration, not a production recommendation. Stated explicitly so
-  nobody infers an isolation boundary that does not exist.
+  admin account is a developer configuration. Stated so nobody infers an isolation boundary that
+  does not exist.
 
-- **`fast-uri` override raised to `^3.1.5`, `ip-address` pinned to `^10.4.0`.** Both reach us as
-  _runtime_ dependencies through `@modelcontextprotocol/sdk` (via `ajv` and `express-rate-limit`),
-  so they ship to consumers. GHSA-7p8r-x3mc-p8w7 (host confusion via a backslash authority
-  introducer) covers `fast-uri` `>=3.0.0 <3.1.5` — the range grew past the `^3.1.4` override this
-  project shipped in 2.1.0, which silently stopped being sufficient. `ip-address` `<=10.3.0`
-  carries GHSA-4xrf-jv44-h6hh and GHSA-22jq-vg5j-6vgg (CIDR-suffix and IPv4-mapped/NAT64
-  misclassification that can bypass SSRF and trust-boundary checks). Both fixed versions sit
-  inside their parents' own semver ranges, so neither override is a semver escape.
-  `npm audit --omit=dev --audit-level=high` — the CI gate — went from exit 1 to exit 0.
+- **`fast-uri` override raised to `^3.1.5`, `ip-address` pinned to `^10.4.0`.** Both ship to
+  consumers as runtime dependencies via `@modelcontextprotocol/sdk`. GHSA-7p8r-x3mc-p8w7 grew past
+  the `^3.1.4` override shipped in 2.1.0, which silently stopped being sufficient; `ip-address`
+  `<=10.3.0` carries GHSA-4xrf-jv44-h6hh and GHSA-22jq-vg5j-6vgg (misclassification that can
+  bypass SSRF checks). Neither override is a semver escape. The CI gate
+  `npm audit --omit=dev --audit-level=high` went from exit 1 to exit 0.
 
 ### Changed — BREAKING
 
 - **Successful tool results no longer ship their payload twice; `structured` is the new default.**
-  Every tool declares an `outputSchema`, so the server parses each handler's JSON into
-  `structuredContent` — and previously left the identical JSON in `content[0].text` as well, so
-  **every** successful response carried its body twice. Measured on a real call:
-  **13898 B → 6612 B, a 52% cut.** Spec-legal because an `outputSchema` is declared
-  (`CallToolResult.content` "may be empty" then).
+  Every tool declares an `outputSchema`, so the payload was parsed into `structuredContent` _and_
+  left in `content[0].text`. Measured: **13898 B → 6612 B, a 52% cut.** Spec-legal, since
+  `CallToolResult.content` may be empty when an `outputSchema` is declared.
 
-  **Breaking for clients that read `content[0].text` and ignore `structuredContent`** — those now
-  see an empty result. `TM1_RESPONSE_MODE=legacy` restores the previous wire format; the escape
-  hatch stays because the MCP spec still recommends shipping both for backwards compatibility.
-  Verified working without it against Claude Code.
-
-  Unaffected in both modes: `format: "markdown"` (there the text block is the rendered table, not a
-  duplicate) and error results (they carry no `structuredContent`).
+  **Breaking for clients that read `content[0].text` and ignore `structuredContent`** — set
+  `TM1_RESPONSE_MODE=legacy` to restore the old wire format. Verified against Claude Code.
+  Unaffected: `format: "markdown"` and error results.
 
 ### Changed
 
 - **The unbounded escape hatches are now bounded.** `fetchAll` and `limit=0` opt out of the page
-  _size_, not of every limit — a 200k-element dimension used to serialize 200k rows into a single
-  response. `paginate()` caps them at 5000 items and reports the remainder through the existing
-  `has_more`/`next_offset` fields, so a capped call is simply a first page the caller can walk on
-  from and `total` still shows what was left out. `tm1_get_hierarchy.topN` gains a 10000 ceiling
-  (`offset` exists for walking large dimensions), `tm1_analyze_object_usage` treats an omitted
-  `limit` as "bounded bulk" rather than "unbounded" with `truncated` reporting when the bound bit,
-  and `tm1_trace_data_flow` — which had **no** limit at all — gains one at 500 entries per
-  direction, with `counts` left unclipped so a partial answer is visibly partial.
+  _size_, not of every limit — a 200k-element dimension serialized 200k rows into one response.
+  `paginate()` caps them at 5000 and reports the rest via `has_more`/`next_offset`, so a capped
+  call is just a first page. Also: `tm1_get_hierarchy.topN` ceiling 10000,
+  `tm1_analyze_object_usage` without `limit` is bounded bulk, and `tm1_trace_data_flow` — which had
+  no limit at all — gains 500 per direction with `counts` left unclipped.
 
 - **`tm1_audit_complexity` fans out its per-process reads.** The `consistency` scope is in the
   default scope set and walked one `getVariables` round-trip per process serially — 276ms
   estimated vs 84ms measured on a 92-process model. Now 8 in flight. Order and fail-fast
   behaviour unchanged.
+
+- **Annotations: irreversible overwrites now declare `destructiveHint: true`.** The taxonomy meant
+  "deletes an object", so full-replacement writes advertised `false` and a client's
+  confirm-before-destructive prompt never fired. `tm1_write_cells` is now `DESTRUCTIVE`;
+  `tm1_set_cube_rules` and `tm1_bulk_upsert_elements` use a new `IDEMPOTENT_DESTRUCTIVE` class —
+  the two properties are orthogonal. No `readOnlyHint` changed, so `TM1_MODE=readonly` exposes the
+  same tools as before.
+
+- **`tm1_bulk_upsert_elements` folds its element writes into OData `$batch`.** N elements now cost
+  four batched passes (create, type-probe, type-patch, components) instead of N round-trips.
+  Servers without a usable `$batch` fall back transparently; inputs, outputs and error behaviour
+  are unchanged. Live-validated against v11 11.8 and v12 / Planning Analytics Engine 12.5.9.
+
+- **`ViewService.list()` queries the public and private scopes in parallel.** Result order and
+  error handling unchanged. MDX stays in the `$select` — `tm1_list_views` advertises it, so
+  dropping it would be a breaking output change, not an optimisation.
+
+- **CI now runs `npm run lint:format`.** `verify` already ran `prettier --check`, so the local gate
+  was stricter than the one guarding main while the README claimed they matched.
+
+- **`docs/ARCHITECTURE.md` service-conventions table corrected.** The version-branch idiom is
+  `this.http.version === 11`, not the pre-v12 `tm1Version.startsWith("11")`, and the "services hold
+  no state" row now names `BatchService` as the deliberate exception.
 
 ### Fixed
 
@@ -107,53 +112,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read also moved to `$select=Name,Type`, dropping an `$expand=Parents` and Edges scan.
 
 - **HTTP transport no longer leaks a listener per request.** Each request builds a fresh
-  `McpServer`, and that build attaches a `SubscriptionRegistry` listener to the process-global
-  `tm1Events` emitter. `server.close()` cannot detach it — it knows nothing about that emitter —
-  so every request left one listener plus the server graph it retained behind, and every TM1
-  mutation fanned out across all historical registries. `buildMcpServer` now returns
-  `{server, dispose}` and every transport teardown path calls `dispose()`. Regression test asserts
-  the listener count is unchanged after repeated requests.
+  `McpServer` that attaches a `SubscriptionRegistry` listener to the process-global `tm1Events`
+  emitter, and `server.close()` cannot detach it — so every TM1 mutation fanned out across all
+  historical registries. `buildMcpServer` now returns `{server, dispose}` and every teardown path
+  calls it.
 
-- **The callgraph cache can no longer publish a pre-mutation index.** `invalidateCallgraphCache()`
-  cleared the map but could not reach a build that was already in flight: that build finished
-  afterwards and wrote its stale snapshot back with a fresh timestamp, serving it as current for a
-  full 60s TTL. Builds now capture a generation counter and refuse to publish if an invalidation
-  happened while they ran. The in-flight caller still receives its result.
+- **The callgraph cache can no longer publish a pre-mutation index.**
+  `invalidateCallgraphCache()` could not reach a build already in flight, which then wrote its
+  stale snapshot back with a fresh timestamp and served it for a full 60s TTL. Builds now capture
+  a generation counter and refuse to publish if an invalidation happened while they ran.
 
-- **`tm1_sample_cells` no longer reports `truncated: true` for an exact-size result.** It asks TM1
-  for one cell more than requested and decides truncation from that sentinel instead of inferring
-  it from a full page; the extra row is dropped, so the response contract is unchanged.
+- **`tm1_sample_cells` no longer reports `truncated: true` for an exact-size result.** It asks for
+  one cell more than requested and decides from that sentinel instead of inferring from a full
+  page; the extra row is dropped, so the response contract is unchanged.
 
-- **Timestamp inputs are validated instead of being decorated.** `since`/`until` used to get a
-  bare `"Z"` appended to whatever arrived, so `"yesterday"` became `"yesterdayZ"` inside an OData
-  `$filter` and TM1 answered with a parse error naming neither the parameter nor the value. Input
-  is now checked against ISO-8601 and rejected with both. Ambiguous locale formats such as
-  `08/06/2026` are rejected too rather than silently resolving to 6 August.
+- **Timestamp inputs are validated instead of decorated.** `since`/`until` got a bare `"Z"`
+  appended to whatever arrived, so `"yesterday"` became `"yesterdayZ"` in an OData `$filter` and
+  TM1 answered with a parse error naming neither parameter nor value. Now checked against ISO-8601;
+  ambiguous locale formats like `08/06/2026` are rejected rather than silently read as 6 August.
 
-### Changed
-
-- **Annotations: irreversible overwrites now declare `destructiveHint: true`.** The taxonomy had
-  come to mean "deletes an object", so full-replacement writes advertised `destructiveHint: false`
-  and a client's confirm-before-destructive prompt never fired for them. `tm1_write_cells` is now
-  `DESTRUCTIVE`; `tm1_set_cube_rules` (replaces the whole rule file) and `tm1_bulk_upsert_elements`
-  (a non-empty components list replaces a consolidation's entire child set) use a new
-  `IDEMPOTENT_DESTRUCTIVE` class — idempotent and destructive are orthogonal. No tool changed its
-  `readOnlyHint`, so `TM1_MODE=readonly` exposes exactly the same tools as before.
-
-- **`ViewService.list()` queries the public and private scopes in parallel** instead of serially.
-  Result order (public first) and error handling are unchanged. MDX stays in the `$select`:
-  `tm1_list_views` advertises it as part of the response, so dropping it would be a breaking
-  output change rather than an optimisation.
-
-- **CI now runs `npm run lint:format`.** `npm run verify` already ran `prettier --check` and the
-  README calls verify "everything CI runs" — without this step that was false in the direction
-  that hurts, with the local gate stricter than the one guarding main.
-
-- **`docs/ARCHITECTURE.md` service-conventions table corrected.** The version-branch idiom is
-  `this.http.version === 11` (numeric major), not the pre-v12 `tm1Version.startsWith("11")`, and
-  the "services hold no state" row now names `BatchService` as the deliberate exception.
-
-- `tm1_bulk_upsert_elements` now folds its element writes into OData `$batch` requests instead of one HTTP call per element: an upsert of N elements costs four batched passes (create, type-probe, type-patch, consolidation components) rather than N round-trips, with each pass split into chunks of at most 200 sub-requests. Servers without a usable `$batch` endpoint transparently fall back to the previous per-request path, and the tool's inputs, outputs and error behaviour are unchanged. Live-validated against TM1 v11 11.8 and v12 / Planning Analytics Engine 12.5.9.
 
 ## [2.1.0] - 2026-07-26
 
