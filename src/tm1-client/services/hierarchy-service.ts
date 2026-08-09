@@ -199,6 +199,33 @@ export class HierarchyService {
   }
 
   /**
+   * Element name + type for a whole hierarchy — nothing else.
+   *
+   * `get()` is the wrong tool for a type lookup: it expands `Parents` on every
+   * element and, when a parent survives the filter, additionally scans the
+   * whole `Edges` collection to weight the children. This reads the Elements
+   * collection directly with `$select=Name,Type` — no expand, no Edges scan —
+   * which is the minimum payload for name → type resolution.
+   *
+   * GET /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Elements?$select=Name,Type
+   */
+  async getElementTypes(
+    dimensionName: string,
+    hierarchyName: string,
+  ): Promise<Array<{ name: string; type: HierarchyElement["type"] }>> {
+    const path =
+      `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')` +
+      `/Elements?$select=Name,Type`;
+    const response = await this.http.request<{
+      value?: Array<{ Name: string; Type: string }>;
+    }>("GET", path);
+    return (response.value ?? []).map((e) => ({
+      name: e.Name,
+      type: e.Type as HierarchyElement["type"],
+    }));
+  }
+
+  /**
    * Resolve descendants of a consolidation element via client-side BFS over
    * the full hierarchy. Returns a flat list with depth from the start element.
    * Reuses get() — REST traffic identical, but the LLM-facing payload is a

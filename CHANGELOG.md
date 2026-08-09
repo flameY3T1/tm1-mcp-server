@@ -98,6 +98,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   serial, deliberately: these are mutations, and overlapping envelopes would make "how much
   committed before the failure" unanswerable.
 
+- **A failed element-type lookup is no longer cached forever.** The feeder audit's type cache
+  stored `null` on any error with no TTL and no retry, so one transient timeout marked every
+  element of that dimension "type unknown" for the rest of the run. Failures now leave the slot
+  unset so a later lookup retries — bounded at three consecutive failures per dimension, after
+  which the slot is pinned and stops issuing requests. The bound matters because a deterministic
+  failure is the common one: TM1 reports a security denial as HTTP 400 `ObjectSecurityNoReadRights`,
+  which any non-admin auditing a restricted dimension hits, and the lookup runs once per feeder
+  entry. The read also moved to `$select=Name,Type`, dropping the `$expand=Parents` and Edges scan
+  that the full hierarchy fetch dragged along for a type lookup.
+
 - **HTTP transport no longer leaks a listener per request.** Each request builds a fresh
   `McpServer`, and that build attaches a `SubscriptionRegistry` listener to the process-global
   `tm1Events` emitter. `server.close()` cannot detach it — it knows nothing about that emitter —

@@ -62,20 +62,10 @@ function makeFakeTM1Client(args: FakeArgs) {
       },
     },
     hierarchies: {
-      get: async (dim: string, hier: string) => {
+      getElementTypes: async (dim: string, hier: string) => {
         const key = `${dim}|${hier}`;
         const elems = args.elements?.[key] ?? {};
-        return {
-          name: hier,
-          dimensionName: dim,
-          elements: Object.entries(elems).map(([name, type]) => ({
-            name,
-            type,
-            level: 0,
-            parents: [],
-            children: [],
-          })),
-        };
+        return Object.entries(elems).map(([name, type]) => ({ name, type }));
       },
     },
     cells: {

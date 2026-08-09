@@ -533,6 +533,52 @@ describe("TM1Client – Metadata Methods", () => {
     });
   });
 
+  // ── getElementTypes() ──────────────────────────────────────────────────────
+
+  describe("getElementTypes()", () => {
+    it("should read Name,Type from Elements without expanding Parents", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          value: [
+            { Name: "Total", Type: "Consolidated" },
+            { Name: "DE", Type: "Numeric" },
+          ],
+        }),
+      );
+
+      const elements = await client.hierarchies.getElementTypes(
+        "Region",
+        "Region",
+      );
+
+      expect(elements).toEqual([
+        { name: "Total", type: "Consolidated" },
+        { name: "DE", type: "Numeric" },
+      ]);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const decoded = decodeURIComponent(fetchSpy.mock.calls[0][0] as string);
+      expect(decoded).toContain(
+        "Dimensions('Region')/Hierarchies('Region')/Elements",
+      );
+      expect(decoded).toContain("$select=Name,Type");
+      expect(decoded).not.toContain("$expand");
+    });
+
+    it("should encode special characters and tolerate a missing value array", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse({}));
+
+      const elements = await client.hierarchies.getElementTypes(
+        "My Dim",
+        "My Hier",
+      );
+
+      expect(elements).toEqual([]);
+      const [url] = fetchSpy.mock.calls[0];
+      expect(url).toContain("Dimensions('My%20Dim')");
+      expect(url).toContain("Hierarchies('My%20Hier')");
+    });
+  });
+
   // ── getDescendants() ───────────────────────────────────────────────────────
 
   describe("getDescendants()", () => {

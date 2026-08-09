@@ -13,20 +13,10 @@ function makeCache(
   table: Record<string, Record<string, "Numeric" | "Consolidated" | "String">>,
 ): ElementTypeCache {
   const hier = {
-    get: vi.fn(async (dim: string, hierName: string) => {
+    getElementTypes: vi.fn(async (dim: string, hierName: string) => {
       const key = `${dim}|${hierName}`;
       const elems = table[key] ?? {};
-      return {
-        name: hierName,
-        dimensionName: dim,
-        elements: Object.entries(elems).map(([name, type]) => ({
-          name,
-          type,
-          level: 0,
-          parents: [],
-          children: [],
-        })),
-      };
+      return Object.entries(elems).map(([name, type]) => ({ name, type }));
     }),
   };
   return new ElementTypeCache(hier as never);
