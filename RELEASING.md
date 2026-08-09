@@ -31,7 +31,8 @@ accumulated `[Unreleased]` changes.
 3. **Bump + tag atomically:** `npm version <patch|minor|major>` — this bumps
    `package.json`, commits, and creates the `vX.Y.Z` tag in one step (no manual
    tagging, no `git tag -f`).
-4. **Refresh the tool README** if tools changed: `npm run tools:update-readme`.
+4. **Refresh the tool list** if tools changed: `npm run tools:update-readme`
+   (regenerates `docs/TOOLS.md` and the category table in `README.md`).
 5. **Push:** `git push --follow-tags origin main`.
 6. **Publish to npm:** `npm publish` — `prepublishOnly` runs `verify`, then
    `prepack` does a clean `rm -rf dist && build`, so the tarball can never carry

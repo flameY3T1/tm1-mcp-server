@@ -49,11 +49,66 @@ This chains:
 | Lint             | `npm run lint:eslint`               | ESLint over the repo                                               |
 | Tests + coverage | `npm run coverage:check`            | full `vitest` suite under coverage, then the coverage ratchet gate |
 
-If your change adds, removes, or renames a tool, regenerate the README tool list:
+If your change adds, removes, or renames a tool, regenerate the tool list — one
+command, two generated blocks (`docs/TOOLS.md` and the category table in
+`README.md`):
 
 ```bash
 npm run tools:update-readme
 ```
+
+There is no CI gate on that list; it is on you to run it.
+
+## Coverage Policy
+
+Coverage is a **ratchet**: it may go up, it must not go down, and the floor is
+not allowed to fall behind reality.
+
+Floors live in one place — [`coverage-thresholds.json`](coverage-thresholds.json) —
+and are enforced twice, both reached through `npm run coverage:check`:
+
+| Enforcer                              | Fails on                                                                 |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| `vitest` (`test.coverage.thresholds`) | any metric **below** its floor                                           |
+| `scripts/check-coverage-ratchet.mjs`  | any metric below its floor, **or** more than `slack` points **above** it |
+
+The second half is the part that matters. A floor nobody raises stops protecting
+anything: this repo once ran with 22% floors while real coverage had already
+grown past 65% — a 40-point hole in which a large regression could land green.
+The gate fails when coverage drifts more than `slack` (5) points above a floor,
+and prints the exact JSON to paste back:
+
+```
+▲ coverage ratchet: coverage grew more than 5 pts above the floor.
+  Lock the gain in — the floor exists to protect it.
+  - lines: 65.75% vs floor 30% (+35.75 pts)
+
+Fix: set "floors" in coverage-thresholds.json to:
+
+  "floors": { "lines": 63, "statements": 62, "functions": 55, "branches": 52 }
+```
+
+A new floor is set `headroomPoints` (2) below the measured value, so an
+unrelated refactor that shaves one covered line does not red the build.
+`target` in the same file is informational and never fails a build — it is the
+next milestone, reached by writing tests and then ratcheting.
+
+Rules:
+
+- **Never lower a floor to make a red build green.** Add tests instead. If a
+  drop is genuinely intentional (e.g. deleting a well-tested subsystem), say so
+  explicitly in the PR description.
+- Raising a floor is a normal, welcome edit — the gate hands you the numbers.
+- Scope: `src/**/*.ts`, minus `src/index.ts` (process entrypoint, exercised by
+  the live suite) and `**/*.d.ts`. `tests/`, `scripts/`, `dist/` and
+  `node_modules/` are outside the measured set by construction.
+- Provider `v8`. Reports: `text-summary` (CI log), `json-summary`
+  (`coverage/coverage-summary.json`, read by the gate), `html`
+  (`coverage/index.html`, local drill-down). `coverage/` is gitignored.
+- Re-run the gate alone against an existing report: `npm run coverage:ratchet`.
+
+There is deliberately **no coverage badge** — a badge needs an external service
+and a token, and a failing build is a stronger signal than a green shield.
 
 ## Architecture Notes
 
@@ -75,11 +130,8 @@ npm run tools:update-readme
 - Unit tests: `tests/unit/`. Add coverage for new behaviour — prefer testing a
   pure function over an end-to-end mock where possible.
 - Run a single file: `npx vitest run tests/unit/<file>.test.ts`.
-- **Coverage is a ratchet.** Floors live in `coverage-thresholds.json` and are
-  enforced by `vitest` _and_ by `scripts/check-coverage-ratchet.mjs`, which also
-  fails when coverage climbs well above the floor without the floor being
-  raised. Never lower a floor to turn a red build green — see
-  [Coverage Policy](README.md#coverage-policy).
+- **Coverage is a ratchet** — see [Coverage Policy](#coverage-policy) above
+  before touching a floor.
 - Live (against a real TM1) is optional but encouraged for tool changes; note in
   the PR what you validated.
 

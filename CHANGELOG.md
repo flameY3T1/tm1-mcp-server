@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **Breaking for clients that read `content[0].text` and ignore `structuredContent`** — set
   `TM1_RESPONSE_MODE=legacy` to restore the old wire format. Verified against Claude Code.
+  `legacy` is **deprecated** and will be removed in a future major; it exists only as a
+  transitional escape hatch.
   Unaffected: `format: "markdown"` and error results.
 
 - **A TI result now says whether the run committed.** `ExecuteWithReturn` answers HTTP 200 whatever

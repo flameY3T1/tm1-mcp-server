@@ -67,7 +67,7 @@ jobs:
       # Runs the whole test suite under coverage, enforces the floors in
       # coverage-thresholds.json (vitest), then runs the ratchet gate — which
       # also fails when coverage has climbed well ABOVE the floor, so the floor
-      # gets raised instead of quietly rotting. See README "Coverage Policy".
+      # gets raised instead of quietly rotting. See CONTRIBUTING "Coverage Policy".
       - name: Tests + coverage ratchet
         run: npm run coverage:check
 
