@@ -37,6 +37,7 @@ function makeConfig(port: number, token?: string): TM1Config {
     httpToken: token,
     mode: "readonly",
     responseMode: "legacy",
+    version: 11,
   };
 }
 

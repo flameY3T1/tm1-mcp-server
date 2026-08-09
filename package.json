@@ -43,6 +43,7 @@
     "coverage:check": "vitest run --coverage && node scripts/check-coverage-ratchet.mjs",
     "coverage:ratchet": "node scripts/check-coverage-ratchet.mjs",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.test.json",
     "lint": "tsc --noEmit && eslint .",
     "lint:no-flat-api": "node scripts/check-no-flat-tm1-methods.mjs",
     "lint:annotations": "node scripts/check-annotation-coverage.mjs",
@@ -53,7 +54,7 @@
     "lint:mutation-envelope": "node scripts/check-mutation-envelope.mjs",
     "lint:format": "prettier --check .",
     "format": "prettier --write .",
-    "verify": "npm run typecheck && npm run lint:no-flat-api && npm run lint:annotations && npm run lint:output-schema && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:input-naming && npm run lint:mutation-envelope && npm run lint:format && npm run lint:eslint && npm run coverage:check",
+    "verify": "npm run typecheck && npm run typecheck:tests && npm run lint:no-flat-api && npm run lint:annotations && npm run lint:output-schema && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:input-naming && npm run lint:mutation-envelope && npm run lint:format && npm run lint:eslint && npm run coverage:check",
     "tools:list": "node scripts/gen-tool-list.mjs",
     "tools:update-readme": "node scripts/gen-tool-list.mjs --write-readme",
     "lint:eslint": "eslint ."

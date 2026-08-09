@@ -25,6 +25,14 @@ const mockLogger = {
 // object the SDK would serialize.
 type Cb = (...a: unknown[]) => Promise<unknown>;
 
+// The shape a tool handler hands back before the proxy rewrites it. Typed
+// (rather than `unknown`) so the `proxied.tool(...)` call below resolves
+// against the SDK's CallToolResult overload instead of silently degrading.
+type HandlerResult = {
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent?: Record<string, unknown>;
+};
+
 // Minimal payload that satisfies ServerStateResultSchema's required keys — the
 // proxy's drift guard runs before the wire shape is decided, so an abbreviated
 // object would fail for the wrong reason.
@@ -40,7 +48,7 @@ const PAYLOAD = {
 // shape rather than that tool's contract.
 function captureWrapped(
   responseMode?: "legacy" | "structured",
-  result?: unknown,
+  result?: HandlerResult,
 ): Cb {
   const server = new McpServer({ name: "t", version: "0.0.0" });
   let wrapped: Cb | undefined;

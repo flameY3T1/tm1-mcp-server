@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
+import { baseTestConfig } from "../helpers/tm1-config.js";
 
 // Silence logger in tests
 const mockLogger = {
@@ -17,6 +18,7 @@ const mockLogger = {
 
 function makeConfig(overrides?: Partial<TM1Config>): TM1Config {
   return {
+    ...baseTestConfig,
     baseUrl: "https://tm1server:8010",
     user: "admin",
     password: "secret",

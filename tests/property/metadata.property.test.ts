@@ -8,6 +8,7 @@ import * as fc from "fast-check";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
+import { baseTestConfig } from "../helpers/tm1-config.js";
 
 const mockLogger = {
   info: vi.fn(),
@@ -23,6 +24,7 @@ const mockLogger = {
 
 function makeConfig(): TM1Config {
   return {
+    ...baseTestConfig,
     baseUrl: "https://tm1server:8010",
     user: "admin",
     password: "secret",

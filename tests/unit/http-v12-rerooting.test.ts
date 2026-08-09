@@ -41,6 +41,7 @@ function makeV12Config(): TM1Config {
     httpPort: 0,
     httpAllowedOrigins: [],
     mode: "readonly",
+    responseMode: "structured",
     version: 12,
     instance: "tm1",
     database: "db1",

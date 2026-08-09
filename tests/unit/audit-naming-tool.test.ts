@@ -10,9 +10,12 @@ import { ElementService } from "../../src/tm1-client/services/element-service.js
 function elementServiceFrom(
   request: (method: string, path: string) => Promise<unknown>,
 ): ElementService {
-  return new ElementService({ request } as unknown as ConstructorParameters<
-    typeof ElementService
-  >[0]);
+  type Ctor = ConstructorParameters<typeof ElementService>;
+  // CellService is a required constructor dependency that scanElementNames
+  // never reaches. Leaving it unset keeps the runtime identical to what this
+  // test always did and makes the test blow up loudly if that path changes.
+  const cells = undefined as unknown as Ctor[1];
+  return new ElementService({ request } as unknown as Ctor[0], cells);
 }
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
@@ -169,7 +172,9 @@ describe("tm1_audit_naming tool", () => {
     const out = parseResult(await fake.getHandler()({ includeControl: true }));
     expect(out.status).toBe("fail");
     expect(out.invalidCount).toBe(2);
-    const rules = out.findings.flatMap((f) => f.violations.map((v) => v.rule));
+    const rules = (out.findings ?? []).flatMap((f) =>
+      f.violations.map((v) => v.rule),
+    );
     expect(rules).toContain("server_reserved_char");
     expect(rules).toContain("leading_control_prefix");
   });
@@ -202,7 +207,7 @@ describe("tm1_audit_naming tool", () => {
     const out = parseResult(await fake.getHandler()({ scope: ["elements"] }));
     expect(out.appliedMajor).toBe(12);
     expect(out.invalidCount).toBe(1);
-    expect(out.findings[0]!.violations[0]!.rule).toBe("element_contains_tab");
+    expect(out.findings?.[0]?.violations[0]?.rule).toBe("element_contains_tab");
   });
 
   it("does NOT flag TAB on v11 server even if elements contain it", async () => {
@@ -373,7 +378,9 @@ describe("tm1_audit_naming tool", () => {
     );
     expect(out.scanned.processVariables).toBe(3);
     expect(out.invalidCount).toBe(2);
-    const rules = out.findings.flatMap((f) => f.violations.map((v) => v.rule));
+    const rules = (out.findings ?? []).flatMap((f) =>
+      f.violations.map((v) => v.rule),
+    );
     expect(rules).toContain("process_var_leading_non_letter");
     expect(rules).toContain("process_var_invalid_char");
   });
@@ -387,7 +394,7 @@ describe("tm1_audit_naming tool", () => {
     registerAuditNaming(fake.server, tm1);
     const out = parseResult(await fake.getHandler()({ maxFindings: 2 }));
     expect(out.invalidCount).toBe(5);
-    expect(out.findings.length).toBe(2);
+    expect(out.findings?.length).toBe(2);
     expect(out.truncated).toBe(true);
   });
 

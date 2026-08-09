@@ -82,7 +82,7 @@ describe("R2-07: resolveAll", () => {
         { kind: "static", resource: staticEntry("tm1://server/info", "info") },
       ],
     };
-    const all = await __testing.resolveAll(catalog);
+    const all = await __testing.resolveAll(catalog, mockLogger);
     expect(all.map((r) => r.uri)).toEqual([
       "tm1://process/Alpha/code",
       "tm1://process/Beta/code",

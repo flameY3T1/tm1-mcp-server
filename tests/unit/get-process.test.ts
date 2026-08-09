@@ -45,10 +45,12 @@ function capture(processes: Partial<TM1Client["processes"]>): {
 const stubs = {
   getCode: async () => ({ prolog: "p", metadata: "m", data: "d", epilog: "e" }),
   getParameters: async () => [
-    { name: "pMonth", type: "String", defaultValue: "Jan" },
+    { name: "pMonth", type: "String" as const, defaultValue: "Jan" },
   ],
-  getVariables: async () => [{ name: "v1", type: "Numeric", position: 1 }],
-  getDataSource: async () => ({ type: "None" }),
+  getVariables: async () => [
+    { name: "v1", type: "Numeric" as const, position: 1 },
+  ],
+  getDataSource: async () => ({ type: "None" as const }),
   getDeployMeta: async () => ({ hasSecurityAccess: true }),
 };
 

@@ -15,10 +15,19 @@ import { OUTPUT_SCHEMA_MAP } from "../../src/tools/output-schema-map.js";
 // This test asserts that for tools whose runtime payload includes extras,
 // the published JSON Schema must allow additional properties.
 
-function asSchema(entry: ZodRawShape | ZodTypeAny): ZodTypeAny {
-  return typeof entry === "object" && entry !== null && "_def" in entry
-    ? (entry as ZodTypeAny)
-    : z.object(entry as ZodRawShape);
+// `zod-to-json-schema` ships types built against zod 3, while this project is
+// on zod 4 — the two `ZodType` declarations are structurally incompatible even
+// though the runtime objects interoperate (that interop is exactly what the
+// MCP SDK relies on). Convert at this one seam so the cast is named and
+// contained rather than sprinkled over every call site.
+type JsonSchemaInput = Parameters<typeof zodToJsonSchema>[0];
+
+function asSchema(entry: ZodRawShape | ZodTypeAny): JsonSchemaInput {
+  const schema =
+    typeof entry === "object" && entry !== null && "_def" in entry
+      ? (entry as ZodTypeAny)
+      : z.object(entry as ZodRawShape);
+  return schema as unknown as JsonSchemaInput;
 }
 
 const TOOLS_WITH_EXTRAS: string[] = [

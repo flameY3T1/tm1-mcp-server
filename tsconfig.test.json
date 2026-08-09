@@ -1,0 +1,33 @@
+{
+  // Type-check gate for the test suite.
+  //
+  // The base tsconfig deliberately excludes `tests/` because it also drives the
+  // `dist` build (rootDir: src, declaration output). That left every test file
+  // compiled only by vitest's esbuild, which strips types without checking
+  // them — so a test could construct an incomplete config literal or call a
+  // function with the wrong arity and `npm run verify` stayed green.
+  //
+  // This config closes that gap: same strict flags, no emit, `src` + `tests`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": ".",
+    "types": ["node", "vitest/globals"],
+
+    // Relaxed for tests ONLY. `noUncheckedIndexedAccess` turns every ordinary
+    // fixture access — `rows[0].name`, `byId.get(k).value` — into a possibly-
+    // undefined error, which in a test body is churn, not signal: the whole
+    // point of `expect(rows[0].name).toBe(...)` is that the run blows up
+    // loudly if the index is empty. Forcing `!` or optional chaining onto
+    // ~180 such sites would weaken assertions and hide nothing real.
+    // Everything this gate is meant to catch — wrong object shapes, missing
+    // required fields, wrong argument counts, wrong types at call sites —
+    // is orthogonal to this flag and stays on.
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

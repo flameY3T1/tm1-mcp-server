@@ -28,8 +28,13 @@ type Registrar = (server: never, client: TM1Client) => void;
 
 /** Register a tool against a stub server and hand back its parsed handler. */
 function register(registrar: Registrar, client: TM1Client): ToolHandler {
-  let captured: ToolHandler | null = null;
-  let parser: z.ZodObject<ZodRawShape> | null = null;
+  // Held in an object rather than two `let`s: TS's control-flow analysis does
+  // not track assignments made inside the `tool` callback, so a `let x = null`
+  // stays narrowed to `null` and the post-check use collapses to `never`.
+  const captured: {
+    handler: ToolHandler | null;
+    parser: z.ZodObject<ZodRawShape> | null;
+  } = { handler: null, parser: null };
   const server = {
     tool: (
       _name: string,
@@ -37,14 +42,13 @@ function register(registrar: Registrar, client: TM1Client): ToolHandler {
       schema: ZodRawShape,
       handler: ToolHandler,
     ) => {
-      parser = z.object(schema);
-      captured = handler;
+      captured.parser = z.object(schema);
+      captured.handler = handler;
     },
   };
   registrar(server as never, client);
-  if (!captured || !parser) throw new Error("handler not registered");
-  const p = parser;
-  const h = captured;
+  const { handler: h, parser: p } = captured;
+  if (!h || !p) throw new Error("handler not registered");
   return (args) => h(p.parse(args) as Record<string, unknown>);
 }
 

@@ -10,6 +10,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import * as fc from "fast-check";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
+import { baseTestConfig } from "../helpers/tm1-config.js";
 
 const mockLogger = {
   info: vi.fn(),
@@ -25,6 +26,7 @@ const mockLogger = {
 
 function makeConfig(user: string, password: string): TM1Config {
   return {
+    ...baseTestConfig,
     baseUrl: "https://tm1server:8010",
     user,
     password,

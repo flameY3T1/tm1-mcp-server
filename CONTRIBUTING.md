@@ -38,6 +38,7 @@ This chains:
 | Step             | Command                             | Checks                                                             |
 | ---------------- | ----------------------------------- | ------------------------------------------------------------------ |
 | Types            | `npm run typecheck`                 | `tsc --noEmit`, strict flags on                                    |
+| Types (tests)    | `npm run typecheck:tests`           | `tests/` under the same strict flags (`tsconfig.test.json`)        |
 | API shape        | `npm run lint:no-flat-api`          | new TM1 calls go through a service, not flat client                |
 | Annotations      | `npm run lint:annotations`          | every tool declares its MCP hint annotations                       |
 | Output schemas   | `npm run lint:output-schema`        | every tool has a registered strict output schema                   |

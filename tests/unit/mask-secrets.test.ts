@@ -159,7 +159,14 @@ describe("maskDataSourceSecrets", () => {
   });
 
   it("is a no-op when oDBCConnection is absent", () => {
-    const ds = { type: "TM1CubeView", view: "Default" };
+    // Typed as a datasource that *could* carry an ODBC connection string but
+    // doesn't. Without the annotation TS's weak-type check rejects the call:
+    // maskDataSourceSecrets' constraint is all-optional, so a literal sharing
+    // no property with it is not assignable.
+    const ds: { type: string; view: string; oDBCConnection?: string } = {
+      type: "TM1CubeView",
+      view: "Default",
+    };
     expect(maskDataSourceSecrets(ds)).toBe(ds);
   });
 });
