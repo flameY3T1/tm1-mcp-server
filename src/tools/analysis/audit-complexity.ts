@@ -21,6 +21,7 @@ import {
   lintProcess,
   type Finding,
 } from "../../lib/complexity/antipatterns.js";
+import { mapSettledWithConcurrency } from "../../lib/concurrency.js";
 const SCOPE_VALUES = [
   "processes",
   "rules",
@@ -31,6 +32,12 @@ type Scope = (typeof SCOPE_VALUES)[number];
 
 // antipatterns is opt-in (different output shape: a findings list, not a
 // ranked score) and excluded from the default scope.
+// Max in-flight getVariables calls while building the consistency input set.
+// Same band as the other TM1 fan-outs (bulkUpsert 8, feeder-audit runtime 10):
+// bounds pressure on TM1's worker pool while removing the serial 1-per-process
+// round-trip.
+const CONSISTENCY_FAN_OUT_CONCURRENCY = 8;
+
 const SCOPE_DEFAULT: ReadonlyArray<Scope> = [
   "processes",
   "rules",
@@ -173,11 +180,29 @@ export function registerAuditComplexity(
           }
         }
         if (want("consistency")) {
-          for (const p of all) {
-            const vars = await tm1Client.processes.getVariables(p.name);
+          // One getVariables round-trip per process: serially that is P ×
+          // latency (11-44s on a 221-process model). Fan out with the same
+          // bound the other TM1 fan-outs use so a large model can't flood the
+          // server's worker pool.
+          const settled = await mapSettledWithConcurrency(
+            all,
+            CONSISTENCY_FAN_OUT_CONCURRENCY,
+            (p) => tm1Client.processes.getVariables(p.name),
+          );
+          // Results are index-aligned, so pushing in order keeps
+          // processVarInputs in `all` order exactly as the serial loop did.
+          for (let i = 0; i < settled.length; i++) {
+            const r = settled[i]!;
+            // Fail-fast, unchanged: the serial loop let the first rejection
+            // escape and abort the whole tool call. The consistency section is
+            // a cross-process aggregate (clusters, type conflicts, prefix
+            // adherence) — silently dropping processes would skew every number
+            // it reports with no signal in the output schema, so a partial
+            // scan stays an error rather than a quietly wrong answer.
+            if (r.status === "rejected") throw r.reason;
             processVarInputs.push({
-              process: p.name,
-              variables: vars.map((v) => ({ name: v.name, type: v.type })),
+              process: all[i]!.name,
+              variables: r.value.map((v) => ({ name: v.name, type: v.type })),
             });
           }
         }

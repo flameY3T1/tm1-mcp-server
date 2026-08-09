@@ -77,6 +77,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `tm1_trace_data_flow` — which had **no** limit at all — gains one at 500 entries per
   direction, with `counts` left unclipped so a partial answer is visibly partial.
 
+- **`tm1_audit_complexity` fans out its per-process reads instead of walking them one at a time.**
+  The `consistency` scope — which is in the default scope set, so this hit every call that did not
+  name one — issued one `getVariables` round-trip per process strictly serially: wall time was
+  process count × latency, or 11–44s on a 221-process model. The reads now run through the
+  existing bounded-concurrency helper at 8 in flight. Result order and the fail-fast contract are
+  unchanged: the consistency section reports cross-process aggregates, so a partial scan would
+  skew every number it prints with nothing in the output schema to signal it.
+
 ### Fixed
 
 - **HTTP transport no longer leaks a listener per request.** Each request builds a fresh

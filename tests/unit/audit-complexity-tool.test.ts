@@ -46,6 +46,12 @@ interface FakeArgs {
     Array<{ name: string; type: "String" | "Numeric"; position: number }>
   >;
   rules?: Array<{ cubeName: string; rulesText: string; skipCheck: boolean }>;
+  /** Overrides the `variables` lookup so a test can instrument timing/failures. */
+  getVariablesImpl?: (
+    name: string,
+  ) => Promise<
+    Array<{ name: string; type: "String" | "Numeric"; position: number }>
+  >;
 }
 
 function makeFakeTM1Client(args: FakeArgs) {
@@ -59,7 +65,10 @@ function makeFakeTM1Client(args: FakeArgs) {
         const all = args.processes ?? [];
         return includeControl ? all : all.filter((p) => !isControl(p.name));
       },
-      getVariables: async (name: string) => args.variables?.[name] ?? [],
+      getVariables: async (name: string) =>
+        args.getVariablesImpl
+          ? await args.getVariablesImpl(name)
+          : (args.variables?.[name] ?? []),
     },
     cubes: {
       getAllRules: async (includeControl = false) => {
@@ -418,5 +427,102 @@ describe("tm1_audit_complexity tool", () => {
     const out = parseResult(await fake.getHandler()({}));
     expect(out.antipatterns).toBeNull();
     expect(out.status).toBe("pass");
+  });
+
+  // ── consistency fan-out (one getVariables call per process) ─────────────
+  describe("consistency variable fan-out", () => {
+    // Mirrors CONSISTENCY_FAN_OUT_CONCURRENCY in audit-complexity.ts. Kept in
+    // sync by hand: the point of the assertions below is that the fan-out is
+    // bounded *and* concurrent, not that the number is exactly this one.
+    const FAN_OUT_LIMIT = 8;
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+    const proc = (name: string) => ({
+      name,
+      prolog: "",
+      metadata: "",
+      data: "",
+      epilog: "",
+    });
+
+    it("fans getVariables out with bounded concurrency instead of serially", async () => {
+      const processes = Array.from({ length: 24 }, (_, i) => proc(`P${i}`));
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const fake = makeFakeServer();
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8",
+        processes,
+        getVariablesImpl: async (name) => {
+          inFlight++;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await sleep(5);
+          inFlight--;
+          return [{ name: `p${name}`, type: "Numeric" as const, position: 1 }];
+        },
+      });
+      registerAuditComplexity(fake.server, tm1);
+      const out = parseResult(
+        await fake.getHandler()({ scope: ["consistency"] }),
+      );
+
+      // Serial today => maxInFlight === 1. Unbounded Promise.all => 24.
+      expect(maxInFlight).toBeGreaterThan(1);
+      expect(maxInFlight).toBeLessThanOrEqual(FAN_OUT_LIMIT);
+      expect(out.consistency.prefixConvention.total).toBe(processes.length);
+    });
+
+    it("preserves the order of `all` even when later calls settle first", async () => {
+      // Two equal-sized cohorts. groupByCohort's sort is stable, so cohort
+      // order == first-encounter order in processVarInputs. Making the first
+      // process the slowest scrambles that order for any completion-ordered
+      // (push-on-resolve) implementation.
+      const processes = [
+        proc("Zeta_Alpha"),
+        proc("Alpha_Beta"),
+        proc("Beta_Alpha"),
+        proc("Gamma_Beta"),
+      ];
+      const fake = makeFakeServer();
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8",
+        processes,
+        getVariablesImpl: async (name) => {
+          await sleep(name === "Zeta_Alpha" ? 40 : 1);
+          return [{ name: "pYear", type: "Numeric" as const, position: 1 }];
+        },
+      });
+      registerAuditComplexity(fake.server, tm1);
+      const out = parseResult(
+        await fake.getHandler()({ scope: ["consistency"] }),
+      );
+
+      expect(
+        out.consistency.cohorts.map((c: { key: string }) => c.key),
+      ).toEqual(["alpha", "beta"]);
+      expect(out.consistency.cohorts[0].members).toEqual([
+        "Beta_Alpha",
+        "Zeta_Alpha",
+      ]);
+    });
+
+    it("keeps fail-fast: a single getVariables rejection fails the tool call", async () => {
+      const processes = Array.from({ length: 12 }, (_, i) => proc(`P${i}`));
+      const fake = makeFakeServer();
+      const tm1 = makeFakeTM1Client({
+        productVersion: "11.8",
+        processes,
+        getVariablesImpl: async (name) => {
+          await sleep(1);
+          if (name === "P7") throw new Error("TM1 rejected P7");
+          return [{ name: "pYear", type: "Numeric" as const, position: 1 }];
+        },
+      });
+      registerAuditComplexity(fake.server, tm1);
+      await expect(
+        fake.getHandler()({ scope: ["consistency"] }),
+      ).rejects.toThrow("TM1 rejected P7");
+    });
   });
 });
