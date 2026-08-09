@@ -77,50 +77,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `tm1_trace_data_flow` — which had **no** limit at all — gains one at 500 entries per
   direction, with `counts` left unclipped so a partial answer is visibly partial.
 
-- **`tm1_audit_complexity` fans out its per-process reads instead of walking them one at a time.**
-  The `consistency` scope — which is in the default scope set, so this hit every call that did not
-  name one — issued one `getVariables` round-trip per process strictly serially: wall time was
-  process count × latency, or 11–44s on a 221-process model. The reads now run through the
-  existing bounded-concurrency helper at 8 in flight. Result order and the fail-fast contract are
-  unchanged: the consistency section reports cross-process aggregates, so a partial scan would
-  skew every number it prints with nothing in the output schema to signal it.
+- **`tm1_audit_complexity` fans out its per-process reads.** The `consistency` scope is in the
+  default scope set and walked one `getVariables` round-trip per process serially — 276ms
+  estimated vs 84ms measured on a 92-process model. Now 8 in flight. Order and fail-fast
+  behaviour unchanged.
 
 ### Fixed
 
-- **`$batch` chunks are bounded by payload size, not just by request count.** The 200-requests-per-
-  round-trip cap said nothing about how large those requests were: 200 sub-requests carrying long
-  element names or a Components list are easily megabytes, and the counter is still under its cap
-  when the body hits a limit in front of TM1 — nginx defaults to 1 MiB. That comes back as 400/413,
-  a status the service reads as "this server has no `$batch`", so an oversized payload could
-  silently re-drive every write down the slow per-request fallback. A chunk now closes when either
-  cap would be exceeded, measured in UTF-8 bytes over the actual wire object. A single sub-request
-  larger than the whole budget still goes out, alone, rather than being dropped. Chunks stay
-  serial, deliberately: these are mutations, and overlapping envelopes would make "how much
-  committed before the failure" unanswerable.
+- **`$batch` chunks are bounded by payload size, not just request count.** 200 sub-requests with
+  long element names run to megabytes while the counter is still under its cap, and a body past a
+  proxy's limit (nginx defaults to 1 MiB) returns 400/413 — which the service read as "no `$batch`
+  here". A chunk now closes at whichever bound comes first, measured in UTF-8 bytes. An
+  over-budget single request is sent alone rather than dropped. Chunks stay serial.
 
-- **An ambiguous first `$batch` failure is settled by a counter-probe instead of a guess.** HTTP 400
-  is overloaded: a gateway that does not route the endpoint answers "invalid URL" 400, and TM1
-  answers 400 for a payload it refuses. Reading the second as the first pinned the connection to
-  "no `$batch`" for the whole session, so every later bulk write silently took the per-request path
-  at N times the cost. On a 400 — and only while no batch has yet succeeded — the service now sends
-  one minimal, side-effect-free envelope. If that comes back readable, `$batch` works, the
-  connection is marked supported and the original error propagates as the real failure it is; the
-  caller's writes are not retried. If it does not, the fallback behaves exactly as before. The
-  probe runs at most once per connection and judges only the envelope, so an account that is
-  refused the probe's own read is not mistaken for a server without `$batch`. The other statuses in
-  the set are left alone deliberately: 404/405/501 are verdicts about a constant URL and method,
-  403 is about an identity the probe shares, and a 500 can arrive after part of a non-atomic
-  envelope was already applied — where the replay-safe fallback is the right answer.
+- **An ambiguous first `$batch` 400 is settled by a counter-probe.** A gateway that does not route
+  the endpoint and a payload TM1 refuses both answer 400; reading the second as the first pinned
+  the connection to "no `$batch`" for the whole session. On a 400, while no batch has yet
+  succeeded and at most once per connection, one minimal envelope is sent: readable means `$batch`
+  works, so the connection is marked supported and the original error propagates unretried.
+  Verified live — v12 rejects duplicate sub-request ids with exactly this 400. Only 400 is probed;
+  404/405/501 concern a constant URL and method, 403 an identity the probe shares, and a 500 can
+  follow a partial commit where the replay-safe fallback is correct.
 
 - **A failed element-type lookup is no longer cached forever.** The feeder audit's type cache
-  stored `null` on any error with no TTL and no retry, so one transient timeout marked every
-  element of that dimension "type unknown" for the rest of the run. Failures now leave the slot
-  unset so a later lookup retries — bounded at three consecutive failures per dimension, after
-  which the slot is pinned and stops issuing requests. The bound matters because a deterministic
-  failure is the common one: TM1 reports a security denial as HTTP 400 `ObjectSecurityNoReadRights`,
-  which any non-admin auditing a restricted dimension hits, and the lookup runs once per feeder
-  entry. The read also moved to `$select=Name,Type`, dropping the `$expand=Parents` and Edges scan
-  that the full hierarchy fetch dragged along for a type lookup.
+  stored `null` on any error with no TTL, so one transient timeout marked a whole dimension "type
+  unknown" for the rest of the run. Failures now retry, bounded at three consecutive ones per
+  dimension — unbounded retry would be worse, since a security denial (HTTP 400
+  `ObjectSecurityNoReadRights`) is deterministic and the lookup runs once per feeder entry. The
+  read also moved to `$select=Name,Type`, dropping an `$expand=Parents` and Edges scan.
 
 - **HTTP transport no longer leaks a listener per request.** Each request builds a fresh
   `McpServer`, and that build attaches a `SubscriptionRegistry` listener to the process-global

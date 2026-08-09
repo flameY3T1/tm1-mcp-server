@@ -15,6 +15,11 @@ updates:
       # Stay on undici 7.x (maintained) until node 20 is dropped.
       - dependency-name: "undici"
         update-types: ["version-update:semver-major"]
+      # typescript-eslint peer-caps typescript at <6.1.0, so a TS major cannot
+      # install at all (npm ci fails ERESOLVE). Lift once typescript-eslint
+      # supports TS 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
