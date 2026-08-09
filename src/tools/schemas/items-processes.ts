@@ -117,7 +117,9 @@ export const ValidateProcessRefsResultSchema = z.object({
 // survive the SDK's object-shape requirement). TypeScript enforces the
 // invariant at the producing end; this schema's job is the strict-completeness
 // gate — `outcome` is a field the handler returns, so it must be listed or the
-// SDK rejects the payload at runtime.
+// SDK rejects the payload at runtime. `outcome: "completed_with_errors"` is
+// the value a reader must not skim past: the run committed what it wrote, so
+// `success: false` there is not licence to re-run.
 export const ProcessResultSchema = z.object({
   success: z.boolean(),
   outcome: PROCESS_OUTCOME,

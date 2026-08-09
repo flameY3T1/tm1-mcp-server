@@ -17,6 +17,7 @@ import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
 import type { ProcessResult } from "../../src/types.js";
 import { ProcessResultSchema } from "../../src/tools/schemas/items-processes.js";
+import { classifyExecution } from "../../src/tm1-client/services/process-status.js";
 import { baseTestConfig } from "../helpers/tm1-config.js";
 
 const mockLogger = {
@@ -141,7 +142,7 @@ describe("ProcessResult — a missing status code is not success (T-4)", () => {
     expect(result.processErrorStatus).toBe("CompletedSuccessfully");
   });
 
-  it("labels a non-success status as failed, not indeterminate", async () => {
+  it("labels an aborted run rolled_back, not indeterminate", async () => {
     fetchSpy.mockResolvedValueOnce(
       mockResponse({
         ProcessExecuteStatusCode: "Aborted",
@@ -152,19 +153,94 @@ describe("ProcessResult — a missing status code is not success (T-4)", () => {
     const result = await client.processes.execute("Broken");
 
     expect(result.success).toBe(false);
-    expect(result.outcome).toBe("failed");
+    expect(result.outcome).toBe("rolled_back");
     expect(result.processErrorStatus).toBe("Aborted");
     expect(result.errorLogFile).toBe("TM1ProcessError_x.log");
   });
 
-  it("labels a TM1 error response as failed", async () => {
+  it("labels a TM1 error response indeterminate and keeps the server text", async () => {
+    // The call errored, so TM1 never reported a status — and an error raised
+    // mid-run tells us nothing about whether the run committed. Claiming a
+    // rollback we did not observe would be the same fail-open mistake in a
+    // different direction.
     fetchSpy.mockResolvedValueOnce(
       mockResponse({ error: { message: { value: "Prolog aborted" } } }, 400),
     );
 
     const result = await client.processes.execute("Broken");
 
-    expect(result.outcome).toBe("failed");
+    expect(result.outcome).toBe("indeterminate");
+    expect(result.success).toBe(false);
+    expect(result.processErrorStatus).toContain("Prolog aborted");
+  });
+});
+
+// One case per member of tm1.ProcessExecuteStatusCode. The enum has exactly
+// six (read from the $metadata of both an 11.8 and a 12.5.9 server — identical,
+// no version drift), and the grouping below is the live-measured commit
+// behaviour, not a reading of the names: a marker cell written in the Prolog
+// survived ItemReject and ProcessQuit, and was gone after ProcessError and
+// ProcessRollback. HasMinorErrors too: its documented path is per-record
+// failures in the Metadata/Data tabs (which need a data source), but a Prolog
+// write to a consolidated element produces the same code without one — and the
+// marker survived, so it belongs with the committed group.
+describe("classifyExecution — one row per ProcessExecuteStatusCode", () => {
+  const CASES: ReadonlyArray<{
+    status: string;
+    outcome: ProcessResult["outcome"];
+    success: boolean;
+  }> = [
+    { status: "CompletedSuccessfully", outcome: "succeeded", success: true },
+    {
+      status: "HasMinorErrors",
+      outcome: "completed_with_errors",
+      success: false,
+    },
+    { status: "QuitCalled", outcome: "completed_with_errors", success: false },
+    {
+      status: "CompletedWithMessages",
+      outcome: "completed_with_errors",
+      success: false,
+    },
+    { status: "Aborted", outcome: "rolled_back", success: false },
+    { status: "RollbackCalled", outcome: "rolled_back", success: false },
+  ];
+
+  for (const c of CASES) {
+    it(`maps ${c.status} to ${c.outcome} (success=${String(c.success)})`, () => {
+      const result = classifyExecution(c.status, undefined);
+      expect(result.outcome).toBe(c.outcome);
+      expect(result.success).toBe(c.success);
+      expect(result.processErrorStatus).toBe(c.status);
+    });
+  }
+
+  it("carries the error log file through unchanged", () => {
+    const result = classifyExecution("Aborted", "TM1ProcessError_y.log");
+    expect(result.errorLogFile).toBe("TM1ProcessError_y.log");
+  });
+
+  it("maps a status code this build does not know to indeterminate", () => {
+    // A seventh member added by a future TM1 must not be absorbed into a group
+    // whose commit semantics we never measured — that is how the old
+    // everything-else-is-failed branch would have swallowed it.
+    const result = classifyExecution("SomeFutureStatus", undefined);
+    expect(result.outcome).toBe("indeterminate");
+    expect(result.success).toBe(false);
+    expect(result.processErrorStatus).toContain("SomeFutureStatus");
+    expect(result.processErrorStatus).toMatch(/unrecognised/i);
+  });
+
+  it("maps a missing status code to indeterminate (T-4)", () => {
+    const result = classifyExecution(undefined, undefined);
+    expect(result.outcome).toBe("indeterminate");
+    expect(result.success).toBe(false);
+    expect(result.processErrorStatus).toMatch(/ProcessExecuteStatusCode/);
+  });
+
+  it("maps an empty status code to indeterminate", () => {
+    const result = classifyExecution("", undefined);
+    expect(result.outcome).toBe("indeterminate");
     expect(result.success).toBe(false);
   });
 });
@@ -184,10 +260,10 @@ describe("ProcessResult — contradictory states are unrepresentable (T-4)", () 
     // @ts-expect-error outcome and success are the same axis; they cannot disagree
     const contradiction: ProcessResult = {
       success: true,
-      outcome: "failed",
+      outcome: "rolled_back",
       processErrorStatus: "CompletedSuccessfully",
     };
-    expect(contradiction.outcome).toBe("failed");
+    expect(contradiction.outcome).toBe("rolled_back");
   });
 
   it("rejects an indeterminate result that claims success at compile time", () => {
@@ -207,7 +283,7 @@ describe("ProcessResult — contradictory states are unrepresentable (T-4)", () 
         outcome: "succeeded",
         processErrorStatus: "CompletedSuccessfully",
       },
-      { success: false, outcome: "failed", processErrorStatus: "Aborted" },
+      { success: false, outcome: "rolled_back", processErrorStatus: "Aborted" },
     ];
     const statuses = results.map((r) =>
       r.success ? r.processErrorStatus : `!${r.processErrorStatus}`,
@@ -233,6 +309,17 @@ describe("ProcessResultSchema carries the new field (strict output gate)", () =>
       processErrorStatus: "CompletedSuccessfully",
     });
     expect(parsed.success).toBe(true);
+  });
+
+  it("accepts the two committed/rolled-back payloads", () => {
+    for (const outcome of ["completed_with_errors", "rolled_back"]) {
+      const parsed = ProcessResultSchema.safeParse({
+        success: false,
+        outcome,
+        processErrorStatus: "QuitCalled",
+      });
+      expect(parsed.success).toBe(true);
+    }
   });
 
   it("rejects an unknown outcome value", () => {

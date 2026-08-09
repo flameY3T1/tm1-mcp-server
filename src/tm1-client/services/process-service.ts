@@ -3,7 +3,7 @@
 // CompileProcess (server-side syntax check, with and without saving).
 //
 // See docs/ARCHITECTURE.md for the layering.
-import { PROCESS_STATUS_UNKNOWN, TM1Error, TM1ErrorCode } from "../../types.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 import type {
   CompileResult,
   DataSource,
@@ -20,6 +20,7 @@ import {
   rethrowIfSystemic,
   rethrowIfSystemicOrDenied,
 } from "./fallback.js";
+import { classifyExecution } from "./process-status.js";
 import {
   filterClause,
   nameFilterPredicates,
@@ -60,45 +61,6 @@ function encodeParameter(p: ProcessParameter): Record<string, unknown> {
     Type: numeric ? 2 : 1,
     Value: value,
     ...(p.prompt ? { Prompt: p.prompt } : {}),
-  };
-}
-
-/**
- * Turn TM1's `ProcessExecuteStatusCode` into a `ProcessResult`.
- *
- * The single decision this centralises is the one T-4 named: an ABSENT status
- * code is not success. The old `?? "CompletedSuccessfully"` on both execution
- * paths meant a server that answered 200 with an empty body, or a body without
- * the field, was reported to the caller as a clean run — fail-open on the one
- * question the caller asked. It is now `indeterminate`, which travels as
- * `success: false` so nothing downstream proceeds on an unverified run, while
- * `outcome` keeps it distinguishable from a genuine abort.
- */
-function classifyExecution(
-  statusCode: string | undefined,
-  errorLogFile: string | undefined,
-): ProcessResult {
-  if (statusCode === undefined || statusCode === "") {
-    return {
-      success: false,
-      outcome: "indeterminate",
-      processErrorStatus: PROCESS_STATUS_UNKNOWN,
-      errorLogFile,
-    };
-  }
-  if (statusCode === "CompletedSuccessfully") {
-    return {
-      success: true,
-      outcome: "succeeded",
-      processErrorStatus: "CompletedSuccessfully",
-      errorLogFile,
-    };
-  }
-  return {
-    success: false,
-    outcome: "failed",
-    processErrorStatus: statusCode,
-    errorLogFile,
   };
 }
 
@@ -264,10 +226,15 @@ export class ProcessService {
       // AUTH_FAILED) must propagate: a timed-out TI run is still executing
       // server-side, so reporting {success:false} would invite a duplicate run.
       rethrowIfSystemic(error);
+      // The call itself errored, so TM1 never reported a status — and an error
+      // raised mid-run says nothing about whether the run committed. That is
+      // `indeterminate` by definition, not a rollback we can promise; the
+      // server's own text rides along in processErrorStatus so the caller still
+      // sees WHY.
       if (error instanceof TM1Error) {
         return {
           success: false,
-          outcome: "failed",
+          outcome: "indeterminate",
           processErrorStatus: error.details ?? error.message,
           errorLogFile: undefined,
         };
@@ -319,10 +286,15 @@ export class ProcessService {
       // AUTH_FAILED) must propagate: a timed-out TI run is still executing
       // server-side, so reporting {success:false} would invite a duplicate run.
       rethrowIfSystemic(error);
+      // The call itself errored, so TM1 never reported a status — and an error
+      // raised mid-run says nothing about whether the run committed. That is
+      // `indeterminate` by definition, not a rollback we can promise; the
+      // server's own text rides along in processErrorStatus so the caller still
+      // sees WHY.
       if (error instanceof TM1Error) {
         return {
           success: false,
-          outcome: "failed",
+          outcome: "indeterminate",
           processErrorStatus: error.details ?? error.message,
           errorLogFile: undefined,
         };

@@ -50,20 +50,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TM1_RESPONSE_MODE=legacy` to restore the old wire format. Verified against Claude Code.
   Unaffected: `format: "markdown"` and error results.
 
-- **A TI run TM1 reports no status for is no longer reported as a success.** `tm1.ExecuteWithReturn`
-  answers HTTP 200 whatever happened, so the outcome lives entirely in `ProcessExecuteStatusCode` —
-  and a missing field defaulted to `CompletedSuccessfully`. An unverified run therefore reached the
-  model as a clean one. It is now a third state: `outcome: "indeterminate"`, carried alongside
-  `success: false` so nothing proceeds on an unverified run, with a `processErrorStatus` that says
-  the run may have completed, partially completed, or never started. `ProcessResult` became a
-  discriminated union, so `{success: true, processErrorStatus: "Aborted"}` no longer typechecks.
+- **A TI result now says whether the run committed.** `tm1.ExecuteWithReturn` answers HTTP 200
+  whatever happened, so the outcome lives entirely in `ProcessExecuteStatusCode` — and a missing
+  field defaulted to `CompletedSuccessfully`, so an unverified run reached the model as a clean one.
+  Results carry an `outcome` covering all six status codes, grouped by commit semantics measured
+  live on 11.8 (marker cell written in the Prolog, read back after each exit path):
+  `succeeded` (`CompletedSuccessfully`); `completed_with_errors` (`CompletedWithMessages`,
+  `QuitCalled`, `HasMinorErrors` — **the run's changes WERE committed; a blind retry can double-post
+  them**); `rolled_back` (`Aborted`, `RollbackCalled` — nothing committed); `indeterminate` (no
+  status code, a code this build does not know, or a call that errored mid-run). `ProcessResult`
+  became a discriminated union, so `{success: true, processErrorStatus: "Aborted"}` no longer
+  typechecks. `succeeded` is not proof the process ran to its intended end: `ProcessBreak` also
+  reports `CompletedSuccessfully` (verified live).
 
   **Breaking in two narrow ways** for `tm1_execute_process` and `tm1_save_data`: results carry a new
-  required `outcome` field (`succeeded` / `failed` / `indeterminate`), and a status-less response
-  now yields `success: false` with `isError` set, where it previously yielded `success: true`. A
-  live v11/v12 server always sends the field, so the second case is the defensive branch, not the
-  normal path. `tm1_clear_cube` follows the same rule: an unconfirmed clear raises rather than
-  reporting a clear that may not have happened.
+  required `outcome` field, and only `succeeded` keeps `success: true` — a status-less response now
+  yields `success: false` with `isError` set. A live v11/v12 server always sends the field, so that
+  case is the defensive branch, not the normal path. `tm1_clear_cube` shares the classifier: a
+  rolled-back or unconfirmed clear raises (with the two stated apart), a committed-with-messages
+  clear stands and logs, since the cube really is cleared.
 
 ### Changed
 

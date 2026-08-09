@@ -106,13 +106,15 @@ describe("TM1Client – Process Execution Methods", () => {
       expect(opts.method).toBe("POST");
     });
 
-    it("reports failure with status + error log on CompletedWithMinorErrors (HTTP 200)", async () => {
+    it("reports HasMinorErrors as committed-with-errors, with status + error log (HTTP 200)", async () => {
       // ExecuteWithReturn answers HTTP 200 even for partial failures — the
       // real outcome is only visible in ProcessExecuteStatusCode. The old
-      // tm1.Execute path reported these runs as success.
+      // tm1.Execute path reported these runs as success. `success: false`
+      // stays (fail-closed), but the outcome records that the run's writes
+      // were committed, so a caller does not re-run it blindly.
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
-          ProcessExecuteStatusCode: "CompletedWithMinorErrors",
+          ProcessExecuteStatusCode: "HasMinorErrors",
           ErrorLogFile: { Filename: "TM1ProcessError_20260718_ImportData.log" },
         }),
       );
@@ -120,7 +122,8 @@ describe("TM1Client – Process Execution Methods", () => {
       const result = await client.processes.execute("ImportData");
 
       expect(result.success).toBe(false);
-      expect(result.processErrorStatus).toBe("CompletedWithMinorErrors");
+      expect(result.outcome).toBe("completed_with_errors");
+      expect(result.processErrorStatus).toBe("HasMinorErrors");
       expect(result.errorLogFile).toBe(
         "TM1ProcessError_20260718_ImportData.log",
       );
@@ -137,6 +140,7 @@ describe("TM1Client – Process Execution Methods", () => {
       const result = await client.processes.execute("Broken");
 
       expect(result.success).toBe(false);
+      expect(result.outcome).toBe("rolled_back");
       expect(result.processErrorStatus).toBe("Aborted");
       expect(result.errorLogFile).toBe("TM1ProcessError_20260718_Broken.log");
     });

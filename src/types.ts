@@ -297,22 +297,44 @@ export interface DataSource {
 }
 
 /**
- * What a TI run is known to have done. Three states, because there really are
- * three: TM1's `tm1.ExecuteWithReturn` answers HTTP 200 whether the process
- * completed, aborted, or (in the shape that motivated this) came back without
- * a `ProcessExecuteStatusCode` at all.
+ * What a TI run is known to have done. The axis that matters to a caller is not
+ * "did TM1 like it" but **was anything committed** — TM1's
+ * `tm1.ExecuteWithReturn` answers HTTP 200 for every one of these.
  *
- * - `succeeded`     — the server reported `CompletedSuccessfully`.
- * - `failed`        — the server reported any other status, or the call errored.
- * - `indeterminate` — the server answered, but said nothing about the outcome.
- *   The run may have completed, partially completed, or never started. This is
- *   NOT success: defaulting it to `CompletedSuccessfully` (T-4) reported
- *   unverified runs to the model as clean ones. It is grouped with
- *   `success: false` so that fail-closed callers — the `isError` flags on
- *   `tm1_execute_process` / `tm1_save_data` — treat "unknown" as "do not
- *   assume it worked". Read `outcome` to tell it apart from a real failure.
+ * `ProcessExecuteStatusCode` has exactly six members (read from the `$metadata`
+ * of both a v11 11.8 and a v12 12.5.9 server — identical, no version drift):
+ * `CompletedSuccessfully`=0, `Aborted`=1, `HasMinorErrors`=2, `QuitCalled`=3,
+ * `CompletedWithMessages`=4, `RollbackCalled`=5. They fall into three groups,
+ * measured live on 11.8 through `ExecuteWithReturn` by writing a marker cell in
+ * the Prolog, taking each exit path, and reading the cell back:
+ *
+ * - `succeeded`             — `CompletedSuccessfully`. Marker written.
+ * - `completed_with_errors` — `CompletedWithMessages` (`ItemReject`),
+ *   `QuitCalled` (`ProcessQuit`) and `HasMinorErrors` all left the marker cell
+ *   **written**: the process ran and **its changes WERE COMMITTED**. Treat a
+ *   blind retry as UNSAFE — the run already wrote data, so re-running can
+ *   double-post it. All three are measured; on `HasMinorErrors` note that the
+ *   DOCUMENTED path to it is per-record failures in the Metadata/Data tabs,
+ *   which need a data source. It was reached here without one, from a pure
+ *   Prolog, by writing to a consolidated element — same status code, and the
+ *   earlier leaf write committed.
+ * - `rolled_back`           — `Aborted` (`ProcessError`, or a `CellPutN` into a
+ *   cube that does not exist) and `RollbackCalled` (`ProcessRollback`) both
+ *   left the marker cell **rolled back**: the process ran, nothing was
+ *   committed. Retrying is safe as far as commit state goes.
+ * - `indeterminate`         — no `ProcessExecuteStatusCode` at all, a status
+ *   code THIS BUILD DOES NOT KNOW (a seventh member added by a future TM1 must
+ *   not be silently absorbed into a group whose commit semantics we never
+ *   measured), or a call that errored before any status was reported. The run
+ *   may have completed, partially completed, or never started. Defaulting this
+ *   to `CompletedSuccessfully` (T-4) reported unverified runs as clean ones.
+ *
+ * Everything but `succeeded` travels with `success: false`, so the fail-closed
+ * `isError` flags on `tm1_execute_process` / `tm1_save_data` keep firing;
+ * `outcome` is what tells the three apart.
  */
-export type ProcessOutcome = "succeeded" | "failed" | "indeterminate";
+export type ProcessOutcome =
+  "succeeded" | "completed_with_errors" | "rolled_back" | "indeterminate";
 
 /**
  * Result of a TI execution. A discriminated union rather than a flat record so
@@ -327,14 +349,33 @@ export type ProcessResult =
   | {
       success: true;
       outcome: "succeeded";
-      /** Pinned: the only status a successful run can carry. */
+      /**
+       * Pinned: the only status a successful run can carry.
+       *
+       * NOT a guarantee that the process reached its intended end. `ProcessBreak`
+       * also comes back as `CompletedSuccessfully` (verified live on 11.8), so a
+       * run that bailed out of its data loop halfway is indistinguishable here.
+       * TM1 gives us nothing to detect it with; read this as "TM1 raised no
+       * objection and committed", not as "the process did all its work".
+       */
       processErrorStatus: "CompletedSuccessfully";
       errorLogFile?: string | undefined;
     }
   | {
       success: false;
-      outcome: "failed";
-      /** TM1's status code, or the error text when the call itself failed. */
+      outcome: "completed_with_errors";
+      /**
+       * TM1's status code: `CompletedWithMessages`, `QuitCalled` or
+       * `HasMinorErrors`. **The changes this run made were COMMITTED** — do not
+       * retry blindly; check what it already wrote first.
+       */
+      processErrorStatus: string;
+      errorLogFile?: string | undefined;
+    }
+  | {
+      success: false;
+      outcome: "rolled_back";
+      /** TM1's status code: `Aborted` or `RollbackCalled`. Nothing was committed. */
       processErrorStatus: string;
       errorLogFile?: string | undefined;
     }

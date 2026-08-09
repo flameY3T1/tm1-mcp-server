@@ -16,6 +16,7 @@ import {
   type Paged,
   type PageOpts,
 } from "./odata-page.js";
+import { classifyExecution } from "./process-status.js";
 
 // OData key encoder: double ' per OData literal rules, then percent-encode.
 const enc = (s: string): string =>
@@ -338,20 +339,39 @@ export class CubeService {
       // outcome is in ProcessExecuteStatusCode. Without this check an aborted
       // clear (e.g. lock, security) would be reported as a successful clear.
       //
-      // T-4: an ABSENT status code is not success either. The old
-      // `?? "CompletedSuccessfully"` made a body without the field report a
-      // clean clear; the honest answer is that the clear is unverified, and for
-      // a destructive operation that has to surface. A live v11/v12 server does
-      // send the field (see tests/live/process.live.test.ts), so this is the
-      // defensive branch, not the normal path.
-      const status = result?.ProcessExecuteStatusCode;
-      if (status !== "CompletedSuccessfully") {
+      // This shares `classifyExecution` with ProcessService rather than
+      // re-deriving `status !== "CompletedSuccessfully"`, because the three
+      // groups mean three different things for a caller holding a cube:
+      //
+      //   committed  — the CubeClearData DID commit (measured: the committed
+      //                statuses leave writes in place). Raising here would tell
+      //                the model the cube still holds its data when it does
+      //                not — the exact false reading this split exists to
+      //                prevent — so the clear stands and the status goes to the
+      //                log instead. Only reachable if TM1 attaches messages to
+      //                a one-line CubeClearData prolog; not observed live.
+      //   rolled back — nothing was cleared; the cube is untouched.
+      //   indeterminate — no status code, or one this build cannot place
+      //                (T-4). Unverified, and for a destructive operation that
+      //                has to surface. A live v11/v12 server always sends the
+      //                field (see tests/live/process.live.test.ts), so this is
+      //                the defensive branch, not the normal path.
+      const verdict = classifyExecution(
+        result?.ProcessExecuteStatusCode,
+        undefined,
+      );
+      if (verdict.outcome === "completed_with_errors") {
+        this.http.logger.warn(
+          { cube: cubeName, status: verdict.processErrorStatus },
+          "Cube clear via TI committed but TM1 reported a non-clean status; the cube IS cleared",
+        );
+      } else if (verdict.outcome !== "succeeded") {
         throw new TM1Error({
           code: TM1ErrorCode.TM1_ERROR,
           message:
-            status === undefined || status === ""
-              ? `Cube clear via TI could not be confirmed for cube '${cubeName}': TM1 returned no ProcessExecuteStatusCode. The clear may or may not have run — check the cube before retrying.`
-              : `Cube clear via TI did not complete for cube '${cubeName}' (status: ${status}).`,
+            verdict.outcome === "rolled_back"
+              ? `Cube clear via TI was rolled back for cube '${cubeName}' (status: ${verdict.processErrorStatus}). Nothing was cleared — the cube is unchanged.`
+              : `Cube clear via TI could not be confirmed for cube '${cubeName}': ${verdict.processErrorStatus} The clear may or may not have run — check the cube before retrying.`,
           endpoint: `/api/v1/Processes('${enc(procName)}')/tm1.ExecuteWithReturn`,
         });
       }

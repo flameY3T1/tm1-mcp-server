@@ -39,7 +39,7 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
   it("flags isError when the TI run reports success:false", async () => {
     const cb = captureHandler(async () => ({
       success: false,
-      outcome: "failed" as const,
+      outcome: "rolled_back" as const,
       processErrorStatus: "DataSource error",
     }));
     const result = await cb(
@@ -53,11 +53,13 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
 
   it("flags isError when the TI run completes with minor errors", async () => {
     // execute() now routes through tm1.ExecuteWithReturn, so partial failures
-    // surface as success:false with the real status + error log attached.
+    // surface as success:false with the real status + error log attached. The
+    // outcome says the run's writes were COMMITTED, and isError still fires —
+    // fail-closed, but the payload tells the agent not to just re-run it.
     const cb = captureHandler(async () => ({
       success: false,
-      outcome: "failed" as const,
-      processErrorStatus: "CompletedWithMinorErrors",
+      outcome: "completed_with_errors" as const,
+      processErrorStatus: "HasMinorErrors",
       errorLogFile: "TM1ProcessError_20260718_Partial.log",
     }));
     const result = await cb(
@@ -65,7 +67,8 @@ describe("tm1_execute_process isError contract (T2.1)", () => {
       {},
     );
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain("CompletedWithMinorErrors");
+    expect(result.content[0]?.text).toContain("completed_with_errors");
+    expect(result.content[0]?.text).toContain("HasMinorErrors");
     expect(result.content[0]?.text).toContain(
       "TM1ProcessError_20260718_Partial.log",
     );

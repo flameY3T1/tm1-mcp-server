@@ -793,6 +793,40 @@ describe("TM1Client – Cell Data Methods", () => {
       expect(delOpts.method).toBe("DELETE");
     });
 
+    it("11.x full clear: a rolled-back clear says the cube is unchanged", async () => {
+      // Distinct from the unconfirmed case above: here TM1 told us the writes
+      // were discarded, so the caller can be told the cube still holds its
+      // data instead of being left to guess.
+      const c = newClient("11.8");
+      fetchSpy
+        .mockResolvedValueOnce(mock204()) // create process
+        .mockResolvedValueOnce(
+          mockResponse({ ProcessExecuteStatusCode: "Aborted" }),
+        ) // execute
+        .mockResolvedValueOnce(mock204()); // delete
+
+      await expect(
+        c.cubes.clear("Sales", ["Time", "Region"], [[], []]),
+      ).rejects.toThrow(/rolled back.*Aborted.*unchanged/s);
+    });
+
+    it("11.x full clear: a committed-with-messages clear stands", async () => {
+      // The measured commit semantics say the CubeClearData DID commit. Raising
+      // here would tell the model the cube still holds its data when it does
+      // not — the inverse of the T-4 fail-open, and just as wrong.
+      const c = newClient("11.8");
+      fetchSpy
+        .mockResolvedValueOnce(mock204()) // create process
+        .mockResolvedValueOnce(
+          mockResponse({ ProcessExecuteStatusCode: "CompletedWithMessages" }),
+        ) // execute
+        .mockResolvedValueOnce(mock204()); // delete
+
+      await expect(
+        c.cubes.clear("Sales", ["Time", "Region"], [[], []]),
+      ).resolves.toBeUndefined();
+    });
+
     it("11.x partial clear: throws UNSUPPORTED_OPERATION", async () => {
       const c = newClient("11.8");
 
