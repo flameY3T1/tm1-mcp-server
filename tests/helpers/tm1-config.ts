@@ -33,7 +33,7 @@ export const baseTestConfig: TM1Config = {
   httpPort: 3000,
   httpAllowedOrigins: ["http://127.0.0.1:3000", "http://localhost:3000"],
   mode: "readonly",
-  responseMode: "structured",
+  responseMode: "legacy",
   version: 11,
 };
 

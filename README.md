@@ -83,13 +83,14 @@ TM1_PASSWORD=your-password
 TM1_SSL_REJECT_UNAUTHORIZED=false
 TM1_VERSION=11.8
 TM1_MODE=readonly                   # readonly (default) | readwrite
-# TM1_RESPONSE_MODE=legacy          # structured (default) | legacy (deprecated)
+# TM1_RESPONSE_MODE=structured      # legacy (default) | structured
 # TM1_LOCAL_FILE_ROOT=/srv/tm1-git  # optional; enables host-disk file params
 ```
 
-`TM1_RESPONSE_MODE=legacy` restores the pre-2.2 wire format for a client that
-only reads `content[0].text` — a transitional escape hatch that will be removed
-in a future major. [`.env.example`](.env.example) lists every variable with
+`TM1_RESPONSE_MODE=structured` drops the text block and ships `structuredContent`
+alone — half the wire bytes, but clients that read `content[]` (Kiro's IDE among
+them) then see nothing. Worth it only for clients that copy the whole result into
+the model prompt. [`.env.example`](.env.example) lists every variable with
 inline comments; [docs/CONFIGURATION.md](docs/CONFIGURATION.md) covers the ones
 needing more than a comment line — CAM/LDAP login, the TM1 v12 (Planning
 Analytics Engine) connection and its auth modes, host-disk file access.

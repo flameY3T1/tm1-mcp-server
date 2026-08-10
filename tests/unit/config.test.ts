@@ -36,6 +36,22 @@ describe("loadConfig", () => {
     expect(config.logFile).toBeUndefined();
   });
 
+  // Not cosmetic: "structured" drops content[0].text, and a client that reads
+  // only content[] (Kiro's IDE MCP layer does exactly that) then renders an
+  // empty result. The default has to stay on the shape every client can read.
+  it("defaults responseMode to legacy so content[0].text is always shipped", () => {
+    setRequiredEnv();
+
+    expect(loadConfig().responseMode).toBe("legacy");
+  });
+
+  it("honours an explicit TM1_RESPONSE_MODE=structured opt-in", () => {
+    setRequiredEnv();
+    process.env.TM1_RESPONSE_MODE = "structured";
+
+    expect(loadConfig().responseMode).toBe("structured");
+  });
+
   it("should throw when TM1_BASE_URL is missing", () => {
     process.env.TM1_USER = "admin";
     process.env.TM1_PASSWORD = "secret";

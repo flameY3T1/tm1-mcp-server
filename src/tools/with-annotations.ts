@@ -116,11 +116,9 @@ export function withAnnotations(
   server: McpServer,
   logger: pino.Logger,
   mode: "readwrite" | "readonly",
-  // NOTE: this parameter default is NOT the shipped default. The server passes
-  // config.responseMode, which defaults to "structured" (see config.ts). The
-  // conservative default here serves direct callers — the live harness and the
-  // unit tests read content[0].text to assert on and would go blind under
-  // "structured". Deliberate divergence, not drift.
+  // Matches the shipped default (config.responseMode, see config.ts), so direct
+  // callers — the live harness and the unit tests, which read content[0].text —
+  // exercise the same wire shape real clients get.
   responseMode: "legacy" | "structured" = "legacy",
 ): McpServer {
   installToolsListSlimming(server);
@@ -140,9 +138,21 @@ export function withAnnotations(
   // In "structured" mode the now-redundant text block is dropped. That is
   // spec-legal only because an outputSchema is declared: CallToolResult.content
   // "may be empty" then (see CallToolResultSchema in the SDK). It is NOT the
-  // default, because a client that reads content[0] and ignores
-  // structuredContent would see an empty result — the spec still recommends
-  // shipping both for backwards compatibility.
+  // default, and must not become one — the spec says a tool returning
+  // structured content SHOULD also return the serialized JSON in a TextContent
+  // block, and clients take that literally. Kiro's MCP layer (bundled TS SDK,
+  // protocolVersion 2025-11-25, clientInfo {name:"kiro"}) parses results with
+  //   const items = Array.isArray(r.content) ? r.content : []
+  // and never reads structuredContent, so an empty content array renders as no
+  // output at all.
+  //
+  // Dropping the text block also buys nothing on the clients that do read
+  // structuredContent: Claude Code de-duplicates, so an identical payload sent
+  // both ways costs exactly one copy of context (measured byte-identical
+  // tool_result at 1 KB and at 23 KB, and the >25k-token offload-to-file path
+  // behaves the same either way). The saving is real only for clients that
+  // serialize the whole CallToolResult into the model prompt — Q DEV CLI /
+  // Kiro CLI do this — which is who this mode is still here for.
   //
   // A non-JSON text block (markdown mode, where the handler already attached
   // structuredContent itself) is left alone in both modes: there the text is

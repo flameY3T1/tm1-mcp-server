@@ -39,18 +39,24 @@ export interface TM1Config {
   mode: "readwrite" | "readonly";
   // How a successful tool result is put on the wire.
   //
-  //   "structured" (default) — structuredContent only; the redundant text block
-  //                  is dropped. Spec-legal precisely because an outputSchema is
-  //                  declared: CallToolResult.content "may be empty" then.
-  //                  Measured on a real call: 13898 B -> 6612 B, a 52% cut.
-  //   "legacy"     — the JSON body appears TWICE: once as content[0].text and
-  //                  once as structuredContent. Every tool declares an
-  //                  outputSchema, so this doubles every successful response.
+  //   "legacy" (default) — the JSON body ships BOTH ways: as content[0].text and
+  //                  as structuredContent. What the spec recommends: a tool
+  //                  returning structured content SHOULD also return the
+  //                  serialized JSON in a TextContent block.
+  //   "structured" — structuredContent only; the text block is dropped. Halves
+  //                  the wire bytes and is spec-legal precisely because an
+  //                  outputSchema is declared (CallToolResult.content "may be
+  //                  empty" then), but a client that reads content[0] and
+  //                  ignores structuredContent sees NO OUTPUT.
   //
-  // "structured" is the default because it is what the payload should have been
-  // all along; "legacy" exists for clients that read content[0] and ignore
-  // structuredContent — they would see an EMPTY result otherwise, so the escape
-  // hatch stays. Verified against Claude Code (renders structuredContent).
+  // "legacy" is the default because the saving "structured" promises does not
+  // exist on the clients that can read structuredContent: Claude Code
+  // de-duplicates, so both-ways costs one copy of context, not two (measured
+  // byte-identical tool_result at 1 KB and 23 KB). It is real only for clients
+  // that serialize the entire CallToolResult into the prompt (Q DEV CLI / Kiro
+  // CLI) — and those are never the ones that break. Meanwhile Kiro's IDE client
+  // reads content[] exclusively, so "structured" renders as an empty result
+  // there. Cost measured, benefit measured, default follows.
   responseMode: "legacy" | "structured";
   // v12 (Planning Analytics Engine). version===12 selects the v12 connection
   // profile (URL reroot + POST /{instance}/auth/v1/session login). Selected
@@ -238,7 +244,7 @@ export function loadConfig(): TM1Config {
   // Same parse shape as TM1_MODE: case-insensitive, unknown value throws at
   // startup rather than silently picking a wire format the operator did not ask
   // for.
-  const responseModeRaw = (process.env.TM1_RESPONSE_MODE ?? "structured")
+  const responseModeRaw = (process.env.TM1_RESPONSE_MODE ?? "legacy")
     .trim()
     .toLowerCase();
   if (

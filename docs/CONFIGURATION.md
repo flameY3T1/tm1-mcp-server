@@ -23,11 +23,26 @@ in a `.env` that stays out of version control.
 
 ## Wire format — `TM1_RESPONSE_MODE`
 
-Default `structured`: a successful result ships its payload as
-`structuredContent` only. `legacy` restores the pre-2.2 format, which also
-repeated the identical JSON in `content[0].text` — a transitional escape hatch
-for clients that ignore `structuredContent`, deprecated and slated for removal
-in a future major. `format: "markdown"` and error results are unaffected.
+Default `legacy`: a successful result ships its payload both as
+`content[0].text` and as `structuredContent`. That is what the MCP spec
+recommends — a tool returning structured content SHOULD also return the
+serialized JSON in a text block — and it is the only shape every client can
+read.
+
+`structured` drops the text block and sends `structuredContent` alone. It halves
+the wire bytes and is spec-legal because every tool declares an `outputSchema`
+(`CallToolResult.content` "may be empty" then), but **a client that reads
+`content[]` and ignores `structuredContent` sees no output at all.** Kiro's IDE
+MCP layer is one such client.
+
+Only turn it on when your client copies the whole `CallToolResult` into the
+model prompt — Q DEV CLI / Kiro CLI do — because there the duplicate really is
+paid for twice. It buys nothing on Claude Code, which de-duplicates: the same
+payload sent both ways costs one copy of context, measured byte-identical at
+1 KB and at 23 KB, with the oversized offload-to-file path behaving the same
+either way.
+
+`format: "markdown"` and error results are unaffected by this setting.
 
 ## Secrets — `TM1_ALLOW_UNMASKED_SECRETS`
 
