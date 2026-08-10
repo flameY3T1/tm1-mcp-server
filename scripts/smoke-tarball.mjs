@@ -24,9 +24,9 @@
 //     crash or a hang.
 //   Tier 2 (only with credentials): a real MCP handshake over stdio against the
 //     installed binary — initialize, notifications/initialized, tools/list, and
-//     one READ-ONLY tools/call — asserting the 3.0.0 wire contract
-//     (structuredContent populated, content empty). Without a reachable target
-//     this tier is SKIPPED, never failed.
+//     one READ-ONLY tools/call — asserting the wire contract (structuredContent
+//     AND content[0].text both populated). Without a reachable target this tier
+//     is SKIPPED, never failed.
 //
 //   npm run smoke:tarball                      # tier 1 + tier 2 vs tm1-test
 //   npm run smoke:tarball -- --target=none     # tier 1 only
@@ -594,8 +594,8 @@ async function tier2(proj, target, opts) {
   // script must be structurally incapable of mutating a server — in readonly
   // mode the write and destructive tools are never even registered.
   // TM1_RESPONSE_MODE is deleted rather than set, because the assertion below
-  // is about the SHIPPED DEFAULT ("structured" as of 3.0.0). Pinning it here
-  // would test the flag and not the release.
+  // is about the SHIPPED DEFAULT ("legacy"). Pinning it here would test the
+  // flag and not the release.
   const env = childEnv(target.env, { TM1_MODE: "readonly" });
   delete env.TM1_RESPONSE_MODE;
   env.TM1_LOG_LEVEL = "error";
@@ -701,11 +701,12 @@ async function tier2(proj, target, opts) {
       );
     }
 
-    // --- the 3.0.0 wire contract
-    // structured is the default as of 3.0.0: the payload rides in
-    // structuredContent and the duplicate text block is gone. Asserting both
-    // halves makes this a regression test for the breaking change as it
-    // actually ships, not as the source tests configure it.
+    // --- the wire contract
+    // The default ships the payload BOTH ways: as content[0].text and as
+    // structuredContent. Asserting both halves against the packed tarball is
+    // what catches a default flip that the source tests configure away — 3.0.0
+    // shipped `content: []` and blanked every result on clients that read
+    // content[] exclusively (Kiro's IDE).
     if (
       result.structuredContent === undefined ||
       result.structuredContent === null ||
@@ -713,17 +714,21 @@ async function tier2(proj, target, opts) {
       Object.keys(result.structuredContent).length === 0
     ) {
       throw new Tier2Error(
-        `structuredContent is empty — TM1_RESPONSE_MODE default is not "structured"`,
+        "structuredContent is empty — every tool declares an outputSchema, so it must be populated",
       );
     }
-    if (!Array.isArray(result.content) || result.content.length !== 0) {
+    const text = Array.isArray(result.content) ? result.content[0]?.text : null;
+    if (typeof text !== "string" || text.length === 0) {
       throw new Tier2Error(
-        `content should be [] under the structured default, got ` +
+        `content[0].text is missing — TM1_RESPONSE_MODE default is not "legacy", ` +
+          `so content-only clients would see an empty result. Got ` +
           `${JSON.stringify(result.content).slice(0, 200)}`,
       );
     }
     const keys = Object.keys(result.structuredContent).slice(0, 4).join(", ");
-    say(`   tools/call ${opts.tool} → structuredContent{${keys}…}, content []`);
+    say(
+      `   tools/call ${opts.tool} → structuredContent{${keys}…}, content[0].text ${text.length} B`,
+    );
 
     const nonJson = client.notifications.filter((n) => n.__nonJson);
     if (nonJson.length > 0) {

@@ -7,26 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-08-10
+
 ### Fixed
 
-- **Successful tool results ship `content[0].text` again; `TM1_RESPONSE_MODE` defaults back to
-  `legacy`.** 3.0.0 made `structured` the default, which drops the text block and sends
-  `structuredContent` alone. Spec-legal, but the spec also says a tool returning structured content
-  SHOULD return the serialized JSON in a text block — and clients rely on that. Kiro's IDE renders
-  every tool call as empty output under the 3.0.0 default. Its MCP layer parses results with
-  `const items = Array.isArray(r.content) ? r.content : []` and never touches `structuredContent`;
-  no handshake field distinguishes such a client, since it bundles the official TS SDK and
-  negotiates protocolVersion `2025-11-25` exactly like clients that do read it.
+- **`TM1_RESPONSE_MODE` defaults back to `legacy` — results ship `content[0].text` again.**
+  The 3.0.0 default dropped the text block, which blanks every tool call on clients that read
+  `content[]` and ignore `structuredContent` (Kiro's IDE; verified live). No handshake field
+  identifies them, so the default has to be the shape all clients can read.
 
-  The 52% saving that motivated the change was measured on the wire, not in the model's context.
-  Claude Code de-duplicates: the same payload sent both ways produces a byte-identical
-  `tool_result` (verified at 1 KB and at 23 KB), and results past the ~25k-token limit offload to
-  a file either way — under `structured` the file even carries a richer format hint, since the
-  `outputSchema` is echoed with it. The saving is real only for clients that serialize the whole
-  `CallToolResult` into the prompt (Q DEV CLI / Kiro CLI), and those never break either way.
-
-  `TM1_RESPONSE_MODE=structured` keeps the 3.0.0 behaviour for exactly that case. It is no longer
-  deprecated in favour of the other; the two modes serve different clients.
+  Its 52% saving was measured on the wire, not in context: Claude Code discards `content` whenever
+  `structuredContent` is present, so both-ways costs one copy. Real only for clients that serialize
+  the whole `CallToolResult` into the prompt — `TM1_RESPONSE_MODE=structured` still serves those,
+  and is no longer deprecated.
 
 ## [3.0.0] - 2026-08-09
 
@@ -678,7 +671,8 @@ Initial public release.
 - Quality gates: strict typecheck, ESLint, `lint:no-flat-api`,
   annotation-coverage, and tool-registration wiring.
 
-[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/flameY3T1/tm1-mcp-server/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.1.0...v3.0.0
 [2.1.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v1.0.4...v2.0.0
