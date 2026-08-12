@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
@@ -18,7 +20,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(overrides?: Partial<TM1Config>): TM1Config {
   return {
@@ -69,7 +71,7 @@ class TestTM1Client extends TM1HttpClient {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("TM1Client", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
   let sessionManager: SessionManager;
   let client: TestTM1Client;
   // Lifecycle (connect/disconnect/isConnected) lives on the TM1Client facade.
@@ -193,7 +195,7 @@ describe("TM1Client", () => {
 
       try {
         await client.testRequest("GET", "/api/v1/Cubes");
-      } catch (e) {
+      } catch {
         // Reset mocks for the second attempt
       }
     });

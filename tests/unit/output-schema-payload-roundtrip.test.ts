@@ -22,7 +22,7 @@ import {
 function asSchema(entry: ZodRawShape | ZodTypeAny): ZodTypeAny {
   return typeof entry === "object" && entry !== null && "_def" in entry
     ? (entry as ZodTypeAny)
-    : z.object(entry as ZodRawShape);
+    : z.object(entry);
 }
 
 describe("strict outputSchemas accept real handler payloads", () => {

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
 import { baseTestConfig } from "../helpers/tm1-config.js";
@@ -14,7 +16,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(overrides?: Partial<TM1Config>): TM1Config {
   return {
@@ -52,7 +54,7 @@ function mockFetchResponse(opts: {
 }
 
 describe("SessionManager", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
 
   beforeEach(() => {
     fetchSpy = vi.fn();

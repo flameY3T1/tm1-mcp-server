@@ -39,9 +39,9 @@ describe("clusterVariableNames", () => {
       { process: "C", variables: [{ name: "Year", type: "Numeric" }] },
     ]);
     expect(clusters).toHaveLength(1);
-    expect(clusters[0]!.normalized).toBe("year");
-    expect(clusters[0]!.variants).toEqual(["Year", "pYear", "vYear"]);
-    expect(clusters[0]!.processes).toEqual(["A", "B", "C"]);
+    expect(clusters[0].normalized).toBe("year");
+    expect(clusters[0].variants).toEqual(["Year", "pYear", "vYear"]);
+    expect(clusters[0].processes).toEqual(["A", "B", "C"]);
   });
 
   it("does not flag a single canonical name", () => {
@@ -70,8 +70,8 @@ describe("clusterVariableNames", () => {
         ],
       },
     ]);
-    expect(clusters[0]!.normalized).toBe("year");
-    expect(clusters[1]!.normalized).toBe("cube");
+    expect(clusters[0].normalized).toBe("year");
+    expect(clusters[1].normalized).toBe("cube");
   });
 });
 
@@ -82,8 +82,8 @@ describe("findTypeInconsistencies", () => {
       { process: "B", variables: [{ name: "pDate", type: "String" }] },
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0]!.variable).toBe("pDate");
-    expect(out[0]!.occurrences).toEqual([
+    expect(out[0].variable).toBe("pDate");
+    expect(out[0].occurrences).toEqual([
       { type: "Numeric", processes: ["A"] },
       { type: "String", processes: ["B"] },
     ]);
@@ -154,6 +154,6 @@ describe("groupByCohort", () => {
       { process: "agg-sales" },
     ]);
     expect(cohorts).toHaveLength(1);
-    expect(cohorts[0]!.key).toBe("sales");
+    expect(cohorts[0].key).toBe("sales");
   });
 });

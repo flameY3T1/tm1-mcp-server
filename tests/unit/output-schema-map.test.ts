@@ -15,7 +15,7 @@ import { OUTPUT_SCHEMA_MAP } from "../../src/tools/output-schema-map.js";
 function asSchema(entry: ZodRawShape | ZodTypeAny): ZodTypeAny {
   return typeof entry === "object" && entry !== null && "_def" in entry
     ? (entry as ZodTypeAny)
-    : z.object(entry as ZodRawShape);
+    : z.object(entry);
 }
 
 // Minimal fixtures matching each item schema. Kept inline so the test fails

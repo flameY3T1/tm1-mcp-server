@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
-import { TM1Error, TM1ErrorCode } from "../../src/types.js";
+import { type TM1Error, TM1ErrorCode } from "../../src/types.js";
 import { toOdataDateTime } from "../../src/tm1-client/services/server-service.js";
 import type { TM1Config } from "../../src/config.js";
 import { baseTestConfig } from "../helpers/tm1-config.js";
@@ -16,7 +18,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -83,7 +85,7 @@ describe("toOdataDateTime", () => {
 });
 
 describe("TM1Client – getTransactionLog()", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
   let client: TM1Client;
 
   beforeEach(() => {

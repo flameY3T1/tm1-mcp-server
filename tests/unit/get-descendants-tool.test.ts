@@ -40,7 +40,7 @@ function makeFakeServer() {
       if (!captured || !parser) throw new Error("handler not registered");
       const p = parser;
       const h = captured;
-      return (args) => h(p.parse(args) as Record<string, unknown>);
+      return (args) => h(p.parse(args));
     },
   };
 }
@@ -66,7 +66,7 @@ describe("tm1_get_descendants tool", () => {
       hierarchyName: "H",
       elementName: "Total",
     });
-    const out = JSON.parse(res.content[0]!.text);
+    const out = JSON.parse(res.content[0].text);
 
     expect(out.descendants).toHaveLength(5);
     expect(out.truncated).toBe(false);
@@ -82,7 +82,7 @@ describe("tm1_get_descendants tool", () => {
       elementName: "Total",
       topN: 3,
     });
-    const out = JSON.parse(res.content[0]!.text);
+    const out = JSON.parse(res.content[0].text);
 
     expect(out.descendants).toHaveLength(3);
     expect(out.descendants.map((d: { name: string }) => d.name)).toEqual([
@@ -103,7 +103,7 @@ describe("tm1_get_descendants tool", () => {
       elementName: "Total",
       topN: 5,
     });
-    const out = JSON.parse(res.content[0]!.text);
+    const out = JSON.parse(res.content[0].text);
 
     expect(out.descendants).toHaveLength(5);
     expect(out.truncated).toBe(false);

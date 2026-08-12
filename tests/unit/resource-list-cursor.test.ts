@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import type pino from "pino";
 import { ListResourcesRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
   installPaginatedListHandler,
@@ -19,7 +20,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function staticEntry(uri: string, name: string): CatalogResource {
   return { uri, name, mimeType: "application/json" };

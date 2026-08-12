@@ -12,6 +12,8 @@
 // variant, `outcome` names the third state, and the success variant pins
 // `processErrorStatus` to the one status that can accompany it.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
@@ -30,7 +32,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -68,7 +70,7 @@ function mockEmptyBody(status = 200): Response {
 }
 
 describe("ProcessResult — a missing status code is not success (T-4)", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
   let client: TM1Client;
 
   beforeEach(() => {

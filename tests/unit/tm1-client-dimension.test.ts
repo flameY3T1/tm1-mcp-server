@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import { TM1Error } from "../../src/types.js";
@@ -17,7 +19,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -47,7 +49,7 @@ function mockResponse(status: number, body?: unknown): Response {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("TM1Client – Dimension Management Methods", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
   let client: TM1Client;
 
   beforeEach(() => {
@@ -252,7 +254,7 @@ describe("TM1Client – Dimension Management Methods", () => {
             },
           }),
         ),
-      } as unknown as Response);
+      });
 
       await expect(
         client.elements.delete("Region", "Region", "Germany"),
@@ -274,7 +276,7 @@ describe("TM1Client – Dimension Management Methods", () => {
               },
             }),
           ),
-        } as unknown as Response);
+        });
         await client.elements.delete("Region", "Region", "Germany");
       } catch (err) {
         expect(err).toBeInstanceOf(TM1Error);

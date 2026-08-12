@@ -49,7 +49,7 @@ function register(registrar: Registrar, client: TM1Client): ToolHandler {
   registrar(server as never, client);
   const { handler: h, parser: p } = captured;
   if (!h || !p) throw new Error("handler not registered");
-  return (args) => h(p.parse(args) as Record<string, unknown>);
+  return (args) => h(p.parse(args));
 }
 
 /**
@@ -78,11 +78,11 @@ function fakeCollection(
         const has = /^contains\(tolower\(Name\),'(.*)'\)$/.exec(predicate);
         if (control) rows = rows.filter((n) => !n.startsWith("}"));
         else if (exact)
-          rows = rows.filter((n) => n === exact[1]!.replace(/''/g, "'"));
+          rows = rows.filter((n) => n === exact[1].replace(/''/g, "'"));
         else if (hasNot)
-          rows = rows.filter((n) => !n.toLowerCase().includes(hasNot[1]!));
+          rows = rows.filter((n) => !n.toLowerCase().includes(hasNot[1]));
         else if (has)
-          rows = rows.filter((n) => n.toLowerCase().includes(has[1]!));
+          rows = rows.filter((n) => n.toLowerCase().includes(has[1]));
         else
           throw new Error(
             `fake server cannot evaluate predicate: ${predicate}`,
@@ -130,7 +130,7 @@ const dimensionClient = (names: string[], paths: string[]): TM1Client =>
   }) as unknown as TM1Client;
 
 const parse = (res: { content: Array<{ text: string }> }) =>
-  JSON.parse(res.content[0]!.text);
+  JSON.parse(res.content[0].text);
 
 const CUBES = ["Delta", "Alpha", "Charlie", "Bravo", "Echo", "}Stats"];
 
@@ -140,7 +140,7 @@ describe("list_* OData push-down", () => {
       const paths: string[] = [];
       const page = parse(
         await register(
-          registerListCubes as Registrar,
+          registerListCubes,
           cubeClient(CUBES, paths),
         )({
           limit: 2,
@@ -166,7 +166,7 @@ describe("list_* OData push-down", () => {
       const paths: string[] = [];
       const page = parse(
         await register(
-          registerListCubes as Registrar,
+          registerListCubes,
           cubeClient(CUBES, paths),
         )({
           limit: 2,
@@ -190,7 +190,7 @@ describe("list_* OData push-down", () => {
       const exactPaths: string[] = [];
       const exact = parse(
         await register(
-          registerListCubes as Registrar,
+          registerListCubes,
           cubeClient(CUBES, exactPaths),
         )({
           nameExact: "Delta",
@@ -206,7 +206,7 @@ describe("list_* OData push-down", () => {
       const containsPaths: string[] = [];
       const contains = parse(
         await register(
-          registerListCubes as Registrar,
+          registerListCubes,
           cubeClient(CUBES, containsPaths),
         )({
           nameContains: "A",
@@ -225,10 +225,7 @@ describe("list_* OData push-down", () => {
     it("bypasses push-down for fetchAll and for limit=0", async () => {
       for (const args of [{ fetchAll: true }, { limit: 0 }]) {
         const paths: string[] = [];
-        await register(
-          registerListCubes as Registrar,
-          cubeClient(CUBES, paths),
-        )(args);
+        await register(registerListCubes, cubeClient(CUBES, paths))(args);
         expect(paths[0]).not.toContain("$top=");
       }
     });
@@ -237,7 +234,7 @@ describe("list_* OData push-down", () => {
       const paths: string[] = [];
       const page = parse(
         await register(
-          registerListCubes as Registrar,
+          registerListCubes,
           cubeClient(CUBES, paths, { omitCount: true }),
         )({ limit: 2 }),
       );
@@ -255,14 +252,11 @@ describe("list_* OData push-down", () => {
 
     it("orders identically whether the page came from the server or the fallback", async () => {
       const pushed = parse(
-        await register(
-          registerListCubes as Registrar,
-          cubeClient(CUBES, []),
-        )({ limit: 5 }),
+        await register(registerListCubes, cubeClient(CUBES, []))({ limit: 5 }),
       );
       const scanned = parse(
         await register(
-          registerListCubes as Registrar,
+          registerListCubes,
           cubeClient(CUBES, []),
         )({
           limit: 5,
@@ -275,7 +269,7 @@ describe("list_* OData push-down", () => {
     it("reports has_more=false on a last page that is exactly `limit` long", async () => {
       const page = parse(
         await register(
-          registerListCubes as Registrar,
+          registerListCubes,
           cubeClient(CUBES, []),
         )({
           limit: 2,
@@ -297,7 +291,7 @@ describe("list_* OData push-down", () => {
       const paths: string[] = [];
       const page = parse(
         await register(
-          registerListProcesses as Registrar,
+          registerListProcesses,
           processClient(PROCS, paths),
         )({
           limit: 10,
@@ -320,7 +314,7 @@ describe("list_* OData push-down", () => {
       for (const args of [{ nameRegex: "^load" }, { excludePattern: "^zz" }]) {
         const paths: string[] = [];
         await register(
-          registerListProcesses as Registrar,
+          registerListProcesses,
           processClient(PROCS, paths),
         )({
           limit: 2,
@@ -339,7 +333,7 @@ describe("list_* OData push-down", () => {
       const paths: string[] = [];
       const page = parse(
         await register(
-          registerListDimensions as Registrar,
+          registerListDimensions,
           dimensionClient(DIMS, paths),
         )({
           limit: 2,
@@ -359,18 +353,15 @@ describe("list_* OData push-down", () => {
 
     it("falls back to a full scan when changedSince filters client-side", async () => {
       const calls: string[] = [];
-      await register(
-        registerListDimensions as Registrar,
-        {
-          dimensions: {
-            list: async (opts?: unknown) => {
-              calls.push(JSON.stringify(opts ?? {}));
-              return [{ name: "Region", hierarchies: ["Region"] }];
-            },
-            getLastUpdatedMap: async () => new Map<string, string>(),
+      await register(registerListDimensions, {
+        dimensions: {
+          list: async (opts?: unknown) => {
+            calls.push(JSON.stringify(opts ?? {}));
+            return [{ name: "Region", hierarchies: ["Region"] }];
           },
-        } as unknown as TM1Client,
-      )({ limit: 2, changedSince: "2026-01-01" });
+          getLastUpdatedMap: async () => new Map<string, string>(),
+        },
+      } as unknown as TM1Client)({ limit: 2, changedSince: "2026-01-01" });
 
       // changedSince joins }DimensionProperties client-side, so @odata.count
       // would over-report — the service must be called without a page.

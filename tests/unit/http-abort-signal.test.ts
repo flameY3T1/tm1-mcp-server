@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
 import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
@@ -14,7 +15,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -100,7 +101,7 @@ describe("R2-03: AbortSignal propagation through HTTP layer", () => {
       statusText: "OK",
       headers: new Headers(),
       text: vi.fn().mockResolvedValue('{"ok":true}'),
-    } as unknown as Response);
+    });
     vi.stubGlobal("fetch", fetchSpy);
 
     await client.request("GET", "/api/v1/Configuration");

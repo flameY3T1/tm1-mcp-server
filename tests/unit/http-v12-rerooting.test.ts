@@ -10,6 +10,8 @@
 // (named in the task brief) tests the unrelated MCP Streamable HTTP transport
 // (startHttpTransport), not TM1HttpClient, so it was not the right host file.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
@@ -24,7 +26,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeV12Config(): TM1Config {
   return {
@@ -63,7 +65,7 @@ function okJsonResponse(): Response {
 
 describe("v12 rerooting: TM1HttpClient prefixes request paths with the database root", () => {
   let client: TM1HttpClient;
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
 
   beforeEach(() => {
     const cfg = makeV12Config();
@@ -95,7 +97,7 @@ describe("v12 rerooting: TM1HttpClient prefixes request paths with the database 
       statusText: "OK",
       headers: new Headers(),
       text: vi.fn().mockResolvedValue("raw text"),
-    } as unknown as Response);
+    });
 
     await client.requestRaw("GET", "/api/v1/Processes('P1')/ExecuteWithReturn");
     const url = fetchSpy.mock.calls.at(-1)![0];
@@ -111,7 +113,7 @@ describe("v12 rerooting: TM1HttpClient prefixes request paths with the database 
       statusText: "No Content",
       headers: new Headers(),
       text: vi.fn().mockResolvedValue(""),
-    } as unknown as Response);
+    });
 
     await client.requestBinary(
       "PUT",

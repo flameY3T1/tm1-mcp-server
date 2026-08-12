@@ -13,7 +13,7 @@ describe("buildDatasourceMembership", () => {
   it("resolves a static subset datasource to exact elements", async () => {
     const m = await buildDatasourceMembership(
       {
-        getViewDefinition: noView as never,
+        getViewDefinition: noView,
         getSubset: async (dim: string, _h: string, sub: string) => ({
           name: sub,
           dimensionName: dim,
@@ -48,7 +48,7 @@ describe("buildDatasourceMembership", () => {
           type: "MDX" as const,
           mdx: "{ TM1FILTERBYLEVEL(TM1SUBSETALL([Zeit]),0) } * { [Datenquellen].[SuDatenquellen_C] }",
         }),
-        getSubset: noSubset as never,
+        getSubset: noSubset,
       },
       [
         {
@@ -83,7 +83,7 @@ describe("buildDatasourceMembership", () => {
             rows: [],
           },
         }),
-        getSubset: noSubset as never,
+        getSubset: noSubset,
       },
       [{ name: "P", type: "TM1CubeView", sourceName: "C", view: "vT" }],
     );
@@ -141,7 +141,7 @@ describe("buildDatasourceMembership", () => {
         getViewDefinition: async () => {
           throw new Error("boom");
         },
-        getSubset: noSubset as never,
+        getSubset: noSubset,
       },
       [{ name: "P", type: "TM1CubeView", sourceName: "C", view: "vX" }],
     );
@@ -174,9 +174,9 @@ describe("buildDatasourceMembership — computed axis resolution (C1)", () => {
             ],
           },
         }),
-        getSubset: (async () => {
+        getSubset: async () => {
           throw new Error("n/a");
-        }) as never,
+        },
         evaluateSetExpression: async (
           cube: string,
           dim: string,
@@ -231,9 +231,9 @@ describe("buildDatasourceMembership — computed axis resolution (C1)", () => {
             ],
           },
         }),
-        getSubset: (async () => {
+        getSubset: async () => {
           throw new Error("n/a");
-        }) as never,
+        },
         // no evaluateSetExpression
       },
       [{ name: "P", type: "TM1CubeView", sourceName: "C", view: "vC" }],
@@ -264,9 +264,9 @@ describe("buildDatasourceMembership — computed axis resolution (C1)", () => {
             ],
           },
         }),
-        getSubset: (async () => {
+        getSubset: async () => {
           throw new Error("n/a");
-        }) as never,
+        },
         evaluateSetExpression: async () => {
           throw new Error("bad mdx");
         },

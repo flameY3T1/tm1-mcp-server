@@ -156,7 +156,7 @@ describe.skipIf(!LIVE_ENABLED)(
         perDay: number;
       }>;
       for (let i = 1; i < items.length; i++) {
-        expect(items[i - 1]!.count).toBeGreaterThanOrEqual(items[i]!.count);
+        expect(items[i - 1].count).toBeGreaterThanOrEqual(items[i].count);
       }
     });
 

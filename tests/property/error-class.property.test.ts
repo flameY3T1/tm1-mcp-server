@@ -8,6 +8,7 @@
  * **Validates: Requirements 7.4** (Property 12)
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
+import type pino from "pino";
 import * as fc from "fast-check";
 import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
@@ -25,7 +26,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {

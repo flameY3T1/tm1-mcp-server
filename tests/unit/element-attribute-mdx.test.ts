@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
@@ -13,7 +15,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -42,7 +44,7 @@ function mockResponse(body: unknown): Response {
 // into bracketed identifiers. Names containing `]` must be doubled (`]]`) or they
 // break out of the identifier (MDX injection, M8).
 describe("ElementService.getAttributeValues — MDX identifier escaping (M8)", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
   let client: TM1Client;
 
   beforeEach(() => {
@@ -69,7 +71,7 @@ describe("ElementService.getAttributeValues — MDX identifier escaping (M8)", (
 
     await client.elements.getAttributeValues("Region]evil", "Foo]Bar");
 
-    const firstCall = fetchSpy.mock.calls[0]!;
+    const firstCall = fetchSpy.mock.calls[0];
     const sentMdx = (
       JSON.parse(String((firstCall[1] as { body: string }).body)) as {
         MDX: string;

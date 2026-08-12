@@ -93,13 +93,13 @@ describe.skipIf(!LIVE_ENABLED)("live: perf fixes 2026-08-09", () => {
         },
       ]);
       expect(results).toHaveLength(1);
-      expect(results[0]!.id).toBe("r1");
+      expect(results[0].id).toBe("r1");
       console.log(
-        `[probe] probe-path sub-status: ${results[0]!.status}, ok=${results[0]!.ok}`,
+        `[probe] probe-path sub-status: ${results[0].status}, ok=${results[0].ok}`,
       );
       // The probe judges the ENVELOPE, not this status — a locked-down account
       // may legitimately be refused the read. Both outcomes prove $batch works.
-      expect(typeof results[0]!.status).toBe("number");
+      expect(typeof results[0].status).toBe("number");
     });
   });
 
@@ -153,7 +153,7 @@ describe.skipIf(!LIVE_ENABLED)("live: perf fixes 2026-08-09", () => {
 
       // Measure one round-trip to get this server's per-call latency.
       const t0 = Date.now();
-      await h.client.processes.getVariables(procs[0]!);
+      await h.client.processes.getVariables(procs[0]);
       const singleMs = Math.max(1, Date.now() - t0);
 
       const t1 = Date.now();

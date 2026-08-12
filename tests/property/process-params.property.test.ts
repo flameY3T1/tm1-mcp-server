@@ -4,6 +4,7 @@
  * **Validates: Requirements 4.4, 5.6**
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
+import type pino from "pino";
 import * as fc from "fast-check";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
@@ -21,7 +22,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 function makeConfig(): TM1Config {
   return {
     ...baseTestConfig,
@@ -65,11 +66,9 @@ describe("Property 8: Prozessparameter-Roundtrip", () => {
               Value: p.defaultValue,
             })),
           };
-          let callIdx = 0;
           const f = vi
             .fn()
             .mockImplementation((_url: string, opts: { method?: string }) => {
-              callIdx++;
               if (opts.method === "PATCH") {
                 return Promise.resolve({
                   ok: true,

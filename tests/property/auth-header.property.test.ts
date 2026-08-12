@@ -7,6 +7,7 @@
  * **Validates: Requirements 7.1**
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
+import type pino from "pino";
 import * as fc from "fast-check";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
@@ -22,7 +23,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(user: string, password: string): TM1Config {
   return {
@@ -59,7 +60,7 @@ describe("Property 2: Authentifizierungs-Header-Konstruktion", () => {
             }),
             json: vi.fn().mockResolvedValue({}),
             text: vi.fn().mockResolvedValue(""),
-          } as unknown as Response);
+          });
           globalThis.fetch = localFetch as typeof fetch;
 
           const sm = new SessionManager(makeConfig(user, password), mockLogger);

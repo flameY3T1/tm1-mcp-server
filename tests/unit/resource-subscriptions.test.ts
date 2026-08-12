@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
+import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   SubscribeRequestSchema,
   UnsubscribeRequestSchema,
@@ -17,11 +19,11 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeServer(): {
   server: McpServer;
-  sendResourceUpdated: ReturnType<typeof vi.fn>;
+  sendResourceUpdated: FnSpy;
   handlers: Map<unknown, (req: unknown) => Promise<unknown>>;
 } {
   const handlers = new Map<unknown, (req: unknown) => Promise<unknown>>();
@@ -47,7 +49,7 @@ function makeServer(): {
 describe("R2-05: SubscriptionRegistry", () => {
   let registry: SubscriptionRegistry;
   let server: McpServer;
-  let sendResourceUpdated: ReturnType<typeof vi.fn>;
+  let sendResourceUpdated: FnSpy;
   let handlers: Map<unknown, (req: unknown) => Promise<unknown>>;
 
   beforeEach(() => {

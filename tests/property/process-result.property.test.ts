@@ -4,6 +4,8 @@
  * **Validates: Requirements 4.2, 4.3**
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import * as fc from "fast-check";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
@@ -20,7 +22,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 function makeConfig(): TM1Config {
   return {
     ...baseTestConfig,
@@ -34,7 +36,7 @@ function makeConfig(): TM1Config {
   };
 }
 const originalFetch = globalThis.fetch;
-function makeClient(f: ReturnType<typeof vi.fn>) {
+function makeClient(f: FnSpy) {
   globalThis.fetch = f as typeof fetch;
   const c = makeConfig();
   const sm = new SessionManager(c, mockLogger);
@@ -64,7 +66,7 @@ describe("Property 7: Prozessausführungs-Ergebnis", () => {
             headers: new Headers(),
             text: vi.fn().mockResolvedValue(body),
             json: vi.fn().mockResolvedValue(JSON.parse(body)),
-          } as unknown as Response);
+          });
           const client = makeClient(f);
           const result = await client.processes.execute(processName);
           expect(result.success).toBe(true);
@@ -91,7 +93,7 @@ describe("Property 7: Prozessausführungs-Ergebnis", () => {
             headers: new Headers(),
             text: vi.fn().mockResolvedValue(""),
             json: vi.fn().mockRejectedValue(new Error("No content")),
-          } as unknown as Response);
+          });
           const client = makeClient(f);
           const result = await client.processes.execute(processName);
           expect(result.success).toBe(false);
@@ -121,7 +123,7 @@ describe("Property 7: Prozessausführungs-Ergebnis", () => {
             json: vi
               .fn()
               .mockResolvedValue({ error: { message: { value: msg } } }),
-          } as unknown as Response);
+          });
           const client = makeClient(f);
           const result = await client.processes.execute(name);
           expect(result.success).toBe(false);

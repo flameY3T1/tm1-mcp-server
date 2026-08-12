@@ -43,8 +43,8 @@ async function run(
 ): Promise<BulkResult> {
   const { schema, handler } = capture(client);
   const args = z.object(schema).parse(input);
-  const res = await handler(args as Record<string, unknown>, {});
-  return JSON.parse(res.content[0]!.text) as BulkResult;
+  const res = await handler(args, {});
+  return JSON.parse(res.content[0].text) as BulkResult;
 }
 
 // Bulk-rules stub mirroring the CubeService.getAllRules overload: plain array
@@ -103,8 +103,8 @@ describe("tm1_get_all_cube_rules default cap", () => {
     const parsed = await run(client, { summary: true });
     expect(parsed.returned).toBe(60);
     expect(parsed.truncated).toBe(false);
-    expect(parsed.cubes[0]!.rulesText).toBeUndefined();
-    expect(parsed.cubes[0]!.lineCount).toBeDefined();
+    expect(parsed.cubes[0].rulesText).toBeUndefined();
+    expect(parsed.cubes[0].lineCount).toBeDefined();
   });
 
   it("explicit limit also caps summary mode", async () => {

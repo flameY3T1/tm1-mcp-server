@@ -112,7 +112,7 @@ describe("maskCode", () => {
     expect(out).not.toContain("hunter2");
     expect(out).toContain("\r\n");
     // The masked line itself must still end in \r right before the split \n.
-    const maskedLine = out.split("\n")[0]!;
+    const maskedLine = out.split("\n")[0];
     expect(maskedLine.endsWith("\r")).toBe(true);
   });
 });

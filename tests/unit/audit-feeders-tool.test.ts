@@ -27,7 +27,7 @@ function makeFakeServer() {
       if (!captured || !parser) throw new Error("handler not registered");
       const p = parser;
       const h = captured;
-      return (args) => h(p.parse(args) as Record<string, unknown>);
+      return (args) => h(p.parse(args));
     },
     getName: () => toolName,
   };
@@ -48,7 +48,7 @@ interface FakeArgs {
   /** Connection major version, as TM1Client.version reports it. */
   version?: 11 | 12;
   /** When set, every }StatsByCube MDX rejects with this (server-wide failure). */
-  statsFailure?: unknown;
+  statsFailure?: Error;
   /** Answer of the structural existence probe `cubes.exists('}StatsByCube')`. */
   statsCubeExists?: boolean;
 }
@@ -86,7 +86,7 @@ function makeAuditFeedersClientStub(args: FakeArgs) {
         // Extract cube name from `{[}PerfCubes].[}PerfCubes].[<name>]}`.
         const m = mdx.match(/\.\[}PerfCubes]\.\[([^\]]+)]/);
         if (!m) throw new Error(`fake executeMdx: cannot parse cube from MDX`);
-        const cubeName = m[1]!;
+        const cubeName = m[1];
         const stats = args.cubeStats?.[cubeName];
         if (!stats)
           throw new Error(
@@ -111,7 +111,7 @@ function makeAuditFeedersClientStub(args: FakeArgs) {
 
 function parseResult(raw: unknown) {
   const result = raw as { content: Array<{ text: string }> };
-  return JSON.parse(result.content[0]!.text);
+  return JSON.parse(result.content[0].text);
 }
 
 describe("tm1_audit_feeders tool", () => {

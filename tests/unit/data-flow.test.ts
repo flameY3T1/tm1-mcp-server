@@ -309,7 +309,7 @@ describe("traceDataFlow — element access classification", () => {
     const flow = traceDataFlow(index, ds, "Sales", "both", {
       element: { dimension: "Currency", name: "USD" },
     });
-    expect(flow.element!.processes[0]!.access).toEqual(["source"]);
+    expect(flow.element!.processes[0].access).toEqual(["source"]);
   });
   it("indeterminate is opt-in and counted when suppressed", async () => {
     const index = await idx("SubsetElementInsert('Currency','sTmp','USD',1);"); // built, never used
@@ -322,7 +322,7 @@ describe("traceDataFlow — element access classification", () => {
       element: { dimension: "Currency", name: "USD" },
       elementAccess: ["source", "write", "zero-out", "indeterminate"],
     });
-    expect(flow2.element!.processes[0]!.access).toEqual(["indeterminate"]);
+    expect(flow2.element!.processes[0].access).toEqual(["indeterminate"]);
   });
   it("does not tag source when a same-named subset handle belongs to a different dimension's datasource", async () => {
     // Generic temp-subset name "sTmp" is reused across dimensions in one process; the datasource's
@@ -340,8 +340,8 @@ describe("traceDataFlow — element access classification", () => {
       element: { dimension: "Currency", name: "USD" },
       elementAccess: ["source", "write", "zero-out", "indeterminate"],
     });
-    expect(flow.element!.processes[0]!.access).not.toContain("source");
-    expect(flow.element!.processes[0]!.access).toEqual(["indeterminate"]);
+    expect(flow.element!.processes[0].access).not.toContain("source");
+    expect(flow.element!.processes[0].access).toEqual(["indeterminate"]);
   });
   it("tags write (not zero-out) for a loop write with a non-literal CellPutN value", async () => {
     // Same shape as the loopWrite/loopZero unit in subset-usage.test.ts: SubsetGetElementName
@@ -389,8 +389,8 @@ describe("traceDataFlow — element access classification", () => {
       element: { dimension: "Currency", name: "USD" },
       elementAccess: ["source", "write", "zero-out", "indeterminate"],
     });
-    expect(flow.element!.processes[0]!.access).not.toContain("source");
-    expect(flow.element!.processes[0]!.access).toEqual(["indeterminate"]);
+    expect(flow.element!.processes[0].access).not.toContain("source");
+    expect(flow.element!.processes[0].access).toEqual(["indeterminate"]);
   });
 });
 

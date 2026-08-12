@@ -4,6 +4,8 @@
  * **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5**
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import * as fc from "fast-check";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
@@ -20,7 +22,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -49,7 +51,7 @@ function mockResp(body: unknown): Response {
 
 const originalFetch = globalThis.fetch;
 
-function makeClient(localFetch: ReturnType<typeof vi.fn>) {
+function makeClient(localFetch: FnSpy) {
   globalThis.fetch = localFetch as typeof fetch;
   const config = makeConfig();
   const sm = new SessionManager(config, mockLogger);

@@ -55,7 +55,7 @@ function makeFakeServer() {
       if (!captured || !parser) throw new Error("handler not registered");
       const p = parser;
       const h = captured;
-      return (args) => h(p.parse(args) as Record<string, unknown>);
+      return (args) => h(p.parse(args));
     },
   };
 }
@@ -84,7 +84,7 @@ describe("tm1_get_view tool", () => {
     registerGetView(server, makeTM1Client(paths));
 
     const res = await getHandler()({ cubeName: "C", viewName: "V", limit: 2 });
-    const env = JSON.parse(res.content[0]!.text);
+    const env = JSON.parse(res.content[0].text);
 
     expect(paths[0]).toContain("$top=2");
     expect(paths[0]).toContain("$skip=0");
@@ -106,7 +106,7 @@ describe("tm1_get_view tool", () => {
       limit: 2,
       offset: 2,
     });
-    const env = JSON.parse(res.content[0]!.text);
+    const env = JSON.parse(res.content[0].text);
 
     expect(paths[0]).toContain("$top=2");
     expect(paths[0]).toContain("$skip=2");
@@ -127,7 +127,7 @@ describe("tm1_get_view tool", () => {
       fetchAll: true,
       format: "markdown",
     });
-    const md = res.content[0]!.text;
+    const md = res.content[0].text;
 
     expect(paths[0]).not.toContain("$top=");
     expect(md).toContain("| Version | Jan | Feb |");

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import { TM1Error, TM1ErrorCode } from "../../src/types.js";
@@ -17,7 +19,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -70,7 +72,7 @@ function mock201Response(body?: unknown): Response {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("TM1Client – TI Development Methods", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
   let client: TM1Client;
 
   beforeEach(() => {
@@ -122,7 +124,7 @@ describe("TM1Client – TI Development Methods", () => {
       );
       try {
         await client.processes.create("Existing");
-      } catch (e) {
+      } catch {
         // The first call already threw; we verify the error from the first call
       }
       // Re-test with fresh mock

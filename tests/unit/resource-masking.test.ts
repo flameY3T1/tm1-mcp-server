@@ -66,7 +66,7 @@ describe("MCP resources – unconditional credential masking", () => {
     const result = await cb!(new URL("tm1://process/My.Proc/code"), {
       name: "My.Proc",
     });
-    const text = result.contents[0]!.text;
+    const text = result.contents[0].text;
     const payload = JSON.parse(text) as Record<string, string>;
 
     // The credential literals never leave the server unmasked …
@@ -85,7 +85,7 @@ describe("MCP resources – unconditional credential masking", () => {
     const cb = readCallbacks.get("server-info");
     expect(cb).toBeDefined();
     const result = await cb!(new URL("tm1://server/info"));
-    const text = result.contents[0]!.text;
+    const text = result.contents[0].text;
     const payload = JSON.parse(text) as Record<string, unknown>;
 
     expect(text).not.toContain("ldap-secret");

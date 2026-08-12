@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { ServerService } from "../../src/tm1-client/services/server-service.js";
 import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { TM1Error, TM1ErrorCode } from "../../src/types.js";
@@ -8,7 +9,7 @@ import { TM1Error, TM1ErrorCode } from "../../src/types.js";
 // (client-side filtering over only the newest window produced false negatives).
 function makeHttp(impl: (method: string, path: string) => Promise<unknown>): {
   http: TM1HttpClient;
-  request: ReturnType<typeof vi.fn>;
+  request: FnSpy;
 } {
   const request = vi.fn(impl);
   return { http: { request } as unknown as TM1HttpClient, request };
@@ -40,10 +41,10 @@ describe("ServerService.getMessageLog — server-side $filter (D3)", () => {
     });
 
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.message).toContain(
+    expect(entries[0].message).toContain(
       "TM1ProcessError_20200101000000_1_Load.log",
     );
-    expect(entries[0]!.errorFile).toBe(
+    expect(entries[0].errorFile).toBe(
       "TM1ProcessError_20200101000000_1_Load.log",
     );
     expect(request).toHaveBeenCalledTimes(1);
@@ -101,7 +102,7 @@ describe("ServerService.getMessageLog — server-side $filter (D3)", () => {
 
     expect(request).toHaveBeenCalledTimes(2);
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.message).toContain("TM1ProcessError");
+    expect(entries[0].message).toContain("TM1ProcessError");
   });
 
   it("fallback re-applies since/until/logger client-side (no out-of-range matches)", async () => {
@@ -136,7 +137,7 @@ describe("ServerService.getMessageLog — server-side $filter (D3)", () => {
 
     expect(call).toBe(2);
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.message).toBe("recent boom"); // 2020 row dropped by since
+    expect(entries[0].message).toBe("recent boom"); // 2020 row dropped by since
   });
 
   it("does NOT fall back on a systemic transport error — it surfaces", async () => {

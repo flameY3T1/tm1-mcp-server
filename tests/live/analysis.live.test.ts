@@ -64,7 +64,7 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
       const els = dims.map((d) => coords[d]);
       if (els.every((e) => typeof e === "string" && e.length > 0)) {
         sampleCube = c.name;
-        sampleElements = els as string[];
+        sampleElements = els;
         break;
       }
     }
@@ -104,8 +104,8 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
     }>;
     // sorted desc by matchCount
     for (let i = 1; i < items.length; i++) {
-      expect(items[i - 1]!.matchCount).toBeGreaterThanOrEqual(
-        items[i]!.matchCount,
+      expect(items[i - 1].matchCount).toBeGreaterThanOrEqual(
+        items[i].matchCount,
       );
     }
   });
@@ -150,7 +150,7 @@ describe.skipIf(!LIVE_ENABLED)("live: analysis / audit domain", () => {
     });
     const sources = s.json.sources as Array<{ count: number }>;
     for (let i = 1; i < sources.length; i++) {
-      expect(sources[i - 1]!.count).toBeGreaterThanOrEqual(sources[i]!.count);
+      expect(sources[i - 1].count).toBeGreaterThanOrEqual(sources[i].count);
     }
   });
 

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   resolveExpression,
-  buildProcessEnv,
   type ProcessEnv,
 } from "../../src/lib/callgraph/variableEnv.js";
 import { buildReferenceIndex } from "../../src/lib/callgraph/referenceIndex.js";

@@ -80,7 +80,7 @@ function fakeServer() {
     server: server as never,
     run: (a: Record<string, unknown>) => {
       if (!handler || !parser) throw new Error("not registered");
-      return handler(parser.parse(a) as Record<string, unknown>);
+      return handler(parser.parse(a));
     },
   };
 }
@@ -90,7 +90,7 @@ function mdxClient(): TM1Client {
 }
 function viewClient(): TM1Client {
   return {
-    views: new ViewService(mockHttp() as never),
+    views: new ViewService(mockHttp()),
   } as unknown as TM1Client;
 }
 
@@ -102,8 +102,8 @@ describe("clipAxesToWindow", () => {
     // top=4 → ord 0..3 reference cols {C1,C2} (full) and rows {R1,R2}.
     const r = clipAxesToWindow(axes(), 4, 0);
     expect(r.clipped).toBe(true);
-    expect(r.axes[0]!.tuples).toHaveLength(2); // cols untouched
-    expect(r.axes[1]!.tuples.map((t) => t.members[0]!.name)).toEqual([
+    expect(r.axes[0].tuples).toHaveLength(2); // cols untouched
+    expect(r.axes[1].tuples.map((t) => t.members[0].name)).toEqual([
       "R1",
       "R2",
     ]);
@@ -114,8 +114,8 @@ describe("clipAxesToWindow", () => {
     // so decode by absolute index stays valid; only R5 (unreferenced) is dropped.
     const r = clipAxesToWindow(axes(), 4, 4);
     expect(r.clipped).toBe(true);
-    expect(r.axes[0]!.tuples).toHaveLength(2); // cols still fully cycled
-    expect(r.axes[1]!.tuples.map((t) => t.members[0]!.name)).toEqual([
+    expect(r.axes[0].tuples).toHaveLength(2); // cols still fully cycled
+    expect(r.axes[1].tuples.map((t) => t.members[0].name)).toEqual([
       "R1",
       "R2",
       "R3",
@@ -138,15 +138,15 @@ describe("clipAxesToWindow", () => {
       ),
     ];
     const r = clipAxesToWindow(big, 3, 13);
-    expect(r.axes[0]!.tuples).toHaveLength(10); // fast axis untouched (unsafe to clip)
-    expect(r.axes[1]!.tuples).toHaveLength(2); // slow axis clips to prefix [B0,B1]
+    expect(r.axes[0].tuples).toHaveLength(10); // fast axis untouched (unsafe to clip)
+    expect(r.axes[1].tuples).toHaveLength(2); // slow axis clips to prefix [B0,B1]
     expect(r.clipped).toBe(true);
   });
 
   it("no clip when the window already spans every referenced tuple", () => {
     const r = clipAxesToWindow(axes(), 10, 0); // full cellset
     expect(r.clipped).toBe(false);
-    expect(r.axes[1]!.tuples).toHaveLength(5);
+    expect(r.axes[1].tuples).toHaveLength(5);
   });
 
   it("empty inputs are inert", () => {
@@ -161,7 +161,7 @@ describe("tm1_execute_mdx axes clipping", () => {
     const { server, run } = fakeServer();
     registerExecuteMdx(server, mdxClient());
     const res = await run({ mdx: "SELECT ...", limit: 4 });
-    const env = JSON.parse(res.content[0]!.text);
+    const env = JSON.parse(res.content[0].text);
 
     expect(env.total).toBe(10); // full cell count preserved
     expect(env.count).toBe(4);
@@ -178,7 +178,7 @@ describe("tm1_execute_mdx axes clipping", () => {
     const { server, run } = fakeServer();
     registerExecuteMdx(server, mdxClient());
     const res = await run({ mdx: "SELECT ...", fetchAll: true });
-    const env = JSON.parse(res.content[0]!.text);
+    const env = JSON.parse(res.content[0].text);
 
     expect(env.axes[1].tuples).toHaveLength(5);
     expect(env.axes_clipped).toBeUndefined();
@@ -188,7 +188,7 @@ describe("tm1_execute_mdx axes clipping", () => {
     const { server, run } = fakeServer();
     registerExecuteMdx(server, mdxClient());
     const res = await run({ mdx: "SELECT ...", limit: 4, format: "markdown" });
-    const md = res.content[0]!.text;
+    const md = res.content[0].text;
     expect(md).toContain("| R1 | 10 | 11 |");
     expect(md).toContain("| R2 | 20 | 21 |");
     expect(md).not.toContain("R3");
@@ -203,7 +203,7 @@ describe("tm1_execute_mdx axes clipping", () => {
       offset: 4,
       format: "markdown",
     });
-    const md = res.content[0]!.text;
+    const md = res.content[0].text;
     // ord 4..7 → C1/R3, C2/R3, C1/R4, C2/R4.
     expect(md).toContain("| C1 | R3 | 30 |");
     expect(md).toContain("| C2 | R3 | 31 |");
@@ -219,7 +219,7 @@ describe("tm1_get_view axes clipping", () => {
     const { server, run } = fakeServer();
     registerGetView(server, viewClient());
     const res = await run({ cubeName: "C", viewName: "V", limit: 4 });
-    const env = JSON.parse(res.content[0]!.text);
+    const env = JSON.parse(res.content[0].text);
 
     expect(env.total).toBe(10);
     expect(env.axes[1].tuples).toHaveLength(2);
@@ -230,7 +230,7 @@ describe("tm1_get_view axes clipping", () => {
     const { server, run } = fakeServer();
     registerGetView(server, viewClient());
     const res = await run({ cubeName: "C", viewName: "V", fetchAll: true });
-    const env = JSON.parse(res.content[0]!.text);
+    const env = JSON.parse(res.content[0].text);
 
     expect(env.axes[1].tuples).toHaveLength(5);
     expect(env.axes_clipped).toBeUndefined();

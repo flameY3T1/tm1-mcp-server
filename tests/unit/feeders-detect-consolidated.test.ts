@@ -19,7 +19,7 @@ function makeCache(
       return Object.entries(elems).map(([name, type]) => ({ name, type }));
     }),
   };
-  return new ElementTypeCache(hier as never);
+  return new ElementTypeCache(hier);
 }
 
 describe("detectFeederToConsolidated — S2", () => {

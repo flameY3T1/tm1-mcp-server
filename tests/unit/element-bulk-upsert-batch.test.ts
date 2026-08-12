@@ -21,7 +21,7 @@ interface FakeOpts {
   /** Per-sub-request outcome. Return a status (+body) or undefined for 200. */
   onSub?: (r: SubRequest) => SubResponse | undefined;
   /** Fail the whole envelope. */
-  throwOnBatch?: unknown;
+  throwOnBatch?: Error;
 }
 
 function makeService(opts: FakeOpts = {}): {
@@ -81,10 +81,10 @@ describe("ElementService.bulkUpsert — $batch path", () => {
     expect(perRequest).toHaveLength(0);
     const creates = batches.flat().filter((r) => r.method === "POST");
     expect(creates).toHaveLength(50);
-    expect(creates[0]!.url).toBe(
+    expect(creates[0].url).toBe(
       "Dimensions('Dim')/Hierarchies('Dim')/Elements",
     );
-    expect(creates[0]!.body).toEqual({ Name: "L0", Type: "Numeric" });
+    expect(creates[0].body).toEqual({ Name: "L0", Type: "Numeric" });
   });
 
   it("holds the pass barrier: no Components PATCH before the last leaf create", async () => {
@@ -115,7 +115,7 @@ describe("ElementService.bulkUpsert — $batch path", () => {
     expect(firstComponents).toBeGreaterThan(lastPost);
     // Components arrive as OData refs with their weights.
     expect(
-      (flat[firstComponents]!.body as { Components: unknown[] }).Components,
+      (flat[firstComponents].body as { Components: unknown[] }).Components,
     ).toEqual([
       {
         "@odata.id": "Dimensions('Dim')/Hierarchies('Dim')/Elements('L1')",
@@ -146,7 +146,7 @@ describe("ElementService.bulkUpsert — $batch path", () => {
       onSub: (r) => {
         if (r.method === "POST") return alreadyExists(r.id);
         if (r.method === "GET") {
-          const name = /Elements\('([^']+)'\)/.exec(r.url)![1]!;
+          const name = /Elements\('([^']+)'\)/.exec(r.url)![1];
           return { id: r.id, status: 200, body: { Type: existingType[name] } };
         }
         return undefined;
@@ -191,7 +191,7 @@ describe("ElementService.bulkUpsert — $batch path", () => {
     expect(typeChanges).toEqual([]);
     const patches = batches.flat().filter((r) => r.method === "PATCH");
     expect(patches).toHaveLength(1);
-    expect(patches[0]!.body).toEqual({ Type: "Numeric" });
+    expect(patches[0].body).toEqual({ Type: "Numeric" });
   });
 
   // The type probe decides whether the Type gets PATCHed. A systemic failure

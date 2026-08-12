@@ -62,8 +62,8 @@ async function run(
 ): Promise<string> {
   const { schema, handler } = capture(register, client);
   const args = z.object(schema).parse(input);
-  const res = await handler(args as Record<string, unknown>, {});
-  return res.content[0]!.text;
+  const res = await handler(args, {});
+  return res.content[0].text;
 }
 
 const NONE_DS: DataSource = { type: "None" };
@@ -432,8 +432,8 @@ describe("tm1_get_all_processes_code summary mode", () => {
     const parsed = JSON.parse(text) as {
       processes: Array<Record<string, unknown>>;
     };
-    expect(parsed.processes[0]!.prolog).toContain("ODBCOpen");
-    expect(parsed.processes[0]!.totalLines).toBeUndefined();
+    expect(parsed.processes[0].prolog).toContain("ODBCOpen");
+    expect(parsed.processes[0].totalLines).toBeUndefined();
   });
 });
 

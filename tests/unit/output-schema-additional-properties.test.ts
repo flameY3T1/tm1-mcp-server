@@ -26,7 +26,7 @@ function asSchema(entry: ZodRawShape | ZodTypeAny): JsonSchemaInput {
   const schema =
     typeof entry === "object" && entry !== null && "_def" in entry
       ? (entry as ZodTypeAny)
-      : z.object(entry as ZodRawShape);
+      : z.object(entry);
   return schema as unknown as JsonSchemaInput;
 }
 

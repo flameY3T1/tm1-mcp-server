@@ -40,7 +40,7 @@ function makeFakeServer() {
       if (!captured || !parser) throw new Error("handler not registered");
       const p = parser;
       const h = captured;
-      return (args) => h(p.parse(args) as Record<string, unknown>);
+      return (args) => h(p.parse(args));
     },
   };
 }
@@ -73,7 +73,7 @@ describe("tm1_get_hierarchy tool", () => {
     registerGetHierarchy(server, makeTM1Client(paths));
 
     const res = await getHandler()({ dimensionName: "D", hierarchyName: "H" });
-    const out = JSON.parse(res.content[0]!.text);
+    const out = JSON.parse(res.content[0].text);
 
     expect(paths[0]).toContain("$top=1000");
     expect(out.elements).toHaveLength(5);
@@ -90,7 +90,7 @@ describe("tm1_get_hierarchy tool", () => {
       hierarchyName: "H",
       topN: 3,
     });
-    const out = JSON.parse(res.content[0]!.text);
+    const out = JSON.parse(res.content[0].text);
 
     expect(paths[0]).toContain("$top=3");
     expect(out.elements).toHaveLength(3);
@@ -104,11 +104,11 @@ describe("tm1_get_hierarchy tool", () => {
 
     const low = JSON.parse(
       (await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 3 }))
-        .content[0]!.text,
+        .content[0].text,
     );
     const high = JSON.parse(
       (await getHandler()({ dimensionName: "D", hierarchyName: "H", topN: 10 }))
-        .content[0]!.text,
+        .content[0].text,
     );
 
     expect(high.elements.length).toBeGreaterThan(low.elements.length);
@@ -152,7 +152,7 @@ describe("tm1_get_hierarchy tool", () => {
             topN: 2,
             offset,
           })
-        ).content[0]!.text,
+        ).content[0].text,
       );
       expect(page.offset).toBe(offset);
       expect(page.total).toBe(5);
@@ -178,7 +178,7 @@ describe("tm1_get_hierarchy tool", () => {
           topN: 2,
           offset: 3,
         })
-      ).content[0]!.text,
+      ).content[0].text,
     );
 
     expect(out.elements).toHaveLength(2);
@@ -204,7 +204,7 @@ describe("tm1_get_hierarchy tool", () => {
           topN: 2,
           offset: 1,
         })
-      ).content[0]!.text,
+      ).content[0].text,
     );
 
     expect(paths[0]).not.toContain("$top=");

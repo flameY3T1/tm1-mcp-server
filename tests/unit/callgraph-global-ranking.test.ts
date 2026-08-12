@@ -70,9 +70,9 @@ describe("globalRanking", () => {
       includeSystem: false,
     });
 
-    expect(res.ranking[0]!.process).toBe("Orchestrator");
-    expect(res.ranking[0]!.outgoingCalls).toBe(3);
-    expect(res.ranking[0]!.outgoingDistinct).toBe(2);
+    expect(res.ranking[0].process).toBe("Orchestrator");
+    expect(res.ranking[0].outgoingCalls).toBe(3);
+    expect(res.ranking[0].outgoingDistinct).toBe(2);
     expect(res.totalProcessesIndexed).toBe(4);
     expect(res.totalCallEdges).toBe(4);
 
@@ -96,9 +96,9 @@ describe("globalRanking", () => {
       topN: 50,
       includeSystem: false,
     });
-    expect(res.ranking[0]!.process).toBe("Hub");
-    expect(res.ranking[0]!.incomingCalls).toBe(2);
-    expect(res.ranking[0]!.incomingDistinct).toBe(2);
+    expect(res.ranking[0].process).toBe("Hub");
+    expect(res.ranking[0].incomingCalls).toBe(2);
+    expect(res.ranking[0].incomingDistinct).toBe(2);
   });
 
   it("excludes control processes unless includeSystem", () => {
@@ -138,8 +138,8 @@ describe("globalRanking", () => {
     });
     expect(res.ranking.length).toBe(3);
     expect(res.truncated).toBe(true);
-    expect(res.ranking[0]!.process).toBe("P0");
-    expect(res.ranking[0]!.outgoingCalls).toBe(10);
+    expect(res.ranking[0].process).toBe("P0");
+    expect(res.ranking[0].outgoingCalls).toBe(10);
   });
 
   it("counts self-recursive calls", () => {

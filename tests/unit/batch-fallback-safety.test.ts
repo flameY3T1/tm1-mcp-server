@@ -187,7 +187,7 @@ class StatefulElementBatchModel {
         // payload". Answer it WITHOUT touching state or the envelope counter —
         // it is not one of the caller's envelopes, and treating it as one would
         // shift every later injection index.
-        if (requests.length === 1 && requests[0]!.id === BATCH_PROBE_ID) {
+        if (requests.length === 1 && requests[0].id === BATCH_PROBE_ID) {
           this.probes++;
           return {
             responses: [

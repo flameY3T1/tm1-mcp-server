@@ -14,9 +14,7 @@ function publishedJsonSchema(entry: ZodRawShape | ZodTypeAny): {
     typeof entry === "object" && entry !== null && "_def" in (entry as object)
       ? (entry as ZodTypeAny)
       : z.object(entry as ZodRawShape);
-  return z.toJSONSchema(schema, { io: "output" }) as {
-    additionalProperties?: boolean | object;
-  };
+  return z.toJSONSchema(schema, { io: "output" });
 }
 
 // Regression guard for `asOutputSchema`'s passthrough detection.

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import { TM1Error } from "../../src/types.js";
@@ -17,7 +19,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -47,7 +49,7 @@ function mockResponse(body: unknown): Response {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("TM1Client – Cell Data Methods", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
   let client: TM1Client;
 
   beforeEach(() => {
@@ -709,7 +711,7 @@ describe("TM1Client – Cell Data Methods", () => {
         ...makeConfig(),
         version: numericVersion,
         tm1Version: version,
-      } as TM1Config;
+      };
       const sm = new SessionManager(cfg, mockLogger);
       vi.spyOn(sm, "ensureSession").mockResolvedValue("s");
       vi.spyOn(sm, "authenticate").mockResolvedValue("s");
@@ -1007,8 +1009,8 @@ describe("TM1Client – Cell Data Methods", () => {
         expect(tree.components).toHaveLength(2);
         expect(tree.truncated).toBe(true);
         // depth: maxDepth=1 → grandchildren cut, child marked truncated
-        expect(tree.components![0]!.truncated).toBe(true);
-        expect(tree.components![0]!.components).toBeUndefined();
+        expect(tree.components![0].truncated).toBe(true);
+        expect(tree.components![0].components).toBeUndefined();
         const [url] = fetchSpy.mock.calls[1];
         expect(url).toContain("/tm1.TraceCellCalculation");
         expect(url).toContain("Components/Tuple($select=Name)");

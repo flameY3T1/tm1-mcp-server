@@ -46,7 +46,8 @@ This chains:
 | Registration     | `npm run lint:tool-registration`    | every `register*` is wired into `src/tools/index.ts`               |
 | Input naming     | `npm run lint:input-naming`         | no tool takes a bare top-level `name` input (use `<entity>Name`)   |
 | Envelope         | `npm run lint:mutation-envelope`    | mutation tools return via `actionResponse()`, not hand-rolled      |
-| Lint             | `npm run lint:eslint`               | ESLint over the repo                                               |
+| Markdown schema  | `npm run lint:markdown-schema`      | tools taking `format` declare a schema that can carry the table    |
+| Lint             | `npm run lint:eslint`               | ESLint over `src/` and `tests/`                                    |
 | Tests + coverage | `npm run coverage:check`            | full `vitest` suite under coverage, then the coverage ratchet gate |
 
 If your change adds, removes, or renames a tool, regenerate the tool list — one

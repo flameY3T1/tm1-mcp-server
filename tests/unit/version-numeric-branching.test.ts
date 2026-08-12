@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import { TM1ErrorCode } from "../../src/types.js";
@@ -19,7 +21,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(over: Partial<TM1Config>): TM1Config {
   return {
@@ -57,7 +59,7 @@ function makeClient(config: TM1Config): TM1Client {
 }
 
 describe("A3 — service version-gating uses numeric config.version", () => {
-  let fetchSpy: ReturnType<typeof vi.fn>;
+  let fetchSpy: FnSpy;
 
   beforeEach(() => {
     fetchSpy = vi.fn();
@@ -88,9 +90,9 @@ describe("A3 — service version-gating uses numeric config.version", () => {
     ).resolves.toBeUndefined();
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const url = String(fetchSpy.mock.calls[0]![0]);
+    const url = String(fetchSpy.mock.calls[0][0]);
     expect(url).toContain("tm1.Clear");
-    expect(fetchSpy.mock.calls[0]![1]).toMatchObject({ method: "POST" });
+    expect(fetchSpy.mock.calls[0][1]).toMatchObject({ method: "POST" });
   });
 
   it("exposes numeric version off the held HTTP client via the same source of truth", () => {

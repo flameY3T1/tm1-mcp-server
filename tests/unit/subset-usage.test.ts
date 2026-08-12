@@ -34,7 +34,7 @@ describe("extractSubsetUsage", () => {
     const u = extractSubsetUsage(
       "ViewSubsetAssign('Sales','vTmp','Currency',pSub);",
     );
-    const only = [...u.values()][0]!;
+    const only = [...u.values()][0];
     expect(only.resolved).toBe(false);
   });
 });

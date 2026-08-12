@@ -47,7 +47,7 @@ function makeFakeServer() {
       if (!captured || !parser) throw new Error("handler not registered");
       const p = parser;
       const h = captured;
-      return (args) => h(p.parse(args) as Record<string, unknown>);
+      return (args) => h(p.parse(args));
     },
     getName: () => toolName,
   };
@@ -73,10 +73,10 @@ function makeAuditNamingClientStub(args: AuditNamingClientStubArgs) {
   const request = async (_method: string, path: string) => {
     const m = ELEMENTS_RE.exec(path);
     if (!m) throw new Error(`unexpected path: ${path}`);
-    const dim = decodeURIComponent(m[1]!);
-    const hier = decodeURIComponent(m[2]!);
+    const dim = decodeURIComponent(m[1]);
+    const hier = decodeURIComponent(m[2]);
     const names = args.elementsByHier?.[`${dim}/${hier}`] ?? [];
-    const qs = new URLSearchParams(m[3]!);
+    const qs = new URLSearchParams(m[3]);
     const top = Number(qs.get("$top") ?? names.length);
     const skip = Number(qs.get("$skip") ?? 0);
     const wantCount = qs.get("$count") === "true";
@@ -135,7 +135,7 @@ function parseResult(raw: unknown): {
   totalElementsInScope: number;
 } {
   const result = raw as { content: Array<{ text: string }> };
-  return JSON.parse(result.content[0]!.text);
+  return JSON.parse(result.content[0].text);
 }
 
 describe("tm1_audit_naming tool", () => {
@@ -271,7 +271,7 @@ describe("tm1_audit_naming tool", () => {
       requestCount++;
       const m = ELEMENTS_RE.exec(path);
       if (!m) throw new Error(`unexpected path: ${path}`);
-      const qs = new URLSearchParams(m[3]!);
+      const qs = new URLSearchParams(m[3]);
       const top = Number(qs.get("$top") ?? names.length);
       const skip = Number(qs.get("$skip") ?? 0);
       const wantCount = qs.get("$count") === "true";
@@ -434,7 +434,7 @@ describe("tm1_audit_naming tool", () => {
       expect(out.truncated).toBe(false);
       expect(out.findingsByGroup).toBeDefined();
       expect(out.findingsByGroup!.length).toBe(1);
-      const g = out.findingsByGroup![0]!;
+      const g = out.findingsByGroup![0];
       expect(g.objectKind).toBe("element");
       expect(g.dimension).toBe("Produkt");
       expect(g.hierarchy).toBe("Produkt");
@@ -481,7 +481,7 @@ describe("tm1_audit_naming tool", () => {
       const out = parseResult(
         await fake.getHandler()({ scope: ["elements"], summary: true }),
       );
-      const g = out.findingsByGroup![0]!;
+      const g = out.findingsByGroup![0];
       expect(g.sampleNames.length).toBe(3);
       expect(g.sampleNames).toEqual(["Bad;A", "Bad;B", "Bad;C"]);
     });

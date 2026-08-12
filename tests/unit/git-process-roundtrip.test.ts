@@ -34,7 +34,7 @@ function makeTi(
   tabs: Partial<Record<"Prolog" | "Metadata" | "Data" | "Epilog", string>>,
 ): string {
   return (["Prolog", "Metadata", "Data", "Epilog"] as const)
-    .filter((k) => tabs[k] && tabs[k]!.length > 0)
+    .filter((k) => tabs[k] && tabs[k].length > 0)
     .map((k) => `#region ${k}\r\n${tabs[k]}\r\n#endregion`)
     .join("\r\n");
 }

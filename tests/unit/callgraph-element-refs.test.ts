@@ -147,6 +147,6 @@ describe("element ref carries subset handle", () => {
       "csSub='sTmp';\nSubsetElementAdd(csSub,'Currency','USD');",
     );
     const el = refs.filter((r) => r.targetKind === "element");
-    expect(el[0]!.subset).toBe("sTmp");
+    expect(el[0].subset).toBe("sTmp");
   });
 });

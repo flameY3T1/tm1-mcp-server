@@ -77,7 +77,7 @@ describe("parseBracketList — edge cases", () => {
 
   it("handles doubled single-quote escape inside element", () => {
     const r = parseBracketList("['It''s_Sales']");
-    expect(r!.entries[0]!.elem).toBe("It's_Sales");
+    expect(r!.entries[0].elem).toBe("It's_Sales");
   });
 
   it("handles doubled single-quote escape inside dim", () => {
@@ -99,32 +99,32 @@ describe("extractBracketLists — finds all bracket lists in a line", () => {
     const line = "['Year':'2026', 'Sales'] = N: 1;";
     const lists = extractBracketLists(line);
     expect(lists).toHaveLength(1);
-    expect(lists[0]!.entries.length).toBe(2);
+    expect(lists[0].entries.length).toBe(2);
   });
 
   it("extracts both LHS and RHS for a feeder with `=>`", () => {
     const line = "['Alpha_Entry', 'Wert'] => ['Alpha'];";
     const lists = extractBracketLists(line);
     expect(lists).toHaveLength(2);
-    expect(lists[0]!.entries.map((e) => e.elem)).toEqual([
+    expect(lists[0].entries.map((e) => e.elem)).toEqual([
       "Alpha_Entry",
       "Wert",
     ]);
-    expect(lists[1]!.entries.map((e) => e.elem)).toEqual(["Alpha"]);
+    expect(lists[1].entries.map((e) => e.elem)).toEqual(["Alpha"]);
   });
 
   it("ignores brackets inside string literals", () => {
     const line = "['Real'] = S: 'this [is] not a bracket';";
     const lists = extractBracketLists(line);
     expect(lists).toHaveLength(1);
-    expect(lists[0]!.entries[0]!.elem).toBe("Real");
+    expect(lists[0].entries[0].elem).toBe("Real");
   });
 
   it("handles set form on RHS", () => {
     const line = "['A'] => ['Year':{'2025','2026'}];";
     const lists = extractBracketLists(line);
     expect(lists).toHaveLength(2);
-    expect(lists[1]!.entries[0]).toEqual({
+    expect(lists[1].entries[0]).toEqual({
       dim: "Year",
       elems: ["2025", "2026"],
     });
@@ -136,10 +136,10 @@ describe("real-world samples from probe", () => {
     const line = "['Alpha_Entry', 'Wert', 'DS_000'] => ['Alpha'];";
     const lists = extractBracketLists(line);
     expect(lists).toHaveLength(2);
-    expect(lists[0]!.isPositional).toBe(true);
-    expect(lists[0]!.entries).toHaveLength(3);
-    expect(lists[1]!.isPositional).toBe(true);
-    expect(lists[1]!.entries).toEqual([{ elem: "Alpha" }]);
+    expect(lists[0].isPositional).toBe(true);
+    expect(lists[0].entries).toHaveLength(3);
+    expect(lists[1].isPositional).toBe(true);
+    expect(lists[1].entries).toEqual([{ elem: "Alpha" }]);
   });
 
   it("parses qualified multi-dim feeder with set form on LHS", () => {
@@ -147,12 +147,12 @@ describe("real-world samples from probe", () => {
       "['Region':'X', 'KPI':{'KN 019', 'KN 020'}, 'Stand':'DS_000'] => ['Driver':'EUR_K'];";
     const lists = extractBracketLists(line);
     expect(lists).toHaveLength(2);
-    expect(lists[0]!.entries).toHaveLength(3);
-    expect(lists[0]!.entries[1]).toEqual({
+    expect(lists[0].entries).toHaveLength(3);
+    expect(lists[0].entries[1]).toEqual({
       dim: "KPI",
       elems: ["KN 019", "KN 020"],
     });
-    expect(lists[1]!.entries[0]).toEqual({
+    expect(lists[1].entries[0]).toEqual({
       dim: "Driver",
       elem: "EUR_K",
     });

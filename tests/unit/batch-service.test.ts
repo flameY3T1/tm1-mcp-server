@@ -21,7 +21,7 @@ type Sent = { method: string; path: string; body?: unknown; opts?: unknown };
 
 interface FakeOpts {
   respond?: (payload: { requests: Array<Record<string, unknown>> }) => unknown;
-  throwOnBatch?: unknown;
+  throwOnBatch?: Error;
 }
 
 function makeService(opts: FakeOpts = {}): { svc: BatchService; sent: Sent[] } {
@@ -61,7 +61,7 @@ type Payload = { requests: Array<Record<string, unknown>> };
 
 /** The counter-probe envelope: exactly one sub-request, carrying the probe id. */
 const isProbePayload = (payload: Payload): boolean =>
-  payload.requests.length === 1 && payload.requests[0]!.id === BATCH_PROBE_ID;
+  payload.requests.length === 1 && payload.requests[0].id === BATCH_PROBE_ID;
 const isProbe = (s: Sent): boolean => isProbePayload(s.body as Payload);
 
 /** What a server WITH a working $batch answers the probe with. */
@@ -97,9 +97,9 @@ describe("BatchService — payload construction", () => {
     ]);
 
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.method).toBe("POST");
-    expect(sent[0]!.path).toBe("/api/v1/$batch");
-    const payload = sent[0]!.body as {
+    expect(sent[0].method).toBe("POST");
+    expect(sent[0].path).toBe("/api/v1/$batch");
+    const payload = sent[0].body as {
       requests: Array<Record<string, unknown>>;
     };
     expect(payload.requests[0]).toEqual({
@@ -118,7 +118,7 @@ describe("BatchService — payload construction", () => {
     await svc.execute([
       req("a", { method: "DELETE", path: "/api/v1/Cubes('C')" }),
     ]);
-    const payload = sent[0]!.body as {
+    const payload = sent[0].body as {
       requests: Array<Record<string, unknown>>;
     };
     expect(payload.requests[0]).toEqual({
@@ -132,7 +132,7 @@ describe("BatchService — payload construction", () => {
   it("scales the timeout with the chunk size (a batch is N ops in one call)", async () => {
     const { svc, sent } = makeService();
     await svc.execute([req("a"), req("b")]);
-    expect(sent[0]!.opts).toEqual({ timeoutMs: 30_000 + 2 * 200 });
+    expect(sent[0].opts).toEqual({ timeoutMs: 30_000 + 2 * 200 });
   });
 
   it("returns an empty result without any HTTP call for zero requests", async () => {
@@ -219,7 +219,7 @@ describe("BatchService — chunking by payload size", () => {
     // It cannot share a chunk with anything, but it must still go out — and the
     // builder must make progress rather than spin on a chunk it can never fill.
     expect(sizes(sent)).toEqual([1, 1, 1]);
-    const middle = (sent[1]!.body as { requests: Array<{ id: string }> })
+    const middle = (sent[1].body as { requests: Array<{ id: string }> })
       .requests;
     expect(middle.map((r) => r.id)).toEqual(["big"]);
     expect(results.map((r) => r.id)).toEqual(["before", "big", "after"]);
@@ -310,7 +310,7 @@ describe("BatchService — sub-response mapping", () => {
 
     const results = await svc.execute([req("0"), req("1"), req("2")]);
     expect(results.map((r) => r.ok)).toEqual([true, false, true]);
-    const failed = results[1]!;
+    const failed = results[1];
     if (failed.ok) throw new Error("expected a failure");
     expect(failed.status).toBe(400);
     expect(failed.error).toBeInstanceOf(TM1Error);
@@ -345,11 +345,11 @@ describe("BatchService — sub-response mapping", () => {
       req("1"),
       req("2"),
     ]);
-    if (notFound!.ok || conflict!.ok || denied!.ok)
+    if (notFound.ok || conflict.ok || denied.ok)
       throw new Error("expected failures");
-    expect(notFound!.error.code).toBe(TM1ErrorCode.NOT_FOUND);
-    expect(conflict!.error.code).toBe(TM1ErrorCode.CONFLICT);
-    expect(denied!.error.code).toBe(TM1ErrorCode.PERMISSION_DENIED);
+    expect(notFound.error.code).toBe(TM1ErrorCode.NOT_FOUND);
+    expect(conflict.error.code).toBe(TM1ErrorCode.CONFLICT);
+    expect(denied.error.code).toBe(TM1ErrorCode.PERMISSION_DENIED);
   });
 
   it("unwraps the nested OData message.value error shape", async () => {
@@ -365,8 +365,8 @@ describe("BatchService — sub-response mapping", () => {
       }),
     });
     const [r] = await svc.execute([req("0")]);
-    if (r!.ok) throw new Error("expected a failure");
-    expect(r!.error.message).toBe("deep text");
+    if (r.ok) throw new Error("expected a failure");
+    expect(r.error.message).toBe("deep text");
   });
 
   // handleResponse() ends its extraction with `?? errorBody`, so an unfamiliar
@@ -386,8 +386,8 @@ describe("BatchService — sub-response mapping", () => {
       }),
     });
     const [r] = await svc.execute([req("0")]);
-    if (r!.ok) throw new Error("expected a failure");
-    expect(r!.error.message).toContain("already exists");
+    if (r.ok) throw new Error("expected a failure");
+    expect(r.error.message).toContain("already exists");
   });
 
   it("correlates by id, not by position", async () => {
@@ -400,8 +400,8 @@ describe("BatchService — sub-response mapping", () => {
       }),
     });
     const [a, b] = await svc.execute([req("a"), req("b")]);
-    expect(a!.ok).toBe(true);
-    expect(b!.ok).toBe(false);
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(false);
   });
 
   it("surfaces a missing sub-response as a failure for that request", async () => {
@@ -409,8 +409,8 @@ describe("BatchService — sub-response mapping", () => {
       respond: () => ({ responses: [{ id: "a", status: 200, body: {} }] }),
     });
     const [, b] = await svc.execute([req("a"), req("b")]);
-    if (b!.ok) throw new Error("expected a failure");
-    expect(b!.error.message).toContain('no response for request id "b"');
+    if (b.ok) throw new Error("expected a failure");
+    expect(b.error.message).toContain('no response for request id "b"');
   });
 });
 
@@ -602,8 +602,8 @@ describe("BatchService — counter-probe on an ambiguous first-call 400", () => 
     // database root.
     const probes = sent.filter(isProbe);
     expect(probes).toHaveLength(1);
-    expect(probes[0]!.path).toBe("/api/v1/$batch");
-    expect((probes[0]!.body as Payload).requests).toEqual([
+    expect(probes[0].path).toBe("/api/v1/$batch");
+    expect((probes[0].body as Payload).requests).toEqual([
       {
         id: BATCH_PROBE_ID,
         method: "GET",

@@ -49,7 +49,7 @@ function makeFakeServer() {
       if (!captured || !parser) throw new Error("handler not registered");
       const p = parser;
       const h = captured;
-      return (args) => h(p.parse(args) as Record<string, unknown>);
+      return (args) => h(p.parse(args));
     },
   };
 }
@@ -89,12 +89,12 @@ const DENIED = new TM1Error({
 interface StubOpts {
   version?: 11 | 12;
   /** Thrown by executeMdx. When absent, `stats` is returned instead. */
-  failWith?: unknown;
+  failWith?: Error;
   stats?: Record<string, number>;
   /** Does `GET Cubes('}StatsByCube')` find the cube? Default: yes. */
   statsCubeExists?: boolean;
   /** When set, the existence probe itself rejects with this. */
-  probeFailsWith?: unknown;
+  probeFailsWith?: Error;
 }
 
 function makeClientStub(opts: StubOpts) {
@@ -139,7 +139,7 @@ function makeClientStub(opts: StubOpts) {
 
 function parseJson(raw: unknown) {
   const result = raw as { content: Array<{ text: string }> };
-  return JSON.parse(result.content[0]!.text);
+  return JSON.parse(result.content[0].text);
 }
 
 const HEALTHY_STATS = {

@@ -26,7 +26,7 @@ function makeFakeServer() {
       if (!captured || !parser) throw new Error("handler not registered");
       const p = parser;
       const h = captured;
-      return (args) => h(p.parse(args) as Record<string, unknown>);
+      return (args) => h(p.parse(args));
     },
     getName: () => toolName,
   };
@@ -81,7 +81,7 @@ function makeAuditComplexityClientStub(args: FakeArgs) {
 
 function parseResult(raw: unknown) {
   const result = raw as { content: Array<{ text: string }> };
-  return JSON.parse(result.content[0]!.text);
+  return JSON.parse(result.content[0].text);
 }
 
 describe("tm1_audit_complexity tool", () => {

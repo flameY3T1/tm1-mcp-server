@@ -174,7 +174,7 @@ describe("v12 buildLoginRequest", () => {
       ok: true,
       json: async () => ({ access_token: "iam-tok" }),
       text: async () => "",
-    } as unknown as Response);
+    });
     vi.stubGlobal("fetch", fetchSpy);
     try {
       const req = await v12({

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type pino from "pino";
 import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
@@ -15,7 +16,7 @@ const mockLogger = {
   child: vi.fn().mockReturnThis(),
   level: "silent",
   flush: vi.fn(),
-} as unknown as import("pino").Logger;
+} as unknown as pino.Logger;
 
 function makeConfig(): TM1Config {
   return {
@@ -61,7 +62,7 @@ describe("R2-05: HTTP layer emits mutation events", () => {
         statusText: "No Content",
         headers: new Headers(),
         text: vi.fn().mockResolvedValue(""),
-      } as unknown as Response),
+      }),
     );
 
     await client.request("POST", "/api/v1/Dimensions", { Name: "Test" });
@@ -77,7 +78,7 @@ describe("R2-05: HTTP layer emits mutation events", () => {
         statusText: "No Content",
         headers: new Headers(),
         text: vi.fn().mockResolvedValue(""),
-      } as unknown as Response),
+      }),
     );
 
     await client.request("DELETE", "/api/v1/Cubes('Old')");
@@ -95,7 +96,7 @@ describe("R2-05: HTTP layer emits mutation events", () => {
         statusText: "OK",
         headers: new Headers(),
         text: vi.fn().mockResolvedValue("{}"),
-      } as unknown as Response),
+      }),
     );
 
     await client.request("GET", "/api/v1/Configuration");
@@ -111,7 +112,7 @@ describe("R2-05: HTTP layer emits mutation events", () => {
         statusText: "Server Error",
         headers: new Headers(),
         text: vi.fn().mockResolvedValue("boom"),
-      } as unknown as Response),
+      }),
     );
 
     await expect(client.request("POST", "/api/v1/Bad")).rejects.toThrow();

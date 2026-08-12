@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
+import type { FnSpy } from "../helpers/spy-types.js";
 import { ElementTypeCache } from "../../src/lib/feeders/element-type-cache.js";
 
 interface HierarchyMock {
-  getElementTypes: ReturnType<typeof vi.fn>;
-  get: ReturnType<typeof vi.fn>;
+  getElementTypes: FnSpy;
+  get: FnSpy;
 }
 
 function makeHierarchyMock(
@@ -30,7 +31,7 @@ describe("ElementTypeCache", () => {
         { name: "DE", type: "Numeric" },
       ],
     });
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
 
     expect(await cache.getType("Region", "Region", "Total")).toBe(
       "Consolidated",
@@ -42,7 +43,7 @@ describe("ElementTypeCache", () => {
     const hier = makeHierarchyMock({
       "Region|Region": [{ name: "DE", type: "Numeric" }],
     });
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
     expect(await cache.getType("Region", "Region", "ZZ")).toBeNull();
   });
 
@@ -50,7 +51,7 @@ describe("ElementTypeCache", () => {
     const hier = makeHierarchyMock({
       "Region|Region": [{ name: "DE", type: "Numeric" }],
     });
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
     await cache.getType("Region", "Region", "DE");
     await cache.getType("Region", "Region", "DE");
     await cache.getType("Region", "Region", "FR");
@@ -61,7 +62,7 @@ describe("ElementTypeCache", () => {
     const hier = makeHierarchyMock({
       "Region|Region": [{ name: "DE", type: "Numeric" }],
     });
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
     expect(await cache.getType("Region", "Region", "DE")).toBe("Numeric");
     expect(hier.getElementTypes).toHaveBeenCalledWith("Region", "Region");
     expect(hier.get).not.toHaveBeenCalled();
@@ -71,7 +72,7 @@ describe("ElementTypeCache", () => {
     const hier = makeHierarchyMock({
       "Region|Region": [{ name: "DE", type: "Numeric" }],
     });
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
     expect(await cache.getType("Region", "Region", "de")).toBe("Numeric");
     expect(await cache.getType("Region", "Region", "DE")).toBe("Numeric");
   });
@@ -80,7 +81,7 @@ describe("ElementTypeCache", () => {
     const hier = makeHierarchyMock({
       "Region|Region": [{ name: "DE", type: "Numeric" }],
     });
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
     await cache.getType("region", "REGION", "DE");
     await cache.getType("Region", "Region", "DE");
     expect(hier.getElementTypes).toHaveBeenCalledTimes(1);
@@ -93,7 +94,7 @@ describe("ElementTypeCache", () => {
       }),
       get: vi.fn(),
     };
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
     expect(await cache.getType("Bogus", "Bogus", "X")).toBeNull();
   });
 
@@ -107,7 +108,7 @@ describe("ElementTypeCache", () => {
       }),
       get: vi.fn(),
     };
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
 
     expect(await cache.getType("Region", "Region", "DE")).toBeNull();
     expect(await cache.getType("Region", "Region", "DE")).toBe("Numeric");
@@ -130,7 +131,7 @@ describe("ElementTypeCache", () => {
       }),
       get: vi.fn(),
     };
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
 
     const inflight = Promise.all([
       cache.getType("Region", "Region", "DE"),
@@ -151,7 +152,7 @@ describe("ElementTypeCache", () => {
       }),
       get: vi.fn(),
     };
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
 
     // Failures 1 and 2 each retry.
     expect(await cache.getType("Region", "Region", "DE")).toBeNull();
@@ -181,7 +182,7 @@ describe("ElementTypeCache", () => {
       }),
       get: vi.fn(),
     };
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
 
     expect(await cache.getType("Region", "Region", "DE")).toBeNull();
     expect(await cache.getType("Region", "Region", "DE")).toBeNull();
@@ -200,7 +201,7 @@ describe("ElementTypeCache", () => {
       }),
       get: vi.fn(),
     };
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
 
     for (let i = 0; i < 5; i++) {
       expect(await cache.getType("Region", "Region", "DE")).toBeNull();
@@ -227,7 +228,7 @@ describe("ElementTypeCache", () => {
       }),
       get: vi.fn(),
     };
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
 
     const inflight = Promise.all([
       cache.getType("Region", "Region", "DE"),
@@ -253,7 +254,7 @@ describe("ElementTypeCache", () => {
     const hier = makeHierarchyMock({
       "Region|Region": [{ name: "Weird", type: "SomethingElse" }],
     });
-    const cache = new ElementTypeCache(hier as never);
+    const cache = new ElementTypeCache(hier);
     expect(await cache.getType("Region", "Region", "Weird")).toBeNull();
   });
 });
