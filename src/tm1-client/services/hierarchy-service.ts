@@ -212,11 +212,10 @@ export class HierarchyService {
   /**
    * Element name + type for a whole hierarchy — nothing else.
    *
-   * `get()` is the wrong tool for a type lookup: it expands `Parents` on every
-   * element and, when a parent survives the filter, additionally scans the
-   * whole `Edges` collection to weight the children. This reads the Elements
-   * collection directly with `$select=Name,Type` — no expand, no Edges scan —
-   * which is the minimum payload for name → type resolution.
+   * `get()` is the wrong tool for a type lookup: it expands `Parents` and
+   * `Edges` on every element to build the tree and weight the children. This
+   * reads the Elements collection directly with `$select=Name,Type` — no
+   * expand at all — which is the minimum payload for name → type resolution.
    *
    * GET /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Elements?$select=Name,Type
    */
