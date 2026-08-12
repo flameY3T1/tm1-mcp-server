@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`tm1_write_cells` writes a whole batch in three requests instead of three per cell.** Each cell
+  had its own cellset, PATCH and delete — 120 requests for 40 cells, measured. TM1py (and tm1npm,
+  which ports it) build one cellset over every target coordinate and PATCH the cell array once;
+  verified against 11.8 at **40 cells in 3 requests, 9 ms**, values read back correct.
+
+  Behaviour changes on failure: TM1 refuses a batch containing a non-writable cell **whole**, so
+  nothing in it lands — where the old per-cell loop committed the cells before the offender. The
+  error names only a status code, so the failing batch is then re-walked cell by cell to identify
+  the coordinate and restore the `written`/`failed`/`notAttempted` report. That costs what the old
+  implementation always cost, but only when a write is refused.
+
 - **`tm1_get_hierarchy` reads edge weights from the elements, and filters by type server-side.**
   Weights came from the hierarchy's entire `Edges` collection — 21.6 MB and 594 ms for a
   171k-element dimension, in a second round trip. `Element` has an `Edges` navigation carrying its

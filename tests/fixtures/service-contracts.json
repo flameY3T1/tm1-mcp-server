@@ -1,5 +1,5 @@
 {
-  "recordedAgainst": ["11.8.02900.8", "12.5.9"],
+  "recordedAgainst": ["11.8.02900.8"],
   "recordedAt": "2026-08-12",
   "methods": {
     "batch.execute": {
@@ -124,14 +124,12 @@
           "}Cube Functions?": "number",
           "}CubeProperties?": "number",
           "}Cubes?": "number",
-          "}CubeSecStatus?": "number",
           "}CubeSecurityProperties?": "number",
           "}Cultures?": "number",
           "}DimensionFormatAttributes?": "number",
           "}DimensionFormatItems?": "number",
           "}DimensionProperties?": "number",
           "}Dimensions?": "number",
-          "}DimensionSecStatus?": "number",
           "}ElementAttributes_}Clients?": "number",
           "}ElementAttributes_}Cultures?": "number",
           "}ElementAttributes_}Groups?": "number",
@@ -148,13 +146,10 @@
           "}ElementAttributes_Time_Month?": "number",
           "}ElementAttributes_Version?": "number",
           "}ElementProperties?": "number",
-          "}ElementSecStatus?": "number",
           "}Features?": "number",
           "}Groups?": "number",
-          "}Hierarchies_a?": "number",
           "}Hierarchies_Account?": "number",
           "}Hierarchies_AssetType?": "number",
-          "}Hierarchies_b?": "number",
           "}Hierarchies_CostCenter?": "number",
           "}Hierarchies_Currency?": "number",
           "}Hierarchies_Customer?": "number",
@@ -176,7 +171,6 @@
           "}Hierarchies_Measure_Status?": "number",
           "}Hierarchies_Measure_Sub?": "number",
           "}Hierarchies_Project?": "number",
-          "}Hierarchies_Sandboxes?": "number",
           "}Hierarchies_Status?": "number",
           "}Hierarchies_Supplier?": "number",
           "}Hierarchies_test1?": "number",
@@ -199,7 +193,6 @@
           "}StatsStatsByCube?": "number",
           "}StatsStatsByCubeByClient?": "number",
           "}StatsStatsForServer?": "number",
-          "}Subsets_a?": "number",
           "}Subsets_Currency?": "number",
           "}Subsets_Location?": "number",
           "}Subsets_Measure_Assumption?": "number",
@@ -210,10 +203,8 @@
           "}Views_Cube_1?": "number",
           "}Views_Cube_Compliance?": "number",
           "}Views_Cube_Status?": "number",
-          "a?": "number",
           "Account?": "number",
           "AssetType?": "number",
-          "b?": "number",
           "ByLevel?": "number",
           "CostCenter?": "number",
           "Currency?": "number",
@@ -291,10 +282,10 @@
     },
     "files.getContent": "string",
     "files.list": {
-      "[]": "string"
+      "[]": "unknown"
     },
     "files.search": {
-      "[]": "string"
+      "[]": "unknown"
     },
     "files.upload": {
       "created": "boolean",
@@ -505,10 +496,10 @@
       }
     },
     "server.getInfo": {
-      "adminHost?": "string",
-      "dataDirectory?": "string",
+      "adminHost": "string",
+      "dataDirectory": "string",
       "extra": {
-        "Access?": {
+        "Access": {
           "Authentication": {
             "IntegratedSecurityMode": "string",
             "MaximumLoginAttempts": "number",
@@ -577,30 +568,29 @@
             "TLSCipherList": "null"
           }
         },
-        "AdminHost?": "string",
+        "AdminHost": "string",
         "Administration": {
-          "AdminHost?": "string",
+          "AdminHost": "string",
           "AllowReadOnlyChoreReschedule": "boolean",
-          "AuditLog?": {
+          "AuditLog": {
             "Enable": "boolean",
             "MaxFileSizeKilobytes": "number",
             "MaxQueryMemoryKilobytes": "number",
             "UpdateInterval": "string"
           },
-          "Clients?": {
+          "Clients": {
             "ClientPropertiesSyncInterval": "string",
             "PasswordMinimumLength": "number",
             "RetainNonCAMGroupMembership": "null"
           },
           "DataBaseDirectory": "string",
-          "DebugLog?": {
+          "DebugLog": {
             "LoggingDirectory": "string"
           },
-          "DefaultNumberFormat?": "string",
-          "DisableSandboxing": "boolean|null",
-          "DownTime?": "string",
+          "DisableSandboxing": "boolean",
+          "DownTime": "string",
           "EnableSandboxDimension": "boolean",
-          "EventLog?": {
+          "EventLog": {
             "Enable": "boolean",
             "ScanFrequency": "string",
             "ThresholdForPooledMemoryInMB": "number",
@@ -609,38 +599,36 @@
             "ThresholdForThreadWaitingTime": "string"
           },
           "ExternalDatabase": {
-            "ODBCLibraryPath?": "null",
-            "ODBCServiceRoot?": "string",
-            "ODBCTimeoutInSeconds?": "number",
-            "OracleErrorForceRowStatus?": "null",
-            "SQLFetchType?": "null",
-            "SQLRowsetSize?": "number",
-            "TM1ConnectorforSAP?": "boolean",
-            "UseNewConnectorforSAP?": "boolean"
+            "ODBCLibraryPath": "null",
+            "ODBCTimeoutInSeconds": "number",
+            "OracleErrorForceRowStatus": "null",
+            "SQLFetchType": "null",
+            "SQLRowsetSize": "number",
+            "TM1ConnectorforSAP": "boolean",
+            "UseNewConnectorforSAP": "boolean"
           },
           "FileRetry": {
             "FileRetryCount": "number",
             "FileRetryDelayMilliseconds": "number",
             "FileRetryFileSpec[]": "string"
           },
-          "Java?": {
+          "Java": {
             "ClassPath": "null",
             "JVMArgs": "null",
             "JVMPath": "null"
           },
-          "Language": "null|string",
-          "LegacyTransactionLog?": "null",
-          "MaskUserNameInServerTools?": "boolean",
-          "PerfMonActive?": "boolean",
-          "PerformanceMonitorOn?": "boolean",
-          "RunningInBackground?": "null",
-          "ServerLog?": {
+          "Language": "null",
+          "MaskUserNameInServerTools": "boolean",
+          "PerfMonActive": "boolean",
+          "PerformanceMonitorOn": "boolean",
+          "RunningInBackground": "null",
+          "ServerLog": {
             "Enable": "boolean",
             "LogReleaseLineCount": "number"
           },
-          "ServerName?": "string",
+          "ServerName": "string",
           "StartupChores": "null",
-          "TM1Web?": {
+          "TM1Web": {
             "ExcelWebPublishEnabled": "boolean"
           },
           "TopLog": {
@@ -650,48 +638,48 @@
           },
           "UnicodeUpperLowerCase": "boolean"
         },
-        "AllowSeparateNandCRules?": "boolean",
-        "ClientCAMURIs[]?": "unknown",
-        "ClientMessagePortNumber?": "number",
-        "ClientPingCAMPassport?": "number",
-        "DataBaseDirectory?": "string",
-        "DisableSandboxing?": "boolean",
-        "DistributedOutputDir?": "string",
-        "ForceReevaluationOfFeedersForFedCellsOnDataChange?": "boolean",
-        "HTTPPortNumber?": "number",
-        "IntegratedSecurityMode?": "boolean",
-        "JobQueuing?": "boolean",
+        "AllowSeparateNandCRules": "boolean",
+        "ClientCAMURIs[]": "unknown",
+        "ClientMessagePortNumber": "number",
+        "ClientPingCAMPassport": "number",
+        "DataBaseDirectory": "string",
+        "DisableSandboxing": "boolean",
+        "DistributedOutputDir": "string",
+        "ForceReevaluationOfFeedersForFedCellsOnDataChange": "boolean",
+        "HTTPPortNumber": "number",
+        "IntegratedSecurityMode": "boolean",
+        "JobQueuing": "boolean",
         "Modelling": {
-          "DefaultMeasuresDimension?": "boolean",
-          "EnableNewHierarchyCreation?": "boolean",
-          "MDXSelectCalculatedMemberInputs": "boolean|null",
+          "DefaultMeasuresDimension": "boolean",
+          "EnableNewHierarchyCreation": "boolean",
+          "MDXSelectCalculatedMemberInputs": "boolean",
           "Rules": {
             "AllowSeparateNandCRules": "boolean",
             "AutomaticallyAddCubeDependencies": "boolean",
             "ForceReevaluationOfFeedersForFedCellsOnDataChange": "boolean",
-            "RulesOverwriteCellsOnLoad?": "boolean"
+            "RulesOverwriteCellsOnLoad": "boolean"
           },
           "Spreading": {
             "ProportionSpreadToZeroCells": "boolean",
             "SpreadingPrecision": "number"
           },
           "Startup": {
-            "LoadPrivateSubsetsOnStartup": "boolean|null",
+            "LoadPrivateSubsetsOnStartup": "boolean",
             "MaximumCubeLoadThreads": "number",
             "PersistentFeeders": "boolean",
-            "SkipLoadingAliases?": "null"
+            "SkipLoadingAliases": "null"
           },
-          "Synchronization?": {
+          "Synchronization": {
             "MaximumSynchAttempts": "number",
             "SyncUnitSize": "number"
           },
           "TI": {
-            "CognosTM1InterfacePath?": "null",
+            "CognosTM1InterfacePath": "null",
             "EnableTIDebugging": "boolean",
             "MaximumTILockObjects": "number",
             "UseExcelSerialDate": "boolean"
           },
-          "UserDefinedCalculations": "boolean|null"
+          "UserDefinedCalculations": "boolean"
         },
         "Performance": {
           "JobQueuing": {
@@ -700,21 +688,19 @@
             "ThreadPoolSize": "number",
             "ThreadSleepTime": "string"
           },
-          "Locking?": {
+          "Locking": {
             "PullInvalidationSubsets": "boolean",
             "SubsetElementLockBreathing": "boolean",
             "UseLocalCopiesForPublicDynamicSubsets": "boolean"
           },
           "Memory": {
             "ApplyMaximumViewSizeToEntireTransaction": "boolean",
-            "CacheFriendlyMalloc": "boolean|null",
-            "DisableMemoryCache": "boolean|null",
-            "LockPagesInMemory": "boolean|null",
-            "MaximumGlobalQueryMemorySizeMB?": "number",
+            "CacheFriendlyMalloc": "boolean",
+            "DisableMemoryCache": "boolean",
+            "LockPagesInMemory": "boolean",
             "MaximumMemoryForSubsetUndoKB": "number",
-            "MaximumSingleQueryMemorySizeMB?": "number",
             "MaximumUserSandboxSizeMB": "number",
-            "MaximumViewSizeMB": "null|number"
+            "MaximumViewSizeMB": "number"
           },
           "MTCubeLoad": {
             "Enabled": "boolean",
@@ -728,8 +714,8 @@
           },
           "MTQ": {
             "ImmediateCheckForSplit": "boolean",
-            "MTFeeders?": "boolean",
-            "MTFeedersAtStartup?": "boolean",
+            "MTFeeders": "boolean",
+            "MTFeedersAtStartup": "boolean",
             "MTQQuery": "boolean",
             "NumberOfThreadsToUse": "number",
             "OperationProgressCheckSkipLoopSize": "number",
@@ -750,17 +736,17 @@
             "ViewConsolidationOptimizationMethod": "string"
           }
         },
-        "PortNumber?": "number",
-        "PrincipalName?": "string",
-        "ProductVersion?": "string",
-        "SecurityMode?": "string",
-        "SecurityPackageName?": "string",
-        "ServerCAMURI?": "string",
+        "PortNumber": "number",
+        "PrincipalName": "string",
+        "ProductVersion": "string",
+        "SecurityMode": "string",
+        "SecurityPackageName": "string",
+        "ServerCAMURI": "string",
         "ServerName": "string",
-        "UnicodeUpperLowerCase?": "boolean",
-        "WebCAMURI?": "string"
+        "UnicodeUpperLowerCase": "boolean",
+        "WebCAMURI": "string"
       },
-      "integratedSecurityMode?": "string",
+      "integratedSecurityMode": "string",
       "productVersion": "string",
       "serverName": "string"
     },
@@ -788,7 +774,6 @@
       "[]": {
         "dimensionName": "string",
         "elements[]": "unknown",
-        "expression?": "string",
         "hierarchyName": "string",
         "name": "string",
         "private": "boolean"

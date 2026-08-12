@@ -503,6 +503,21 @@ describe("TM1Client – Cell Data Methods", () => {
           const id = mdx.includes("[Dim1].[Dim1].[BAD]") ? "bad" : "good";
           return Promise.resolve(mockResponse({ ID: id }));
         }
+        // The bulk PATCH targets /Cells (no ordinal). A chunk holding the bad
+        // coordinate is refused whole, exactly as TM1 does.
+        if (u.endsWith("/Cells") && u.includes("Cellsets('bad')")) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            statusText: "Bad Request",
+            headers: new Headers(),
+            text: vi
+              .fn()
+              .mockResolvedValue(
+                JSON.stringify({ error: { message: "consolidated cell" } }),
+              ),
+          });
+        }
         if (u.includes("/Cells(0)")) {
           if (u.includes("Cellsets('bad')")) {
             return Promise.resolve({
@@ -527,8 +542,10 @@ describe("TM1Client – Cell Data Methods", () => {
     it("throws with written/failed/notAttempted split and stops after the failing batch", async () => {
       routeWithBadCell();
 
-      // 12 cells → two batches (BATCH_SIZE 10). The failing cell sits in batch 1,
-      // so batch 2 (indices 10–11) must never be attempted.
+      // 12 cells fit one chunk. The bulk PATCH is refused because BAD is in
+      // it — nothing lands — so the fallback re-walks the chunk one cell at a
+      // time: 11 succeed, BAD does not. `notAttempted` counts whole chunks
+      // beyond the failing one, of which there are none here.
       const dimensions = ["Dim1", "Dim2"];
       const cells = Array.from({ length: 12 }, (_, i) => ({
         elements: [`E${i}`, "M"],
@@ -547,23 +564,18 @@ describe("TM1Client – Cell Data Methods", () => {
       const err = caught as TM1Error;
       expect(err.code).toBe("TM1_ERROR");
       expect(err.message).toMatch(/partially applied/);
-      expect(err.message).toMatch(/9 written/);
+      expect(err.message).toMatch(/11 written/);
       expect(err.message).toMatch(/1 failed/);
-      expect(err.message).toMatch(/2 not attempted/);
+      expect(err.message).toMatch(/0 not attempted/);
 
       const details = JSON.parse(err.details ?? "{}");
-      expect(details.written).toBe(9);
-      expect(details.notAttempted).toBe(2);
+      expect(details.written).toBe(11);
+      expect(details.notAttempted).toBe(0);
+      // The coordinate the server refused — its own message names only a
+      // status code, which is why the fallback exists at all.
       expect(details.failed).toEqual([
         { elements: ["BAD", "M"], error: "consolidated cell" },
       ]);
-
-      // Batch 2 cells (E10 / E11) were never sent to ExecuteMDX.
-      const mdxBodies = fetchSpy.mock.calls
-        .filter(([u]) => String(u).includes("/ExecuteMDX"))
-        .map(([, o]) => (o as { body?: string }).body ?? "");
-      expect(mdxBodies.some((b) => b.includes("[E10]"))).toBe(false);
-      expect(mdxBodies.some((b) => b.includes("[E11]"))).toBe(false);
     });
   });
 
@@ -607,10 +619,11 @@ describe("TM1Client – Cell Data Methods", () => {
         [{ elements: ["[Time].[FiscalCal].[Q4]", "EU"], value: 5 }],
       );
       const mdx = firstMdx();
-      // Alt hierarchy preserved on COLUMNS — NOT rewritten to the default [Time].[Time].[…].
-      expect(mdx).toContain("{[Time].[FiscalCal].[Q4]}");
+      // Every coordinate is one tuple in a single set now, but qualification is
+      // unchanged: an alternate hierarchy survives verbatim…
+      expect(mdx).toContain("[Time].[FiscalCal].[Q4]");
       expect(mdx).not.toContain("[Time].[Time].[Time]");
-      // Bare element still defaults hierarchy to the dimension name.
+      // …and a bare element still defaults its hierarchy to the dimension name.
       expect(mdx).toContain("[Region].[Region].[EU]");
     });
 
@@ -622,8 +635,7 @@ describe("TM1Client – Cell Data Methods", () => {
         [{ elements: ["Jan", "EU"], value: 5 }],
       );
       const mdx = firstMdx();
-      expect(mdx).toContain("{[Time].[Time].[Jan]}");
-      expect(mdx).toContain("([Region].[Region].[EU])");
+      expect(mdx).toContain("([Time].[Time].[Jan],[Region].[Region].[EU])");
     });
   });
 

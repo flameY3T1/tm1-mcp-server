@@ -183,27 +183,35 @@ export class CellService {
     }
 
     const cube = escapeMdxName(cubeName);
+    const tupleOf = (c: { elements: string[] }) => {
+      const refs = c.elements.map((e, idx) =>
+        qualifyWriteMember(dimensions[idx]!, e),
+      );
+      return refs.length === 1 ? refs[0]! : `(${refs.join(",")})`;
+    };
+
+    // One cell at a time cost three requests each — cellset, PATCH, delete —
+    // which measured 120 requests for 40 cells. TM1py (and tm1npm, which ports
+    // it) build ONE cellset over every target coordinate and PATCH the whole
+    // cell array once; verified against 11.8 at 40 cells in 3 requests, 9 ms.
+    //
+    // The array goes out BARE. `{Cells: [...]}` — what tm1npm sends — is
+    // refused with "Invalid CellsetCell property encountered in payload".
+    //
+    // Ordinals are positional, and TM1 does not collapse a repeated tuple in a
+    // set (verified), so cells[i] stays ordinal i even when a caller sends the
+    // same coordinate twice.
     const writeOne = async (c: {
       elements: string[];
       value: number | string;
     }) => {
-      const memberRefs = c.elements.map((e, idx) =>
-        qualifyWriteMember(dimensions[idx]!, e),
-      );
-      const colMember = memberRefs[0];
-      const rowTuple = memberRefs.slice(1).join(",");
-      const mdx =
-        memberRefs.length === 1
-          ? `SELECT {${colMember}} ON COLUMNS FROM [${cube}]`
-          : `SELECT {${colMember}} ON COLUMNS, {(${rowTuple})} ON ROWS FROM [${cube}]`;
-
+      const mdx = `SELECT {${tupleOf(c)}} ON COLUMNS FROM [${cube}]`;
       const cellset = await this.http.request<{ ID: string }>(
         "POST",
         "/api/v1/ExecuteMDX",
         { MDX: mdx },
       );
       const id = cellset.ID;
-
       try {
         await this.http.request<void>(
           "PATCH",
@@ -222,25 +230,58 @@ export class CellService {
       }
     };
 
-    // Batched concurrency. Each cell is an independent 3-call round-trip, so a
-    // failure mid-run leaves earlier cells committed — TM1 has no transaction
-    // across them. Report the split (written / failed / notAttempted) instead of
-    // surfacing only the single rejected cell, so the caller knows exactly what
-    // landed and what to retry. Stop at the first batch containing a failure;
-    // later batches are left unattempted rather than compounding partial state.
-    const BATCH_SIZE = 10;
+    // Chunked because the MDX carries one tuple per cell: 2000 tuples measured
+    // at 194 KB and 90 ms, so this stays far inside what the server and any
+    // proxy in front of it accept.
+    const CHUNK = 500;
     let written = 0;
-    for (let i = 0; i < cells.length; i += BATCH_SIZE) {
-      const batch = cells.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(batch.map(writeOne));
 
+    for (let i = 0; i < cells.length; i += CHUNK) {
+      const chunk = cells.slice(i, i + CHUNK);
+      const mdx = `SELECT {${chunk.map(tupleOf).join(",")}} ON COLUMNS FROM [${cube}]`;
+
+      let bulkFailed = false;
+      const cellset = await this.http.request<{ ID: string }>(
+        "POST",
+        "/api/v1/ExecuteMDX",
+        { MDX: mdx },
+      );
+      try {
+        await this.http.request<void>(
+          "PATCH",
+          `/api/v1/Cellsets('${enc(cellset.ID)}')/Cells`,
+          chunk.map((c, ordinal) => ({ Ordinal: ordinal, Value: c.value })),
+        );
+        written += chunk.length;
+      } catch {
+        // A chunk holding one non-writable cell is refused WHOLE — nothing
+        // lands, not even the writable cells (measured:
+        // CubeCellWriteStatusElementIsConsolidated). The error names the
+        // status, never the coordinate, so the only way to tell the caller
+        // WHICH cell was refused is to re-walk this chunk one cell at a time.
+        // That is the old cost, paid only on the failing path.
+        bulkFailed = true;
+      } finally {
+        try {
+          await this.http.request<void>(
+            "DELETE",
+            `/api/v1/Cellsets('${enc(cellset.ID)}')`,
+          );
+        } catch {
+          // cleanup best-effort
+        }
+      }
+
+      if (!bulkFailed) continue;
+
+      const results = await Promise.allSettled(chunk.map(writeOne));
       const failed: Array<{ elements: string[]; error: string }> = [];
       results.forEach((r, j) => {
         if (r.status === "fulfilled") {
           written++;
         } else {
           failed.push({
-            elements: batch[j]!.elements,
+            elements: chunk[j]!.elements,
             error:
               r.reason instanceof Error ? r.reason.message : String(r.reason),
           });
@@ -248,7 +289,7 @@ export class CellService {
       });
 
       if (failed.length > 0) {
-        const notAttempted = cells.length - (i + batch.length);
+        const notAttempted = cells.length - (i + chunk.length);
         throw new TM1Error({
           code: TM1ErrorCode.TM1_ERROR,
           message:
