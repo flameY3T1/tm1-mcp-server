@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`tm1_audit_naming` checks element names on the server, and now checks all of them.** The audit
+  downloaded every element name of every dimension — 15.2 MB for a single 171k-element dimension,
+  66 MB across a real model — and stopped at `maxElementsPerDim`, beyond which it examined only a
+  prefix. Every element rule is character-based, and TM1 implements the OData functions they need,
+  so the server does the narrowing and returns only candidates: **66 MB → 400 KB** on that model,
+  while the elements examined went from a 100k cap to **1,280,396**, surfacing 64 violations.
+
+  `maxElementsPerDim` now bounds how many offenders are REPORTED, not how many elements are
+  checked, and `scanned.elements` counts what the server examined. The filter is a prefilter only —
+  the same `checkName` still decides on every candidate — and its soundness is asserted live: the
+  suite plants an element whose name contains a reserved character and requires the audit to find
+  it, on v11 and v12.
+
 - **`tm1_audit_complexity` issues one request instead of one per process.** The consistency scan
   listed every process, then asked each one for its variables — 221 extra round trips on a
   221-process model, measured. `Variables` is a complex-typed property, so the process list can

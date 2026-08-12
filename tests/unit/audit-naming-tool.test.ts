@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { matchesElementViolationFilter } from "../../src/lib/naming/odata-filter.js";
 import { z, type ZodRawShape } from "zod";
 import { registerAuditNaming } from "../../src/tools/analysis/audit-naming.js";
 import { ElementService } from "../../src/tm1-client/services/element-service.js";
@@ -80,8 +81,22 @@ function makeAuditNamingClientStub(args: AuditNamingClientStubArgs) {
     const top = Number(qs.get("$top") ?? names.length);
     const skip = Number(qs.get("$skip") ?? 0);
     const wantCount = qs.get("$count") === "true";
-    const value = names.slice(skip, skip + top).map((Name) => ({ Name }));
-    return wantCount ? { "@odata.count": names.length, value } : { value };
+    // The audit asks the server to do the narrowing, so the fake has to narrow
+    // too — otherwise the paging and the counts under test would be measured
+    // against a response shape no server produces. Same predicate the builder
+    // emits; its agreement with checkName is pinned in
+    // naming-odata-filter.test.ts, and with TM1 in the live suite.
+    // A server applies the filter it was given. Deriving the version from
+    // productVersion instead would ignore versionOverride, which exists
+    // precisely to send v12 rules to a v11 server — the TAB clause is the
+    // observable difference.
+    const sentFilter = qs.get("$filter");
+    const filterMajor = sentFilter?.includes("indexof(Name,'%09')") ? 12 : 11;
+    const matching = sentFilter
+      ? names.filter((n) => matchesElementViolationFilter(n, filterMajor))
+      : names;
+    const value = matching.slice(skip, skip + top).map((Name) => ({ Name }));
+    return wantCount ? { "@odata.count": matching.length, value } : { value };
   };
   return {
     server: { getInfo: async () => ({ productVersion: args.productVersion }) },
@@ -263,8 +278,11 @@ describe("tm1_audit_naming tool", () => {
   it("paginates element scan via $skip across multiple HTTP pages", async () => {
     // Zod schema clamps elementsPageSize to min(1000), so verify multi-page
     // $skip behaviour against a dimension whose count exceeds one page.
+    // Every name violates a rule (leading '+'), so the filtered result set is
+    // itself multi-page — paging now happens over the OFFENDERS, and a
+    // dimension of clean names would never reach a second page.
     const total = 2500;
-    const names = Array.from({ length: total }, (_, i) => `e${i}`);
+    const names = Array.from({ length: total }, (_, i) => `+e${i}`);
     const fake = makeFakeServer();
     let requestCount = 0;
     const request = async (_method: string, path: string) => {
@@ -275,8 +293,11 @@ describe("tm1_audit_naming tool", () => {
       const top = Number(qs.get("$top") ?? names.length);
       const skip = Number(qs.get("$skip") ?? 0);
       const wantCount = qs.get("$count") === "true";
-      const value = names.slice(skip, skip + top).map((Name) => ({ Name }));
-      return wantCount ? { "@odata.count": names.length, value } : { value };
+      const matching = qs.get("$filter")
+        ? names.filter((n) => matchesElementViolationFilter(n, 11))
+        : names;
+      const value = matching.slice(skip, skip + top).map((Name) => ({ Name }));
+      return wantCount ? { "@odata.count": matching.length, value } : { value };
     };
     const tm1 = {
       server: { getInfo: async () => ({ productVersion: "11.8.01100" }) },
@@ -300,8 +321,11 @@ describe("tm1_audit_naming tool", () => {
       }),
     );
     expect(out.scanned.elements).toBe(total);
-    // Pages: probe (skip=0, count=true) + skip=1000 + skip=2000 → 3 requests.
-    expect(requestCount).toBe(3);
+    expect(out.invalidCount).toBe(total);
+    // probe (skip=0, count=true) + skip=1000 + skip=2000, then one unfiltered
+    // $top=0 probe for the hierarchy size, which the filtered count cannot
+    // supply. Four requests — and 145 bytes for the fourth.
+    expect(requestCount).toBe(4);
   });
 
   it("reports scanned.dimensions when only hierarchies are in scope", async () => {
@@ -338,8 +362,8 @@ describe("tm1_audit_naming tool", () => {
 
   it("truncates dimension above maxElementsPerDim and reports it transparently", async () => {
     const fake = makeFakeServer();
-    const big = Array.from({ length: 10 }, (_, i) => `e${i}`);
-    const small = ["ok1", "ok2"];
+    const big = Array.from({ length: 10 }, (_, i) => `+e${i}`);
+    const small = ["+bad1", "+bad2"];
     const tm1 = makeAuditNamingClientStub({
       productVersion: "11.8.01100",
       dimensions: [
@@ -352,13 +376,17 @@ describe("tm1_audit_naming tool", () => {
     const out = parseResult(
       await fake.getHandler()({ scope: ["elements"], maxElementsPerDim: 5 }),
     );
-    expect(out.scanned.elements).toBe(7); // first 5 of Huge + all 2 of Small
+    // The cap now bounds REPORTED violations, not elements examined: "Huge"
+    // has ten offenders and only five come back, while both hierarchies are
+    // still checked in full (10 + 2).
+    expect(out.scanned.elements).toBe(12);
+    expect(out.invalidCount).toBe(5 + 2);
     expect(out.elementsTruncated).toEqual([
       {
         dimension: "Huge",
         hierarchy: "Huge",
         elementCount: 10,
-        scannedCount: 5,
+        scannedCount: 10,
       },
     ]);
   });
@@ -529,8 +557,10 @@ describe("tm1_audit_naming tool", () => {
       const out = parseResult(
         await fake.getHandler()({ scope: ["elements"], maxElementsPerDim: 5 }),
       );
-      // scanned: 5 from Huge + 2 from Small = 7. Total: 10 + 2 = 12.
-      expect(out.scanned.elements).toBe(7);
+      // The server applies the rules to every element, so both hierarchies
+      // are examined in full whatever the cap: 10 + 2 = 12. The cap bounds how
+      // many offenders come back, and these names are all clean.
+      expect(out.scanned.elements).toBe(12);
       expect(out.totalElementsInScope).toBe(12);
     });
 

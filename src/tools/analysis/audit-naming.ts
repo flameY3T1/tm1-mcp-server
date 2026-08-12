@@ -8,6 +8,7 @@ import {
   type TM1MajorVersion,
   type Violation,
 } from "../../lib/naming/rules.js";
+import { elementViolationFilter } from "../../lib/naming/odata-filter.js";
 import { isControlName } from "../../lib/control-name.js";
 
 interface Finding {
@@ -95,7 +96,7 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(25000)
         .describe(
-          "Element-scan page size for $top/$skip pagination. Bounded to keep each response " +
+          "Page size for paging through violating elements. Bounded to keep each response " +
             "well below the V8 string limit (~512 MB). Default 25000.",
         ),
       maxElementsPerDim: z
@@ -105,11 +106,10 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         .optional()
         .default(100000)
         .describe(
-          "Per-(dimension, hierarchy) cap on elements scanned. When total exceeds the cap, " +
-            "only the first N elements are checked (paginated via elementsPageSize) and the " +
-            "truncation is reported under `elementsTruncated` with both totalCount and " +
-            "scannedCount, so the partial scan is transparent. Default 100000. Raise (e.g. " +
-            "10_000_000) to scan everything; lower for faster audits on huge models.",
+          "Per-(dimension, hierarchy) cap on VIOLATING elements returned. The server checks " +
+            "every element against the rules, so the whole hierarchy is always examined; this " +
+            "bounds how many offenders come back. A hit of the cap is reported under " +
+            "`elementsTruncated`. Default 100000.",
         ),
       summary: z
         .boolean()
@@ -188,9 +188,21 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         want("elements") ||
         want("subsets");
       let dimensionsForChildren:
-        Array<{ name: string; hierarchies: string[] }> | undefined;
+        | Array<{
+            name: string;
+            hierarchies: string[];
+            elementCounts?: Record<string, number> | undefined;
+          }>
+        | undefined;
       if (needDims) {
-        const dims = await tm1Client.dimensions.list();
+        // With elements in scope, ask for the per-hierarchy element totals in
+        // this same request. TM1 answers a nested $count without listing the
+        // elements, so the scope figures cost nothing here — versus one probe
+        // request per hierarchy, which on a 107-hierarchy model was 107 round
+        // trips for a number the list could have carried.
+        const dims = await tm1Client.dimensions.list(
+          want("elements") ? { includeElementCount: true } : {},
+        );
         const filtered = includeControl
           ? dims
           : dims.filter((d) => !isControlName(d.name));
@@ -214,15 +226,25 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
         dimensionsForChildren = filtered.map((d) => ({
           name: d.name,
           hierarchies: d.hierarchies,
+          elementCounts: d.elementCounts,
         }));
       }
 
-      // ── Elements (per-dim/per-hierarchy, server-side paginated) ────────
-      // Delegated to ElementService.scanElementNames, which owns the
-      // probe-then-page strategy and the V8-string-limit workaround (a single
-      // bulk OData fetch used to crash Node on large models). If a hierarchy
-      // exceeds maxElementsPerDim we still scan the first N names and report
-      // the truncation in `elementsTruncated` — never a silent skip.
+      // ── Elements (per-dim/per-hierarchy, filtered server-side) ─────────
+      // Every element rule is character-based, so TM1 evaluates them: the
+      // scan asks for the names that MIGHT violate one and checks only those
+      // (see src/lib/naming/odata-filter.ts). Downloading every name cost
+      // 15.2 MB on a single 171k-element dimension and 66 MB across a real
+      // model, and capped the audit at maxElementsPerDim — beyond which it
+      // examined a prefix of the dimension and said so. Now the server looks
+      // at all of them, and the cap bounds the number of REPORTED violations
+      // instead of the number examined.
+      //
+      // The filter is a prefilter, never the verdict: checkName still decides
+      // on every candidate, so an over-wide filter costs rows and nothing
+      // more. Its soundness — never omitting a name checkName would flag — is
+      // pinned by tests/unit/naming-odata-filter.test.ts and by the live
+      // suite, which plants a violating element and expects it back.
       const elementsTruncated: TruncatedElementGroup[] = [];
       let totalElementsInScope = 0;
       if (want("elements") && dimensionsForChildren) {
@@ -237,10 +259,19 @@ export function registerAuditNaming(server: McpServer, tm1Client: TM1Client) {
             } = await tm1Client.elements.scanElementNames(d.name, h, {
               pageSize: elementsPageSize,
               maxScan: maxElementsPerDim,
+              filter: elementViolationFilter(major),
+              ...(d.elementCounts?.[h] !== undefined
+                ? { scopeTotal: d.elementCounts[h] }
+                : {}),
             });
             totalElementsInScope += total;
+            // `scanned` counts what was EXAMINED, which is now the whole
+            // hierarchy — the server applied the rules to every element and
+            // returned the candidates. Counting the candidates instead would
+            // report "5 elements scanned" for a 171k dimension with 5
+            // offenders.
+            elemCount += scannedHere;
             for (const name of names) {
-              elemCount++;
               addIfInvalid(name, "element", `${d.name} / ${h}`);
             }
             if (truncated) {

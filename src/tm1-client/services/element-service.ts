@@ -176,22 +176,43 @@ export class ElementService {
    * exhausted. Callers learn the true `total` and whether the scan was
    * `truncated` — never a silent skip. Owns the V8-string-limit workaround so
    * tools don't reimplement raw OData paging.
+   *
+   * `opts.filter` narrows the scan to names matching an OData predicate, and
+   * changes what the numbers mean: the server then evaluates every element and
+   * returns only the matches, so `scanned` becomes the hierarchy total (the
+   * server checked all of it) and `truncated` reports a capped MATCH set
+   * rather than a partial walk. That is the difference between an audit that
+   * examines the first 100k names and one that examines the dimension —
+   * see src/lib/naming/odata-filter.ts.
+   *
    * GET /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Elements?$select=Name
    */
   async scanElementNames(
     dimensionName: string,
     hierarchyName: string,
-    opts: { pageSize: number; maxScan: number },
+    opts: {
+      pageSize: number;
+      maxScan: number;
+      filter?: string;
+      /**
+       * Hierarchy size, when the caller already knows it. With a filter the
+       * response counts MATCHES, so the scope figure would otherwise cost an
+       * extra request per hierarchy — and the dimension listing can carry it
+       * for free via a nested $count.
+       */
+      scopeTotal?: number;
+    },
   ): Promise<{
     names: string[];
     total: number;
     scanned: number;
     truncated: boolean;
   }> {
-    const { pageSize, maxScan } = opts;
+    const { pageSize, maxScan, filter, scopeTotal } = opts;
+    const hierarchyPath = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')`;
     const basePath =
-      `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')` +
-      `/Elements?$select=Name&$top=${pageSize}`;
+      `${hierarchyPath}/Elements?$select=Name&$top=${pageSize}` +
+      (filter ? `&$filter=${encodeURIComponent(filter)}` : "");
 
     // First page carries $count=true so we learn the total in one round-trip
     // without the /$count endpoint (TM1 v11 returns text/plain there and
@@ -225,7 +246,32 @@ export class ElementService {
       skip += page.value.length;
     }
 
-    return { names, total, scanned: names.length, truncated: total > maxScan };
+    if (filter === undefined) {
+      return {
+        names,
+        total,
+        scanned: names.length,
+        truncated: total > maxScan,
+      };
+    }
+
+    // With a filter, `total` above counted the MATCHES. The caller still wants
+    // to report how large the hierarchy was; when it already knows, that costs
+    // nothing, otherwise one 145-byte probe.
+    let inScope = scopeTotal;
+    if (inScope === undefined) {
+      const scopeProbe = await this.http.request<{ "@odata.count"?: number }>(
+        "GET",
+        `${hierarchyPath}/Elements?$select=Name&$top=0&$count=true`,
+      );
+      inScope = scopeProbe["@odata.count"] ?? total;
+    }
+    return {
+      names,
+      total: inScope,
+      scanned: inScope,
+      truncated: total > maxScan,
+    };
   }
 
   /**

@@ -37,7 +37,7 @@ export interface Violation {
  * Subset, View, Process, and Chore names. Source: IBM PA naming docs,
  * "Reserved characters per component" → "TM1 Server reserves these characters".
  */
-const SERVER_RESERVED_CHARS = new Set([
+export const SERVER_RESERVED_CHARS: ReadonlySet<string> = new Set([
   "\\",
   "/",
   ":",

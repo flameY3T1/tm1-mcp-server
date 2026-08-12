@@ -83,6 +83,39 @@ describe.skipIf(!LIVE_ENABLED)(
       });
     });
 
+    it("the naming audit finds a violating element name on this server", async () => {
+      // The audit no longer downloads element names: it asks TM1 for the ones
+      // that MIGHT violate a rule and checks only those. That is only safe if
+      // the server's evaluation agrees with ours, which no unit test can
+      // establish — a mock agreeing with itself proves nothing.
+      //
+      // QUOTE_EL contains an apostrophe, a TM1-Server-reserved character, and
+      // is also the literal OData is likeliest to misparse (the quote has to
+      // be doubled inside the filter). If the push-down were unsound, this
+      // element would be missing from the findings and the audit would report
+      // a clean model — the exact failure this test exists to prevent.
+      const r = await h.ok("tm1_audit_naming", {
+        scope: ["elements"],
+        maxFindings: 500,
+      });
+      const findings = (
+        r.json as {
+          findings?: Array<{
+            objectName: string;
+            violations: Array<{ rule: string }>;
+          }>;
+        }
+      ).findings;
+      const hit = findings?.find((f) => f.objectName === QUOTE_EL);
+      expect(
+        hit,
+        `expected ${QUOTE_EL} among the naming findings`,
+      ).toBeDefined();
+      expect(hit!.violations.map((v) => v.rule)).toContain(
+        "server_reserved_char",
+      );
+    });
+
     it("bulk-upserts more elements (leafs before consolidation)", async () => {
       const r = await h.ok("tm1_bulk_upsert_elements", {
         dimensionName: DIM,
