@@ -122,8 +122,11 @@ describe("TM1Client – Dimension Management Methods", () => {
       expect(body.Type).toBe("Consolidated");
       expect(body.Components).toHaveLength(2);
       expect(body.Components[0]["@odata.id"]).toContain("Elements('Germany')");
-      expect(body.Components[0].Weight).toBe(1);
       expect(body.Components[1]["@odata.id"]).toContain("Elements('France')");
+      // Weight never rides on the link — TM1 ignores it there. Both weights
+      // are the default here, so no edge PATCH follows.
+      expect(body.Components[0].Weight).toBeUndefined();
+      expect(fetchSpy).toHaveBeenCalledOnce();
     });
 
     it("should not include Components for Consolidated with empty components array", async () => {
@@ -184,6 +187,7 @@ describe("TM1Client – Dimension Management Methods", () => {
 
     it("should update element components", async () => {
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
+      fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
       await client.elements.update("Region", "Region", "Europe", {
         components: [
@@ -195,8 +199,17 @@ describe("TM1Client – Dimension Management Methods", () => {
       const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(body.Components).toHaveLength(2);
       expect(body.Components[0]["@odata.id"]).toContain("Elements('Germany')");
-      expect(body.Components[0].Weight).toBe(1);
-      expect(body.Components[1].Weight).toBe(2);
+      expect(body.Components[1]["@odata.id"]).toContain("Elements('France')");
+      // Weight never rides on the link — TM1 ignores it there. Germany keeps
+      // the default and costs nothing; France's 2 arrives as an edge PATCH.
+      expect(body.Components[0].Weight).toBeUndefined();
+      expect(body.Components[1].Weight).toBeUndefined();
+      const [url, opts] = fetchSpy.mock.calls[1];
+      expect(opts.method).toBe("PATCH");
+      expect(String(url)).toContain(
+        "Edges(ParentName='Europe',ComponentName='France')",
+      );
+      expect(JSON.parse(opts.body).Weight).toBe(2);
     });
 
     it("should update multiple fields at once", async () => {
@@ -311,16 +324,25 @@ describe("TM1Client – Dimension Management Methods", () => {
       expect(opts.method).toBe("POST");
       const body = JSON.parse(opts.body);
       expect(body["@odata.id"]).toContain("Elements('Germany')");
-      expect(body.Weight).toBe(1);
+      // Default weight needs no follow-up: the link already yields 1.
+      expect(body.Weight).toBeUndefined();
     });
 
     it("should move an element with a custom weight", async () => {
+      // The weight cannot ride on the link: TM1 ignores it there and creates
+      // the edge at 1 (verified live). It goes on the Edge entity afterwards.
+      fetchSpy.mockResolvedValueOnce(mockResponse(204));
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
       await client.elements.move("Region", "Region", "Germany", "Europe", 2.5);
 
-      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
-      expect(body.Weight).toBe(2.5);
+      expect(JSON.parse(fetchSpy.mock.calls[0][1].body).Weight).toBeUndefined();
+      const [url, opts] = fetchSpy.mock.calls[1];
+      expect(opts.method).toBe("PATCH");
+      expect(String(url)).toContain(
+        "Edges(ParentName='Europe',ComponentName='Germany')",
+      );
+      expect(JSON.parse(opts.body).Weight).toBe(2.5);
     });
 
     it("should encode special characters in element and parent names", async () => {
@@ -342,12 +364,14 @@ describe("TM1Client – Dimension Management Methods", () => {
     });
 
     it("should use weight 0 when explicitly passed", async () => {
+      // 0 is a real weight and differs from the default, so it must be sent —
+      // a truthiness check here would drop it.
+      fetchSpy.mockResolvedValueOnce(mockResponse(204));
       fetchSpy.mockResolvedValueOnce(mockResponse(204));
 
       await client.elements.move("Region", "Region", "Germany", "Europe", 0);
 
-      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
-      expect(body.Weight).toBe(0);
+      expect(JSON.parse(fetchSpy.mock.calls[1][1].body).Weight).toBe(0);
     });
   });
 

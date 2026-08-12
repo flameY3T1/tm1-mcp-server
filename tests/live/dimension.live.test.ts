@@ -78,9 +78,37 @@ describe.skipIf(!LIVE_ENABLED)(
         element: {
           name: SUB,
           type: "Consolidated",
-          components: [{ name: LEAF1, weight: 1 }],
+          // Weight deliberately NOT 1: 1 is what a missing edge falls back to,
+          // so a test built on it cannot tell a real weight from a lost one.
+          components: [{ name: LEAF1, weight: -1 }],
         },
       });
+    });
+
+    it("reports the real edge weight, not the fallback", async () => {
+      // get_hierarchy reads child weights from the Edges the element carries.
+      // A missing edge silently falls back to 1, so a consolidation weighted
+      // -1 is the only way to tell "weight read" from "weight invented" — and
+      // -1 is the case that matters in practice (P&L dimensions that net
+      // costs against revenue).
+      const r = await h.ok("tm1_get_hierarchy", {
+        dimensionName: DIM,
+        hierarchyName: HIER,
+        limit: 200,
+      });
+      const elements = (
+        r.json as {
+          elements?: Array<{
+            name: string;
+            children?: Array<{ name: string; weight: number }>;
+          }>;
+        }
+      ).elements;
+      const parent = elements?.find((e) => e.name === SUB);
+      expect(parent, `expected ${SUB} in the hierarchy`).toBeDefined();
+      const child = parent!.children?.find((c) => c.name === LEAF1);
+      expect(child, `expected ${LEAF1} as a child of ${SUB}`).toBeDefined();
+      expect(child!.weight).toBe(-1);
     });
 
     it("the naming audit finds a violating element name on this server", async () => {

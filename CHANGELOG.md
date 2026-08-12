@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Consolidation weights were silently dropped on write.** `tm1_create_element`,
+  `tm1_update_element` and `tm1_move_element` sent `Weight` inside the `Components` link payload.
+  TM1 accepts that body and ignores the field: the edge is created with weight 1 whatever was
+  asked for. Verified live — a consolidation created with weight -1 read back as 1 from the Edges
+  collection itself, so nothing downstream could have recovered the intent.
+
+  A dropped -1 is not cosmetic: it is the weight that nets costs against revenue, and turning it
+  into +1 inverts the consolidation. The weight lives on the Edge entity and is now PATCHed there
+  once the link exists — only for weights that differ from the default, so an all-1 consolidation
+  costs no extra request.
+
 - **`format: "markdown"` now reaches clients that read `structuredContent`.**
   The rendered table went out in `content[0].text` while `structuredContent` carried the JSON
   payload. Claude Code discards `content` whenever `structuredContent` is present, so the table

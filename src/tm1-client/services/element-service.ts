@@ -103,6 +103,36 @@ export class ElementService {
    * Components inline; their target elements must already exist.
    * POST /api/v1/Dimensions('{d}')/Hierarchies('{h}')/Elements
    */
+  /**
+   * Set edge weights that differ from TM1's default.
+   *
+   * TM1 accepts `Weight` inside a Components link payload and ignores it: the
+   * edge is created with weight 1 whatever the body said. Verified live — a
+   * consolidation created with weight -1 read back as 1 from the Edges
+   * collection itself, so no reader could have recovered the intent. The
+   * weight lives on the Edge entity and has to be PATCHed once the link
+   * exists.
+   *
+   * Only deviating weights cost a request: consolidations are overwhelmingly
+   * all-1, and a PATCH that sets 1 to 1 is a round trip for nothing.
+   */
+  private async applyEdgeWeights(
+    dimensionName: string,
+    hierarchyName: string,
+    parentName: string,
+    components: ReadonlyArray<{ name: string; weight?: number | undefined }>,
+  ): Promise<void> {
+    const base = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')`;
+    for (const c of components) {
+      if (c.weight === undefined || c.weight === 1) continue;
+      await this.http.request<void>(
+        "PATCH",
+        `${base}/Edges(ParentName='${enc(parentName)}',ComponentName='${enc(c.name)}')`,
+        { Weight: c.weight },
+      );
+    }
+  }
+
   async create(
     dimensionName: string,
     hierarchyName: string,
@@ -120,10 +150,17 @@ export class ElementService {
     ) {
       body.Components = element.components.map((c) => ({
         "@odata.id": `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(c.name)}')`,
-        Weight: c.weight,
       }));
     }
     await this.http.request<void>("POST", path, body);
+    if (element.components && element.components.length > 0) {
+      await this.applyEdgeWeights(
+        dimensionName,
+        hierarchyName,
+        element.name,
+        element.components,
+      );
+    }
   }
 
   /**
@@ -147,10 +184,19 @@ export class ElementService {
     if (update.components !== undefined) {
       body.Components = update.components.map((c) => ({
         "@odata.id": `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(c.name)}')`,
-        Weight: c.weight,
       }));
     }
     await this.http.request<void>("PATCH", path, body);
+    if (update.components !== undefined) {
+      await this.applyEdgeWeights(
+        dimensionName,
+        hierarchyName,
+        // A rename in the same PATCH takes effect immediately, so the edge
+        // key must use the NEW parent name.
+        update.newName ?? elementName,
+        update.components,
+      );
+    }
   }
 
   /**
@@ -288,9 +334,11 @@ export class ElementService {
     const path = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(newParent)}')/Components`;
     const body = {
       "@odata.id": `Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Elements('${enc(elementName)}')`,
-      Weight: weight ?? 1,
     };
     await this.http.request<void>("POST", path, body);
+    await this.applyEdgeWeights(dimensionName, hierarchyName, newParent, [
+      { name: elementName, ...(weight !== undefined ? { weight } : {}) },
+    ]);
   }
 
   /**
