@@ -5,6 +5,7 @@ import { z, type ZodRawShape, type ZodTypeAny } from "zod";
 import { slimJsonSchema } from "../lib/slim-json-schema.js";
 import { ANNOTATION_MAP } from "./annotation-map.js";
 import { OUTPUT_SCHEMA_MAP } from "./output-schema-map.js";
+import { strictVariants } from "./schemas/markdown-capable.js";
 import {
   formatTm1ErrorResult,
   normalizeErrorResult,
@@ -39,6 +40,17 @@ function isZodSchema(entry: ZodRawShape | ZodTypeAny): entry is ZodTypeAny {
 
 function asZodSchema(entry: ZodRawShape | ZodTypeAny): ZodTypeAny {
   return isZodSchema(entry) ? entry : z.object(entry);
+}
+
+// A markdown response carries exactly one key. Anything else is the JSON path.
+function isMarkdownPayload(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const keys = Object.keys(value);
+  return (
+    keys.length === 1 &&
+    keys[0] === "markdown" &&
+    typeof (value as { markdown: unknown }).markdown === "string"
+  );
 }
 
 // Rewrite a tools/list response so every advertised schema is slimmed.
@@ -183,6 +195,12 @@ export function withAnnotations(
   ): ToolCallback => {
     // Normalize once per tool, not per call.
     const schema = outputSchema ? asZodSchema(outputSchema) : undefined;
+    // Tools offering format:"markdown" publish a loosened schema (top-level
+    // keys optional, plus `markdown`) because the SDK cannot express "either
+    // shape" — see ./schemas/markdown-capable.ts. Validating against that
+    // loosened schema would forfeit top-level drift detection on the JSON
+    // path, so we pick the matching strict variant per response instead.
+    const variants = strictVariants(outputSchema);
     return async (...cbArgs: unknown[]) => {
       const start = Date.now();
       try {
@@ -223,7 +241,21 @@ export function withAnnotations(
             // fields slip through silently. Prefer a strict, fully-modelled
             // schema for any new output whose shape you want enforced (the
             // callgraph tree was tightened for exactly this reason).
-            const parsed = schema.safeParse(withStructured.structuredContent);
+            //
+            // Variant pick is made from the RESPONSE, not from the requested
+            // `format`: a handler may legitimately fall back to JSON while
+            // format:"markdown" was asked for (unavailable stats, empty
+            // result), and branching on the input would reject that. No JSON
+            // payload in OUTPUT_SCHEMA_MAP carries a top-level `markdown`
+            // string, so the discriminator is unambiguous.
+            const effectiveSchema = variants
+              ? isMarkdownPayload(withStructured.structuredContent)
+                ? variants.markdown
+                : variants.json
+              : schema;
+            const parsed = effectiveSchema.safeParse(
+              withStructured.structuredContent,
+            );
             if (!parsed.success) {
               const issue = parsed.error.issues[0];
               const detail = issue

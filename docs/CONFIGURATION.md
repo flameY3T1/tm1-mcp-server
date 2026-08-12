@@ -44,6 +44,24 @@ either way.
 
 `format: "markdown"` and error results are unaffected by this setting.
 
+### `format: "markdown"` and structuredContent
+
+Tools that take `format` send the rendered table twice: as the text block and as
+`structuredContent: { "markdown": "..." }`. The JSON payload is not included —
+in markdown mode the table replaces it.
+
+This is not redundancy for its own sake. Clients disagree about which field to
+read (Kiro renders `content[]`, Claude Code reads `structuredContent` and drops
+`content`), so a table placed in only one of them is invisible on the other.
+Before 3.1.0 the table went out in `content[]` while `structuredContent` carried
+the JSON, which made `format: "markdown"` a silent no-op on Claude Code — it
+showed the JSON the caller had asked not to get.
+
+Consequence for schema consumers: the published `outputSchema` of these tools
+has optional top-level fields, because it must accept both shapes and MCP output
+schemas cannot express a union. Responses are still validated strictly — the
+server picks the matching strict shape per response before answering.
+
 ## Secrets — `TM1_ALLOW_UNMASKED_SECRETS`
 
 Credential masking is on by default everywhere it applies. Several tools take a

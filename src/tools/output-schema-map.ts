@@ -13,6 +13,7 @@ import type { ZodRawShape, ZodTypeAny } from "zod";
 import { z } from "zod";
 import { pageShapeFor } from "./schemas/common.js";
 import { asOutputSchema } from "./schemas/output-schema.js";
+import { markdownCapable } from "./schemas/markdown-capable.js";
 import {
   CalculationTraceResultSchema,
   CallgraphResultSchema,
@@ -108,7 +109,50 @@ const searchFilePageShape = {
   ...pageShapeFor(FilenameItemSchema),
 };
 
-export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
+// Tools that accept FORMAT_SCHEMA and may therefore answer with a rendered
+// Markdown table instead of the JSON payload. Their schema is widened by
+// `markdownCapable()` below so `structuredContent: { markdown }` validates;
+// the strict shape is re-applied per response by the guard in
+// ./with-annotations.ts. Kept in sync with the source by
+// tests/unit/markdown-structured.test.ts, which scans the tool files.
+export const MARKDOWN_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
+  "tm1_execute_mdx",
+  "tm1_find_orphan_dimensions",
+  "tm1_get_ancestors",
+  "tm1_get_audit_log",
+  "tm1_get_client",
+  "tm1_get_cube_stats",
+  "tm1_get_descendants",
+  "tm1_get_element_attribute_values",
+  "tm1_get_message_log",
+  "tm1_get_process_datasource",
+  "tm1_get_process_parameters",
+  "tm1_get_process_variables",
+  "tm1_get_server_info",
+  "tm1_get_server_state",
+  "tm1_get_transaction_log",
+  "tm1_get_view",
+  "tm1_list_chores",
+  "tm1_list_clients",
+  "tm1_list_cubes",
+  "tm1_list_dimensions",
+  "tm1_list_element_attributes",
+  "tm1_list_error_logs",
+  "tm1_list_files",
+  "tm1_list_groups",
+  "tm1_list_jobs",
+  "tm1_list_processes",
+  "tm1_list_processes_grouped",
+  "tm1_list_sessions",
+  "tm1_list_subsets",
+  "tm1_list_threads",
+  "tm1_list_views",
+  "tm1_search_code",
+  "tm1_search_files",
+  "tm1_search_rules",
+]);
+
+const RAW_OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_list_cubes: pageShapeFor(CubeItemSchema),
   tm1_list_dimensions: pageShapeFor(DimensionItemSchema),
   tm1_list_processes: pageShapeFor(ProcessItemSchema),
@@ -343,3 +387,11 @@ export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> = {
   tm1_update_chore: asOutputSchema(MutationResultSchema),
   tm1_update_client: asOutputSchema(MutationResultSchema),
 };
+
+export const OUTPUT_SCHEMA_MAP: Record<string, ZodRawShape | ZodTypeAny> =
+  Object.fromEntries(
+    Object.entries(RAW_OUTPUT_SCHEMA_MAP).map(([name, schema]) => [
+      name,
+      MARKDOWN_CAPABLE_TOOLS.has(name) ? markdownCapable(schema) : schema,
+    ]),
+  );

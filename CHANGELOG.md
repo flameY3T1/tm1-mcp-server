@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`format: "markdown"` now reaches clients that read `structuredContent`.**
+  The rendered table went out in `content[0].text` while `structuredContent` carried the JSON
+  payload. Claude Code discards `content` whenever `structuredContent` is present, so the table
+  never arrived and the caller got the JSON it had asked not to get — a silent no-op across all
+  34 tools that take `format`.
+
+  Markdown responses now send the table both ways: as the text block (for clients like Kiro) and
+  as `structuredContent: { markdown }`. The JSON payload is omitted in that mode.
+
+  This widens the published `outputSchema` of those 34 tools — top-level fields become optional,
+  plus an optional `markdown` — because the MCP SDK cannot express "either shape" (a `z.union`
+  outputSchema makes it publish no schema at all). Responses are still validated strictly: the
+  server selects the matching strict shape per response. Net effect on `tools/list` is 1.3 KB
+  smaller, since the dropped `required` arrays outweigh the added property.
+
+  New gate `npm run lint:markdown-schema` fails the build when a tool accepts `format` without a
+  schema that can carry the table.
+
 ## [3.0.1] - 2026-08-10
 
 ### Fixed

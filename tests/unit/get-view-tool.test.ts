@@ -133,7 +133,8 @@ describe("tm1_get_view tool", () => {
     expect(md).toContain("| Version | Jan | Feb |");
     expect(md).toContain("| Plan | 10 | 20 |");
     expect(md).toContain("| Actual | 11 | 22 |");
-    // markdown mode still attaches structuredContent (output-schema roundtrip)
-    expect(res.structuredContent?.cubeName).toBe("C");
+    // The table — not the JSON payload — is what structuredContent carries, so
+    // clients that ignore `content` (Claude Code) still see the markdown.
+    expect(res.structuredContent).toEqual({ markdown: md });
   });
 });

@@ -3,8 +3,12 @@
 // JSON (default, parsed by Proxy into structuredContent) while humans get a
 // readable Markdown table when piped to chat output.
 //
-// Markdown payload deliberately skips structuredContent — agents that need
-// typed data should leave format at the default.
+// The markdown payload travels BOTH ways: as the text block (read by clients
+// like Kiro) and as `structuredContent: { markdown }` (read by clients like
+// Claude Code, which discard `content` whenever structuredContent is present).
+// Shipping it only one way makes format:"markdown" a no-op on one of them.
+// Every tool exposing FORMAT_SCHEMA must therefore wrap its outputSchema in
+// `markdownCapable()` — see ./schemas/markdown-capable.ts for the why.
 import { z } from "zod";
 import type { Page } from "./pagination.js";
 
@@ -103,23 +107,29 @@ interface TextResult {
   structuredContent?: { [k: string]: unknown };
 }
 
+// The rendered table goes out twice on purpose: once as the text block, once
+// as structuredContent. Which of the two a client reads is not negotiable from
+// here — Kiro renders `content` and ignores structuredContent, Claude Code
+// does the reverse — so a markdown response that fills only one of them is
+// invisible on the other client. The JSON payload is deliberately NOT included
+// alongside: a client that reads structuredContent would then be shown the
+// JSON it asked not to get, which is exactly the bug this replaces.
+export function markdownResult(markdown: string): TextResult {
+  return {
+    content: [{ type: "text" as const, text: markdown }],
+    structuredContent: { markdown },
+  };
+}
+
 // Page payload as either JSON (default, Proxy → structuredContent) or
 // Markdown table (for human display).
-//
-// In markdown mode we also attach `structuredContent` directly so tools that
-// declare `outputSchema` still satisfy the SDK's "outputSchema requires
-// structuredContent" validation — agents get typed data and the markdown
-// renders for humans.
 export function pageResponse<T>(
   page: Page<T>,
   format: ResponseFormat,
   opts: PageRenderOpts<T>,
 ): TextResult {
   if (format === "markdown") {
-    return {
-      content: [{ type: "text" as const, text: renderPage(page, opts) }],
-      structuredContent: page as unknown as { [k: string]: unknown },
-    };
+    return markdownResult(renderPage(page, opts));
   }
   return {
     content: [{ type: "text" as const, text: JSON.stringify(page) }],
@@ -137,10 +147,7 @@ export function wrappedPageResponse<T>(
   opts: PageRenderOpts<T>,
 ): TextResult {
   if (format === "markdown") {
-    return {
-      content: [{ type: "text" as const, text: renderPage(page, opts) }],
-      structuredContent: wrapper as { [k: string]: unknown },
-    };
+    return markdownResult(renderPage(page, opts));
   }
   return {
     content: [{ type: "text" as const, text: JSON.stringify(wrapper) }],
@@ -155,10 +162,7 @@ export function payloadResponse<T>(
   renderMarkdown: (p: T) => string,
 ): TextResult {
   if (format === "markdown") {
-    return {
-      content: [{ type: "text" as const, text: renderMarkdown(payload) }],
-      structuredContent: payload as unknown as { [k: string]: unknown },
-    };
+    return markdownResult(renderMarkdown(payload));
   }
   return {
     content: [{ type: "text" as const, text: JSON.stringify(payload) }],
