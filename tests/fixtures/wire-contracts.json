@@ -445,6 +445,11 @@
       "DefaultMemberName": "null",
       "Elements[]": {
         "@odata.etag": "string",
+        "Edges[]": {
+          "ComponentName": "string",
+          "ParentName": "string",
+          "Weight": "number"
+        },
         "Level": "number",
         "Name": "string",
         "Parents[]": {
@@ -472,14 +477,6 @@
       "@odata.context": "string",
       "Level@odata.navigationLink": "string",
       "Name": "string"
-    },
-    "GET /*/api/v1/Databases('*')/Dimensions('*')/Hierarchies('*')/Edges": {
-      "@odata.context": "string",
-      "value[]": {
-        "ComponentName": "string",
-        "ParentName": "string",
-        "Weight": "number"
-      }
     },
     "GET /*/api/v1/Databases('*')/Dimensions('*')/Hierarchies('*')/ElementAttributes": {
       "@odata.context": "string",
@@ -1126,6 +1123,11 @@
       "Cardinality": "number",
       "Elements[]": {
         "@odata.etag": "string",
+        "Edges[]": {
+          "@odata.id": "string",
+          "ComponentName": "string",
+          "Weight": "number"
+        },
         "Level": "number",
         "Name": "string",
         "Parents[]": {
@@ -1150,14 +1152,6 @@
       "@odata.context": "string",
       "Level@odata.navigationLink": "string",
       "Name": "string"
-    },
-    "GET /api/v1/Dimensions('*')/Hierarchies('*')/Edges": {
-      "@odata.context": "string",
-      "value[]": {
-        "ComponentName": "string",
-        "ParentName": "string",
-        "Weight": "number"
-      }
     },
     "GET /api/v1/Dimensions('*')/Hierarchies('*')/ElementAttributes": {
       "@odata.context": "string",
@@ -1396,6 +1390,12 @@
       "ViewStorageMaxMemory": "null",
       "ViewStorageMinTime": "null"
     },
+    "PATCH /*/api/v1/Databases('*')/Dimensions('*')/Hierarchies('*')/Edges(ParentName='Region_North',ComponentName='City_A')": {
+      "@odata.context": "string",
+      "ComponentName": "string",
+      "ParentName": "string",
+      "Weight": "number"
+    },
     "PATCH /*/api/v1/Databases('*')/Dimensions('*')/Hierarchies('*')/Elements('*')": {
       "@odata.context": "string",
       "@odata.etag": "string",
@@ -1473,6 +1473,12 @@
       "LastSchemaUpdate": "string",
       "Name": "string",
       "Rules": "string"
+    },
+    "PATCH /api/v1/Dimensions('*')/Hierarchies('*')/Edges(ParentName='Region_North',ComponentName='City_A')": {
+      "@odata.context": "string",
+      "ComponentName": "string",
+      "ParentName": "string",
+      "Weight": "number"
     },
     "PATCH /api/v1/Dimensions('*')/Hierarchies('*')/Elements('*')": {
       "@odata.context": "string",

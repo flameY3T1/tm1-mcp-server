@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`tm1_get_hierarchy` reads edge weights from the elements, and filters by type server-side.**
+  Weights came from the hierarchy's entire `Edges` collection — 21.6 MB and 594 ms for a
+  171k-element dimension, in a second round trip. `Element` has an `Edges` navigation carrying its
+  own outgoing edges, so the page that fetches the elements now brings their weights with it: one
+  request, and bounded by the page's fan-out rather than by the dimension.
+
+  `elementType` also stopped being a client-side filter. It pushes down as the ordinal
+  (`Type eq 3`); the name form is accepted by TM1 and matches nothing, silently, which is why it
+  had been left to the client. A consolidated page of a 171k-element dimension went from fetching
+  the whole dimension to **410 KB in one request**.
+
 - **`tm1_audit_naming` checks element names on the server, and now checks all of them.** The audit
   downloaded every element name of every dimension — 15.2 MB for a single 171k-element dimension,
   66 MB across a real model — and stopped at `maxElementsPerDim`, beyond which it examined only a

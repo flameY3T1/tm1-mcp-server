@@ -240,32 +240,39 @@ describe("TM1Client – Metadata Methods", () => {
       fetchSpy.mockResolvedValue(mockResponse({ value: [] }));
     });
 
-    it("joins real edge weights from the Edges collection (P&L -1 weights)", async () => {
+    it("reads edge weights off the elements themselves (P&L -1 weights)", async () => {
+      // Element carries an `Edges` navigation with its OUTGOING edges, so the
+      // weights arrive with the page. Reading the hierarchy's whole Edges
+      // collection instead cost 21.6 MB on a 171k-element dimension against
+      // 309 KB for this shape — and a second round trip.
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           Name: "Account",
           Elements: [
-            { Name: "Profit", Type: "Consolidated", Level: 1, Parents: [] },
+            {
+              Name: "Profit",
+              Type: "Consolidated",
+              Level: 1,
+              Parents: [],
+              Edges: [
+                { ComponentName: "Revenue", Weight: 1 },
+                { ComponentName: "Costs", Weight: -1 },
+              ],
+            },
             {
               Name: "Revenue",
               Type: "Numeric",
               Level: 0,
               Parents: [{ Name: "Profit" }],
+              Edges: [],
             },
             {
               Name: "Costs",
               Type: "Numeric",
               Level: 0,
               Parents: [{ Name: "Profit" }],
+              Edges: [],
             },
-          ],
-        }),
-      );
-      fetchSpy.mockResolvedValueOnce(
-        mockResponse({
-          value: [
-            { ParentName: "Profit", ComponentName: "Revenue", Weight: 1 },
-            { ParentName: "Profit", ComponentName: "Costs", Weight: -1 },
           ],
         }),
       );
@@ -277,10 +284,11 @@ describe("TM1Client – Metadata Methods", () => {
         { name: "Costs", weight: -1 },
       ]);
 
-      const edgesUrl = String(fetchSpy.mock.calls[1][0]);
-      expect(edgesUrl).toContain(
-        "/Edges?$select=ParentName,ComponentName,Weight",
-      );
+      // One request, and the expand asks for both navigations.
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const url = String(fetchSpy.mock.calls[0][0]);
+      expect(url).toContain("Edges($select=ComponentName,Weight)");
+      expect(url).toContain("Parents($select=Name)");
     });
 
     it("falls back to the TM1 default weight 1 for edges missing from the lookup", async () => {

@@ -57,7 +57,10 @@ describe("element edge weights", () => {
     await svc.create("Dim", "Dim", {
       name: "C1",
       type: "Consolidated",
-      components: [{ name: "L1", weight: 1 }, { name: "L2" }],
+      components: [
+        { name: "L1", weight: 1 },
+        { name: "L2", weight: 1 },
+      ],
     });
     expect(edgeCalls(calls)).toHaveLength(0);
   });

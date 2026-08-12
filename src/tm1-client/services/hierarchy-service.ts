@@ -62,7 +62,10 @@ export class HierarchyService {
   ): Promise<HierarchyPage> {
     const elementClauses: string[] = [
       "$select=Name,Type,Level",
-      "$expand=Parents($select=Name)",
+      // Parents for the tree, Edges for the child weights. Both are element
+      // navigations, so one request answers both — see the weight join below
+      // for why the separate Edges scan is gone.
+      "$expand=Parents($select=Name),Edges($select=ComponentName,Weight)",
     ];
     const filters: string[] = [];
     if (opts?.level !== undefined) filters.push(`Level eq ${opts.level}`);
@@ -72,17 +75,34 @@ export class HierarchyService {
       filters.push(`contains(Name, '${escapeOdata(opts.nameContains)}')`);
     if (opts?.nameStartsWith)
       filters.push(`startswith(Name, '${escapeOdata(opts.nameStartsWith)}')`);
-    // elementType filter is applied client-side (TM1 OData rejects `Type eq 'Consolidated'`
-    // — the property is an enum, not a string. Type filter happens before topN/server-side
-    // filters because we cannot reliably express it in $filter without an enum-cast that
-    // varies between TM1 versions.) Same for nameRegex (regex unsupported in OData).
-    // When either is set, $top must also move client-side.
-    const filterByType = opts?.elementType && opts.elementType !== "All";
+    // elementType pushes down as the ORDINAL, not the name: `Type eq
+    // 'Consolidated'` is accepted and matches nothing — silently, which is
+    // worse than an error and is why this filter used to run client-side.
+    // `Type eq 3` works (verified live on 11.8: 1 → Numeric, 2 → String,
+    // 3 → Consolidated).
+    //
+    // Doing it here matters more since elements carry their Edges: a
+    // client-side type filter means fetching every element of the dimension
+    // with its edges attached — measured at 99 MB on a 171k-element dimension,
+    // against 300 KB for the pushed-down page.
+    //
+    // nameRegex stays client-side; OData has no regex.
+    const TYPE_ORDINAL: Record<string, number> = {
+      Numeric: 1,
+      String: 2,
+      Consolidated: 3,
+    };
+    const typeOrdinal =
+      opts?.elementType && opts.elementType !== "All"
+        ? TYPE_ORDINAL[opts.elementType]
+        : undefined;
+    if (typeOrdinal !== undefined) filters.push(`Type eq ${typeOrdinal}`);
+
     let regex: RegExp | undefined;
     if (opts?.nameRegex !== undefined) {
       regex = compileUserRegex(opts.nameRegex, undefined, "nameRegex");
     }
-    const needsClientPostFilter = filterByType || regex !== undefined;
+    const needsClientPostFilter = regex !== undefined;
     if (filters.length > 0)
       elementClauses.push(`$filter=${filters.join(" and ")}`);
     const skip = opts?.skip ?? 0;
@@ -103,13 +123,10 @@ export class HierarchyService {
         Type: string;
         Level: number;
         Parents?: Array<{ Name: string }>;
+        Edges?: Array<{ ComponentName: string; Weight: number }>;
       }>;
     }>("GET", path);
     let filteredElements = rawResponse.Elements;
-    if (filterByType)
-      filteredElements = filteredElements.filter(
-        (e) => e.Type === opts.elementType,
-      );
     if (regex !== undefined)
       filteredElements = filteredElements.filter((e) => regex.test(e.Name));
     // Total of everything the filters kept, before the window is applied.
@@ -132,33 +149,27 @@ export class HierarchyService {
 
     const keptNames = new Set(response.Elements.map((e) => e.Name));
 
-    // Real edge weights live on the Edges collection, not on the Parents
-    // expand — join them client-side. Without this every child weight was
-    // fabricated as 1, which mislabels e.g. P&L dims that consolidate costs
-    // with -1. Weights only surface in children lists, and children only
-    // exist when a kept element's parent is also kept — so the (unbounded)
-    // Edges scan is skipped when the narrowed result contains no such pair
-    // (leaf-only / level=0 queries on huge dims stay cheap). An edge missing
-    // from the lookup falls back to 1 (the TM1 default); a failed Edges
-    // request propagates like every other request in this service.
+    // Edge weights ride along with the elements: `Element` has an `Edges`
+    // navigation carrying its OUTGOING edges — its children, with weights —
+    // so the page already fetched above answers the question. Verified live:
+    // every consolidated row's edges had ParentName equal to that row, and no
+    // row carried an edge belonging to anything else.
+    //
+    // The alternative this replaces was reading the hierarchy's whole `Edges`
+    // collection: 21.6 MB and 594 ms for a 171k-element dimension, against
+    // 309 KB and 98 ms for the page-with-edges — one round trip instead of
+    // two, and bounded by the page's fan-out rather than by the dimension.
+    //
+    // A missing edge still falls back to 1, TM1's default. That fallback is
+    // why tests/live/dimension.live.test.ts pins a weight of -1: with 1 there
+    // is no way to tell a weight that was read from one that was invented.
     const weightByEdge = new Map<string, Map<string, number>>();
-    const hasKeptChildEdge = response.Elements.some((e) =>
-      (e.Parents ?? []).some((p) => keptNames.has(p.Name)),
-    );
-    if (hasKeptChildEdge) {
-      const edgesPath = `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Edges?$select=ParentName,ComponentName,Weight`;
-      const edgesResponse = await this.http.request<{
-        value?: Array<{
-          ParentName: string;
-          ComponentName: string;
-          Weight: number;
-        }>;
-      }>("GET", edgesPath);
-      for (const edge of edgesResponse.value ?? []) {
-        let byChild = weightByEdge.get(edge.ParentName);
+    for (const e of response.Elements) {
+      for (const edge of e.Edges ?? []) {
+        let byChild = weightByEdge.get(e.Name);
         if (!byChild) {
           byChild = new Map<string, number>();
-          weightByEdge.set(edge.ParentName, byChild);
+          weightByEdge.set(e.Name, byChild);
         }
         byChild.set(edge.ComponentName, edge.Weight);
       }
