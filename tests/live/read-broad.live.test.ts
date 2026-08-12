@@ -115,6 +115,16 @@ describe.skipIf(!LIVE_ENABLED)("live: broad read sweep", () => {
     await h.call("tm1_get_process_code", { processName: process });
   });
 
+  it("runs the whole-model read audits", async () => {
+    // These are the tools that fan out across the entire model, so they are
+    // where a per-item round trip hides. Running them here keeps their real
+    // query shapes in the recorded contracts — audit_complexity now reads
+    // every process's Variables from the process list itself, and that only
+    // shows up in a recording if something exercises it.
+    await h.call("tm1_audit_complexity", { limit: 10 });
+    await h.call("tm1_audit_naming", { limit: 10 });
+  });
+
   it("reads server-level collections", async () => {
     await h.call("tm1_get_server_info");
     await h.call("tm1_list_chores", { limit: 5 });

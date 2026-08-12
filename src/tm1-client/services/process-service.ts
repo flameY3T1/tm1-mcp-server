@@ -856,6 +856,56 @@ export class ProcessService {
   }
 
   /**
+   * Variables of every process, in ONE request.
+   *
+   * `Variables` is a complex-typed property, not a navigation collection, so
+   * the process list can carry it directly — no `$expand`, and no follow-up
+   * call per process. `getVariables` above answers the same question for a
+   * single process and stays the right tool when that is all you need.
+   *
+   * The difference is not cosmetic: asking per process costs one round trip
+   * each, which on a 221-process model measured as 221 extra requests against
+   * a single 147 KB one. Whole-model analyses (audit_complexity) use this.
+   *
+   * GET /api/v1/Processes?$select=Name,Variables
+   */
+  async getAllVariables(
+    includeControl = false,
+  ): Promise<Map<string, ProcessVariable[]>> {
+    const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
+    const path = `/api/v1/Processes?$select=Name,Variables${filter}`;
+    const response = await this.http.request<{
+      value: Array<{
+        Name: string;
+        Variables?: Array<{
+          Name: string;
+          Type: string;
+          Position: number;
+          StartByte?: number;
+          EndByte?: number;
+        }>;
+      }>;
+    }>("GET", path);
+
+    const byProcess = new Map<string, ProcessVariable[]>();
+    for (const p of response.value) {
+      // A process without variables comes back with the property omitted
+      // rather than as an empty array.
+      byProcess.set(
+        p.Name,
+        (p.Variables ?? []).map((v): ProcessVariable => ({
+          name: v.Name,
+          type: v.Type === "Numeric" ? "Numeric" : "String",
+          position: v.Position,
+          ...(v.StartByte !== undefined ? { startByte: v.StartByte } : {}),
+          ...(v.EndByte !== undefined ? { endByte: v.EndByte } : {}),
+        })),
+      );
+    }
+    return byProcess;
+  }
+
+  /**
    * Update the variables of a TI process (column-name mapping for ASCII/ODBC sources).
    * Required after setting an ASCII DataSource.
    * PATCH /api/v1/Processes('{name}') with Variables array.

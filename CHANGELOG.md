@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`tm1_audit_complexity` issues one request instead of one per process.** The consistency scan
+  listed every process, then asked each one for its variables — 221 extra round trips on a
+  221-process model, measured. `Variables` is a complex-typed property, so the process list can
+  carry it: `$select=Name,Variables` answers for the whole model at once. 225 requests → 5, and
+  3.4 s → 94 ms on that model. Output is unchanged.
+
 ### Fixed
 
 - **`format: "markdown"` now reaches clients that read `structuredContent`.**
