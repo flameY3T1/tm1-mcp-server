@@ -8,7 +8,7 @@
 // alongside the rest of the live suite.
 //
 //   TM1_BASE_URL=https://pae-host:4444 TM1_INSTANCE=tm1 \
-//   TM1_DATABASE=tm1_v12_test TM1_AUTH_MODE=s2s TM1_USER=admin \
+//   TM1_DATABASE=<database> TM1_AUTH_MODE=s2s TM1_USER=admin \
 //   TM1_CLIENT_ID=... TM1_CLIENT_SECRET=... npm run test:live
 import { describe, it, expect } from "vitest";
 import { loadConfig } from "../../src/config.js";

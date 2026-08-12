@@ -110,12 +110,13 @@ everything else that fires at :00, and outside working hours so the run has the
 test server to itself:
 
 ```cron
-17 3 * * * cd /home/niklas/tm1-mcp-server && /home/niklas/.local/share/fnm/node-versions/v26.2.0/installation/bin/node scripts/run-live-nightly.mjs >> /home/niklas/tm1-mcp-server/.live-reports/cron.log 2>&1
+17 3 * * * cd /path/to/tm1-mcp-server && /path/to/node scripts/run-live-nightly.mjs >> /path/to/tm1-mcp-server/.live-reports/cron.log 2>&1
 ```
 
-The absolute node path is required: cron gets a bare `PATH` and fnm's shim
-directory is per-shell. Update the path when you switch node versions
-(`readlink -f "$(which node)"` prints the current one).
+Substitute your own checkout path, and an absolute node path — cron gets a bare
+`PATH`, and a version manager's shim directory is per-shell, so a bare `node`
+will not resolve. `readlink -f "$(which node)"` prints the path to use, and it
+changes when you switch node versions.
 
 systemd user timer (`~/.config/systemd/user/tm1-live.service` +
 `tm1-live.timer`, enable with `systemctl --user enable --now tm1-live.timer`;
@@ -125,8 +126,8 @@ needs `loginctl enable-linger $USER` to fire while logged out):
 # tm1-live.service
 [Service]
 Type=oneshot
-WorkingDirectory=/home/niklas/tm1-mcp-server
-ExecStart=/home/niklas/.local/share/fnm/node-versions/v26.2.0/installation/bin/node scripts/run-live-nightly.mjs
+WorkingDirectory=/path/to/tm1-mcp-server
+ExecStart=/path/to/node scripts/run-live-nightly.mjs
 
 # tm1-live.timer
 [Timer]

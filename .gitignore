@@ -23,3 +23,6 @@ docs/superpowers/
 
 # agent entry point — local only, not for public release
 CLAUDE.md
+
+# Live-run reports: real model names, server output, timings.
+.live-reports/
