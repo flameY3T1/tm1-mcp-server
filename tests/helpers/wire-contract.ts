@@ -168,7 +168,13 @@ export function endpointKey(method: string, path: string): string {
   const noQuery = path.split("?")[0] ?? path;
   const normalized = noQuery
     .replace(/\('[^']*'\)/g, "('*')")
-    .replace(/\(\d+\)/g, "(*)");
+    .replace(/\(\d+\)/g, "(*)")
+    // v12 reroots every call under the instance name (`/<instance>/api/v1/…`).
+    // That name is deployment-specific — a customer's instance would otherwise
+    // be committed in an endpoint key, which is exactly what recording shapes
+    // instead of values is meant to avoid. The `/*/` marker still keeps v12
+    // keys distinct from v11's bare `/api/v1/…`.
+    .replace(/^\/[^/]+\/api\//, "/*/api/");
   return `${method.toUpperCase()} ${normalized}`;
 }
 

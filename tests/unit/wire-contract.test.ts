@@ -97,6 +97,16 @@ describe("endpointKey", () => {
     );
   });
 
+  it("strips the v12 instance segment, which is deployment-specific", () => {
+    // `/acme_prod/api/v1/...` would otherwise commit a customer's instance
+    // name into an endpoint key.
+    expect(
+      endpointKey("GET", "/acme_prod/api/v1/Databases('Sales')/Cubes"),
+    ).toBe("GET /*/api/v1/Databases('*')/Cubes");
+    // v11 has no such prefix and must stay untouched.
+    expect(endpointKey("GET", "/api/v1/Cubes")).toBe("GET /api/v1/Cubes");
+  });
+
   it("strips numeric keys", () => {
     expect(endpointKey("PATCH", "/api/v1/Cellsets('abc')/Cells(0)")).toBe(
       "PATCH /api/v1/Cellsets('*')/Cells(*)",
