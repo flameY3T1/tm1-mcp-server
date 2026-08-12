@@ -9,6 +9,7 @@
 // (highest-index) partially-referenced axis and axes above it — never a
 // fully-cycled fast axis whose stride the higher axes decode through.
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import { z, type ZodRawShape } from "zod";
 import type { MdxAxis } from "../../src/types.js";
 import { clipAxesToWindow } from "../../src/tm1-client/services/cellset-transform.js";
@@ -86,12 +87,14 @@ function fakeServer() {
 }
 
 function mdxClient(): TM1Client {
-  return { cells: new CellService(mockHttp()) } as unknown as TM1Client;
+  return contractCheckedClient({
+    cells: new CellService(mockHttp()),
+  } as unknown as TM1Client);
 }
 function viewClient(): TM1Client {
-  return {
+  return contractCheckedClient({
     views: new ViewService(mockHttp()),
-  } as unknown as TM1Client;
+  } as unknown as TM1Client);
 }
 
 // ── clipAxesToWindow: the pure integrity core ────────────────────────────────

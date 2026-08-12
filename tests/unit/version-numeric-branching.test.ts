@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
@@ -63,7 +64,7 @@ describe("A3 — service version-gating uses numeric config.version", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
   });
 
   afterEach(() => {

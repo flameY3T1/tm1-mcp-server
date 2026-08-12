@@ -40,6 +40,8 @@
     "test:property": "vitest run tests/property",
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:live:nightly": "node scripts/run-live-nightly.mjs",
+    "contracts:record": "node scripts/record-wire-contracts.mjs",
+    "contracts:verify": "node scripts/record-wire-contracts.mjs tm1-test --verify",
     "smoke:tarball": "node scripts/smoke-tarball.mjs",
     "test:coverage": "vitest run --coverage",
     "coverage:check": "vitest run --coverage && node scripts/check-coverage-ratchet.mjs",

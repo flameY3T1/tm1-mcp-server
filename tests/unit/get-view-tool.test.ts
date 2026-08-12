@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import { z, type ZodRawShape } from "zod";
 import { registerGetView } from "../../src/tools/celldata/get-view.js";
 import { ViewService } from "../../src/tm1-client/services/view-service.js";
@@ -74,7 +75,7 @@ function makeTM1Client(paths: string[]): TM1Client {
   const views = new ViewService({ request } as unknown as ConstructorParameters<
     typeof ViewService
   >[0]);
-  return { views } as unknown as TM1Client;
+  return contractCheckedClient({ views } as unknown as TM1Client);
 }
 
 describe("tm1_get_view tool", () => {

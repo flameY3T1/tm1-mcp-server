@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import { z, type ZodRawShape } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../src/tm1-client.js";
@@ -50,14 +51,14 @@ async function run(
 // Bulk-rules stub mirroring the CubeService.getAllRules overload: plain array
 // without a cap, { items, total } when the tool pushes $top server-side.
 function bulkRulesClient(rows: CubeRules[]): TM1Client {
-  return {
+  return contractCheckedClient({
     cubes: {
       getAllRules: async (_includeControl?: boolean, top?: number) =>
         top === undefined
           ? rows
           : { items: rows.slice(0, top), total: rows.length },
     },
-  } as unknown as TM1Client;
+  } as unknown as TM1Client);
 }
 
 function cube(name: string, rulesText: string): CubeRules {

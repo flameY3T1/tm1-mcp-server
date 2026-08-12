@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
@@ -59,7 +60,7 @@ describe("R2-03: AbortSignal propagation through HTTP layer", () => {
           new DOMException("The operation was aborted.", "AbortError"),
         ),
       );
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
 
     await expect(
       client.request("GET", "/api/v1/Configuration"),
@@ -81,7 +82,7 @@ describe("R2-03: AbortSignal propagation through HTTP layer", () => {
           });
         });
       });
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
 
     const external = new AbortController();
     const promise = client.request("GET", "/api/v1/Configuration", undefined, {
@@ -100,9 +101,11 @@ describe("R2-03: AbortSignal propagation through HTTP layer", () => {
       status: 200,
       statusText: "OK",
       headers: new Headers(),
-      text: vi.fn().mockResolvedValue('{"ok":true}'),
+      // Body is irrelevant to signal propagation; keep it empty so it makes
+      // no claim about what /Configuration returns (see wire contracts).
+      text: vi.fn().mockResolvedValue("{}"),
     });
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
 
     await client.request("GET", "/api/v1/Configuration");
     expect(fetchSpy).toHaveBeenCalledOnce();
@@ -127,7 +130,7 @@ describe("R2-03: AbortSignal propagation through HTTP layer", () => {
           text: vi.fn().mockResolvedValue("{}"),
         } as unknown as Response);
       });
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
 
     const external = new AbortController();
     external.abort(new Error("pre-aborted"));

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -82,7 +83,7 @@ function bulkCodeClient(
   }>,
   opts?: { omitCount?: boolean },
 ): TM1Client {
-  return {
+  return contractCheckedClient({
     processes: {
       getAllCode: async (_includeControl?: boolean, top?: number) =>
         top === undefined
@@ -92,14 +93,14 @@ function bulkCodeClient(
               total: opts?.omitCount ? undefined : rows.length,
             },
     },
-  } as unknown as TM1Client;
+  } as unknown as TM1Client);
 }
 
 // A processes stub whose getCode returns per-process code maps.
 function clientWith(
   codeByProcess: Record<string, Record<string, string>>,
 ): TM1Client {
-  return {
+  return contractCheckedClient({
     processes: {
       getCode: async (name: string) => {
         const c = codeByProcess[name] ?? {};
@@ -125,7 +126,7 @@ function clientWith(
       getDataSource: async () => NONE_DS,
       getDeployMeta: async () => ({ hasSecurityAccess: false }),
     },
-  } as unknown as TM1Client;
+  } as unknown as TM1Client);
 }
 
 describe("tm1_get_process_code masks inline ODBC credentials", () => {
@@ -540,7 +541,7 @@ const ODBC_DS: DataSource = {
 };
 
 function clientWithDs(ds: DataSource): TM1Client {
-  return {
+  return contractCheckedClient({
     processes: {
       getCode: async () => ({ prolog: "", metadata: "", data: "", epilog: "" }),
       getCodeBlob: async () => "",
@@ -549,7 +550,7 @@ function clientWithDs(ds: DataSource): TM1Client {
       getDataSource: async () => ds,
       getDeployMeta: async () => ({ hasSecurityAccess: false }),
     },
-  } as unknown as TM1Client;
+  } as unknown as TM1Client);
 }
 
 describe("tm1_get_process_datasource masks conn-string credentials", () => {

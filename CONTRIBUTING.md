@@ -47,6 +47,7 @@ This chains:
 | Input naming     | `npm run lint:input-naming`         | no tool takes a bare top-level `name` input (use `<entity>Name`)   |
 | Envelope         | `npm run lint:mutation-envelope`    | mutation tools return via `actionResponse()`, not hand-rolled      |
 | Markdown schema  | `npm run lint:markdown-schema`      | tools taking `format` declare a schema that can carry the table    |
+| Wire contracts   | `npm run contracts:verify`\*        | the live server still matches the recorded response shapes         |
 | Lint             | `npm run lint:eslint`               | ESLint over `src/` and `tests/`                                    |
 | Tests + coverage | `npm run coverage:check`            | full `vitest` suite under coverage, then the coverage ratchet gate |
 
@@ -142,12 +143,12 @@ The suite mixes four kinds of test that prove different things. Know which one
 you are writing, and say so in the PR — "I added tests" is not a claim until the
 class is named.
 
-| Class                    | Lives in                              | Asserts                                                      | Proves                                                            | Does **not** prove                                                                                           |
-| ------------------------ | ------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **behavioral/invariant** | `tests/unit/`, `tests/property/`      | our logic and its invariants, against hand-written mocks     | the code does what we intended, and keeps doing it under refactor | anything about TM1. The mock is our belief about TM1, restated                                               |
-| **recorded contract**    | _none yet_ — see below                | our parsing against captured real TM1 responses              | we can read what the server actually sends                        | that we send the right request, or that the capture is still current                                         |
-| **request-shape**        | `tests/unit/` (client/service suites) | the OData/HTTP request we build — URL, method, body, `$`-ops | the request is stable and does not silently change                | that TM1 accepts it. Source and mock can be changed together and stay green                                  |
-| **live**                 | `tests/live/`                         | real calls against a real server                             | the round trip works on that server, that version, that day       | anything in CI — the live suite never runs by default, and its harness stubs the transport/registration edge |
+| Class                    | Lives in                              | Asserts                                                       | Proves                                                            | Does **not** prove                                                                                           |
+| ------------------------ | ------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **behavioral/invariant** | `tests/unit/`, `tests/property/`      | our logic and its invariants, against hand-written mocks      | the code does what we intended, and keeps doing it under refactor | anything about TM1. The mock is our belief about TM1, restated                                               |
+| **recorded contract**    | `tests/fixtures/` + every faked test  | every hand-written fake against shapes captured from real TM1 | the mocks describe a payload TM1 actually produces                | that the capture is current — `npm run contracts:verify` answers that, and needs a live server               |
+| **request-shape**        | `tests/unit/` (client/service suites) | the OData/HTTP request we build — URL, method, body, `$`-ops  | the request is stable and does not silently change                | that TM1 accepts it. Source and mock can be changed together and stay green                                  |
+| **live**                 | `tests/live/`                         | real calls against a real server                              | the round trip works on that server, that version, that day       | anything in CI — the live suite never runs by default, and its harness stubs the transport/registration edge |
 
 Two consequences worth internalising:
 
@@ -156,10 +157,18 @@ Two consequences worth internalising:
   against mocks we wrote. Cite it as suite size, never as evidence of REST
   correctness. If you quote it in a PR or release note, say which classes it
   contains.
-- **The recorded-contract class is currently empty.** No sanitised TM1 responses
-  are checked in, so nothing in CI verifies our belief about IBM's wire format.
-  A coordinated wrong change to source _and_ mock passes every required job.
-  Closing this is tracked work, not a nice-to-have.
+- **The recorded-contract class is no longer a separate suite** — it is a
+  constraint on the other classes. `tests/fixtures/wire-contracts.json` and
+  `service-contracts.json` record the _structure_ of real responses (never
+  values, so nothing model-specific is committed), and the guards in
+  `tests/helpers/contract-*.ts` check every fake against them. A coordinated
+  wrong change to source _and_ mock now fails, because the mock is measured
+  against the server rather than against our belief about it.
+
+  What it still cannot prove is that the recording is current: contracts are a
+  snapshot, and only `npm run contracts:verify` against a live server tells you
+  whether TM1 still matches. Reviewed gaps — shapes the recording never saw —
+  are listed with reasons in `tests/fixtures/contract-exceptions.json`.
 
 Conventions for new tests, so the class is self-evident:
 
@@ -168,9 +177,10 @@ Conventions for new tests, so the class is self-evident:
 - Request-shape tests: prefix the `describe` with `request shape:` — e.g.
   `describe("request shape: DimensionService.list", ...)`. New tests only; the
   existing ~12 client suites are not retrofitted.
-- Recorded-contract tests: when the first ones land, they go in
-  `tests/contract/` as `*.contract.test.ts`, with the captured payloads in
-  `tests/fixtures/` — sanitised, no real object or host names.
+- Recorded-contract checking needs no new file: route a `fetch` stub through
+  `stubContractCheckedFetch`, an `TM1HttpClient` fake through
+  `contractCheckedHttp`, and a `TM1Client` fake through
+  `contractCheckedClient`. See `tests/fixtures/README.md`.
 - Everything else is behavioral/invariant by default; no marker needed.
 
 ## Commits & PRs
@@ -193,3 +203,14 @@ picked and tagged only at publish time via `npm version` — never bump
 
 By contributing, you agree your contributions are licensed under the
 [MIT License](LICENSE).
+
+## Wire contracts
+
+Most unit tests fake TM1. `tests/fixtures/` records the _structure_ of real
+responses — never their values — and every fake is checked against it, so a
+mock cannot invent a field the server never sends or use the wrong type for one
+it does. See `tests/fixtures/README.md` for the format, how to re-record, and
+why `contract-exceptions.json` exists.
+
+`contracts:verify` is not part of `npm run verify`: it needs a live TM1 server.
+Run it when touching the client or service layer, and after a server upgrade.

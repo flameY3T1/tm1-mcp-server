@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
@@ -52,9 +53,7 @@ function notFound(): Response {
     headers: new Headers(),
     text: vi
       .fn()
-      .mockResolvedValue(
-        JSON.stringify({ error: { message: { value: "Not found" } } }),
-      ),
+      .mockResolvedValue(JSON.stringify({ error: { message: "Not found" } })),
   } as unknown as Response;
 }
 
@@ -64,7 +63,7 @@ describe("DimensionService.resolveDefaultMember", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
     const config = makeConfig();
     const sm = new SessionManager(config, mockLogger);
     vi.spyOn(sm, "ensureSession").mockResolvedValue("s");

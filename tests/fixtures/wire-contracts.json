@@ -1,0 +1,1161 @@
+{
+  "recordedAgainst": ["11.8.02900.8"],
+  "recordedAt": "2026-08-12",
+  "endpoints": {
+    "DELETE /api/v1/Chores('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "DELETE /api/v1/Contents('*')/Contents('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "DELETE /api/v1/Cubes('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "DELETE /api/v1/Cubes('*')/Views('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "DELETE /api/v1/Dimensions('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "DELETE /api/v1/Dimensions('*')/Hierarchies('*')/Subsets('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "DELETE /api/v1/Processes('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/ActiveConfiguration": {
+      "@odata.context": "string",
+      "Access": {
+        "Authentication": {
+          "IntegratedSecurityMode": "string",
+          "MaximumLoginAttempts": "number",
+          "SecurityPackageName": "string",
+          "ServicePrincipalName": "string"
+        },
+        "CAM": {
+          "CAMUseSSL": "boolean",
+          "ClientPingCAMPassport": "string",
+          "ClientURI": "null",
+          "CreateNewCAMClients": "boolean",
+          "PortalVariableFile": "null",
+          "ServerCAMURIRetryAttempts": "number",
+          "ServerURIs[]": "unknown"
+        },
+        "CAPI": {
+          "ClientMessagePort": "number",
+          "ClientVersionMaximum": "number",
+          "ClientVersionMinimum": "number",
+          "ClientVersionPrecision": "number",
+          "MessageCompression": "boolean",
+          "Port": "number",
+          "ProgressMessage": "boolean"
+        },
+        "HTTP": {
+          "OriginAllowList[]": "unknown",
+          "Port": "number",
+          "RequestEntityMaxSizeInKB": "number",
+          "SessionMaxRequests": "number",
+          "SessionTimeout": "string"
+        },
+        "LDAP": {
+          "Enable": "boolean",
+          "Host": "null",
+          "PasswordFile": "null",
+          "PasswordKeyFile": "null",
+          "Port": "number",
+          "SearchBase": "null",
+          "SearchField": "string",
+          "SkipSSLCertVerification": "boolean",
+          "SkipSSLCRLVerification": "boolean",
+          "UseServerAccount": "boolean",
+          "VerifyCertServerName[]": "unknown",
+          "VerifyServerSSLCert": "boolean",
+          "WellKnownUserName": "null"
+        },
+        "Network": {
+          "IdleConnectionTimeOut": "string",
+          "IPAddress": "null",
+          "IPVersion": "string",
+          "NetRecvBlockingWaitLimit": "string",
+          "NetRecvMaxClientIOWaitWithinAPIs": "string",
+          "ReceiveProgressResponseTimeout": "string"
+        },
+        "SSL": {
+          "CertAuthority": "null",
+          "CertificateID": "null",
+          "CertRevocationFile": "null",
+          "ClientExportServerKeyID": "null",
+          "Enable": "boolean",
+          "FIPSOperationMode": "string",
+          "KeyFile": "string",
+          "KeyLabel": "null",
+          "KeyStashFile": "string",
+          "NIST_SP800_131A_MODE": "boolean",
+          "TLSCipherList": "null"
+        }
+      },
+      "Administration": {
+        "AdminHost": "string",
+        "AllowReadOnlyChoreReschedule": "boolean",
+        "AuditLog": {
+          "Enable": "boolean",
+          "MaxFileSizeKilobytes": "number",
+          "MaxQueryMemoryKilobytes": "number",
+          "UpdateInterval": "string"
+        },
+        "Clients": {
+          "ClientPropertiesSyncInterval": "string",
+          "PasswordMinimumLength": "number",
+          "RetainNonCAMGroupMembership": "null"
+        },
+        "DataBaseDirectory": "string",
+        "DebugLog": {
+          "LoggingDirectory": "string"
+        },
+        "DisableSandboxing": "boolean",
+        "DownTime": "string",
+        "EnableSandboxDimension": "boolean",
+        "EventLog": {
+          "Enable": "boolean",
+          "ScanFrequency": "string",
+          "ThresholdForPooledMemoryInMB": "number",
+          "ThresholdForThreadBlockingNumber": "number",
+          "ThresholdForThreadRunningTime": "string",
+          "ThresholdForThreadWaitingTime": "string"
+        },
+        "ExternalDatabase": {
+          "ODBCLibraryPath": "null",
+          "ODBCTimeoutInSeconds": "number",
+          "OracleErrorForceRowStatus": "null",
+          "SQLFetchType": "null",
+          "SQLRowsetSize": "number",
+          "TM1ConnectorforSAP": "boolean",
+          "UseNewConnectorforSAP": "boolean"
+        },
+        "FileRetry": {
+          "FileRetryCount": "number",
+          "FileRetryDelayMilliseconds": "number",
+          "FileRetryFileSpec[]": "string"
+        },
+        "Java": {
+          "ClassPath": "null",
+          "JVMArgs": "null",
+          "JVMPath": "null"
+        },
+        "Language": "null",
+        "MaskUserNameInServerTools": "boolean",
+        "PerfMonActive": "boolean",
+        "PerformanceMonitorOn": "boolean",
+        "RunningInBackground": "null",
+        "ServerLog": {
+          "Enable": "boolean",
+          "LogReleaseLineCount": "number"
+        },
+        "ServerName": "string",
+        "StartupChores": "null",
+        "TM1Web": {
+          "ExcelWebPublishEnabled": "boolean"
+        },
+        "TopLog": {
+          "Enable": "boolean",
+          "ScanFrequency": "string",
+          "ScanMode": "string"
+        },
+        "UnicodeUpperLowerCase": "boolean"
+      },
+      "Modelling": {
+        "DefaultMeasuresDimension": "boolean",
+        "EnableNewHierarchyCreation": "boolean",
+        "MDXSelectCalculatedMemberInputs": "boolean",
+        "Rules": {
+          "AllowSeparateNandCRules": "boolean",
+          "AutomaticallyAddCubeDependencies": "boolean",
+          "ForceReevaluationOfFeedersForFedCellsOnDataChange": "boolean",
+          "RulesOverwriteCellsOnLoad": "boolean"
+        },
+        "Spreading": {
+          "ProportionSpreadToZeroCells": "boolean",
+          "SpreadingPrecision": "number"
+        },
+        "Startup": {
+          "LoadPrivateSubsetsOnStartup": "boolean",
+          "MaximumCubeLoadThreads": "number",
+          "PersistentFeeders": "boolean",
+          "SkipLoadingAliases": "null"
+        },
+        "Synchronization": {
+          "MaximumSynchAttempts": "number",
+          "SyncUnitSize": "number"
+        },
+        "TI": {
+          "CognosTM1InterfacePath": "null",
+          "EnableTIDebugging": "boolean",
+          "MaximumTILockObjects": "number",
+          "UseExcelSerialDate": "boolean"
+        },
+        "UserDefinedCalculations": "boolean"
+      },
+      "Performance": {
+        "JobQueuing": {
+          "Enable": "boolean",
+          "MaxWaitTime": "string",
+          "ThreadPoolSize": "number",
+          "ThreadSleepTime": "string"
+        },
+        "Locking": {
+          "PullInvalidationSubsets": "boolean",
+          "SubsetElementLockBreathing": "boolean",
+          "UseLocalCopiesForPublicDynamicSubsets": "boolean"
+        },
+        "Memory": {
+          "ApplyMaximumViewSizeToEntireTransaction": "boolean",
+          "CacheFriendlyMalloc": "boolean",
+          "DisableMemoryCache": "boolean",
+          "LockPagesInMemory": "boolean",
+          "MaximumMemoryForSubsetUndoKB": "number",
+          "MaximumUserSandboxSizeMB": "number",
+          "MaximumViewSizeMB": "number"
+        },
+        "MTCubeLoad": {
+          "Enabled": "boolean",
+          "MinFileSize": "number",
+          "UseBookmarkFiles": "boolean",
+          "Weight": "number"
+        },
+        "MTFeeders": {
+          "AtStartup": "boolean",
+          "Enabled": "boolean"
+        },
+        "MTQ": {
+          "ImmediateCheckForSplit": "boolean",
+          "MTFeeders": "boolean",
+          "MTFeedersAtStartup": "boolean",
+          "MTQQuery": "boolean",
+          "NumberOfThreadsToUse": "number",
+          "OperationProgressCheckSkipLoopSize": "number",
+          "SingleCellConsolidation": "boolean",
+          "UseAllThreads": "boolean"
+        },
+        "PrivilegeGenerationOptimization": "boolean",
+        "Stargate": {
+          "AllRuleCalcStargateOptimization": "boolean",
+          "UseStargateForRules": "boolean",
+          "ZeroWeightOptimization": "boolean"
+        },
+        "ViewCalculation": {
+          "CalculationThresholdForStorage": "number",
+          "CheckFeedersMaximumCells": "number",
+          "MagnitudeDifferenceToBeZero": "number",
+          "ViewConsolidationOptimization": "boolean",
+          "ViewConsolidationOptimizationMethod": "string"
+        }
+      },
+      "ServerName": "string"
+    },
+    "GET /api/v1/AuditLogEntries": {
+      "@odata.context": "string",
+      "value[]": {
+        "Description": "string",
+        "ID": "number",
+        "ObjectName": "string",
+        "ObjectType": "string",
+        "TimeStamp": "string",
+        "UserName": "string"
+      }
+    },
+    "GET /api/v1/Chores": {
+      "@odata.context": "string",
+      "value[]": {
+        "@odata.etag": "string",
+        "Active": "boolean",
+        "Attributes": {
+          "Caption": "string"
+        },
+        "DSTSensitive": "boolean",
+        "ExecutionMode": "string",
+        "Frequency": "string",
+        "Name": "string",
+        "StartTime": "string",
+        "Tasks[]": {
+          "Parameters[]": {
+            "Name": "string",
+            "Value": "number|string"
+          },
+          "Process": {
+            "@odata.etag": "string",
+            "Name": "string"
+          },
+          "Step": "number"
+        }
+      }
+    },
+    "GET /api/v1/Configuration": {
+      "@odata.context": "string",
+      "AdminHost": "string",
+      "AllowSeparateNandCRules": "boolean",
+      "ClientCAMURIs[]": "unknown",
+      "ClientMessagePortNumber": "number",
+      "ClientPingCAMPassport": "number",
+      "DataBaseDirectory": "string",
+      "DisableSandboxing": "boolean",
+      "DistributedOutputDir": "string",
+      "ForceReevaluationOfFeedersForFedCellsOnDataChange": "boolean",
+      "HTTPPortNumber": "number",
+      "IntegratedSecurityMode": "boolean",
+      "JobQueuing": "boolean",
+      "PortNumber": "number",
+      "PrincipalName": "string",
+      "ProductVersion": "string",
+      "SecurityMode": "string",
+      "SecurityPackageName": "string",
+      "ServerCAMURI": "string",
+      "ServerName": "string",
+      "UnicodeUpperLowerCase": "boolean",
+      "WebCAMURI": "string"
+    },
+    "GET /api/v1/Configuration/ProductVersion": {
+      "@odata.context": "string",
+      "value": "string"
+    },
+    "GET /api/v1/Contents('*')/Contents": {
+      "@odata.context": "string",
+      "value[]": {
+        "@odata.type": "string",
+        "Name": "string"
+      }
+    },
+    "GET /api/v1/Contents('*')/Contents !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/Contents('*')/Contents('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/Contents('*')/Contents('*')/Content !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/Cubes": {
+      "@odata.context": "string",
+      "@odata.count?": "number",
+      "value[]": {
+        "@odata.etag": "string",
+        "Dimensions[]?": {
+          "@odata.etag": "string",
+          "Name": "string"
+        },
+        "Name": "string",
+        "Rules?": "null|string"
+      }
+    },
+    "GET /api/v1/Cubes('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes?": {
+        "Caption": "string"
+      },
+      "Dimensions[]?": {
+        "@odata.etag": "string",
+        "Name": "string"
+      },
+      "DrillthroughRules?": "null",
+      "LastDataUpdate?": "string",
+      "LastSchemaUpdate?": "string",
+      "Name": "string",
+      "Rules?": "null|string"
+    },
+    "GET /api/v1/Cubes('*')/PrivateViews": {
+      "@odata.context": "string",
+      "value[]": "unknown"
+    },
+    "GET /api/v1/Cubes('*')/PrivateViews('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/Cubes('*')/Rules": {
+      "@odata.context": "string",
+      "value": "string"
+    },
+    "GET /api/v1/Cubes('*')/Views": {
+      "@odata.context": "string",
+      "value[]": {
+        "@odata.etag": "string",
+        "@odata.type": "string",
+        "Name": "string"
+      }
+    },
+    "GET /api/v1/Cubes('*')/Views('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "@odata.type": "string",
+      "MDX?": "string",
+      "Name": "string"
+    },
+    "GET /api/v1/Cubes('*')/Views('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/Cubes('*')/Views('*')/tm1.NativeView": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "@odata.type": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Columns[]": {
+        "Subset": {
+          "@odata.etag": "string",
+          "Attributes": {
+            "Caption": "string"
+          },
+          "Expression": "null|string",
+          "Hierarchy": {
+            "@odata.etag": "string",
+            "Attributes": {
+              "Caption": "string"
+            },
+            "Cardinality": "number",
+            "Dimension": {
+              "@odata.etag": "string",
+              "AllLeavesHierarchyName": "string",
+              "Attributes": {
+                "Caption": "string"
+              },
+              "Name": "string",
+              "UniqueName": "string"
+            },
+            "Name": "string",
+            "Structure": "number",
+            "UniqueName": "string",
+            "Visible": "boolean"
+          },
+          "Name": "string",
+          "UniqueName": "string"
+        }
+      },
+      "FormatString": "string",
+      "Name": "string",
+      "Rows[]": {
+        "Subset": {
+          "@odata.etag": "string",
+          "Attributes": {
+            "Caption": "string"
+          },
+          "Expression": "null|string",
+          "Hierarchy": {
+            "@odata.etag": "string",
+            "Attributes": {
+              "Caption": "string"
+            },
+            "Cardinality": "number",
+            "Dimension": {
+              "@odata.etag": "string",
+              "AllLeavesHierarchyName": "string",
+              "Attributes": {
+                "Caption": "string"
+              },
+              "Name": "string",
+              "UniqueName": "string"
+            },
+            "Name": "string",
+            "Structure": "number",
+            "UniqueName": "string",
+            "Visible": "boolean"
+          },
+          "Name": "string",
+          "UniqueName": "string"
+        }
+      },
+      "SuppressEmptyColumns": "boolean",
+      "SuppressEmptyRows": "boolean",
+      "Titles[]": {
+        "Selected": {
+          "@odata.etag": "string",
+          "Attributes": {
+            "5-Stellig?": "string",
+            "BST+Name?": "string",
+            "BSTNAME?": "string",
+            "Caption": "string",
+            "Name?": "string"
+          },
+          "Index": "number",
+          "Level": "number",
+          "Name": "string",
+          "Type": "string",
+          "UniqueName": "string"
+        },
+        "Subset": {
+          "@odata.etag": "string",
+          "Attributes": {
+            "Caption": "string"
+          },
+          "Expression": "string",
+          "Hierarchy": {
+            "@odata.etag": "string",
+            "Attributes": {
+              "Caption": "string"
+            },
+            "Cardinality": "number",
+            "Dimension": {
+              "@odata.etag": "string",
+              "AllLeavesHierarchyName": "string",
+              "Attributes": {
+                "Caption": "string"
+              },
+              "Name": "string",
+              "UniqueName": "string"
+            },
+            "Name": "string",
+            "Structure": "number",
+            "UniqueName": "string",
+            "Visible": "boolean"
+          },
+          "Name": "string",
+          "UniqueName": "string"
+        }
+      }
+    },
+    "GET /api/v1/Dimensions": {
+      "@odata.context": "string",
+      "@odata.count?": "number",
+      "value[]": {
+        "@odata.etag": "string",
+        "AllLeavesHierarchyName": "string",
+        "Attributes": {
+          "Caption": "string"
+        },
+        "Hierarchies[]": {
+          "@odata.etag": "string",
+          "Name": "string"
+        },
+        "Name": "string",
+        "UniqueName": "string"
+      }
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Cardinality": "number",
+      "Elements[]": {
+        "@odata.etag": "string",
+        "Level": "number",
+        "Name": "string",
+        "Parents[]": {
+          "@odata.etag": "string",
+          "Name": "string"
+        },
+        "Type": "string"
+      },
+      "Elements@odata.count?": "number",
+      "Name": "string",
+      "Structure": "number",
+      "UniqueName": "string",
+      "Visible": "boolean"
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*')/DefaultMember": {
+      "@odata.context": "string",
+      "Level@odata.navigationLink": "string",
+      "Name": "string"
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*')/Edges": {
+      "@odata.context": "string",
+      "value[]": {
+        "ComponentName": "string",
+        "ParentName": "string",
+        "Weight": "number"
+      }
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*')/ElementAttributes": {
+      "@odata.context": "string",
+      "value[]": {
+        "Name": "string",
+        "Type": "string"
+      }
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*')/Elements": {
+      "@odata.context": "string",
+      "value[]": {
+        "@odata.etag": "string",
+        "Name": "string",
+        "Type": "string"
+      }
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*')/PrivateSubsets": {
+      "@odata.context": "string",
+      "value[]": "unknown"
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*')/Subsets": {
+      "@odata.context": "string",
+      "value[]": {
+        "@odata.etag": "string",
+        "Alias": "string",
+        "Expression": "null|string",
+        "Name": "string"
+      }
+    },
+    "GET /api/v1/Dimensions('*')/Hierarchies('*')/Subsets('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Alias": "string",
+      "Elements[]": {
+        "@odata.etag": "string",
+        "Name": "string"
+      },
+      "Expression": "null|string",
+      "Name": "string"
+    },
+    "GET /api/v1/ErrorLogFiles": {
+      "@odata.context": "string",
+      "value[]": {
+        "Filename": "string"
+      }
+    },
+    "GET /api/v1/ErrorLogFiles('*')/Content !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/Groups": {
+      "@odata.context": "string",
+      "value[]": {
+        "Name": "string",
+        "Users[]": {
+          "Name": "string"
+        }
+      }
+    },
+    "GET /api/v1/MessageLogEntries": {
+      "@odata.context": "string",
+      "@odata.count": "number",
+      "value[]": {
+        "ID": "number",
+        "Level": "string",
+        "Logger": "string",
+        "Message": "string",
+        "SessionID": "number",
+        "ThreadID": "number",
+        "TimeStamp": "string"
+      }
+    },
+    "GET /api/v1/Processes": {
+      "@odata.context": "string",
+      "@odata.count?": "number",
+      "value[]": {
+        "@odata.etag": "string",
+        "DataProcedure?": "string",
+        "EpilogProcedure?": "string",
+        "HasSecurityAccess?": "boolean",
+        "MetadataProcedure?": "string",
+        "Name": "string",
+        "Parameters[]?": {
+          "Name": "string",
+          "Prompt": "string",
+          "Type": "string",
+          "Value": "number|string"
+        },
+        "PrologProcedure?": "string"
+      }
+    },
+    "GET /api/v1/Processes('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "@odata.id?": "string",
+      "Attributes?": {
+        "Caption": "string"
+      },
+      "DataProcedure?": "string",
+      "DataSource?": {
+        "Type": "string"
+      },
+      "EpilogProcedure?": "string",
+      "HasSecurityAccess": "boolean",
+      "MetadataProcedure?": "string",
+      "Name?": "string",
+      "Parameters[]?": {
+        "Name": "string",
+        "Prompt": "string",
+        "Type": "string",
+        "Value": "number"
+      },
+      "PrologProcedure?": "string",
+      "Variables[]?": "unknown"
+    },
+    "GET /api/v1/Processes('*') !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "GET /api/v1/Processes('*')/Parameters": {
+      "@odata.context": "string",
+      "value[]": {
+        "Name": "string",
+        "Prompt": "string",
+        "Type": "string",
+        "Value": "number"
+      }
+    },
+    "GET /api/v1/Processes('*')/Variables": {
+      "@odata.context": "string",
+      "value[]": {
+        "EndByte": "number",
+        "Name": "string",
+        "Position": "number",
+        "StartByte": "number",
+        "Type": "string"
+      }
+    },
+    "GET /api/v1/Sessions": {
+      "@odata.context": "string",
+      "value[]": {
+        "Active": "boolean",
+        "Context": "string",
+        "ID": "number",
+        "Threads[]": {
+          "Context": "string",
+          "ElapsedTime": "string",
+          "Function": "string",
+          "ID": "number",
+          "Info": "string",
+          "IXLocks": "number",
+          "Name": "string",
+          "ObjectName": "string",
+          "ObjectType": "string",
+          "RLocks": "number",
+          "State": "string",
+          "Type": "string",
+          "WaitTime": "string",
+          "WLocks": "number"
+        },
+        "User": "null|object"
+      }
+    },
+    "GET /api/v1/Threads": {
+      "@odata.context": "string",
+      "value[]": {
+        "Context": "string",
+        "ElapsedTime": "string",
+        "Function": "string",
+        "ID": "number",
+        "Name": "string",
+        "ObjectName": "string",
+        "State": "string",
+        "Type": "string"
+      }
+    },
+    "GET /api/v1/Users": {
+      "@odata.context": "string",
+      "value[]": {
+        "Enabled": "boolean",
+        "FriendlyName": "string",
+        "Groups[]": {
+          "Name": "string"
+        },
+        "Name": "string",
+        "Type": "string"
+      }
+    },
+    "GET /api/v1/Users('*')": {
+      "@odata.context": "string",
+      "Enabled": "boolean",
+      "FriendlyName": "string",
+      "Groups[]": {
+        "Name": "string"
+      },
+      "Name": "string",
+      "Type": "string"
+    },
+    "PATCH /api/v1/Chores('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Active": "boolean",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "DSTSensitive": "boolean",
+      "ExecutionMode": "string",
+      "Frequency": "string",
+      "Name": "string",
+      "StartTime": "string"
+    },
+    "PATCH /api/v1/Cubes('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "DrillthroughRules": "null",
+      "LastDataUpdate": "string",
+      "LastSchemaUpdate": "string",
+      "Name": "string",
+      "Rules": "string"
+    },
+    "PATCH /api/v1/Dimensions('*')/Hierarchies('*')/Elements('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Index": "number",
+      "Level": "number",
+      "Name": "string",
+      "Type": "string",
+      "UniqueName": "string"
+    },
+    "PATCH /api/v1/Dimensions('*')/Hierarchies('*')/Subsets('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Expression": "string",
+      "Name": "string",
+      "UniqueName": "string"
+    },
+    "PATCH /api/v1/Processes('*')": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "DataProcedure": "string",
+      "DataSource": {
+        "Type": "string"
+      },
+      "EpilogProcedure": "string",
+      "HasSecurityAccess": "boolean",
+      "MetadataProcedure": "string",
+      "Name": "string",
+      "Parameters[]": {
+        "Name": "string",
+        "Prompt": "string",
+        "Type": "string",
+        "Value": "number"
+      },
+      "PrologProcedure": "string",
+      "Variables[]": "unknown"
+    },
+    "PATCH /api/v1/Users('*')": {
+      "@odata.context": "string",
+      "Enabled": "boolean",
+      "FriendlyName": "string",
+      "IsActive": "boolean",
+      "Name": "string",
+      "Password": "null",
+      "Type": "string"
+    },
+    "POST /api/v1/$batch": {
+      "responses[]": {
+        "body": "unknown",
+        "headers?": {
+          "content-type?": "string",
+          "etag?": "string",
+          "location?": "string"
+        },
+        "id": "string",
+        "status": "number"
+      }
+    },
+    "POST /api/v1/Chores": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Active": "boolean",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "DSTSensitive": "boolean",
+      "ExecutionMode": "string",
+      "Frequency": "string",
+      "Name": "string",
+      "StartTime": "string"
+    },
+    "POST /api/v1/CompileProcess": {
+      "@odata.context": "string",
+      "value[]": "unknown"
+    },
+    "POST /api/v1/Contents('*')/Contents": {
+      "@odata.context": "string",
+      "@odata.type": "string",
+      "Attributes": {},
+      "Content@odata.mediaContentType": "string",
+      "ID": "string",
+      "LastUpdated": "string",
+      "Name": "string",
+      "Size": "number"
+    },
+    "POST /api/v1/Contents('*')/Contents !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "POST /api/v1/Cubes": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "DrillthroughRules": "null",
+      "LastDataUpdate": "string",
+      "LastSchemaUpdate": "string",
+      "Name": "string",
+      "Rules": "null"
+    },
+    "POST /api/v1/Cubes('*')/tm1.CheckFeeders": {
+      "@odata.context": "string",
+      "value[]": "unknown"
+    },
+    "POST /api/v1/Cubes('*')/tm1.CheckRules": {
+      "@odata.context": "string",
+      "value[]": "unknown"
+    },
+    "POST /api/v1/Cubes('*')/tm1.TraceCellCalculation": {
+      "@odata.context": "string",
+      "Components[]": "unknown",
+      "Statements[]": "unknown",
+      "Status": "string",
+      "Tuple[]": {
+        "@odata.etag": "string",
+        "Name": "string"
+      },
+      "Type": "string",
+      "Value": "number"
+    },
+    "POST /api/v1/Cubes('*')/tm1.TraceFeeders": {
+      "@odata.context": "string",
+      "FedCells[]": {
+        "Cube": {
+          "@odata.etag": "string",
+          "Name": "string"
+        },
+        "Fed": "boolean",
+        "Tuple[]": {
+          "@odata.etag": "string",
+          "Name": "string"
+        }
+      },
+      "Statements[]": "string"
+    },
+    "POST /api/v1/Cubes('*')/Views": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "@odata.type": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Columns[]?": {},
+      "FormatString?": "string",
+      "MDX?": "string",
+      "Name": "string",
+      "Rows[]?": {},
+      "SuppressEmptyColumns?": "boolean",
+      "SuppressEmptyRows?": "boolean",
+      "Titles[]?": "unknown"
+    },
+    "POST /api/v1/Cubes('*')/Views('*')/tm1.Execute": {
+      "@odata.context": "string",
+      "Axes[]": {
+        "Cardinality": "number",
+        "Ordinal": "number",
+        "Tuples[]": {
+          "Members[]": {
+            "Hierarchy": {
+              "@odata.etag": "string",
+              "Name": "string"
+            },
+            "Name": "string"
+          },
+          "Ordinal": "number"
+        }
+      },
+      "Cells[]": {
+        "@odata.id": "string",
+        "FormattedValue": "string",
+        "Value": "null|number"
+      },
+      "ID": "string"
+    },
+    "POST /api/v1/Dimensions": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "AllLeavesHierarchyName": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Name": "string",
+      "UniqueName": "string"
+    },
+    "POST /api/v1/Dimensions('*')/Hierarchies": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Cardinality": "number",
+      "Name": "string",
+      "Structure": "number",
+      "UniqueName": "string",
+      "Visible": "boolean"
+    },
+    "POST /api/v1/Dimensions('*')/Hierarchies('*')/ElementAttributes": {
+      "@odata.context": "string",
+      "Name": "string",
+      "Type": "string"
+    },
+    "POST /api/v1/Dimensions('*')/Hierarchies('*')/Elements": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Index": "number",
+      "Level": "number",
+      "Name": "string",
+      "Type": "string",
+      "UniqueName": "string"
+    },
+    "POST /api/v1/Dimensions('*')/Hierarchies('*')/Elements('*')/Components": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Index": "number",
+      "Level": "number",
+      "Name": "string",
+      "Type": "string",
+      "UniqueName": "string"
+    },
+    "POST /api/v1/Dimensions('*')/Hierarchies('*')/Subsets": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "Expression": "null",
+      "Name": "string",
+      "UniqueName": "string"
+    },
+    "POST /api/v1/ExecuteMDX": {
+      "@odata.context": "string",
+      "Axes[]?": {
+        "Cardinality": "number",
+        "Ordinal": "number",
+        "Tuples[]": {
+          "Members[]": {
+            "Hierarchy": {
+              "@odata.etag": "string",
+              "Name": "string"
+            },
+            "Name": "string"
+          },
+          "Ordinal": "number"
+        }
+      },
+      "Cells[]?": {
+        "@odata.id": "string",
+        "FormattedValue": "string",
+        "Value": "null|number|string"
+      },
+      "ID": "string"
+    },
+    "POST /api/v1/ExecuteMDX !400": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "POST /api/v1/Processes": {
+      "@odata.context": "string",
+      "@odata.etag": "string",
+      "Attributes": {
+        "Caption": "string"
+      },
+      "DataProcedure": "string",
+      "DataSource": {
+        "Type": "string"
+      },
+      "EpilogProcedure": "string",
+      "HasSecurityAccess": "boolean",
+      "MetadataProcedure": "string",
+      "Name": "string",
+      "Parameters[]": {
+        "Name": "string",
+        "Prompt": "string",
+        "Type": "string",
+        "Value": "number"
+      },
+      "PrologProcedure": "string",
+      "Variables[]": "unknown"
+    },
+    "POST /api/v1/Processes('*')/tm1.Compile": {
+      "@odata.context": "string",
+      "value[]": {
+        "LineNumber": "number",
+        "Message": "string",
+        "Procedure": "string"
+      }
+    },
+    "POST /api/v1/Processes('*')/tm1.ExecuteWithReturn": {
+      "@odata.context": "string",
+      "ProcessExecuteStatusCode": "string"
+    },
+    "POST /api/v1/Threads(*)/tm1.CancelOperation !404": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
+    },
+    "POST /api/v1/Users": {
+      "@odata.context": "string",
+      "Enabled": "boolean",
+      "FriendlyName": "string",
+      "IsActive": "boolean",
+      "Name": "string",
+      "Password": "null",
+      "Type": "string"
+    }
+  }
+}

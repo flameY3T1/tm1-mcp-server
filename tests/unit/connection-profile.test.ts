@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import { createConnectionProfile } from "../../src/tm1-client/connection/profile.js";
 import type { TM1Config } from "../../src/config.js";
 
@@ -175,7 +176,7 @@ describe("v12 buildLoginRequest", () => {
       json: async () => ({ access_token: "iam-tok" }),
       text: async () => "",
     });
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
     try {
       const req = await v12({
         authMode: "iam",

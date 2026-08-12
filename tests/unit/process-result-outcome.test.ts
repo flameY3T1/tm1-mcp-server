@@ -12,6 +12,7 @@
 // variant, `outcome` names the third state, and the success variant pins
 // `processErrorStatus` to the one status that can accompany it.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
@@ -75,7 +76,7 @@ describe("ProcessResult — a missing status code is not success (T-4)", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
     const config = makeConfig();
     const sessionManager = new SessionManager(config, mockLogger);
     vi.spyOn(sessionManager, "ensureSession").mockResolvedValue("session123");
@@ -166,7 +167,7 @@ describe("ProcessResult — a missing status code is not success (T-4)", () => {
     // rollback we did not observe would be the same fail-open mistake in a
     // different direction.
     fetchSpy.mockResolvedValueOnce(
-      mockResponse({ error: { message: { value: "Prolog aborted" } } }, 400),
+      mockResponse({ error: { message: "Prolog aborted" } }, 400),
     );
 
     const result = await client.processes.execute("Broken");

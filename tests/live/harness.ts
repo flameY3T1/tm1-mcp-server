@@ -18,6 +18,8 @@ import { SessionManager } from "../../src/session-manager.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { createLogger } from "../../src/logger.js";
 import { withAnnotations } from "../../src/tools/with-annotations.js";
+import { RECORDING } from "./contract-mode.js";
+import { recordingClient } from "./service-recorder.js";
 import { registerAllTools } from "../../src/tools/index.js";
 import type { McpToolResult } from "../../src/tools/error-format.js";
 
@@ -84,8 +86,12 @@ async function build(): Promise<LiveHarness> {
   const config: TM1Config = { ...baseConfig, mode: "readwrite" };
   const logger = createLogger({ logLevel: "error" });
   const sessionManager = new SessionManager(config, logger);
-  const client = new TM1Client(config, sessionManager, logger);
-  await client.connect();
+  const realClient = new TM1Client(config, sessionManager, logger);
+  await realClient.connect();
+  // While recording, tools run against a transparent proxy that notes the
+  // shape each service method returns — the layer the client-level unit fakes
+  // stand in for. Identical behaviour otherwise.
+  const client = RECORDING ? recordingClient(realClient) : realClient;
 
   // Fake McpServer: capture the fully-wrapped (annotation + error-normalized)
   // handlers that withAnnotations registers via registerTool.

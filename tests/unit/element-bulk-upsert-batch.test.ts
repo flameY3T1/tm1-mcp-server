@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedHttp } from "../helpers/contract-http.js";
 import { ElementService } from "../../src/tm1-client/services/element-service.js";
 import {
   BatchService,
@@ -31,7 +32,7 @@ function makeService(opts: FakeOpts = {}): {
 } {
   const batches: SubRequest[][] = [];
   const perRequest: Array<{ method: string; path: string }> = [];
-  const http = {
+  const http = contractCheckedHttp({
     async request<T>(method: string, path: string, body?: unknown): Promise<T> {
       if (path === "/api/v1/$batch") {
         if (opts.throwOnBatch) throw opts.throwOnBatch;
@@ -46,7 +47,7 @@ function makeService(opts: FakeOpts = {}): {
       perRequest.push({ method, path });
       return undefined as T;
     },
-  } as unknown as TM1HttpClient;
+  } as unknown as TM1HttpClient);
   const cells = {} as unknown as CellService;
   const batch = new BatchService(http);
   return { svc: new ElementService(http, cells, batch), batches, perRequest };
@@ -347,7 +348,7 @@ describe("ElementService.bulkUpsert — fallback to the per-request path", () =>
 
   it("does not re-probe $batch on a later bulkUpsert once it is known unsupported", async () => {
     let batchAttempts = 0;
-    const http = {
+    const http = contractCheckedHttp({
       async request<T>(_method: string, path: string): Promise<T> {
         if (path === "/api/v1/$batch") {
           batchAttempts++;
@@ -359,7 +360,7 @@ describe("ElementService.bulkUpsert — fallback to the per-request path", () =>
         }
         return undefined as T;
       },
-    } as unknown as TM1HttpClient;
+    } as unknown as TM1HttpClient);
     const svc = new ElementService(
       http,
       {} as unknown as CellService,
@@ -399,12 +400,12 @@ describe("ElementService.bulkUpsert — fallback to the per-request path", () =>
 
   it("uses the per-request path when no BatchService is wired", async () => {
     const calls: string[] = [];
-    const http = {
+    const http = contractCheckedHttp({
       async request<T>(method: string, path: string): Promise<T> {
         calls.push(`${method} ${path}`);
         return undefined as T;
       },
-    } as unknown as TM1HttpClient;
+    } as unknown as TM1HttpClient);
     const svc = new ElementService(http, {} as unknown as CellService);
     await svc.bulkUpsert("Dim", "Dim", [{ name: "L1", type: "Numeric" }]);
     expect(calls.some((c) => c.includes("$batch"))).toBe(false);

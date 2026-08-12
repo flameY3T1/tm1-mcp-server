@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import { z, type ZodRawShape } from "zod";
 import { registerGetDescendants } from "../../src/tools/metadata/get-descendants.js";
 import { HierarchyService } from "../../src/tm1-client/services/hierarchy-service.js";
@@ -53,7 +54,7 @@ function makeTM1Client(): TM1Client {
   const hierarchies = new HierarchyService({
     request,
   } as unknown as ConstructorParameters<typeof HierarchyService>[0]);
-  return { hierarchies } as unknown as TM1Client;
+  return contractCheckedClient({ hierarchies } as unknown as TM1Client);
 }
 
 describe("tm1_get_descendants tool", () => {

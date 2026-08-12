@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
@@ -64,7 +65,7 @@ describe("TM1Client – Process Execution Methods", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
 
     const config = makeConfig();
     const sessionManager = new SessionManager(config, mockLogger);
@@ -207,7 +208,7 @@ describe("TM1Client – Process Execution Methods", () => {
         mockResponse(
           {
             error: {
-              message: { value: "Process aborted with error in Prolog" },
+              message: "Process aborted with error in Prolog",
             },
           },
           400,
@@ -225,7 +226,7 @@ describe("TM1Client – Process Execution Methods", () => {
     it("should return failure when process is not found (404)", async () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse(
-          { error: { message: { value: "Process 'NonExistent' not found" } } },
+          { error: { message: "Process 'NonExistent' not found" } },
           404,
         ),
       );

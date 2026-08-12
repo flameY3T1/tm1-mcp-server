@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { SessionManager } from "../../src/session-manager.js";
@@ -58,7 +59,7 @@ describe("SessionManager", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
   });
 
   afterEach(() => {

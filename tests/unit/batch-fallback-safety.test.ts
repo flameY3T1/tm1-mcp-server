@@ -59,6 +59,7 @@
 //   - Concurrency, locking, or the TM1 transaction log.
 //   - $batch atomicity semantics of any server other than v11 11.8.
 import { describe, it, expect } from "vitest";
+import { contractCheckedHttp } from "../helpers/contract-http.js";
 import { ElementService } from "../../src/tm1-client/services/element-service.js";
 import {
   BATCH_PROBE_ID,
@@ -162,7 +163,7 @@ class StatefulElementBatchModel {
   }
 
   http(): TM1HttpClient {
-    return {
+    return contractCheckedHttp({
       request: async <T>(
         method: string,
         path: string,
@@ -230,7 +231,7 @@ class StatefulElementBatchModel {
         }
         return { responses } as T;
       },
-    } as unknown as TM1HttpClient;
+    } as unknown as TM1HttpClient);
   }
 
   snapshot(): unknown {

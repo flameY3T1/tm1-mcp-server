@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import { tm1Events } from "../../src/lib/tm1-events.js";
 import {
   registerCallgraphCacheInvalidation,
@@ -10,11 +11,11 @@ import type { TM1Client } from "../../src/tm1-client.js";
 
 // Minimal stub exposing only what buildIndexInternal touches. An empty model is
 // enough to populate exactly one cache entry (key `inc=false`).
-const stubClient = {
+const stubClient = contractCheckedClient({
   processes: { fetchForCallgraph: async () => [] },
   cubes: { getAllRules: async () => [] },
   chores: { list: async () => [] },
-} as unknown as TM1Client;
+} as unknown as TM1Client);
 
 describe("A4 — callgraph cache-invalidation wiring is explicit", () => {
   beforeEach(() => {
@@ -106,7 +107,7 @@ describe("P2 — invalidation is precise and cannot publish a stale index", () =
     const gate = new Promise<void>((r) => {
       release = r;
     });
-    const slowClient = {
+    const slowClient = contractCheckedClient({
       processes: {
         fetchForCallgraph: async () => {
           await gate;
@@ -115,7 +116,7 @@ describe("P2 — invalidation is precise and cannot publish a stale index", () =
       },
       cubes: { getAllRules: async () => [] },
       chores: { list: async () => [] },
-    } as unknown as TM1Client;
+    } as unknown as TM1Client);
 
     const pending = buildIndexFromTM1(slowClient);
 

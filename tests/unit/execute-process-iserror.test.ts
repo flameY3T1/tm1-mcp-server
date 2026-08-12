@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../src/tm1-client.js";
 import { TM1Error } from "../../src/types.js";
@@ -29,7 +30,9 @@ function captureHandler(execute: TM1Client["processes"]["execute"]): ToolCb {
       cb = handler;
     },
   } as unknown as McpServer;
-  const client = { processes: { execute } } as unknown as TM1Client;
+  const client = contractCheckedClient({
+    processes: { execute },
+  } as unknown as TM1Client);
   registerExecuteProcess(server, client);
   if (!cb) throw new Error("handler was not registered");
   return cb;

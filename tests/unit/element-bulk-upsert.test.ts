@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedHttp } from "../helpers/contract-http.js";
 import { ElementService } from "../../src/tm1-client/services/element-service.js";
 import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 import type { CellService } from "../../src/tm1-client/services/cell-service.js";
@@ -26,7 +27,7 @@ function makeService(opts: FakeOpts = {}): {
 } {
   const calls: Call[] = [];
   const delay = opts.delayMs ?? 0;
-  const http = {
+  const http = contractCheckedHttp({
     async request<T>(method: string, path: string, body?: unknown): Promise<T> {
       calls.push({ method, path, body });
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
@@ -34,7 +35,7 @@ function makeService(opts: FakeOpts = {}): {
       if (method === "GET" && opts.onGet) return opts.onGet(path) as T;
       return undefined as T;
     },
-  } as unknown as TM1HttpClient;
+  } as unknown as TM1HttpClient);
   const cells = {} as unknown as CellService;
   return { svc: new ElementService(http, cells), calls };
 }

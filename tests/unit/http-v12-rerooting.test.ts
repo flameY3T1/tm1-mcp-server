@@ -10,6 +10,7 @@
 // (named in the task brief) tests the unrelated MCP Streamable HTTP transport
 // (startHttpTransport), not TM1HttpClient, so it was not the right host file.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1HttpClient } from "../../src/tm1-client/http.js";
@@ -74,7 +75,7 @@ describe("v12 rerooting: TM1HttpClient prefixes request paths with the database 
     client = new TM1HttpClient(cfg, sm, mockLogger);
 
     fetchSpy = vi.fn().mockResolvedValue(okJsonResponse());
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
   });
 
   afterEach(() => {

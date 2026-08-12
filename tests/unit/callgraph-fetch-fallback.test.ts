@@ -18,6 +18,7 @@
 // `ViewService.list()` had the same blanket-catch shape (view-service.ts:43)
 // and is covered at the bottom of this file.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
@@ -64,7 +65,7 @@ function mockResponse(body: unknown, status = 200): Response {
 /** TM1 refusing the query SHAPE — an unparsable $select/$expand comes back 400. */
 const shapeRejection = (): Response =>
   mockResponse(
-    { error: { message: { value: "Invalid $select clause: 'Parameters'" } } },
+    { error: { message: "Invalid $select clause: 'Parameters'" } },
     400,
   );
 
@@ -75,7 +76,7 @@ const shapeRejection = (): Response =>
  */
 const securityDenial = (): Response =>
   mockResponse(
-    { error: { code: "65", message: { value: "ObjectSecurityNoReadRights" } } },
+    { error: { code: "65", message: "ObjectSecurityNoReadRights" } },
     400,
   );
 
@@ -99,7 +100,7 @@ describe("ProcessService.fetchForCallgraph — fallback discipline (P7/K6/T-9)",
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
     const config = makeConfig();
     const sessionManager = new SessionManager(config, mockLogger);
     vi.spyOn(sessionManager, "ensureSession").mockResolvedValue("session123");
@@ -227,7 +228,7 @@ describe("ViewService.list — permission denial must not read as 'no views' (T-
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
     const config = makeConfig();
     const sessionManager = new SessionManager(config, mockLogger);
     vi.spyOn(sessionManager, "ensureSession").mockResolvedValue("session123");

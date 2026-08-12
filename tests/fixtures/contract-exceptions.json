@@ -1,0 +1,162 @@
+{
+  "_readme": [
+    "Divergences between a hand-written fake and the recorded wire contract that",
+    "were reviewed and found to be gaps in the RECORDING, not defects in the fake.",
+    "",
+    "A contract records what was observed. The live suite works on a sandbox it",
+    "builds itself — an empty cube, a two-element dimension, a process with no",
+    "data source — and the read sweep walks whatever model happens to be on the",
+    "server. Shapes that neither produced were never recorded, even though TM1",
+    "sends them routinely.",
+    "",
+    "Every entry below states why the fake is right. Anything not listed here",
+    "fails the build, so an invented field still cannot slip through. Each entry",
+    "is also a to-do: widen the recording until the exception is unnecessary,",
+    "then delete it.",
+    "",
+    "Fields: endpoint (contract key), path (payload path, array indices",
+    "collapsed to []), reason."
+  ],
+  "exceptions": [
+    {
+      "endpoint": "GET /api/v1/AuditLogEntries",
+      "path": "$.value[].AuditDetails",
+      "reason": "Present only on entries that carry detail rows. The test server's audit log had none during recording; TM1 expands AuditDetails whenever the entry has them."
+    },
+    {
+      "endpoint": "GET /api/v1/Cubes('*')/Views",
+      "path": "$.value[].MDX",
+      "reason": "ViewService.list requests $select=Name,MDX; the recording's list calls selected Name only, so the column never appeared. MDX is a real View property."
+    },
+    {
+      "endpoint": "GET /api/v1/Cubes('*')/Views('*')",
+      "path": "$.MDX",
+      "reason": "Null for a native view — the recorded views were all MDX views, so only the string branch was seen. A native view legitimately returns MDX: null."
+    },
+    {
+      "endpoint": "GET /api/v1/Dimensions('*')/Hierarchies('*')",
+      "path": "$.Elements[].Children",
+      "reason": "Only consolidated elements have Children, and only when the query expands them. The swept models exposed leaves at the sampled positions."
+    },
+    {
+      "endpoint": "GET /api/v1/Dimensions('*')/Hierarchies('*')/DefaultMember",
+      "path": "$.Level",
+      "reason": "Level is a standard Element property; the DefaultMember probe in the recording used a narrower $select."
+    },
+    {
+      "endpoint": "GET /api/v1/Dimensions('*')/Hierarchies('*')/Elements",
+      "path": "$.value[].Level",
+      "reason": "Standard Element property, omitted by the $select used on the recorded call path."
+    },
+    {
+      "endpoint": "GET /api/v1/Dimensions('*')/Hierarchies('*')/Elements",
+      "path": "$.value[].Parents",
+      "reason": "Navigation property expanded only by some call paths; the recorded Elements calls did not expand it. Its shape IS recorded under the Hierarchies endpoint."
+    },
+    {
+      "endpoint": "GET /api/v1/Processes('*')",
+      "path": "$.DataSource.asciiDelimiterChar",
+      "reason": "ASCII data-source field. TM1's DataSource properties are camelCase in the OData model; no recorded process used an ASCII source."
+    },
+    {
+      "endpoint": "GET /api/v1/Processes('*')",
+      "path": "$.DataSource.asciiHeaderRecords",
+      "reason": "ASCII data-source field; see asciiDelimiterChar."
+    },
+    {
+      "endpoint": "GET /api/v1/Processes('*')",
+      "path": "$.DataSource.asciiQuoteCharacter",
+      "reason": "ASCII data-source field; see asciiDelimiterChar."
+    },
+    {
+      "endpoint": "GET /api/v1/Processes('*')",
+      "path": "$.DataSource.dataSourceNameForClient",
+      "reason": "Set on file and ODBC sources. The recorded processes had DataSource type None."
+    },
+    {
+      "endpoint": "GET /api/v1/Processes('*')",
+      "path": "$.DataSource.dataSourceNameForServer",
+      "reason": "Set on file and ODBC sources; see dataSourceNameForClient."
+    },
+    {
+      "endpoint": "GET /api/v1/Processes('*')",
+      "path": "$.DataSource.oDBCConnection",
+      "reason": "ODBC-only field. No ODBC process existed on either recorded server."
+    },
+    {
+      "endpoint": "GET /api/v1/Processes('*')",
+      "path": "$.DataSource.query",
+      "reason": "ODBC-only field; see oDBCConnection."
+    },
+    {
+      "endpoint": "GET /api/v1/Processes('*')/Parameters",
+      "path": "$.value[].Value",
+      "reason": "A TI parameter's default is numeric or string depending on its type. Only numeric defaults were recorded; the string branch is equally valid."
+    },
+    {
+      "endpoint": "POST /api/v1/Processes('*')/tm1.ExecuteWithReturn",
+      "path": "$.ErrorLogFile",
+      "reason": "Returned only when the run produced an error log. The recorded executions succeeded."
+    },
+    {
+      "endpoint": "POST /api/v1/ExecuteMDX !400",
+      "path": "$.error.message",
+      "reason": "One test deliberately feeds the nested `{value: ...}` error shape, which http.ts accepts alongside the plain string. No recorded server sends it; the test exists to pin that tolerance, so the divergence from the contract is the point."
+    },
+    {
+      "endpoint": "POST /api/v1/$batch",
+      "path": "$.*",
+      "reason": "Several BatchService tests answer a $batch POST with a deliberately NON-envelope 200 (a proxy or misconfigured gateway returning a page, `{nope:true}`, …). Violating the contract is the scenario under test, not a defective fake, and the payload differs per case — hence the wildcard path."
+    },
+    {
+      "endpoint": "cubes.getAllRules",
+      "path": "$.items",
+      "reason": "getAllRules is overloaded: without `top` it returns CubeRules[], with `top` it returns {items,total}. The live suite only calls the unpaginated form, so the paginated shape was never recorded."
+    },
+    {
+      "endpoint": "cubes.getAllRules",
+      "path": "$.total",
+      "reason": "Paginated overload of getAllRules; see $.items."
+    },
+    {
+      "endpoint": "processes.execute",
+      "path": "$.errorLogFile",
+      "reason": "Set only when the run produced an error log. The recorded executions either succeeded or failed without one, so the key was never observed carrying a value."
+    },
+    {
+      "endpoint": "processes.getDataSource",
+      "path": "$.oDBCConnection",
+      "reason": "ODBC-only field; no ODBC process existed on either recorded server. Mirrors the wire-level exception on GET /api/v1/Processes('*')."
+    },
+    {
+      "endpoint": "processes.getDataSource",
+      "path": "$.userName",
+      "reason": "ODBC/file credential field; see $.oDBCConnection."
+    },
+    {
+      "endpoint": "processes.getDataSource",
+      "path": "$.dataSourceNameForServer",
+      "reason": "Set on file and ODBC sources; the recorded processes had DataSource type None."
+    },
+    {
+      "endpoint": "processes.getParameters",
+      "path": "$[].defaultValue",
+      "reason": "A TI parameter default is numeric or string depending on the parameter's type. Only numeric defaults were recorded."
+    },
+    {
+      "endpoint": "server.getInfo",
+      "path": "$.extra.Access.Authentication.ServiceAuthPassword",
+      "reason": "Present only when service authentication is configured. The masking test needs the key to exist in order to prove it gets masked."
+    },
+    {
+      "endpoint": "server.getInfo",
+      "path": "$.extra.Access.LDAP.Password",
+      "reason": "Present only when LDAP is configured; see ServiceAuthPassword. Neither recorded server used LDAP."
+    },
+    {
+      "endpoint": "processes.getDataSource",
+      "path": "$.password",
+      "reason": "Credential field on file and ODBC sources. The recorded processes had DataSource type None, so it never appeared — and the test that needs it is precisely the one proving the password gets masked."
+    }
+  ]
+}

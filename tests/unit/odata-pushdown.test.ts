@@ -11,6 +11,7 @@
 //      `has_more` promises pages that come back empty. Such a request has to
 //      fall back to a full scan.
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import { z, type ZodRawShape } from "zod";
 import { registerListCubes } from "../../src/tools/metadata/list-cubes.js";
 import { registerListProcesses } from "../../src/tools/metadata/list-processes.js";
@@ -353,15 +354,18 @@ describe("list_* OData push-down", () => {
 
     it("falls back to a full scan when changedSince filters client-side", async () => {
       const calls: string[] = [];
-      await register(registerListDimensions, {
-        dimensions: {
-          list: async (opts?: unknown) => {
-            calls.push(JSON.stringify(opts ?? {}));
-            return [{ name: "Region", hierarchies: ["Region"] }];
+      await register(
+        registerListDimensions,
+        contractCheckedClient({
+          dimensions: {
+            list: async (opts?: unknown) => {
+              calls.push(JSON.stringify(opts ?? {}));
+              return [{ name: "Region", hierarchies: ["Region"] }];
+            },
+            getLastUpdatedMap: async () => new Map<string, string>(),
           },
-          getLastUpdatedMap: async () => new Map<string, string>(),
-        },
-      } as unknown as TM1Client)({ limit: 2, changedSince: "2026-01-01" });
+        } as unknown as TM1Client),
+      )({ limit: 2, changedSince: "2026-01-01" });
 
       // changedSince joins }DimensionProperties client-side, so @odata.count
       // would over-report — the service must be called without a page.

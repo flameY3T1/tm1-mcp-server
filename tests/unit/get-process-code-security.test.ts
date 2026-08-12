@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../src/tm1-client.js";
 import { registerGetProcessCode } from "../../src/tools/ti-development/get-process-code.js";
@@ -15,7 +16,10 @@ function captureHandler(processes: Partial<TM1Client["processes"]>): ToolCb {
       cb = handler;
     },
   } as unknown as McpServer;
-  registerGetProcessCode(server, { processes } as unknown as TM1Client);
+  registerGetProcessCode(
+    server,
+    contractCheckedClient({ processes } as unknown as TM1Client),
+  );
   if (!cb) throw new Error("handler not registered");
   return cb;
 }

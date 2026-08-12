@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerAllResources } from "../../src/resources/index.js";
 import type { TM1Client } from "../../src/tm1-client.js";
@@ -36,7 +37,7 @@ function makeFakeServer(): {
 const ODBC_PASSWORD = "Sup3rSecret!";
 
 function makeTM1Stub(): TM1Client {
-  return {
+  return contractCheckedClient({
     processes: {
       getCode: async () => ({
         prolog: `ODBCOpen('MyDSN', 'sa', '${ODBC_PASSWORD}');`,
@@ -53,7 +54,7 @@ function makeTM1Stub(): TM1Client {
         extra: { Access: { LDAP: { Password: "ldap-secret" } } },
       }),
     },
-  } as unknown as TM1Client;
+  } as unknown as TM1Client);
 }
 
 describe("MCP resources – unconditional credential masking", () => {

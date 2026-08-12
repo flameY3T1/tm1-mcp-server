@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import { TM1HttpClient } from "../../src/tm1-client/http.js";
 import { SessionManager } from "../../src/session-manager.js";
@@ -55,7 +56,7 @@ async function fetchCallsFor(
   vi.useFakeTimers();
   try {
     const fetchSpy = vi.fn().mockRejectedValue(err);
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
     const assertion = expect(
       client.request("GET", "/api/v1/Configuration"),
     ).rejects.toThrow();

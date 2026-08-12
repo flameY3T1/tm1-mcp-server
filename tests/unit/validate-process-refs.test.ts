@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../src/tm1-client.js";
 import { registerValidateProcessRefs } from "../../src/tools/ti-development/validate-process-refs.js";
@@ -23,14 +24,14 @@ function captureHandler(opts: {
       cb = handler;
     },
   } as unknown as McpServer;
-  const client = {
+  const client = contractCheckedClient({
     cubes: {
       list: async () => opts.cubes.map((name) => ({ name })),
     },
     dimensions: {
       list: async () => opts.dimensions.map((name) => ({ name })),
     },
-  } as unknown as TM1Client;
+  } as unknown as TM1Client);
   registerValidateProcessRefs(server, client);
   if (!cb) throw new Error("handler was not registered");
   return cb;

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
@@ -79,7 +80,7 @@ describe("TM1Client", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
 
     const config = makeConfig();
     sessionManager = new SessionManager(config, mockLogger);
@@ -221,7 +222,7 @@ describe("TM1Client", () => {
         mockResponse({
           ok: false,
           status: 403,
-          body: { error: { message: { value: "Insufficient privileges" } } },
+          body: { error: { message: "Insufficient privileges" } },
         }),
       );
 
@@ -264,6 +265,36 @@ describe("TM1Client", () => {
     });
 
     it("keeps VALIDATION-style 400s as generic (not a security message)", async () => {
+      // Wire shape confirmed by the recorded contracts: v11.8 sends
+      // `error.message` as a plain string.
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse({
+          ok: false,
+          status: 400,
+          body: {
+            error: { code: "278", message: "Syntax error in MDX statement" },
+          },
+        }),
+      );
+
+      try {
+        await client.testRequest("POST", "/api/v1/ExecuteMDX");
+        expect.unreachable("Should have thrown");
+      } catch (e) {
+        const err = e as TM1Error;
+        expect(err.code).toBe(TM1ErrorCode.TM1_ERROR);
+        expect(err.httpStatus).toBe(400);
+        expect(err.details).toBe("Syntax error in MDX statement");
+      }
+    });
+
+    it("also reads the nested `message.value` error shape", async () => {
+      // http.ts accepts `error.message.value` as well as a plain string. No
+      // server in the recordings sends the nested form, so this branch had no
+      // coverage of its own — until the contracts showed the suite was testing
+      // only the shape TM1 does NOT send. Both stay covered: the plain string
+      // above because it is what arrives, this one because the code promises
+      // to handle it.
       fetchSpy.mockResolvedValueOnce(
         mockResponse({
           ok: false,
@@ -280,7 +311,7 @@ describe("TM1Client", () => {
       } catch (e) {
         const err = e as TM1Error;
         expect(err.code).toBe(TM1ErrorCode.TM1_ERROR);
-        expect(err.httpStatus).toBe(400);
+        expect(err.details).toBe("Syntax error in MDX statement");
       }
     });
 
@@ -289,7 +320,7 @@ describe("TM1Client", () => {
         mockResponse({
           ok: false,
           status: 404,
-          body: { error: { message: { value: "Cube not found" } } },
+          body: { error: { message: "Cube not found" } },
         }),
       );
 
@@ -309,7 +340,7 @@ describe("TM1Client", () => {
         mockResponse({
           ok: false,
           status: 409,
-          body: { error: { message: { value: "Process already exists" } } },
+          body: { error: { message: "Process already exists" } },
         }),
       );
 
@@ -329,7 +360,7 @@ describe("TM1Client", () => {
         mockResponse({
           ok: false,
           status: 500,
-          body: { error: { message: { value: "Internal server error" } } },
+          body: { error: { message: "Internal server error" } },
         }),
       );
 
@@ -409,9 +440,9 @@ describe("TM1Client", () => {
         new DOMException("The operation was aborted.", "AbortError"),
       );
       // Would succeed if (wrongly) retried — proves no retry happens.
-      fetchSpy.mockResolvedValueOnce(
-        mockResponse({ ok: true, body: { ok: true } }),
-      );
+      // Body is irrelevant to retry classification; empty keeps it from
+      // claiming a shape /Cubes does not have.
+      fetchSpy.mockResolvedValueOnce(mockResponse({ ok: true, body: {} }));
 
       await expect(
         client.testRequest("GET", "/api/v1/Cubes"),
@@ -422,12 +453,12 @@ describe("TM1Client", () => {
     it("should classify ECONNREFUSED as network error and retry", async () => {
       const err = new Error("connect ECONNREFUSED 127.0.0.1:8010");
       fetchSpy.mockRejectedValueOnce(err);
-      fetchSpy.mockResolvedValueOnce(
-        mockResponse({ ok: true, body: { ok: true } }),
-      );
+      // Body is irrelevant to retry classification; empty keeps it from
+      // claiming a shape /Cubes does not have.
+      fetchSpy.mockResolvedValueOnce(mockResponse({ ok: true, body: {} }));
 
       const result = await client.testRequest("GET", "/api/v1/Cubes");
-      expect(result).toEqual({ ok: true });
+      expect(result).toEqual({});
     });
   });
 

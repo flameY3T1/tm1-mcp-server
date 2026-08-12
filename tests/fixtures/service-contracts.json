@@ -1,0 +1,735 @@
+{
+  "recordedAgainst": ["11.8.02900.8"],
+  "recordedAt": "2026-08-12",
+  "methods": {
+    "batch.execute": {
+      "[]": {
+        "body": {
+          "@odata.context": "string",
+          "AdminHost?": "string",
+          "AllowSeparateNandCRules?": "boolean",
+          "ClientCAMURIs[]?": "unknown",
+          "ClientMessagePortNumber?": "number",
+          "ClientPingCAMPassport?": "number",
+          "DataBaseDirectory?": "string",
+          "DisableSandboxing?": "boolean",
+          "DistributedOutputDir?": "string",
+          "ForceReevaluationOfFeedersForFedCellsOnDataChange?": "boolean",
+          "HTTPPortNumber?": "number",
+          "IntegratedSecurityMode?": "boolean",
+          "JobQueuing?": "boolean",
+          "PortNumber?": "number",
+          "PrincipalName?": "string",
+          "ProductVersion?": "string",
+          "SecurityMode?": "string",
+          "SecurityPackageName?": "string",
+          "ServerCAMURI?": "string",
+          "ServerName?": "string",
+          "UnicodeUpperLowerCase?": "boolean",
+          "value?": "string",
+          "WebCAMURI?": "string"
+        },
+        "id": "string",
+        "ok": "boolean",
+        "status": "number"
+      }
+    },
+    "cells.checkFeeders": {
+      "[]": "unknown"
+    },
+    "cells.executeMdx": {
+      "axes[]": {
+        "tuples[]": {
+          "members[]": {
+            "hierarchyName": "string",
+            "name": "string"
+          }
+        }
+      },
+      "cells[]": {
+        "formattedValue": "string",
+        "value": "null|number"
+      },
+      "totalCellCount": "number"
+    },
+    "cells.getValue": "number",
+    "cells.traceCellCalculation": {
+      "status": "string",
+      "tuple[]": "string",
+      "type": "string",
+      "value": "number"
+    },
+    "cells.traceFeeders": {
+      "fedCells[]": {
+        "cube": "string",
+        "fed": "boolean",
+        "tuple[]": "string"
+      },
+      "statements[]": "string"
+    },
+    "chores.list": {
+      "[]": {
+        "active": "boolean",
+        "frequency": "string",
+        "name": "string",
+        "processes[]": {
+          "name": "string",
+          "parameters": {
+            "pDelim?": "string",
+            "pEndTime?": "number",
+            "pLogOutput?": "number",
+            "pMonthDays?": "string",
+            "psDatenart?": "string",
+            "psDim?": "string",
+            "psJahr?": "string",
+            "psQuellDatenart?": "string",
+            "psQuellJahr?": "string",
+            "psQuellMonat?": "string",
+            "psSchnwellwert?": "string",
+            "psSourceDatenart?": "string",
+            "psSourceJahr?": "string",
+            "psSourceMonat?": "string",
+            "psTargetDatenart?": "string",
+            "psTargetDatenquelle?": "string",
+            "psTargetJahr?": "string",
+            "psTargetMonat?": "string",
+            "pStartTime?": "number",
+            "pStrictErrorHandling?": "number",
+            "psZielDatenart?": "string",
+            "psZielJahr?": "string",
+            "psZielMonat?": "string",
+            "pWeekDays?": "string"
+          }
+        },
+        "startTime": "string"
+      }
+    },
+    "cubes.checkRule": {
+      "[]": "unknown"
+    },
+    "cubes.exists": "boolean",
+    "cubes.getAllRules": {
+      "[]": {
+        "cubeName": "string",
+        "rulesText": "string",
+        "skipCheck": "boolean"
+      }
+    },
+    "cubes.getDimensionNames": {
+      "[]": "string"
+    },
+    "cubes.getRules": {
+      "cubeName": "string",
+      "rulesText": "string",
+      "skipCheck": "boolean"
+    },
+    "cubes.list": {
+      "[]?": {
+        "dimensions[]": "string",
+        "hasRules?": "boolean",
+        "name": "string"
+      },
+      "items[]?": {
+        "dimensions[]": "string",
+        "name": "string"
+      },
+      "total?": "number"
+    },
+    "dimensions.list": {
+      "[]?": {
+        "hierarchies[]": "string",
+        "name": "string"
+      },
+      "items[]?": {
+        "hierarchies[]": "string",
+        "name": "string"
+      },
+      "total?": "number"
+    },
+    "dimensions.resolveDefaultMember": {
+      "confidence": "string",
+      "dimension": "string",
+      "hierarchy": "string",
+      "resolved": {
+        "level": "number",
+        "name": "string"
+      },
+      "source": "string"
+    },
+    "elements.bulkUpsert": {
+      "typeChanges[]": {
+        "from": "string",
+        "name": "string",
+        "to": "string"
+      }
+    },
+    "elements.getAttributeValues": {
+      "[]": {
+        "attributeName": "string",
+        "elementName": "string",
+        "value": "null|number|string"
+      }
+    },
+    "elements.listAttributes": {
+      "[]": {
+        "name": "string",
+        "type": "string"
+      }
+    },
+    "files.getContent": "string",
+    "files.list": {
+      "[]": "string"
+    },
+    "files.search": {
+      "[]": "unknown"
+    },
+    "files.upload": {
+      "created": "boolean",
+      "root": "string"
+    },
+    "hierarchies.get": {
+      "dimensionName": "string",
+      "elements[]": {
+        "children[]": {
+          "name": "string",
+          "weight": "number"
+        },
+        "level": "number",
+        "name": "string",
+        "parents[]": "string",
+        "type": "string"
+      },
+      "name": "string",
+      "totalElements": "number"
+    },
+    "hierarchies.getAncestors": {
+      "ancestors[]": {
+        "level": "number",
+        "name": "string"
+      },
+      "element": "string",
+      "paths[]": {
+        "[]": "string"
+      }
+    },
+    "hierarchies.getDescendants": {
+      "descendants[]": {
+        "depth": "number",
+        "level": "number",
+        "name": "string",
+        "type": "string"
+      },
+      "element": "string"
+    },
+    "hierarchies.getElementTypes": {
+      "[]": {
+        "name": "string",
+        "type": "string"
+      }
+    },
+    "monitoring.getSessions": {
+      "[]": {
+        "active": "boolean",
+        "id": "string",
+        "threads[]": {
+          "elapsedTime": "string",
+          "function": "string",
+          "id": "number",
+          "info": "string",
+          "name": "string",
+          "objectName": "string",
+          "objectType": "string",
+          "state": "string",
+          "type": "string",
+          "waitTime": "string"
+        },
+        "user": "string"
+      }
+    },
+    "monitoring.getThreads": {
+      "[]": {
+        "context": "string",
+        "elapsedTime": "string",
+        "function": "string",
+        "id": "number",
+        "name": "string",
+        "objectName": "string",
+        "state": "string",
+        "type": "string"
+      }
+    },
+    "processes.check": {
+      "errors[]": "unknown",
+      "success": "boolean"
+    },
+    "processes.compile": {
+      "errors[]": {
+        "lineNumber": "number",
+        "message": "string",
+        "procedure": "string"
+      },
+      "success": "boolean"
+    },
+    "processes.execute": {
+      "outcome": "string",
+      "processErrorStatus": "string",
+      "success": "boolean"
+    },
+    "processes.exists": "boolean",
+    "processes.fetchForCallgraph": {
+      "[]": {
+        "data": "string",
+        "epilog": "string",
+        "metadata": "string",
+        "name": "string",
+        "parameterDefaults": {},
+        "parameters[]": "string",
+        "prolog": "string"
+      }
+    },
+    "processes.getAllCode": {
+      "[]?": {
+        "data": "string",
+        "epilog": "string",
+        "hasSecurityAccess": "boolean",
+        "metadata": "string",
+        "name": "string",
+        "prolog": "string"
+      },
+      "items[]?": {
+        "data": "string",
+        "epilog": "string",
+        "hasSecurityAccess": "boolean",
+        "metadata": "string",
+        "name": "string",
+        "prolog": "string"
+      },
+      "total?": "number"
+    },
+    "processes.getCode": {
+      "data": "string",
+      "epilog": "string",
+      "metadata": "string",
+      "prolog": "string"
+    },
+    "processes.getCodeBlob": "string",
+    "processes.getDataSource": {
+      "type": "string"
+    },
+    "processes.getDeployMeta": {
+      "hasSecurityAccess": "boolean"
+    },
+    "processes.getParameters": {
+      "[]": {
+        "defaultValue": "number",
+        "name": "string",
+        "prompt": "string",
+        "type": "string"
+      }
+    },
+    "processes.getVariables": {
+      "[]": {
+        "endByte": "number",
+        "name": "string",
+        "position": "number",
+        "startByte": "number",
+        "type": "string"
+      }
+    },
+    "processes.list": {
+      "[]?": {
+        "name": "string",
+        "parameters[]": {
+          "defaultValue": "number|string",
+          "name": "string",
+          "prompt?": "string",
+          "type": "string"
+        }
+      },
+      "items[]?": {
+        "name": "string",
+        "parameters[]": {
+          "defaultValue": "number|string",
+          "name": "string",
+          "prompt?": "string",
+          "type": "string"
+        }
+      },
+      "total?": "number"
+    },
+    "security.getClient": {
+      "@odata.context": "string",
+      "Enabled": "boolean",
+      "FriendlyName": "string",
+      "Groups[]": {
+        "Name": "string"
+      },
+      "Name": "string",
+      "Type": "string"
+    },
+    "security.listClients": {
+      "[]": {
+        "Enabled": "boolean",
+        "FriendlyName": "string",
+        "Groups[]": {
+          "Name": "string"
+        },
+        "Name": "string",
+        "Type": "string"
+      }
+    },
+    "security.listGroups": {
+      "[]": {
+        "Clients[]": {
+          "Name": "string"
+        },
+        "Name": "string"
+      }
+    },
+    "server.getAuditLog": {
+      "[]": {
+        "description": "string",
+        "id": "number",
+        "objectName": "string",
+        "objectType": "string",
+        "timestamp": "string",
+        "user": "string"
+      }
+    },
+    "server.getInfo": {
+      "adminHost": "string",
+      "dataDirectory": "string",
+      "extra": {
+        "Access": {
+          "Authentication": {
+            "IntegratedSecurityMode": "string",
+            "MaximumLoginAttempts": "number",
+            "SecurityPackageName": "string",
+            "ServicePrincipalName": "string"
+          },
+          "CAM": {
+            "CAMUseSSL": "boolean",
+            "ClientPingCAMPassport": "string",
+            "ClientURI": "null",
+            "CreateNewCAMClients": "boolean",
+            "PortalVariableFile": "null",
+            "ServerCAMURIRetryAttempts": "number",
+            "ServerURIs[]": "unknown"
+          },
+          "CAPI": {
+            "ClientMessagePort": "number",
+            "ClientVersionMaximum": "number",
+            "ClientVersionMinimum": "number",
+            "ClientVersionPrecision": "number",
+            "MessageCompression": "boolean",
+            "Port": "number",
+            "ProgressMessage": "boolean"
+          },
+          "HTTP": {
+            "OriginAllowList[]": "unknown",
+            "Port": "number",
+            "RequestEntityMaxSizeInKB": "number",
+            "SessionMaxRequests": "number",
+            "SessionTimeout": "string"
+          },
+          "LDAP": {
+            "Enable": "boolean",
+            "Host": "null",
+            "PasswordFile": "null",
+            "PasswordKeyFile": "null",
+            "Port": "number",
+            "SearchBase": "null",
+            "SearchField": "string",
+            "SkipSSLCertVerification": "boolean",
+            "SkipSSLCRLVerification": "boolean",
+            "UseServerAccount": "boolean",
+            "VerifyCertServerName[]": "unknown",
+            "VerifyServerSSLCert": "boolean",
+            "WellKnownUserName": "null"
+          },
+          "Network": {
+            "IdleConnectionTimeOut": "string",
+            "IPAddress": "null",
+            "IPVersion": "string",
+            "NetRecvBlockingWaitLimit": "string",
+            "NetRecvMaxClientIOWaitWithinAPIs": "string",
+            "ReceiveProgressResponseTimeout": "string"
+          },
+          "SSL": {
+            "CertAuthority": "null",
+            "CertificateID": "null",
+            "CertRevocationFile": "null",
+            "ClientExportServerKeyID": "null",
+            "Enable": "boolean",
+            "FIPSOperationMode": "string",
+            "KeyFile": "string",
+            "KeyLabel": "null",
+            "KeyStashFile": "string",
+            "NIST_SP800_131A_MODE": "boolean",
+            "TLSCipherList": "null"
+          }
+        },
+        "AdminHost": "string",
+        "Administration": {
+          "AdminHost": "string",
+          "AllowReadOnlyChoreReschedule": "boolean",
+          "AuditLog": {
+            "Enable": "boolean",
+            "MaxFileSizeKilobytes": "number",
+            "MaxQueryMemoryKilobytes": "number",
+            "UpdateInterval": "string"
+          },
+          "Clients": {
+            "ClientPropertiesSyncInterval": "string",
+            "PasswordMinimumLength": "number",
+            "RetainNonCAMGroupMembership": "null"
+          },
+          "DataBaseDirectory": "string",
+          "DebugLog": {
+            "LoggingDirectory": "string"
+          },
+          "DisableSandboxing": "boolean",
+          "DownTime": "string",
+          "EnableSandboxDimension": "boolean",
+          "EventLog": {
+            "Enable": "boolean",
+            "ScanFrequency": "string",
+            "ThresholdForPooledMemoryInMB": "number",
+            "ThresholdForThreadBlockingNumber": "number",
+            "ThresholdForThreadRunningTime": "string",
+            "ThresholdForThreadWaitingTime": "string"
+          },
+          "ExternalDatabase": {
+            "ODBCLibraryPath": "null",
+            "ODBCTimeoutInSeconds": "number",
+            "OracleErrorForceRowStatus": "null",
+            "SQLFetchType": "null",
+            "SQLRowsetSize": "number",
+            "TM1ConnectorforSAP": "boolean",
+            "UseNewConnectorforSAP": "boolean"
+          },
+          "FileRetry": {
+            "FileRetryCount": "number",
+            "FileRetryDelayMilliseconds": "number",
+            "FileRetryFileSpec[]": "string"
+          },
+          "Java": {
+            "ClassPath": "null",
+            "JVMArgs": "null",
+            "JVMPath": "null"
+          },
+          "Language": "null",
+          "MaskUserNameInServerTools": "boolean",
+          "PerfMonActive": "boolean",
+          "PerformanceMonitorOn": "boolean",
+          "RunningInBackground": "null",
+          "ServerLog": {
+            "Enable": "boolean",
+            "LogReleaseLineCount": "number"
+          },
+          "ServerName": "string",
+          "StartupChores": "null",
+          "TM1Web": {
+            "ExcelWebPublishEnabled": "boolean"
+          },
+          "TopLog": {
+            "Enable": "boolean",
+            "ScanFrequency": "string",
+            "ScanMode": "string"
+          },
+          "UnicodeUpperLowerCase": "boolean"
+        },
+        "AllowSeparateNandCRules": "boolean",
+        "ClientCAMURIs[]": "unknown",
+        "ClientMessagePortNumber": "number",
+        "ClientPingCAMPassport": "number",
+        "DataBaseDirectory": "string",
+        "DisableSandboxing": "boolean",
+        "DistributedOutputDir": "string",
+        "ForceReevaluationOfFeedersForFedCellsOnDataChange": "boolean",
+        "HTTPPortNumber": "number",
+        "IntegratedSecurityMode": "boolean",
+        "JobQueuing": "boolean",
+        "Modelling": {
+          "DefaultMeasuresDimension": "boolean",
+          "EnableNewHierarchyCreation": "boolean",
+          "MDXSelectCalculatedMemberInputs": "boolean",
+          "Rules": {
+            "AllowSeparateNandCRules": "boolean",
+            "AutomaticallyAddCubeDependencies": "boolean",
+            "ForceReevaluationOfFeedersForFedCellsOnDataChange": "boolean",
+            "RulesOverwriteCellsOnLoad": "boolean"
+          },
+          "Spreading": {
+            "ProportionSpreadToZeroCells": "boolean",
+            "SpreadingPrecision": "number"
+          },
+          "Startup": {
+            "LoadPrivateSubsetsOnStartup": "boolean",
+            "MaximumCubeLoadThreads": "number",
+            "PersistentFeeders": "boolean",
+            "SkipLoadingAliases": "null"
+          },
+          "Synchronization": {
+            "MaximumSynchAttempts": "number",
+            "SyncUnitSize": "number"
+          },
+          "TI": {
+            "CognosTM1InterfacePath": "null",
+            "EnableTIDebugging": "boolean",
+            "MaximumTILockObjects": "number",
+            "UseExcelSerialDate": "boolean"
+          },
+          "UserDefinedCalculations": "boolean"
+        },
+        "Performance": {
+          "JobQueuing": {
+            "Enable": "boolean",
+            "MaxWaitTime": "string",
+            "ThreadPoolSize": "number",
+            "ThreadSleepTime": "string"
+          },
+          "Locking": {
+            "PullInvalidationSubsets": "boolean",
+            "SubsetElementLockBreathing": "boolean",
+            "UseLocalCopiesForPublicDynamicSubsets": "boolean"
+          },
+          "Memory": {
+            "ApplyMaximumViewSizeToEntireTransaction": "boolean",
+            "CacheFriendlyMalloc": "boolean",
+            "DisableMemoryCache": "boolean",
+            "LockPagesInMemory": "boolean",
+            "MaximumMemoryForSubsetUndoKB": "number",
+            "MaximumUserSandboxSizeMB": "number",
+            "MaximumViewSizeMB": "number"
+          },
+          "MTCubeLoad": {
+            "Enabled": "boolean",
+            "MinFileSize": "number",
+            "UseBookmarkFiles": "boolean",
+            "Weight": "number"
+          },
+          "MTFeeders": {
+            "AtStartup": "boolean",
+            "Enabled": "boolean"
+          },
+          "MTQ": {
+            "ImmediateCheckForSplit": "boolean",
+            "MTFeeders": "boolean",
+            "MTFeedersAtStartup": "boolean",
+            "MTQQuery": "boolean",
+            "NumberOfThreadsToUse": "number",
+            "OperationProgressCheckSkipLoopSize": "number",
+            "SingleCellConsolidation": "boolean",
+            "UseAllThreads": "boolean"
+          },
+          "PrivilegeGenerationOptimization": "boolean",
+          "Stargate": {
+            "AllRuleCalcStargateOptimization": "boolean",
+            "UseStargateForRules": "boolean",
+            "ZeroWeightOptimization": "boolean"
+          },
+          "ViewCalculation": {
+            "CalculationThresholdForStorage": "number",
+            "CheckFeedersMaximumCells": "number",
+            "MagnitudeDifferenceToBeZero": "number",
+            "ViewConsolidationOptimization": "boolean",
+            "ViewConsolidationOptimizationMethod": "string"
+          }
+        },
+        "PortNumber": "number",
+        "PrincipalName": "string",
+        "ProductVersion": "string",
+        "SecurityMode": "string",
+        "SecurityPackageName": "string",
+        "ServerCAMURI": "string",
+        "ServerName": "string",
+        "UnicodeUpperLowerCase": "boolean",
+        "WebCAMURI": "string"
+      },
+      "integratedSecurityMode": "string",
+      "productVersion": "string",
+      "serverName": "string"
+    },
+    "server.getMessageLog": {
+      "[]": {
+        "errorFile?": "string",
+        "level": "string",
+        "message": "string",
+        "timestamp": "string"
+      }
+    },
+    "server.listErrorLogFiles": {
+      "[]": {
+        "filename": "string"
+      }
+    },
+    "subsets.get": {
+      "dimensionName": "string",
+      "elements[]": "string",
+      "expression?": "string",
+      "hierarchyName": "string",
+      "name": "string",
+      "private": "boolean"
+    },
+    "subsets.list": {
+      "[]": {
+        "alias?": "string",
+        "dimensionName": "string",
+        "elements[]": "unknown",
+        "expression?": "string",
+        "hierarchyName": "string",
+        "name": "string",
+        "private": "boolean"
+      }
+    },
+    "views.getDefinition": {
+      "cubeName": "string",
+      "mdx?": "string",
+      "native?": {
+        "columns[]": {
+          "dimensionName": "string",
+          "expression?": "string",
+          "hierarchyName": "string"
+        },
+        "rows[]": {
+          "dimensionName": "string",
+          "expression?": "string",
+          "hierarchyName": "string"
+        },
+        "titles[]": {
+          "dimensionName": "string",
+          "expression": "string",
+          "hierarchyName": "string",
+          "selectedElement": "string"
+        }
+      },
+      "private": "boolean",
+      "type": "string",
+      "viewName": "string"
+    },
+    "views.getView": {
+      "axes[]": {
+        "tuples[]": {
+          "members[]": {
+            "hierarchyName": "string",
+            "name": "string"
+          }
+        }
+      },
+      "cells[]": {
+        "formattedValue": "string",
+        "value": "null|number"
+      },
+      "cubeName": "string",
+      "totalCellCount": "number",
+      "viewName": "string"
+    },
+    "views.list": {
+      "[]": {
+        "name": "string",
+        "private": "boolean"
+      }
+    }
+  }
+}

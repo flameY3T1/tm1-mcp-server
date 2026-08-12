@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
@@ -77,7 +78,7 @@ describe("TM1Client – TI Development Methods", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    stubContractCheckedFetch(fetchSpy);
 
     const config = makeConfig();
     const sessionManager = new SessionManager(config, mockLogger);
@@ -113,7 +114,7 @@ describe("TM1Client – TI Development Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse(
           {
-            error: { message: { value: "Process 'Existing' already exists" } },
+            error: { message: "Process 'Existing' already exists" },
           },
           409,
         ),
@@ -131,7 +132,7 @@ describe("TM1Client – TI Development Methods", () => {
       fetchSpy.mockResolvedValueOnce(
         mockResponse(
           {
-            error: { message: { value: "Process 'Existing' already exists" } },
+            error: { message: "Process 'Existing' already exists" },
           },
           409,
         ),
@@ -529,18 +530,12 @@ describe("TM1Client – TI Development Methods", () => {
 
     it("should throw NOT_FOUND when process does not exist", async () => {
       fetchSpy.mockResolvedValueOnce(
-        mockResponse(
-          { error: { message: { value: "Process 'Ghost' not found" } } },
-          404,
-        ),
+        mockResponse({ error: { message: "Process 'Ghost' not found" } }, 404),
       );
 
       await expect(client.processes.delete("Ghost")).rejects.toThrow(TM1Error);
       fetchSpy.mockResolvedValueOnce(
-        mockResponse(
-          { error: { message: { value: "Process 'Ghost' not found" } } },
-          404,
-        ),
+        mockResponse({ error: { message: "Process 'Ghost' not found" } }, 404),
       );
       try {
         await client.processes.delete("Ghost");

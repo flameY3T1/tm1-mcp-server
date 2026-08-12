@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { contractCheckedHttp } from "../helpers/contract-http.js";
 import { ServerService } from "../../src/tm1-client/services/server-service.js";
 import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 
@@ -9,7 +10,9 @@ import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 function makeHttp(
   requestImpl: (method: string, path: string) => Promise<unknown>,
 ): TM1HttpClient {
-  return { request: vi.fn(requestImpl) } as unknown as TM1HttpClient;
+  return contractCheckedHttp({
+    request: vi.fn(requestImpl),
+  } as unknown as TM1HttpClient);
 }
 
 describe("ServerService.getInfo() — v12 ProductVersion fallback", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import { z, type ZodRawShape, type ZodTypeAny } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type pino from "pino";
@@ -94,9 +95,12 @@ function registeredToolNames(): Set<string> {
         typeof server.registerTool
       >;
     };
-    registerAllTools(withAnnotations(server, mockLogger, "readwrite"), {
-      version,
-    } as unknown as TM1Client);
+    registerAllTools(
+      withAnnotations(server, mockLogger, "readwrite"),
+      contractCheckedClient({
+        version,
+      } as unknown as TM1Client),
+    );
   }
   return names;
 }

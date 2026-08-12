@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedClient } from "../helpers/service-contract.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../src/tm1-client.js";
 import { registerGetServerInfo } from "../../src/tools/operations/get-server-info.js";
@@ -19,7 +20,7 @@ function capture(extra: Record<string, unknown>): ToolCb {
       cb = handler;
     },
   } as unknown as McpServer;
-  const tm1 = {
+  const tm1 = contractCheckedClient({
     server: {
       getInfo: async () => ({
         serverName: "testserver",
@@ -27,7 +28,7 @@ function capture(extra: Record<string, unknown>): ToolCb {
         extra,
       }),
     },
-  } as unknown as TM1Client;
+  } as unknown as TM1Client);
   registerGetServerInfo(server, tm1);
   if (!cb) throw new Error("handler not registered");
   return cb;

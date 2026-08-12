@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { contractCheckedHttp } from "../helpers/contract-http.js";
 import { TM1Error, TM1ErrorCode } from "../../src/types.js";
 import type { TM1HttpClient } from "../../src/tm1-client/http.js";
 import {
@@ -26,7 +27,7 @@ interface FakeOpts {
 
 function makeService(opts: FakeOpts = {}): { svc: BatchService; sent: Sent[] } {
   const sent: Sent[] = [];
-  const http = {
+  const http = contractCheckedHttp({
     async request<T>(
       method: string,
       path: string,
@@ -46,7 +47,7 @@ function makeService(opts: FakeOpts = {}): { svc: BatchService; sent: Sent[] } {
         })),
       } as T;
     },
-  } as unknown as TM1HttpClient;
+  } as unknown as TM1HttpClient);
   return { svc: new BatchService(http), sent };
 }
 
@@ -359,7 +360,7 @@ describe("BatchService — sub-response mapping", () => {
           {
             id: "0",
             status: 400,
-            body: { error: { message: { value: "deep text" } } },
+            body: { error: { message: "deep text" } },
           },
         ],
       }),
@@ -487,7 +488,7 @@ describe("BatchService — unsupported-server detection and fallback signalling"
   // committed. Everything after the first success therefore propagates.
   it("never declares unsupported after a batch has already succeeded", async () => {
     let call = 0;
-    const http = {
+    const http = contractCheckedHttp({
       async request<T>(_m: string, _p: string, body?: unknown): Promise<T> {
         call++;
         if (call === 1) {
@@ -506,7 +507,7 @@ describe("BatchService — unsupported-server detection and fallback signalling"
           httpStatus: 400,
         });
       },
-    } as unknown as TM1HttpClient;
+    } as unknown as TM1HttpClient);
     const svc = new BatchService(http);
 
     await svc.execute([req("a")]);
@@ -541,7 +542,7 @@ describe("BatchService — unsupported-server detection and fallback signalling"
 
   it("treats a non-envelope 200 after a successful batch as a hard error", async () => {
     let call = 0;
-    const http = {
+    const http = contractCheckedHttp({
       async request<T>(_m: string, _p: string, body?: unknown): Promise<T> {
         call++;
         if (call === 1) {
@@ -556,7 +557,7 @@ describe("BatchService — unsupported-server detection and fallback signalling"
         }
         return { value: "some proxy page" } as T;
       },
-    } as unknown as TM1HttpClient;
+    } as unknown as TM1HttpClient);
     const svc = new BatchService(http);
 
     await svc.execute([req("a")]);
