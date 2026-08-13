@@ -50,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carry it: `$select=Name,Variables` answers for the whole model at once. 225 requests → 5, and
   3.4 s → 94 ms on that model. Output is unchanged.
 
+- **`tm1_audit_feeders` takes cube dimensions off the bulk rules request.** The static scan needs
+  each cube's dimension order to score how broadly a feeder is pinned, and asked for it one cube at
+  a time — a GET per rule-bearing cube on top of the bulk rules query. The same request can expand
+  them: `$select=Name,Rules&$expand=Dimensions($select=Name)`. Measured on 11.8 against a 12-cube
+  model, **18 requests → 11**, with the seven per-cube lookups gone and the report identical. The
+  expansion is opt-in, so callers that only read rules text still pay nothing for it. A server that
+  answers without the expansion still falls back to the per-cube lookup, because a missing
+  dimension list would quietly change every ratio the scan computes.
+
 ### Fixed
 
 - **Consolidation weights were silently dropped on write.** `tm1_create_element`,

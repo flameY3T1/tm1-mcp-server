@@ -497,6 +497,12 @@ export interface CubeRules {
   cubeName: string;
   rulesText: string;
   skipCheck: boolean;
+  /**
+   * Ordered dimension names. Only present when the rules were fetched with
+   * `withDimensions` — otherwise the caller never asked and the server never
+   * expanded them.
+   */
+  dimensions?: string[];
 }
 
 export interface ChoreStep {

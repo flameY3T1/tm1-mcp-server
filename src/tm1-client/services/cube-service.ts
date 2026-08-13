@@ -22,6 +22,13 @@ import { classifyExecution } from "./process-status.js";
 const enc = (s: string): string =>
   encodeURIComponent(String(s).replace(/'/g, "''"));
 
+export interface AllRulesOpts {
+  /** Include control cubes (`}`-prefixed). Default false. */
+  includeControl?: boolean;
+  /** Also expand each cube's ordered dimension names into `CubeRules.dimensions`. */
+  withDimensions?: boolean;
+}
+
 export interface CubeListOpts extends NameFilterOpts {
   includeRules?: boolean;
   /** Set to slice server-side. Only legal when every active filter is in NameFilterOpts. */
@@ -208,6 +215,12 @@ export class CubeService {
    * With `top` set the cap is pushed server-side ($top + $orderby=Name for
    * stable ordering + $count=true) and the return carries the server-side
    * total matching the filter so callers can report truncation honestly.
+   *
+   * `withDimensions` adds `$expand=Dimensions($select=Name)` to the same
+   * request. A caller that needs a cube's dimension order per rule — the
+   * feeder audit does — would otherwise issue one getDimensionNames() per
+   * rule-bearing cube. Opt-in, because the callers that only read rules text
+   * should not pay for the expansion.
    */
   async getAllRules(includeControl?: boolean): Promise<CubeRules[]>;
   async getAllRules(
@@ -218,17 +231,29 @@ export class CubeService {
     /** Server-side total ($count=true); undefined when the server omitted @odata.count. */
     total: number | undefined;
   }>;
+  async getAllRules(opts: AllRulesOpts): Promise<CubeRules[]>;
   async getAllRules(
-    includeControl = false,
+    arg: boolean | AllRulesOpts = false,
     top?: number,
   ): Promise<CubeRules[] | { items: CubeRules[]; total: number | undefined }> {
-    const filter = includeControl ? "" : "&$filter=not startswith(Name,'}')";
+    const opts: AllRulesOpts =
+      typeof arg === "object" ? arg : { includeControl: arg };
+    const filter = opts.includeControl
+      ? ""
+      : "&$filter=not startswith(Name,'}')";
+    const expand = opts.withDimensions
+      ? "&$expand=Dimensions($select=Name)"
+      : "";
     const cap =
       top !== undefined ? `&$orderby=Name&$top=${top}&$count=true` : "";
-    const path = `/api/v1/Cubes?$select=Name,Rules${filter}${cap}`;
+    const path = `/api/v1/Cubes?$select=Name,Rules${expand}${filter}${cap}`;
     const response = await this.http.request<{
       "@odata.count"?: number;
-      value: Array<{ Name: string; Rules?: string | null }>;
+      value: Array<{
+        Name: string;
+        Rules?: string | null;
+        Dimensions?: Array<{ Name: string }>;
+      }>;
     }>("GET", path);
     const items = response.value.map((c) => {
       const rulesText = c.Rules ?? "";
@@ -236,6 +261,9 @@ export class CubeService {
         cubeName: c.Name,
         rulesText,
         skipCheck: rulesText.toUpperCase().includes("SKIPCHECK"),
+        ...(c.Dimensions
+          ? { dimensions: c.Dimensions.map((d) => d.Name) }
+          : {}),
       };
     });
     if (top !== undefined) {

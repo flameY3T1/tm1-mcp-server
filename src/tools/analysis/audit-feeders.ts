@@ -156,7 +156,13 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
       severityThreshold,
     }) => {
       const serverInfo = await tm1Client.server.getInfo();
-      const all = await tm1Client.cubes.getAllRules(includeControl);
+      // withDimensions: the static scan needs each rule-bearing cube's
+      // dimension order. Expanded here it costs nothing extra; fetched per
+      // cube it was one GET per cube with rules.
+      const all = await tm1Client.cubes.getAllRules({
+        includeControl,
+        withDimensions: true,
+      });
       const targetSet = cubes && cubes.length > 0 ? new Set(cubes) : null;
 
       const skipcheckMap = new Map<string, boolean>();
@@ -191,11 +197,17 @@ export function registerAuditFeeders(server: McpServer, tm1Client: TM1Client) {
 
         const ast = parseRules(c.rulesText);
 
-        let cubeDimNames: string[] = [];
-        try {
-          cubeDimNames = await tm1Client.cubes.getDimensionNames(c.cubeName);
-        } catch {
-          dimResolveFailures++;
+        // Normal path: the names rode along on the bulk rules request. The
+        // per-cube fetch stays as a fallback for a server that answered
+        // without the expansion — a missing dimension list would silently
+        // change every ratio below, so it is worth one request to avoid.
+        let cubeDimNames: string[] = c.dimensions ?? [];
+        if (cubeDimNames.length === 0) {
+          try {
+            cubeDimNames = await tm1Client.cubes.getDimensionNames(c.cubeName);
+          } catch {
+            dimResolveFailures++;
+          }
         }
         const cubeDimCount = cubeDimNames.length;
 

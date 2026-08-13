@@ -1,6 +1,6 @@
 {
   "recordedAgainst": ["11.8.02900.8"],
-  "recordedAt": "2026-08-12",
+  "recordedAt": "2026-08-13",
   "methods": {
     "batch.execute": {
       "[]": {
@@ -86,6 +86,7 @@
     "cubes.getAllRules": {
       "[]": {
         "cubeName": "string",
+        "dimensions[]?": "string",
         "rulesText": "string",
         "skipCheck": "boolean"
       }

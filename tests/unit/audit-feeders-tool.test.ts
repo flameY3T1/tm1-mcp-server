@@ -38,6 +38,13 @@ interface FakeArgs {
   rules?: Array<{ cubeName: string; rulesText: string; skipCheck: boolean }>;
   /** Map of cubeName -> ordered dimension names. Missing entry => getDimensionNames throws. */
   dims?: Record<string, string[]>;
+  /**
+   * Make the bulk rules request answer without the Dimensions expansion, so
+   * the tool has to fall back to the per-cube getDimensionNames path.
+   */
+  expandOmitsDimensions?: boolean;
+  /** Every cube name getDimensionNames was asked for, in call order. */
+  dimCallLog?: string[];
   /** Map of "dim|hierarchy" -> { elemName: type } for the element-type cache. */
   elements?: Record<
     string,
@@ -59,11 +66,26 @@ function makeAuditFeedersClientStub(args: FakeArgs) {
     version: args.version ?? 11,
     server: { getInfo: async () => ({ productVersion: args.productVersion }) },
     cubes: {
-      getAllRules: async (includeControl = false) => {
+      getAllRules: async (
+        arg:
+          | boolean
+          | { includeControl?: boolean; withDimensions?: boolean } = false,
+      ) => {
+        const opts = typeof arg === "object" ? arg : { includeControl: arg };
         const all = args.rules ?? [];
-        return includeControl ? all : all.filter((r) => !isControl(r.cubeName));
+        const visible = opts.includeControl
+          ? all
+          : all.filter((r) => !isControl(r.cubeName));
+        if (!opts.withDimensions || args.expandOmitsDimensions) return visible;
+        // Mirror the server: $expand carries the dimension names on the same
+        // response, so the tool never has to ask per cube.
+        return visible.map((r) => {
+          const dims = args.dims?.[r.cubeName];
+          return dims ? { ...r, dimensions: dims } : r;
+        });
       },
       getDimensionNames: async (cubeName: string) => {
+        args.dimCallLog?.push(cubeName);
         const dims = args.dims?.[cubeName];
         if (!dims) throw new Error(`no dims for ${cubeName}`);
         return dims;
@@ -1010,5 +1032,72 @@ describe("tm1_audit_feeders when }StatsByCube is unavailable", () => {
     expect(out.runtimeUnavailable).toBeUndefined();
     expect(out.scanned.runtimeAvailable).toBe(2);
     expect(out.summary.byRule.cube_high_fed_ratio).toBe(1);
+  });
+});
+
+describe("tm1_audit_feeders dimension resolution", () => {
+  const TWO_CUBES = [
+    {
+      cubeName: "Sales",
+      rulesText: [
+        "skipcheck;",
+        "['A','B','C','D','E'] = N: 1;",
+        "feeders;",
+        "['A','B'] => ['E'];",
+      ].join("\n"),
+      skipCheck: true,
+    },
+    {
+      cubeName: "Costs",
+      rulesText: [
+        "skipcheck;",
+        "['A','B','C','D','E'] = N: 1;",
+        "feeders;",
+        "['A','B'] => ['E'];",
+      ].join("\n"),
+      skipCheck: true,
+    },
+  ];
+  const DIMS = {
+    Sales: ["D1", "D2", "D3", "D4", "D5"],
+    Costs: ["D1", "D2", "D3", "D4", "D5"],
+  };
+
+  it("takes dimension names off the bulk rules request, not one call per cube", async () => {
+    const dimCallLog: string[] = [];
+    const fake = makeFakeServer();
+    const tm1 = makeAuditFeedersClientStub({
+      productVersion: "11.8",
+      dims: DIMS,
+      dimCallLog,
+      rules: TWO_CUBES,
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+
+    expect(dimCallLog).toEqual([]);
+    expect(out.scanned.dimResolveFailures).toBe(0);
+    // Same verdict as the per-cube path produced: ratio scoring saw 5 dims.
+    expect(out.summary.byRule.feeder_broader_than_rule).toBe(2);
+    expect(out.findings[0].detail).toBe("pins 2 vs rule 5");
+  });
+
+  it("falls back to per-cube lookup when the server answers without the expansion", async () => {
+    const dimCallLog: string[] = [];
+    const fake = makeFakeServer();
+    const tm1 = makeAuditFeedersClientStub({
+      productVersion: "11.8",
+      dims: DIMS,
+      dimCallLog,
+      expandOmitsDimensions: true,
+      rules: TWO_CUBES,
+    });
+    registerAuditFeeders(fake.server, tm1);
+    const out = parseResult(await fake.getHandler()({}));
+
+    expect(dimCallLog).toEqual(["Sales", "Costs"]);
+    expect(out.scanned.dimResolveFailures).toBe(0);
+    expect(out.summary.byRule.feeder_broader_than_rule).toBe(2);
+    expect(out.findings[0].detail).toBe("pins 2 vs rule 5");
   });
 });
