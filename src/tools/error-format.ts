@@ -83,7 +83,7 @@ export function normalizeErrorResult(result: McpToolResult): McpToolResult {
   let parsed: Record<string, unknown> | null = null;
   if (raw.startsWith("{")) {
     try {
-      const candidate = JSON.parse(raw);
+      const candidate: unknown = JSON.parse(raw);
       if (
         candidate &&
         typeof candidate === "object" &&

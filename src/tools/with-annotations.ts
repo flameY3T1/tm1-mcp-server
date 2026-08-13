@@ -58,9 +58,12 @@ function slimToolsListResult(result: unknown): unknown {
   if (!result || typeof result !== "object") return result;
   const listing = result as { tools?: unknown };
   if (!Array.isArray(listing.tools)) return result;
+  // Array.isArray widens an `unknown` to `any[]`; name the element type so the
+  // map below stays checked.
+  const tools = listing.tools as unknown[];
   return {
     ...listing,
-    tools: listing.tools.map((entry) => {
+    tools: tools.map((entry) => {
       if (!entry || typeof entry !== "object") return entry;
       const tool: Record<string, unknown> = {
         ...(entry as Record<string, unknown>),
@@ -177,7 +180,10 @@ export function withAnnotations(
     const raw = first.text.trim();
     if (!raw.startsWith("{") && !raw.startsWith("[")) return result;
     try {
-      const parsed = JSON.parse(raw);
+      // Deliberately not narrowed to an object: a handler may serialize a
+      // top-level array, and this wrapper's job is to pass the payload
+      // through unchanged, not to re-decide its shape.
+      const parsed = JSON.parse(raw) as McpToolResult["structuredContent"];
       return responseMode === "structured"
         ? { ...result, content: [], structuredContent: parsed }
         : { ...result, structuredContent: parsed };
@@ -282,7 +288,8 @@ export function withAnnotations(
 
   return new Proxy(server, {
     get(target, prop, receiver) {
-      if (prop !== "tool") return Reflect.get(target, prop, receiver);
+      if (prop !== "tool")
+        return Reflect.get(target, prop, receiver) as unknown;
       return (...args: unknown[]) => {
         const isFourArg =
           args.length === 4 &&

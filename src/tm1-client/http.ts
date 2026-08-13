@@ -490,9 +490,8 @@ export class TM1HttpClient {
     try {
       errorBody = await response.text();
       if (errorBody) {
-        const parsed = JSON.parse(errorBody);
-        details =
-          parsed?.error?.message?.value ?? parsed?.error?.message ?? errorBody;
+        const parsed: unknown = JSON.parse(errorBody);
+        details = odataErrorText(parsed) ?? errorBody;
       }
     } catch {
       /* ignore parse errors */
@@ -697,6 +696,27 @@ function errorCodeOf(value: unknown): string | undefined {
   }
   const code = (value as { code?: unknown }).code;
   return typeof code === "string" ? code : undefined;
+}
+
+/**
+ * Pull the message out of an OData error body. TM1 writes it two ways —
+ * `error.message` as a plain string, or `error.message.value` — so both are
+ * read, and anything else yields undefined so the caller can fall back to the
+ * raw body. Returning only strings matters: the previous chained-optional
+ * version could hand a whole object to a `string` field when `message` was an
+ * object without `value`.
+ */
+function odataErrorText(parsed: unknown): string | undefined {
+  if (typeof parsed !== "object" || parsed === null) return undefined;
+  const err = (parsed as { error?: unknown }).error;
+  if (typeof err !== "object" || err === null) return undefined;
+  const message = (err as { message?: unknown }).message;
+  if (typeof message === "string") return message;
+  if (typeof message === "object" && message !== null) {
+    const value = (message as { value?: unknown }).value;
+    if (typeof value === "string") return value;
+  }
+  return undefined;
 }
 
 function isTimeoutError(error: unknown): boolean {

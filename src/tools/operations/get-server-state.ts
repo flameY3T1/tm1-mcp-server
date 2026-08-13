@@ -13,6 +13,16 @@ function pick(extra: Record<string, unknown>, path: string[]): unknown {
   return node;
 }
 
+/** A rejection reason is `any`; take its message only when there really is one. */
+function reasonText(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  if (typeof reason === "object" && reason !== null) {
+    const message = (reason as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return String(reason);
+}
+
 function settleCount<T>(res: PromiseSettledResult<T[]>): {
   count: number | null;
   error?: string;
@@ -92,9 +102,7 @@ export function registerGetServerState(
               timeZoneId: info.timeZoneId,
             }
           : {
-              error:
-                (infoRes as PromiseRejectedResult).reason?.message ??
-                String((infoRes as PromiseRejectedResult).reason),
+              error: reasonText((infoRes as PromiseRejectedResult).reason),
             },
         capabilities: info
           ? {

@@ -114,9 +114,12 @@ export async function startHttpTransport(
       try {
         // Cast: StreamableHTTPServerTransport.onclose is `(() => void) | undefined`
         // while Transport expects `() => void`; the cast papers over that library-
-        // internal signature mismatch without changing behaviour.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await server.connect(transport as any);
+        // internal signature mismatch without changing behaviour. Cast to the
+        // parameter's own type rather than `any`, so only this mismatch is
+        // waived and the argument stays checked against the real signature.
+        await server.connect(
+          transport as unknown as Parameters<typeof server.connect>[0],
+        );
         await transport.handleRequest(req, res, body);
       } catch (err) {
         logger.error({ err }, "Transport handleRequest threw");

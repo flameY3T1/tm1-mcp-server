@@ -79,7 +79,7 @@ export function registerGetCubeStats(server: McpServer, tm1Client: TM1Client) {
       );
       const items: CubeStatsItem[] = settled.map((r, i) => {
         if (r.status === "fulfilled") return r.value;
-        const err = r.reason;
+        const err: unknown = r.reason;
         // `}StatsByCube` missing or unreadable is a property of the server or
         // the account, not of this cube — its message is already plain prose.
         if (err instanceof CubeStatsUnavailableError)

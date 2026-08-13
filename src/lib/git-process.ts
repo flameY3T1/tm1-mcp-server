@@ -252,7 +252,7 @@ export function parseProcessFromGit(
   // schema uses `defaultValue`. Normalize value→defaultValue before validation,
   // keeping back-compat with legacy files that wrote `defaultValue`.
   const rawParams = Array.isArray(meta.parameters)
-    ? meta.parameters.map((p) => {
+    ? (meta.parameters as unknown[]).map((p): unknown => {
         if (
           p &&
           typeof p === "object" &&

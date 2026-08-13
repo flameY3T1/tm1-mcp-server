@@ -47,12 +47,18 @@ export default tseslint.config(
       // ── Noise reduction: downgrade or disable churn-only rules ───────
       // no-explicit-any: warn only — codebase has justified any in adapter layers
       "@typescript-eslint/no-explicit-any": "warn",
-      // unsafe rules from recommended-type-checked are noisy without full any-clean pass
-      "@typescript-eslint/no-unsafe-assignment": "off",
-      "@typescript-eslint/no-unsafe-member-access": "off",
-      "@typescript-eslint/no-unsafe-call": "off",
-      "@typescript-eslint/no-unsafe-return": "off",
-      "@typescript-eslint/no-unsafe-argument": "off",
+      // ── Where `any` actually enters src ──────────────────────────────
+      // These were off wholesale. Turned on after counting: src had 25 hits,
+      // every one of them the same three doors — JSON.parse, Array.isArray on
+      // an unknown (which widens to any[]), and a settled promise's `reason`.
+      // Each is a place where unvalidated server data was being read as if it
+      // had a type. They stay errors so the next one has to be answered rather
+      // than absorbed.
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
       // explicit return types — too noisy for this codebase
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
@@ -104,7 +110,17 @@ export default tseslint.config(
         { prefer: "type-imports", fixStyle: "inline-type-imports" },
       ],
 
-      // ── Off for the same reasons as src ──────────────────────────────
+      // ── The unsafe family stays off here, unlike src ─────────────────
+      // Counted rather than assumed: with all five on, src had 25 hits and
+      // tests had 1219. The asymmetry is structural, not laziness. A test
+      // reads its result as `r.json.items[0].error` — the harness types that
+      // payload as `any` on purpose, because a tool's response shape is what
+      // the test is there to assert, and typing it up front would assert it in
+      // the type system instead. The fakes are the same story from the other
+      // side: `{...} as unknown as TM1Client` is how a partial stand-in is
+      // built. Turning these on would mean a cast per property read, and the
+      // shapes are already pinned — by the service contracts, which check the
+      // fakes against structures recorded from a live server.
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-call": "off",

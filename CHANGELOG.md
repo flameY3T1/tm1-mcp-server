@@ -61,6 +61,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A TM1 error body could put a non-string into the error `details` field.** The message was read
+  as `error.message.value ?? error.message ?? raw`, so a body whose `message` was an object without
+  a `value` handed that object to a field typed as a string. Both shapes are now read explicitly
+  and anything else falls back to the raw body. Found by turning on the `no-unsafe-*` lint rules
+  for `src/`, which are now errors: every one of the 25 sites they flagged was unvalidated server
+  data being read as if it had a type.
+
 - **`tm1_set_cube_rules` took a `skipCheck` parameter that did nothing.** It was accepted,
   defaulted to `true`, forwarded to a service argument that was never read, and echoed back in the
   success payload — so a caller was told it had switched something on. SKIPCHECK is a line inside

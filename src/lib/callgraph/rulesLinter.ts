@@ -21,6 +21,25 @@ const odataKey = (s: string): string =>
 // ─── String/comment neutralization ──────────────────────────────────────────
 
 /** Replaces quoted strings with same-length spaces and strips trailing comments. */
+/**
+ * Names out of an OData collection body (`{value:[{Name}]}`). Written against
+ * `unknown` rather than a cast: `JSON.parse` hands back `any`, and an assumed
+ * `{Name: string}` element would let a malformed body reach `String()` as
+ * undefined and land "undefined" in the resolved-name set.
+ */
+function odataNames(parsed: unknown): string[] {
+  if (typeof parsed !== "object" || parsed === null) return [];
+  const value = (parsed as { value?: unknown }).value;
+  if (!Array.isArray(value)) return [];
+  const names: string[] = [];
+  for (const entry of value as unknown[]) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const name = (entry as { Name?: unknown }).Name;
+    if (typeof name === "string") names.push(name);
+  }
+  return names;
+}
+
 function neutralizeLine(line: string): string {
   return line
     .replace(/'[^']*'/g, (s) => " ".repeat(s.length))
@@ -718,10 +737,8 @@ export async function lintRulesServer(
         if (res.statusCode === 404) {
           cubeDimDetails.set(lc, "not-found");
         } else if (res.statusCode >= 200 && res.statusCode < 300) {
-          const parsed = JSON.parse(res.body);
-          const dims = Array.isArray(parsed.value)
-            ? parsed.value.map((d: { Name: string }) => String(d.Name))
-            : [];
+          const parsed: unknown = JSON.parse(res.body);
+          const dims = odataNames(parsed);
           cubeDimDetails.set(lc, dims);
         }
       } catch {
@@ -774,13 +791,9 @@ export async function lintRulesServer(
         if (res.statusCode === 404) {
           dimElements.set(lc, "not-found");
         } else if (res.statusCode >= 200 && res.statusCode < 300) {
-          const parsed = JSON.parse(res.body);
+          const parsed: unknown = JSON.parse(res.body);
           const names = new Set<string>(
-            Array.isArray(parsed.value)
-              ? parsed.value.map((e: { Name: string }) =>
-                  String(e.Name).toLowerCase(),
-                )
-              : [],
+            odataNames(parsed).map((n) => n.toLowerCase()),
           );
           dimElements.set(lc, names);
         }

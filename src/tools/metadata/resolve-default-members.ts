@@ -40,7 +40,7 @@ export function registerResolveDefaultMembers(
       );
       const results = settled.map((s, i) => {
         if (s.status === "fulfilled") return s.value;
-        const err = s.reason;
+        const err: unknown = s.reason;
         const item = items[i]!; // settled.length === items.length
         const message = err instanceof Error ? err.message : String(err);
         const code =
