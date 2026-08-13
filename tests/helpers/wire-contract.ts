@@ -225,6 +225,14 @@ export function diffAgainstShape(
   if (typeof contract === "string") {
     const actual = typeNameOf(payload);
     if (contract === "unknown") return problems;
+    // A contract of bare "null" carries no type claim, only "every sample the
+    // recording happened to see was null" — the same empty observation that
+    // "unknown" stands for on an empty array. TM1 has plenty of fields that
+    // are null on one object and set on the next (a subset's Expression is
+    // null while it is static, MDX once it is not), so treating that as a
+    // type would make the contract report drift for the second object it ever
+    // sees. A union that names a real type — "string|null" — still binds.
+    if (contract === "null") return problems;
     const allowed = new Set(contract.split("|"));
     if (allowed.has("object") && actual === "object") return problems;
     if (!allowed.has(actual)) {

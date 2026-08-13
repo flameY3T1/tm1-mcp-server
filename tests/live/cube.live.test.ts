@@ -159,8 +159,22 @@ describe.skipIf(!LIVE_ENABLED)("live: cube + cell/rules lifecycle", () => {
       expect(r.json.statsUnavailable?.reason).toBe("absent");
       expect(r.json.items[0].error).toBe(r.json.statsUnavailable.message);
     } else {
+      // The server-wide verdict must stay clear on v11: }StatsByCube exists
+      // here, so "unavailable" would be a false claim about the whole server.
       expect(r.json.statsUnavailable).toBeUndefined();
-      expect(r.json.items[0].error).toBeUndefined();
+      // The cube itself may still be unknown to }StatsByCube. TM1 lists a cube
+      // there only after a performance-monitor cycle has sampled it, and this
+      // cube was created seconds ago — measured live: the MDX answers "member
+      // not found" for it while the same call returns metrics for cubes that
+      // have been on the server a while. Both outcomes are correct behaviour;
+      // what must hold is that a per-cube miss is reported per cube, and names
+      // the cube rather than being swallowed or generalized.
+      const { error } = r.json.items[0];
+      if (error !== undefined) {
+        expect(error).toContain(C1);
+      } else {
+        expect(r.json.items[0]).toMatchObject({ cubeName: C1 });
+      }
     }
   });
 
