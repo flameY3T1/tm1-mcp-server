@@ -426,3 +426,68 @@ describe("ElementService.bulkUpsert — fallback to the per-request path", () =>
     });
   });
 });
+
+// Same weight contract as the per-request path, plus the one thing only the
+// batch path can get wrong: two edges under one element must not reuse an id.
+// v12 rejects an envelope with duplicate ids outright.
+describe("bulkUpsert batch path — consolidation weights", () => {
+  const WEIGHTED: ElementCreate[] = [
+    { name: "L1", type: "Numeric" },
+    { name: "L2", type: "Numeric" },
+    {
+      name: "C1",
+      type: "Consolidated",
+      components: [
+        { name: "L1", weight: -1 },
+        { name: "L2", weight: 3 },
+      ],
+    },
+  ];
+
+  it("PATCHes each deviating Edge, with unique ids, after the Components pass", async () => {
+    const { svc, batches } = makeService();
+    await svc.bulkUpsert("Dim", "Dim", WEIGHTED);
+
+    const edgeBatch = batches.find((reqs) =>
+      reqs.some((r) => r.url.includes("/Edges(")),
+    );
+    expect(edgeBatch).toBeDefined();
+    expect(edgeBatch).toHaveLength(2);
+    expect(new Set(edgeBatch!.map((r) => r.id)).size).toBe(2);
+    expect(edgeBatch!.map((r) => r.body)).toEqual([
+      { Weight: -1 },
+      { Weight: 3 },
+    ]);
+
+    // Order: the edge has to exist before its weight can be set.
+    const componentsBatchIdx = batches.findIndex((reqs) =>
+      reqs.some((r) => (r.body as { Components?: unknown })?.Components),
+    );
+    expect(batches.indexOf(edgeBatch!)).toBeGreaterThan(componentsBatchIdx);
+  });
+
+  it("a rejected weight fails the whole upsert", async () => {
+    const { svc } = makeService({
+      onSub: (r) =>
+        r.url.includes("/Edges(")
+          ? { id: r.id, status: 400, body: { error: { message: "nope" } } }
+          : undefined,
+    });
+    await expect(svc.bulkUpsert("Dim", "Dim", WEIGHTED)).rejects.toThrow();
+  });
+
+  it("sends no weight batch when every weight is 1", async () => {
+    const { svc, batches } = makeService();
+    await svc.bulkUpsert("Dim", "Dim", [
+      { name: "L1", type: "Numeric" },
+      {
+        name: "C1",
+        type: "Consolidated",
+        components: [{ name: "L1", weight: 1 }],
+      },
+    ]);
+    expect(
+      batches.some((reqs) => reqs.some((r) => r.url.includes("/Edges("))),
+    ).toBe(false);
+  });
+});

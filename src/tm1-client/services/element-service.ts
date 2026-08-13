@@ -521,6 +521,37 @@ export class ElementService {
     }
     throwFirstFailure(await batch.execute(components), indexOf);
 
+    // Pass 3 — the weights. TM1 accepts `Weight` inside the Components link
+    // above and ignores it: every edge it creates has weight 1 (measured, see
+    // applyEdgeWeights). The weight lives on the Edge entity and has to be
+    // PATCHed once the link exists, which is only true after pass 2. Only
+    // deviating weights cost a request.
+    //
+    // Own id space: one element can own several edges, and a repeated id makes
+    // v12 reject the whole envelope. `edgeOwner` maps each request back to the
+    // element that asked for it, so a failure still names the right one.
+    const edges: BatchRequest[] = [];
+    const edgeOwner: number[] = [];
+    for (const [i, el] of elements.entries()) {
+      if (el.type !== "Consolidated" || !el.components) continue;
+      for (const c of el.components) {
+        if (c.weight === undefined || c.weight === 1) continue;
+        edges.push({
+          id: `e${edgeOwner.length}`,
+          method: "PATCH",
+          path: `/api/v1/Dimensions('${enc(dimensionName)}')/Hierarchies('${enc(hierarchyName)}')/Edges(ParentName='${enc(el.name)}',ComponentName='${enc(c.name)}')`,
+          body: { Weight: c.weight },
+        });
+        edgeOwner.push(i);
+      }
+    }
+    if (edges.length > 0) {
+      throwFirstFailure(
+        await batch.execute(edges),
+        (id) => edgeOwner[Number(id.slice(1))] ?? Number.POSITIVE_INFINITY,
+      );
+    }
+
     return { typeChanges };
   }
 
@@ -636,6 +667,25 @@ export class ElementService {
       },
     );
     for (const r of pass2) {
+      if (r.status === "rejected") throw r.reason;
+    }
+
+    // Pass 3: the weights, for the same reason as the $batch path — TM1 takes
+    // `Weight` in the Components link and ignores it, so every edge lands at 1
+    // until it is PATCHed on the Edge entity. Runs after pass 2 because the
+    // edge has to exist first.
+    const pass3 = await mapSettledWithConcurrency(
+      consolidated,
+      BULK_UPSERT_CONCURRENCY,
+      (el) =>
+        this.applyEdgeWeights(
+          dimensionName,
+          hierarchyName,
+          el.name,
+          el.components!,
+        ),
+    );
+    for (const r of pass3) {
       if (r.status === "rejected") throw r.reason;
     }
 

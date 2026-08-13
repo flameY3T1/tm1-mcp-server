@@ -61,6 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`tm1_bulk_upsert_elements` dropped consolidation weights.** The single-element tools were fixed
+  for this in the same release; the bulk path — the one that actually builds hierarchies — was
+  missed, and it is the more consequential of the two. TM1 accepts `Weight` inside the `Components`
+  link payload and ignores it, so every edge landed at 1 no matter what was asked for. Verified by
+  driving the tool against 11.8: a component asked for at `-1` read back as `+1`, and the
+  consolidation then added where it was supposed to subtract — wrong numbers, no error anywhere.
+  Both write paths (`$batch` and the per-request fallback) now PATCH the deviating weights onto the
+  Edge entity once the links exist. Weights of 1 cost nothing, as before. Re-measured after the
+  fix: `Q1 = Jan + Feb − Mar` returns 25 for 10/20/5, where it returned 35 before.
+
 - **A TM1 error body could put a non-string into the error `details` field.** The message was read
   as `error.message.value ?? error.message ?? raw`, so a body whose `message` was an object without
   a `value` handed that object to a field typed as a string. Both shapes are now read explicitly

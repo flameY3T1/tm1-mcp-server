@@ -111,6 +111,53 @@ describe.skipIf(!LIVE_ENABLED)(
       expect(child!.weight).toBe(-1);
     });
 
+    it("bulk_upsert_elements keeps a weight that is not 1", async () => {
+      // The bulk path builds hierarchies wholesale and had the same defect the
+      // single-element path was fixed for: TM1 takes `Weight` inside the
+      // Components link and ignores it, so every edge landed at 1. Found by
+      // driving the tool by hand against 11.8 — a component asked for at -1
+      // read back as +1, which inverts a netting consolidation without a word.
+      const BULK_C = `${SANDBOX}_BULK_C`;
+      await h.ok("tm1_bulk_upsert_elements", {
+        dimensionName: DIM,
+        hierarchyName: HIER,
+        elements: [
+          { name: LEAF1, type: "Numeric" },
+          { name: LEAF2, type: "Numeric" },
+          {
+            name: BULK_C,
+            type: "Consolidated",
+            components: [
+              { name: LEAF1, weight: 1 },
+              { name: LEAF2, weight: -1 },
+            ],
+          },
+        ],
+      });
+
+      const r = await h.ok("tm1_get_hierarchy", {
+        dimensionName: DIM,
+        hierarchyName: HIER,
+        limit: 200,
+      });
+      const elements = (
+        r.json as {
+          elements?: Array<{
+            name: string;
+            children?: Array<{ name: string; weight: number }>;
+          }>;
+        }
+      ).elements;
+      const parent = elements?.find((e) => e.name === BULK_C);
+      expect(parent, `expected ${BULK_C} in the hierarchy`).toBeDefined();
+      const kept = parent!.children?.find((c) => c.name === LEAF2);
+      expect(kept, `expected ${LEAF2} as a child of ${BULK_C}`).toBeDefined();
+      expect(kept!.weight).toBe(-1);
+      // The 1s are left alone on purpose — no request is spent on them.
+      const unchanged = parent!.children?.find((c) => c.name === LEAF1);
+      expect(unchanged!.weight).toBe(1);
+    });
+
     it("the naming audit finds a violating element name on this server", async () => {
       // The audit no longer downloads element names: it asks TM1 for the ones
       // that MIGHT violate a rule and checks only those. That is only safe if

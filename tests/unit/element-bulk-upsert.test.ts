@@ -160,3 +160,73 @@ describe("ElementService.bulkUpsert — pass barrier + concurrency", () => {
     );
   });
 });
+
+// Consolidation weights, per-request path. TM1 accepts `Weight` inside the
+// Components link and ignores it — every edge it creates has weight 1 — so the
+// deviating ones have to be PATCHed on the Edge entity afterwards. Measured on
+// 11.8 via tm1_bulk_upsert_elements: a component asked for at -1 read back as
+// +1, which silently inverts a netting consolidation.
+describe("ElementService.bulkUpsert — consolidation weights", () => {
+  const edgePatches = (calls: Call[]) =>
+    calls.filter((c) => c.method === "PATCH" && c.path.includes("/Edges("));
+
+  it("PATCHes the Edge for a weight that is not 1", async () => {
+    const { svc, calls } = makeService();
+    await svc.bulkUpsert("Dim", "Dim", [
+      { name: "L1", type: "Numeric" },
+      { name: "L2", type: "Numeric" },
+      {
+        name: "C1",
+        type: "Consolidated",
+        components: [
+          { name: "L1", weight: 1 },
+          { name: "L2", weight: -1 },
+        ],
+      },
+    ]);
+
+    const edges = edgePatches(calls);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].path).toContain("ParentName='C1'");
+    expect(edges[0].path).toContain("ComponentName='L2'");
+    expect(edges[0].body).toEqual({ Weight: -1 });
+  });
+
+  it("does not spend a request on the weights that are already 1", async () => {
+    const { svc, calls } = makeService();
+    await svc.bulkUpsert("Dim", "Dim", [
+      { name: "L1", type: "Numeric" },
+      {
+        name: "C1",
+        type: "Consolidated",
+        components: [{ name: "L1", weight: 1 }],
+      },
+      {
+        name: "C2",
+        type: "Consolidated",
+        components: [{ name: "L1", weight: 1 }],
+      },
+    ]);
+    expect(edgePatches(calls)).toHaveLength(0);
+  });
+
+  it("sets the weight only after the edge exists", async () => {
+    const { svc, calls } = makeService();
+    await svc.bulkUpsert("Dim", "Dim", [
+      { name: "L1", type: "Numeric" },
+      {
+        name: "C1",
+        type: "Consolidated",
+        components: [{ name: "L1", weight: 2.5 }],
+      },
+    ]);
+    const componentsAt = calls.findIndex(
+      (c) => c.method === "PATCH" && hasComponents(c),
+    );
+    const edgeAt = calls.findIndex(
+      (c) => c.method === "PATCH" && c.path.includes("/Edges("),
+    );
+    expect(componentsAt).toBeGreaterThanOrEqual(0);
+    expect(edgeAt).toBeGreaterThan(componentsAt);
+  });
+});
