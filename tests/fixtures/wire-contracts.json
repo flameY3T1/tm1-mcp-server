@@ -663,10 +663,22 @@
       },
       "DataProcedure?": "string",
       "DataSource?": {
-        "Type": "string"
+        "asciiDecimalSeparator?": "string",
+        "asciiDelimiterChar?": "string",
+        "asciiDelimiterType?": "string",
+        "asciiHeaderRecords?": "number",
+        "asciiQuoteCharacter?": "string",
+        "asciiThousandSeparator?": "string",
+        "dataSourceNameForClient?": "string",
+        "dataSourceNameForServer?": "string",
+        "password?": "string",
+        "query?": "string",
+        "Type": "string",
+        "userName?": "string",
+        "usesUnicode?": "boolean"
       },
       "EpilogProcedure?": "string",
-      "HasSecurityAccess": "boolean",
+      "HasSecurityAccess?": "boolean",
       "MetadataProcedure?": "string",
       "Name?": "string",
       "Parameters[]?": {
@@ -820,7 +832,18 @@
       },
       "DataProcedure": "string",
       "DataSource": {
-        "Type": "string"
+        "asciiDecimalSeparator?": "string",
+        "asciiDelimiterChar?": "string",
+        "asciiDelimiterType?": "string",
+        "asciiHeaderRecords?": "number",
+        "asciiQuoteCharacter?": "string",
+        "asciiThousandSeparator?": "string",
+        "dataSourceNameForClient?": "string",
+        "dataSourceNameForServer?": "string",
+        "password?": "string",
+        "query?": "string",
+        "Type": "string",
+        "userName?": "string"
       },
       "EpilogProcedure": "string",
       "HasSecurityAccess": "boolean",
@@ -834,6 +857,12 @@
       },
       "PrologProcedure": "string",
       "Variables[]": "unknown"
+    },
+    "PATCH /api/v1/Processes('*') !400": {
+      "error": {
+        "code": "string",
+        "message": "string"
+      }
     },
     "PATCH /api/v1/Users('*')": {
       "@odata.context": "string",

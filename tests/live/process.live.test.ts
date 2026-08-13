@@ -378,3 +378,141 @@ describe.skipIf(!LIVE_ENABLED)("native #region blob round-trip (live)", () => {
     }
   });
 });
+
+// Data source shapes. Every other process the live suite builds has
+// `DataSource: {Type: "None"}`, so TM1 never sent an ASCII or ODBC source
+// during a recording run and a dozen wire fields — the ascii* group, the
+// ODBC query, the credential pair — had to be excused as unrecorded. These
+// two processes make the server emit them. Neither source is ever read from:
+// the file does not exist and the DSN does not resolve, and TM1 stores both
+// definitions without checking, which is exactly what makes this safe.
+describe.skipIf(!LIVE_ENABLED)("live: process data sources", () => {
+  let h: LiveHarness;
+  const PROC_DS_ASCII = `${SANDBOX}_PROC_DS_ASCII`;
+  const PROC_DS_ODBC = `${SANDBOX}_PROC_DS_ODBC`;
+
+  beforeAll(async () => {
+    h = await getHarness();
+    for (const name of [PROC_DS_ASCII, PROC_DS_ODBC]) {
+      await h.call("tm1_delete_process", { processName: name, confirm: name });
+    }
+  });
+
+  afterAll(async () => {
+    for (const name of [PROC_DS_ASCII, PROC_DS_ODBC]) {
+      try {
+        await h.call("tm1_delete_process", {
+          processName: name,
+          confirm: name,
+        });
+      } catch {
+        /* idempotent teardown — ignore missing */
+      }
+    }
+  });
+
+  it("round-trips an ASCII data source with every delimiter field", async () => {
+    await h.ok("tm1_upsert_process", {
+      processName: PROC_DS_ASCII,
+      prolog: "# harmless: data source is never read",
+      dataSource: {
+        type: "ASCII",
+        dataSourceNameForServer: `${SANDBOX}_nonexistent.csv`,
+        dataSourceNameForClient: `${SANDBOX}_nonexistent.csv`,
+        asciiDelimiterType: "Character",
+        asciiDelimiterChar: ";",
+        asciiQuoteCharacter: '"',
+        asciiHeaderRecords: 1,
+        asciiDecimalSeparator: ".",
+        asciiThousandSeparator: ",",
+      },
+      mode: "upsert",
+    });
+
+    const r = await h.ok("tm1_get_process_datasource", {
+      processName: PROC_DS_ASCII,
+    });
+    expect(r.json).toMatchObject({
+      type: "ASCII",
+      asciiDelimiterType: "Character",
+      asciiDelimiterChar: ";",
+      asciiQuoteCharacter: '"',
+      asciiHeaderRecords: 1,
+      dataSourceNameForServer: `${SANDBOX}_nonexistent.csv`,
+      dataSourceNameForClient: `${SANDBOX}_nonexistent.csv`,
+    });
+  });
+
+  it("round-trips an ODBC data source and redacts the password", async () => {
+    await h.ok("tm1_upsert_process", {
+      processName: PROC_DS_ODBC,
+      prolog: "# harmless: the DSN does not resolve, nothing connects",
+      dataSource: {
+        type: "ODBC",
+        dataSourceNameForServer: `${SANDBOX}_DSN`,
+        dataSourceNameForClient: `${SANDBOX}_DSN`,
+        userName: `${SANDBOX}_user`,
+        password: "not-a-real-password",
+        query: "SELECT 1 AS x",
+      },
+      mode: "upsert",
+    });
+
+    const r = await h.ok("tm1_get_process_datasource", {
+      processName: PROC_DS_ODBC,
+    });
+    expect(r.json).toMatchObject({
+      type: "ODBC",
+      dataSourceNameForServer: `${SANDBOX}_DSN`,
+      userName: `${SANDBOX}_user`,
+      query: "SELECT 1 AS x",
+    });
+    // TM1 hands back the stored password as an encrypted blob; what must never
+    // reach the caller is that blob, whatever it decrypts to.
+    expect(r.json.password).toBe("[redacted]");
+    expect(r.json.password).not.toContain("not-a-real-password");
+
+    // The same fields on the whole-process read path, which has its own
+    // wire contract.
+    const full = await h.ok("tm1_get_process", { processName: PROC_DS_ODBC });
+    expect(full.json.dataSource).toMatchObject({
+      type: "ODBC",
+      query: "SELECT 1 AS x",
+    });
+  });
+
+  it("no reachable TM1 keeps oDBCConnection: v11 refuses it, v12 drops it", async () => {
+    // The field is in our DataSource model and in the git round-trip schema,
+    // so what servers do with it is not a detail. Measured on both:
+    //   11.8 → 400 'Invalid data source properties supplied ... unprocessed
+    //          properties were: "oDBCConnection"'
+    //   v12  → accepts the write, then never returns the field again.
+    // So it cannot round-trip anywhere we can reach, and the contract recorded
+    // against v11 cannot contain it. v12's silent drop is the more dangerous
+    // of the two: a caller who sets a connection string there is told nothing.
+    const r = await h.call("tm1_upsert_process", {
+      processName: PROC_DS_ODBC,
+      dataSource: {
+        type: "ODBC",
+        dataSourceNameForServer: `${SANDBOX}_DSN`,
+        oDBCConnection: "DRIVER={nothing};SERVER=nowhere",
+        query: "SELECT 1 AS x",
+      },
+      mode: "upsert",
+    });
+
+    if (h.client.version === 12) {
+      expect(r.isError).toBe(false);
+      const back = await h.ok("tm1_get_process_datasource", {
+        processName: PROC_DS_ODBC,
+      });
+      // Accepted, then gone — the rest of the source survived, this one field
+      // did not.
+      expect(back.json.oDBCConnection).toBeUndefined();
+      expect(back.json.query).toBe("SELECT 1 AS x");
+    } else {
+      expect(r.isError).toBe(true);
+      expect(JSON.stringify(r.json)).toMatch(/oDBCConnection/);
+    }
+  });
+});

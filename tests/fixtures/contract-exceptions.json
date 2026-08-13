@@ -55,38 +55,8 @@
     },
     {
       "endpoint": "GET /api/v1/Processes('*')",
-      "path": "$.DataSource.asciiDelimiterChar",
-      "reason": "ASCII data-source field. TM1's DataSource properties are camelCase in the OData model; no recorded process used an ASCII source."
-    },
-    {
-      "endpoint": "GET /api/v1/Processes('*')",
-      "path": "$.DataSource.asciiHeaderRecords",
-      "reason": "ASCII data-source field; see asciiDelimiterChar."
-    },
-    {
-      "endpoint": "GET /api/v1/Processes('*')",
-      "path": "$.DataSource.asciiQuoteCharacter",
-      "reason": "ASCII data-source field; see asciiDelimiterChar."
-    },
-    {
-      "endpoint": "GET /api/v1/Processes('*')",
-      "path": "$.DataSource.dataSourceNameForClient",
-      "reason": "Set on file and ODBC sources. The recorded processes had DataSource type None."
-    },
-    {
-      "endpoint": "GET /api/v1/Processes('*')",
-      "path": "$.DataSource.dataSourceNameForServer",
-      "reason": "Set on file and ODBC sources; see dataSourceNameForClient."
-    },
-    {
-      "endpoint": "GET /api/v1/Processes('*')",
       "path": "$.DataSource.oDBCConnection",
-      "reason": "ODBC-only field. No ODBC process existed on either recorded server."
-    },
-    {
-      "endpoint": "GET /api/v1/Processes('*')",
-      "path": "$.DataSource.query",
-      "reason": "ODBC-only field; see oDBCConnection."
+      "reason": "Measured on both servers: TM1 11.8 refuses oDBCConnection on an ODBC source (400 'Invalid data source properties supplied ... unprocessed properties were: \"oDBCConnection\"'), and v12 accepts the write but never returns the field. It therefore cannot be recorded from any server we can reach, while every other field of a real ODBC source now is — the live suite builds one. The fakes keep it because the field is in our DataSource model and in the git round-trip schema. Pinned by 'no reachable TM1 keeps oDBCConnection' in tests/live/process.live.test.ts."
     },
     {
       "endpoint": "GET /api/v1/Processes('*')/Parameters",
@@ -126,17 +96,7 @@
     {
       "endpoint": "processes.getDataSource",
       "path": "$.oDBCConnection",
-      "reason": "ODBC-only field; no ODBC process existed on either recorded server. Mirrors the wire-level exception on GET /api/v1/Processes('*')."
-    },
-    {
-      "endpoint": "processes.getDataSource",
-      "path": "$.userName",
-      "reason": "ODBC/file credential field; see $.oDBCConnection."
-    },
-    {
-      "endpoint": "processes.getDataSource",
-      "path": "$.dataSourceNameForServer",
-      "reason": "Set on file and ODBC sources; the recorded processes had DataSource type None."
+      "reason": "See the wire-level exception on GET /api/v1/Processes('*'): v11 rejects the property and v12 silently drops it, so no recording can contain it."
     },
     {
       "endpoint": "processes.getParameters",
@@ -152,11 +112,6 @@
       "endpoint": "server.getInfo",
       "path": "$.extra.Access.LDAP.Password",
       "reason": "Present only when LDAP is configured; see ServiceAuthPassword. Neither recorded server used LDAP."
-    },
-    {
-      "endpoint": "processes.getDataSource",
-      "path": "$.password",
-      "reason": "Credential field on file and ODBC sources. The recorded processes had DataSource type None, so it never appeared — and the test that needs it is precisely the one proving the password gets masked."
     }
   ]
 }

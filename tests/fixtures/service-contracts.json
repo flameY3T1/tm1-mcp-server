@@ -199,7 +199,6 @@
           "}Subsets_Measure_Assumption?": "number",
           "}Subsets_Time_Month?": "number",
           "}Subsets_Version?": "number",
-          "}Subsets_ZZ_MCP_LIVE_VIEW_D1?": "number",
           "}TimeIntervals?": "number",
           "}Views_Cube_1?": "number",
           "}Views_Cube_Compliance?": "number",
@@ -420,7 +419,19 @@
     },
     "processes.getCodeBlob": "string",
     "processes.getDataSource": {
-      "type": "string"
+      "asciiDecimalSeparator?": "string",
+      "asciiDelimiterChar?": "string",
+      "asciiDelimiterType?": "string",
+      "asciiHeaderRecords?": "number",
+      "asciiQuoteCharacter?": "string",
+      "asciiThousandSeparator?": "string",
+      "dataSourceNameForClient?": "string",
+      "dataSourceNameForServer?": "string",
+      "password?": "string",
+      "query?": "string",
+      "type": "string",
+      "userName?": "string",
+      "usesUnicode?": "boolean"
     },
     "processes.getDeployMeta": {
       "hasSecurityAccess": "boolean"
@@ -753,6 +764,7 @@
     },
     "server.getMessageLog": {
       "[]": {
+        "errorFile?": "string",
         "level": "string",
         "message": "string",
         "timestamp": "string"
