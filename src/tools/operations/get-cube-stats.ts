@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error } from "../../types.js";
+import { mapSettledWithConcurrency } from "../../lib/concurrency.js";
 import {
   FORMAT_SCHEMA,
   payloadResponse,
@@ -32,9 +33,10 @@ export function registerGetCubeStats(server: McpServer, tm1Client: TM1Client) {
       cubeNames: z
         .array(z.string())
         .min(1)
+        .max(500)
         .optional()
         .describe(
-          "Batch mode — list of cube names. Mutually exclusive with cubeName.",
+          "Batch mode — list of cube names (max 500). Mutually exclusive with cubeName.",
         ),
       ...FORMAT_SCHEMA,
     },
@@ -68,8 +70,12 @@ export function registerGetCubeStats(server: McpServer, tm1Client: TM1Client) {
         };
       }
 
-      const settled = await Promise.allSettled(
-        targets.map((name) => fetchCubeStats(tm1Client, name)),
+      // One }StatsByCube MDX per target, capped in flight. Unbounded, a batch
+      // of a few hundred cubes hands TM1's worker pool that many simultaneous
+      // queries — the same reason tm1_audit_feeders caps its runtime pass at
+      // the same width.
+      const settled = await mapSettledWithConcurrency(targets, 10, (name) =>
+        fetchCubeStats(tm1Client, name),
       );
       const items: CubeStatsItem[] = settled.map((r, i) => {
         if (r.status === "fulfilled") return r.value;

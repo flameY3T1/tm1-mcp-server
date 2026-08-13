@@ -14,7 +14,7 @@ export function registerSetCubeRules(
     "tm1_set_cube_rules",
     [
       "Create or replace the rules for a TM1 cube.",
-      "The rules text must include SKIPCHECK; at the top and FEEDERS; before all feeder definitions.",
+      "SKIPCHECK; belongs at the top and FEEDERS; before all feeder definitions — SKIPCHECK is what makes feeders take effect, so rules with feeders need it.",
       "Replaces existing rules completely — always provide the full rules text.",
       "Before: tm1_check_cube_rule to validate syntax. After: tm1_get_cube_rules to read back, tm1_invalidate_callgraph_cache is called automatically (rule changes shift DB() / feeder edges).",
     ].join(" "),
@@ -23,24 +23,17 @@ export function registerSetCubeRules(
       rules: z
         .string()
         .describe(
-          "Full rules text (must start with SKIPCHECK; and include FEEDERS; section)",
-        ),
-      skipCheck: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe(
-          "Enable SKIPCHECK for performance (default: true, recommended)",
+          "Full rules text. Put SKIPCHECK; first and a FEEDERS; section after the rule statements — SKIPCHECK is a line in this text, there is no separate switch for it.",
         ),
       ...CONFIRM_SCHEMA,
     },
-    async ({ cubeName, rules, skipCheck, confirm }) => {
+    async ({ cubeName, rules, confirm }) => {
       // Replaces the cube's ENTIRE rule file; the previous text is not
       // recoverable through this API. Guards against accidental invocation —
       // not a security control.
       requireConfirm(confirm, cubeName, "cube");
       await withToolHint(
-        tm1Client.cubes.updateRules(cubeName, rules, skipCheck),
+        tm1Client.cubes.updateRules(cubeName, rules),
         `Pre-flight syntax with tm1_check_cube_rule(cubeName='${cubeName}', rules=...) before set_cube_rules. Inspect details for the offending line.`,
       );
       const lineCount = rules.split("\n").length;
@@ -50,7 +43,6 @@ export function registerSetCubeRules(
         success: true,
         cubeName,
         lineCount,
-        skipCheck,
         callgraphEntriesCleared,
       });
     },

@@ -276,12 +276,11 @@ export class CubeService {
    * Create or replace the rules for a cube.
    * TM1 11.8 sets rules by PATCHing the Cube entity ({Rules: "...text..."}).
    * PATCH/POST on /Cubes('{name}')/Rules returns 400 "not supported".
+   *
+   * There is no skipcheck switch to pass: SKIPCHECK is a line inside the rules
+   * text, so it travels in `rulesText` like every other statement.
    */
-  async updateRules(
-    cubeName: string,
-    rulesText: string,
-    _skipCheck = true,
-  ): Promise<void> {
+  async updateRules(cubeName: string, rulesText: string): Promise<void> {
     const cubePath = `/api/v1/Cubes('${enc(cubeName)}')`;
     await this.http.request<void>("PATCH", cubePath, { Rules: rulesText });
   }

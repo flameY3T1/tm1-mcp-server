@@ -61,6 +61,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`tm1_set_cube_rules` took a `skipCheck` parameter that did nothing.** It was accepted,
+  defaulted to `true`, forwarded to a service argument that was never read, and echoed back in the
+  success payload — so a caller was told it had switched something on. SKIPCHECK is a line inside
+  the rules text and nothing else; there is no separate switch. The parameter is gone, and the
+  tool description no longer claims the rules text *must* contain SKIPCHECK — it explains what the
+  line does instead. Passing `skipCheck` now has the same effect it always had: none.
+
+- **`tm1_get_cube_stats` fanned out without a limit.** A batch of cube names issued one
+  `}StatsByCube` MDX per cube, all at once, bounded only by how many names the caller sent. It now
+  runs at most ten in flight — the same width `tm1_audit_feeders` uses for the identical call —
+  and `cubeNames` accepts at most 500 entries.
+
+- **`.env.example` advertised a request timeout the code does not use.** It showed
+  `TM1_REQUEST_TIMEOUT=600000` while the built-in default is `30000`, so anyone copying the file
+  as a starting point expected ten minutes and got thirty seconds. It now shows the real default,
+  with a note about which readers justify raising it.
+
 - **`tm1_upsert_process` could create an ODBC data source but not its SQL.** The tool carried its
   own copy of the data-source schema, and that copy had drifted from the shared one: no `query`,
   no `oDBCConnection`, no `usesUnicode`. Because the schema is strict, passing `query` was rejected
