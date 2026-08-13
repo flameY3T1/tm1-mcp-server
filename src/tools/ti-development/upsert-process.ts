@@ -3,34 +3,14 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { invalidateCallgraphCache } from "../../lib/callgraph/tm1-adapter.js";
+import { dataSourceSchema as sharedDataSourceSchema } from "../../lib/process-parts-schema.js";
 
-const dataSourceSchema = z
-  .object({
-    type: z.enum([
-      "None",
-      "TM1CubeView",
-      "TM1DimensionSubset",
-      "ASCII",
-      "ODBC",
-      "TM1Process",
-    ]),
-    dataSourceNameForServer: z.string().optional(),
-    dataSourceNameForClient: z.string().optional(),
-    asciiDelimiterType: z
-      .string()
-      .optional()
-      .describe("ASCII delimiter type (e.g. 'Character' or 'FixedWidth')"),
-    asciiDelimiterChar: z.string().optional(),
-    asciiQuoteCharacter: z.string().optional(),
-    asciiHeaderRecords: z.number().optional(),
-    asciiDecimalSeparator: z.string().optional(),
-    asciiThousandSeparator: z.string().optional(),
-    userName: z.string().optional(),
-    password: z.string().optional(),
-    view: z.string().optional(),
-    subset: z.string().optional(),
-  })
-  .strict();
+// The same data source shape the git round-trip and check_process_code use.
+// This tool used to carry its own copy, which had drifted: it was missing
+// `query` and `oDBCConnection`, so an ODBC source could be created here but
+// its SQL could not — while tm1_get_process_datasource reads both back.
+// Strict, so a misspelled field is rejected instead of silently dropped.
+const dataSourceSchema = sharedDataSourceSchema.strict();
 
 const parameterSchema = z.object({
   name: z.string(),

@@ -238,6 +238,11 @@ function diffDs(a: DataSource, b: DataSource) {
     "view",
     "subset",
     "userName",
+    // The SQL is the substance of an ODBC source: two processes that differ
+    // only in their query are not the same process. `password` stays out —
+    // both sides read back redacted, so it can only produce noise.
+    "query",
+    "oDBCConnection",
   ];
   for (const f of fields) {
     if ((a[f] ?? "") !== (b[f] ?? ""))

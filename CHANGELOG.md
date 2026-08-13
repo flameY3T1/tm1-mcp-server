@@ -61,6 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`tm1_upsert_process` could create an ODBC data source but not its SQL.** The tool carried its
+  own copy of the data-source schema, and that copy had drifted from the shared one: no `query`,
+  no `oDBCConnection`, no `usesUnicode`. Because the schema is strict, passing `query` was rejected
+  outright — while `tm1_get_process_datasource` read it back happily, and the git round-trip
+  schema had it all along. The tool now uses the shared schema, so what can be read can be written.
+
+- **`tm1_diff_processes` and `tm1_diff_process_with_file` ignored the ODBC query.** Two processes
+  differing only in their SQL were reported identical. Both now compare `query` and
+  `oDBCConnection`; `password` stays out of the comparison, since both sides read back redacted
+  and could only produce noise.
+
 - **Consolidation weights were silently dropped on write.** `tm1_create_element`,
   `tm1_update_element` and `tm1_move_element` sent `Weight` inside the `Components` link payload.
   TM1 accepts that body and ignores the field: the edge is created with weight 1 whatever was
