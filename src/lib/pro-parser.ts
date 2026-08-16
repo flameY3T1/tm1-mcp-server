@@ -183,14 +183,26 @@ function parseVariables(blocks: Map<string, string[]>): ProcessVariable[] {
     (l) => parseInt(l.trim(), 10) || 1,
   );
 
+  const startBytes = (blocks.get("580") ?? []).map(
+    (l) => parseInt(l.trim(), 10) || 0,
+  );
+  const endBytes = (blocks.get("581") ?? []).map(
+    (l) => parseInt(l.trim(), 10) || 0,
+  );
+
   return names.map((name, idx) => {
     const proType = types[idx] ?? 2;
     const restType: "String" | "Numeric" = proType === 1 ? "Numeric" : "String";
-    return {
+    const variable: ProcessVariable = {
       name,
       type: restType,
       position: positions[idx] ?? idx + 1,
     };
+    // Byte offsets only mean something for fixed-width sources; TM1 writes 0
+    // for every other kind, and carrying those zeros around adds nothing.
+    if (startBytes[idx]) variable.startByte = startBytes[idx];
+    if (endBytes[idx]) variable.endByte = endBytes[idx];
+    return variable;
   });
 }
 

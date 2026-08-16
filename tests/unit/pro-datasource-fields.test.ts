@@ -270,7 +270,9 @@ describe("pro-serializer: datasource fields", () => {
       dataSource: { type: "ODBC", dataSourceNameForServer: "SRV" },
     });
     expect(out).toContain(`586,"SRV"`);
-    expect(out).toContain(`585,""`);
+    // Bare, like TM1 writes it — not empty quotes.
+    expect(out).toContain(`585,\n`);
+    expect(out).not.toContain(`585,""`);
     expect(parseProFile(out).dataSource.dataSourceNameForClient).toBe("");
   });
 
@@ -280,6 +282,61 @@ describe("pro-serializer: datasource fields", () => {
       dataSource: { type: "ODBC", dataSourceNameForServer: "D" },
     });
     expect(out).toContain(`562,"ODBC"`);
+  });
+
+  it("round-trips variable byte offsets for a fixed-width source", () => {
+    const out = serializeToPro({
+      ...base,
+      dataSource: {
+        type: "ASCII",
+        dataSourceNameForServer: "C:\\tmp\\fx.txt",
+        asciiDelimiterType: "FixedWidth",
+      },
+      variables: [
+        { name: "V1", type: "String", position: 1, startByte: 1, endByte: 10 },
+        {
+          name: "V2",
+          type: "Numeric",
+          position: 2,
+          startByte: 11,
+          endByte: 20,
+        },
+      ],
+    });
+    expect(out).toContain("580,2\n1\n11\n");
+    expect(out).toContain("581,2\n10\n20\n");
+    expect(parseProFile(out).variables).toEqual([
+      { name: "V1", type: "String", position: 1, startByte: 1, endByte: 10 },
+      { name: "V2", type: "Numeric", position: 2, startByte: 11, endByte: 20 },
+    ]);
+  });
+
+  it("omits zero byte offsets for delimited sources", () => {
+    const out = serializeToPro({
+      ...base,
+      dataSource: { type: "None" },
+      variables: [{ name: "V1", type: "String", position: 1 }],
+    });
+    expect(out).toContain("580,1\n0\n");
+    expect(parseProFile(out).variables[0]).toEqual({
+      name: "V1",
+      type: "String",
+      position: 1,
+    });
+  });
+
+  it("preserves blank lines inside an ODBC query", () => {
+    // TM1 counts them: "SELECT 1\n\nFROM T\n" is written as 566,4.
+    const out = serializeToPro({
+      ...base,
+      dataSource: {
+        type: "ODBC",
+        dataSourceNameForServer: "DSN",
+        query: "SELECT 1\n\nFROM T\n",
+      },
+    });
+    expect(out).toContain("566,4\nSELECT 1\n\nFROM T\n\n");
+    expect(parseProFile(out).dataSource.query).toBe("SELECT 1\n\nFROM T\n");
   });
 
   it("never writes the ODBC password", () => {

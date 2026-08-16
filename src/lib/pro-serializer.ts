@@ -60,6 +60,12 @@ function serializeVariables(vars: ProcessVariable[]): string[] {
   for (const v of vars) lines.push(String(variableTypeToInt(v.type)));
   lines.push(`579,${vars.length}`);
   for (const v of vars) lines.push(String(v.position));
+  // 580/581 = start and end byte per variable. Zero everywhere for delimited
+  // sources; a fixed-width source is unusable without them.
+  lines.push(`580,${vars.length}`);
+  for (const v of vars) lines.push(String(v.startByte ?? 0));
+  lines.push(`581,${vars.length}`);
+  for (const v of vars) lines.push(String(v.endByte ?? 0));
   return lines;
 }
 
@@ -86,8 +92,10 @@ function serializeDataSource(ds: DataSource | undefined): string[] {
   // TM1 leaves 585 empty when no client-side name is set — mirror that rather
   // than duplicating the server name, which would alter state on re-import.
   const client = ds.dataSourceNameForClient ?? "";
-  lines.push(`586,${quote(server)}`);
-  lines.push(`585,${quote(client)}`);
+  // TM1 leaves an unset slot bare ("585,"), it does not write empty quotes.
+  const slot = (s: string): string => (s === "" ? "" : quote(s));
+  lines.push(`586,${slot(server)}`);
+  lines.push(`585,${slot(client)}`);
 
   // View and subset names go in unquoted — TM1 writes `570,Ansicht, mit "Komma"`
   // verbatim, commas and quotes included.

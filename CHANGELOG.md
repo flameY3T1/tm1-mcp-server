@@ -77,6 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The subset name is `571`; `570` holds view names. The parser read subsets from `570` and
     therefore never found one.
 
+  Variable byte offsets (`580`/`581`) were not written either, which makes an exported fixed-width
+  process unusable — those offsets *are* the column layout. They now round-trip; TM1 writes zeros
+  for delimited sources and those are dropped again on read.
+
   Three more mismatches surfaced from write probes over the remaining datasource variants:
   a fixed-width ASCII source is its own `.pro` type (`562,"POSITIONDELIMITED"`, not a flag on
   `CHARACTERDELIMITED`) and parsed as *no datasource at all*; view and subset names are written
