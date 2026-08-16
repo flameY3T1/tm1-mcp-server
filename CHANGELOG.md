@@ -59,6 +59,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answers without the expansion still falls back to the per-cube lookup, because a missing
   dimension list would quietly change every ratio the scan computes.
 
+### Added
+
+- **`tm1_import_pro_file` takes a `dataSourcePassword`.** A `.pro` stores the ODBC password only as
+  a server-encrypted blob, so an imported ODBC process arrived with its DSN, user and query but no
+  credential, and there was no way to supply one in the same call — `tm1_import_process_from_git`
+  already had that parameter. Measured on a real model: of 30 ODBC processes, 29 connect through a
+  registered DSN plus credentials and none through a connection string, so the password is the only
+  piece of the connection that a `.pro` cannot carry.
+
 ### Fixed
 
 - **`.pro` export and import lost the ODBC query, the datasource name and the subset.** Three line

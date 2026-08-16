@@ -10,7 +10,7 @@ import { withToolHint } from "../error-format.js";
 export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_import_pro_file",
-    "Parse a TM1 .pro file (Tabs / Parameters / Variables / DataSource) and deploy the process in one call. Provide either filePath (absolute path on the MCP host) or content (the .pro file body as string). Modes: 'create' (fail if exists), 'update' (fail if missing), 'upsert' (default — create or update).",
+    "Parse a TM1 .pro file (Tabs / Parameters / Variables / DataSource) and deploy the process in one call. Provide either filePath (absolute path on the MCP host) or content (the .pro file body as string). Modes: 'create' (fail if exists), 'update' (fail if missing), 'upsert' (default — create or update). An ODBC datasource arrives without its password — TM1 stores that server-encrypted and it is not portable — so pass dataSourcePassword to re-supply it.",
     {
       filePath: z
         .string()
@@ -40,6 +40,12 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         .describe(
           "Run tm1_check_process_code before applying. Abort on syntax errors. Default true.",
         ),
+      dataSourcePassword: z
+        .string()
+        .optional()
+        .describe(
+          "ODBC password to re-inject. A .pro carries the password only as a server-encrypted blob, which is not portable, so it is never read from the file. Ignored for non-ODBC datasources.",
+        ),
     },
     async ({
       filePath,
@@ -47,6 +53,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       processName: nameOverride,
       mode,
       preflight,
+      dataSourcePassword,
     }) => {
       if (!filePath && !content) {
         throw new TM1Error({
@@ -61,6 +68,8 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
       }
 
       const parsed = parseProFile(body);
+      if (parsed.dataSource.type === "ODBC" && dataSourcePassword !== undefined)
+        parsed.dataSource.password = dataSourcePassword;
       const processName = nameOverride ?? parsed.name;
       if (!processName) {
         throw new TM1Error({
