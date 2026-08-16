@@ -63,7 +63,7 @@ const REAL_SUBSET_PRO = [
   `585,"CostCenter"`,
   `566,0`,
   `570,`,
-  `571,"N-Elements"`,
+  `571,N-Elements`,
   `569,0`,
   `572,0`,
   `573,0`,
@@ -110,6 +110,51 @@ describe("pro-parser: real TM1 line codes", () => {
     const ds = parseProFile(pro).dataSource;
     expect(ds.type).toBe("ODBC");
     expect(ds.query).toContain(`570,Sales`);
+  });
+
+  it("reads a fixed-width ASCII source (562 = POSITIONDELIMITED)", () => {
+    const pro = [
+      `602,"Fixed_Width_Load"`,
+      `562,"POSITIONDELIMITED"`,
+      `586,"C:\\tmp\\fx.txt"`,
+      `585,`,
+      `566,0`,
+      `569,0`,
+      `572,0`,
+    ].join("\n");
+    expect(parseProFile(pro).dataSource).toMatchObject({
+      type: "ASCII",
+      dataSourceNameForServer: "C:\\tmp\\fx.txt",
+      asciiDelimiterType: "FixedWidth",
+    });
+  });
+
+  it("keeps an empty client name empty instead of copying the server name", () => {
+    const pro = [
+      `602,"P"`,
+      `562,"VIEW"`,
+      `586,"Sales"`,
+      `585,`,
+      `570,MyView`,
+      `572,0`,
+    ].join("\n");
+    expect(parseProFile(pro).dataSource).toMatchObject({
+      dataSourceNameForServer: "Sales",
+      dataSourceNameForClient: "",
+      view: "MyView",
+    });
+  });
+
+  it("reads an unquoted view name containing commas and quotes verbatim", () => {
+    const pro = [
+      `602,"P"`,
+      `562,"VIEW"`,
+      `586,"Sales"`,
+      `585,`,
+      `570,Ansicht, mit "Komma"`,
+      `572,0`,
+    ].join("\n");
+    expect(parseProFile(pro).dataSource.view).toBe(`Ansicht, mit "Komma"`);
   });
 
   it("still reads files this serializer wrote before the fix (585 only, subset in 570)", () => {
@@ -179,7 +224,7 @@ describe("pro-serializer: datasource fields", () => {
     expect(out).toContain(`585,"CLI"`);
   });
 
-  it("writes the subset to 571 and the view to 570", () => {
+  it("writes the subset to 571 and the view to 570, both unquoted like TM1", () => {
     const subset = serializeToPro({
       ...base,
       dataSource: {
@@ -188,18 +233,45 @@ describe("pro-serializer: datasource fields", () => {
         subset: "All",
       },
     });
-    expect(subset).toContain(`571,"All"`);
-    expect(subset).not.toContain(`570,"All"`);
+    expect(subset).toContain(`571,All`);
+    expect(subset).not.toContain(`570,All`);
 
     const view = serializeToPro({
       ...base,
       dataSource: {
         type: "TM1CubeView",
         dataSourceNameForServer: "Sales",
-        view: "MyView",
+        view: `Ansicht, mit "Komma"`,
       },
     });
-    expect(view).toContain(`570,"MyView"`);
+    expect(view).toContain(`570,Ansicht, mit "Komma"`);
+    expect(parseProFile(view).dataSource.view).toBe(`Ansicht, mit "Komma"`);
+  });
+
+  it("writes a fixed-width ASCII source as POSITIONDELIMITED", () => {
+    const out = serializeToPro({
+      ...base,
+      dataSource: {
+        type: "ASCII",
+        dataSourceNameForServer: "C:\\tmp\\fx.txt",
+        asciiDelimiterType: "FixedWidth",
+      },
+    });
+    expect(out).toContain(`562,"POSITIONDELIMITED"`);
+    expect(parseProFile(out).dataSource).toMatchObject({
+      type: "ASCII",
+      asciiDelimiterType: "FixedWidth",
+    });
+  });
+
+  it("leaves 585 empty when the datasource has no client name", () => {
+    const out = serializeToPro({
+      ...base,
+      dataSource: { type: "ODBC", dataSourceNameForServer: "SRV" },
+    });
+    expect(out).toContain(`586,"SRV"`);
+    expect(out).toContain(`585,""`);
+    expect(parseProFile(out).dataSource.dataSourceNameForClient).toBe("");
   });
 
   it("quotes the datasource type like TM1 does", () => {

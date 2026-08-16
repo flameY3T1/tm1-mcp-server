@@ -74,19 +74,28 @@ function serializeDataSource(ds: DataSource | undefined): string[] {
     TM1Process: "TM1PROCESS",
   };
   const lines: string[] = [];
-  lines.push(`562,${quote(REVERSE_TYPE_MAP[ds.type])}`);
+  // A fixed-width ASCII source is its own .pro type, not a flag on the type.
+  const proType =
+    ds.type === "ASCII" && ds.asciiDelimiterType === "FixedWidth"
+      ? "POSITIONDELIMITED"
+      : REVERSE_TYPE_MAP[ds.type];
+  lines.push(`562,${quote(proType)}`);
   // 586 = DataSourceNameForServer, 585 = DataSourceNameForClient — this is the
   // slot order TM1 itself writes; each falls back to the other when unset.
   const server = ds.dataSourceNameForServer ?? ds.dataSourceNameForClient ?? "";
-  const client = ds.dataSourceNameForClient ?? server;
+  // TM1 leaves 585 empty when no client-side name is set — mirror that rather
+  // than duplicating the server name, which would alter state on re-import.
+  const client = ds.dataSourceNameForClient ?? "";
   lines.push(`586,${quote(server)}`);
   lines.push(`585,${quote(client)}`);
 
+  // View and subset names go in unquoted — TM1 writes `570,Ansicht, mit "Komma"`
+  // verbatim, commas and quotes included.
   if (ds.type === "TM1CubeView") {
-    lines.push(`570,${quote(ds.view ?? "")}`);
+    lines.push(`570,${ds.view ?? ""}`);
   } else if (ds.type === "TM1DimensionSubset") {
     // 571 is the subset slot; 570 holds view names.
-    lines.push(`571,${quote(ds.subset ?? "")}`);
+    lines.push(`571,${ds.subset ?? ""}`);
   } else if (ds.type === "ASCII") {
     if (ds.asciiDelimiterChar !== undefined)
       lines.push(`567,${quote(ds.asciiDelimiterChar)}`);

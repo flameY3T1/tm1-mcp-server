@@ -77,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The subset name is `571`; `570` holds view names. The parser read subsets from `570` and
     therefore never found one.
 
+  Three more mismatches surfaced from write probes over the remaining datasource variants:
+  a fixed-width ASCII source is its own `.pro` type (`562,"POSITIONDELIMITED"`, not a flag on
+  `CHARACTERDELIMITED`) and parsed as *no datasource at all*; view and subset names are written
+  unquoted, so TM1 stores `570,Ansicht, mit "Komma"` verbatim; and `585` stays empty when no client
+  name is set instead of repeating the server name.
+
   Both directions now use TM1's codes, including the line counts on the code sections (`572,138`),
   which keeps TI code that looks like a header line inside its section. Files written by earlier
   versions still parse — `585` and a subset in `570` are accepted as fallbacks. The encrypted

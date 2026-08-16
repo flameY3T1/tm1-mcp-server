@@ -56,6 +56,8 @@ function parseProcessName(lines: string[]): string | null {
 
 interface HeaderFields {
   scalars: Map<string, string>;
+  /** Same values, unquoted — for slots TM1 writes without quotes (570, 571). */
+  rawScalars: Map<string, string>;
   blocks: Map<string, string[]>;
 }
 
@@ -64,6 +66,7 @@ interface HeaderFields {
 // an ODBC query line such as `FROM dbo."570,Sales"` must not be read as a header.
 function parseHeaderFields(lines: string[]): HeaderFields {
   const scalars = new Map<string, string>();
+  const rawScalars = new Map<string, string>();
   const blocks = new Map<string, string[]>();
   const sectionIdx = lines.findIndex((l) => SECTION_RE.test(l));
   const pre = sectionIdx === -1 ? lines : lines.slice(0, sectionIdx);
@@ -80,11 +83,13 @@ function parseHeaderFields(lines: string[]): HeaderFields {
     }
     const m = line.match(/^(\d{3}),/);
     // First occurrence wins, mirroring the old first-match lookup.
-    if (m && !scalars.has(m[1]!))
+    if (m && !scalars.has(m[1]!)) {
       scalars.set(m[1]!, stripQuotes(lineValue(line)));
+      rawScalars.set(m[1]!, lineValue(line));
+    }
     i++;
   }
-  return { scalars, blocks };
+  return { scalars, rawScalars, blocks };
 }
 
 function parseSections(lines: string[]): {
@@ -190,7 +195,7 @@ function parseVariables(blocks: Map<string, string[]>): ProcessVariable[] {
 }
 
 function parseDataSource(fields: HeaderFields): DataSource {
-  const { scalars, blocks } = fields;
+  const { scalars, rawScalars, blocks } = fields;
   const get = (code: string): string => scalars.get(code) ?? "";
 
   const proType = (get("562") || "NULL").toUpperCase();
@@ -199,6 +204,8 @@ function parseDataSource(fields: HeaderFields): DataSource {
     VIEW: "TM1CubeView",
     SUBSET: "TM1DimensionSubset",
     CHARACTERDELIMITED: "ASCII",
+    // A fixed-width ASCII source carries its own type name.
+    POSITIONDELIMITED: "ASCII",
     ODBC: "ODBC",
   };
   const restType = TYPE_MAP[proType] ?? "None";
@@ -206,17 +213,26 @@ function parseDataSource(fields: HeaderFields): DataSource {
   if (restType === "None") return { type: "None" };
 
   // 586 = DataSourceNameForServer, 585 = DataSourceNameForClient (verified
-  // against .pro files TM1 wrote itself). Files written by this serializer
-  // before that was known only carry 585, hence the fallback in both slots.
-  const server = get("586") || get("585");
-  const client = get("585") || server;
+  // against .pro files TM1 wrote itself; 585 is empty when no client name is
+  // set). Files written by this serializer before that was known carry only
+  // 585 — recognisable by the missing 586 — and put the server name there.
+  const tm1Layout = scalars.has("586");
+  const server = tm1Layout ? get("586") : get("585");
+  const client = tm1Layout ? get("585") : get("585");
+
+  // TM1 writes view and subset names unquoted, so a name may legitimately start
+  // and end with a quote; only our own older files need unquoting here.
+  const rawName = (code: string): string => {
+    const value = tm1Layout ? rawScalars.get(code) : scalars.get(code);
+    return value ?? "";
+  };
 
   if (restType === "TM1CubeView") {
     return {
       type: restType,
       dataSourceNameForServer: server,
       dataSourceNameForClient: client,
-      view: get("570"),
+      view: rawName("570"),
     };
   }
   if (restType === "TM1DimensionSubset") {
@@ -225,7 +241,7 @@ function parseDataSource(fields: HeaderFields): DataSource {
       dataSourceNameForServer: server,
       dataSourceNameForClient: client,
       // 571 holds the subset; 570 is the fallback for our own older files.
-      subset: get("571") || get("570"),
+      subset: rawName("571") || rawName("570"),
     };
   }
 
@@ -235,6 +251,8 @@ function parseDataSource(fields: HeaderFields): DataSource {
     dataSourceNameForClient: client,
   };
   if (restType === "ASCII") {
+    ds.asciiDelimiterType =
+      proType === "POSITIONDELIMITED" ? "FixedWidth" : "Character";
     ds.asciiDelimiterChar = scalars.get("567") ?? ",";
     ds.asciiQuoteCharacter = scalars.get("568") ?? '"';
     ds.asciiDecimalSeparator = scalars.get("588") ?? ".";
