@@ -61,6 +61,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`.pro` export and import lost the ODBC query, the datasource name and the subset.** Three line
+  codes were wrong or missing, so `tm1_export_process_to_pro` wrote files without the SQL and
+  `tm1_import_pro_file` silently deployed processes whose datasource had lost its target. The codes
+  were pinned two ways: by scanning 1001 `.pro` files written by TM1 11.8 (30 of them ODBC) and by a
+  write probe — create a process over REST with marker values, then read the file TM1 wrote back.
+
+  - The ODBC query lives in `566,<n>` followed by `n` lines. Every ODBC file carries that header,
+    every non-ODBC file carries `566,0`. It was neither written nor read; the largest query in the
+    scanned corpus is 26 lines.
+  - `586` is `DataSourceNameForServer` and `585` is `DataSourceNameForClient` — the serializer wrote
+    the server name into `585` and the parser read it from there. In files TM1 wrote, `585` is
+    frequently empty, so importing a real `.pro` lost the cube name or file path outright. This hit
+    every datasource type, not just ODBC.
+  - The subset name is `571`; `570` holds view names. The parser read subsets from `570` and
+    therefore never found one.
+
+  Both directions now use TM1's codes, including the line counts on the code sections (`572,138`),
+  which keeps TI code that looks like a header line inside its section. Files written by earlier
+  versions still parse — `585` and a subset in `570` are accepted as fallbacks. The encrypted
+  password blob (`565`) stays out of the export by design. Verified end to end against 11.8: export
+  a process with a three-line query, delete it, re-import from the `.pro`, and the query, server and
+  client names come back byte-identical; all 1001 corpus files parse without error.
+
 - **`tm1_bulk_upsert_elements` dropped consolidation weights.** The single-element tools were fixed
   for this in the same release; the bulk path — the one that actually builds hierarchies — was
   missed, and it is the more consequential of the two. TM1 accepts `Weight` inside the `Components`

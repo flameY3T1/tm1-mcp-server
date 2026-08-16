@@ -17,6 +17,22 @@ export interface ParsedPro {
 
 const SECTION_RE = /^(572|573|574|575),(\d*)$/;
 
+// Header codes whose value is a counted block ("560,3" + 3 lines), not a scalar.
+// 566 is the ODBC query — TM1 writes "566,0" for every non-ODBC datasource.
+const BLOCK_CODES = new Set([
+  "560",
+  "561",
+  "566",
+  "577",
+  "578",
+  "579",
+  "580",
+  "581",
+  "582",
+  "590",
+  "637",
+]);
+
 function stripQuotes(s: string): string {
   if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
     return s.slice(1, -1).replace(/""/g, '"');
@@ -38,6 +54,39 @@ function parseProcessName(lines: string[]): string | null {
   return null;
 }
 
+interface HeaderFields {
+  scalars: Map<string, string>;
+  blocks: Map<string, string[]>;
+}
+
+// Read everything before the first code section into scalars ("585,\"DSN\"") and
+// counted blocks ("566,3" + 3 lines). Consuming blocks by their count matters:
+// an ODBC query line such as `FROM dbo."570,Sales"` must not be read as a header.
+function parseHeaderFields(lines: string[]): HeaderFields {
+  const scalars = new Map<string, string>();
+  const blocks = new Map<string, string[]>();
+  const sectionIdx = lines.findIndex((l) => SECTION_RE.test(l));
+  const pre = sectionIdx === -1 ? lines : lines.slice(0, sectionIdx);
+
+  let i = 0;
+  while (i < pre.length) {
+    const line = pre[i]!;
+    const block = line.match(/^(\d{3}),(\d+)$/);
+    if (block && BLOCK_CODES.has(block[1]!)) {
+      const count = parseInt(block[2]!, 10);
+      blocks.set(block[1]!, pre.slice(i + 1, i + 1 + count));
+      i += 1 + count;
+      continue;
+    }
+    const m = line.match(/^(\d{3}),/);
+    // First occurrence wins, mirroring the old first-match lookup.
+    if (m && !scalars.has(m[1]!))
+      scalars.set(m[1]!, stripQuotes(lineValue(line)));
+    i++;
+  }
+  return { scalars, blocks };
+}
+
 function parseSections(lines: string[]): {
   prolog: string;
   metadata: string;
@@ -50,22 +99,34 @@ function parseSections(lines: string[]): {
     "574": [],
     "575": [],
   };
-  const headers: Array<{ code: string; idx: number }> = [];
-  for (let i = 0; i < lines.length; i++) {
+
+  let i = 0;
+  while (i < lines.length) {
     const m = lines[i]!.match(SECTION_RE);
-    if (m) headers.push({ code: m[1]!, idx: i });
-  }
-  for (let h = 0; h < headers.length; h++) {
-    const hdr = headers[h]!;
-    const { code, idx } = hdr;
-    const next = h + 1 < headers.length ? headers[h + 1]!.idx : lines.length;
-    for (let j = idx + 1; j < next; j++) {
-      const ln = lines[j]!;
-      // Stop at any non-section numeric header line (e.g. 576, 930)
-      if (/^\d{3},/.test(ln) && !/^57[2345],/.test(ln)) break;
-      map[code]!.push(ln);
+    if (!m) {
+      i++;
+      continue;
+    }
+    const code = m[1]!;
+    const rawCount = m[2]!;
+    i++;
+    if (rawCount !== "") {
+      // TM1 writes an explicit line count ("572,138"). Trust it, so code lines
+      // that look like a header (e.g. a literal "930,0") stay in the section.
+      const count = parseInt(rawCount, 10);
+      for (let taken = 0; taken < count && i < lines.length; taken++, i++) {
+        map[code]!.push(lines[i]!);
+      }
+      continue;
+    }
+    // Countless header (older files written by this serializer): read until the
+    // next numeric header line.
+    while (i < lines.length && !/^\d{3},/.test(lines[i]!)) {
+      map[code]!.push(lines[i]!);
+      i++;
     }
   }
+
   return {
     prolog: map["572"]!.join("\n").trimEnd(),
     metadata: map["573"]!.join("\n").trimEnd(),
@@ -74,39 +135,23 @@ function parseSections(lines: string[]): {
   };
 }
 
-function parseParameters(lines: string[]): ProcessParameter[] {
-  const prologIdx = lines.findIndex((l) => /^572,/.test(l));
-  const pre = prologIdx === -1 ? lines : lines.slice(0, prologIdx);
-
-  let names: string[] = [];
-  let types: number[] = [];
+function parseParameters(blocks: Map<string, string[]>): ProcessParameter[] {
+  const names = (blocks.get("560") ?? []).map((l) => l.trim());
+  const types = (blocks.get("561") ?? []).map(
+    (l) => parseInt(l.trim(), 10) || 1,
+  );
   const defaults: Record<string, string> = {};
   const prompts: Record<string, string> = {};
 
-  let i = 0;
-  while (i < pre.length) {
-    const m = pre[i]!.match(/^(560|561|590|637),(\d+)$/);
-    if (m) {
-      const code = m[1]!;
-      const count = parseInt(m[2]!, 10);
-      const data = pre.slice(i + 1, i + 1 + count);
-      if (code === "560") names = data.map((l) => l.trim());
-      else if (code === "561")
-        types = data.map((l) => parseInt(l.trim(), 10) || 1);
-      else if (code === "590" || code === "637") {
-        for (const dl of data) {
-          const ci = dl.indexOf(",");
-          if (ci === -1) continue;
-          const name = dl.slice(0, ci);
-          const val = stripQuotes(dl.slice(ci + 1));
-          if (code === "590") defaults[name] = val;
-          else prompts[name] = val;
-        }
-      }
-      i += 1 + count;
-      continue;
+  for (const [code, target] of [
+    ["590", defaults],
+    ["637", prompts],
+  ] as const) {
+    for (const line of blocks.get(code) ?? []) {
+      const ci = line.indexOf(",");
+      if (ci === -1) continue;
+      target[line.slice(0, ci)] = stripQuotes(line.slice(ci + 1));
     }
-    i++;
   }
 
   return names.map((name, idx) => {
@@ -124,31 +169,14 @@ function parseParameters(lines: string[]): ProcessParameter[] {
   });
 }
 
-function parseVariables(lines: string[]): ProcessVariable[] {
-  const prologIdx = lines.findIndex((l) => /^572,/.test(l));
-  const pre = prologIdx === -1 ? lines : lines.slice(0, prologIdx);
-
-  let names: string[] = [];
-  let types: number[] = [];
-  let positions: number[] = [];
-
-  let i = 0;
-  while (i < pre.length) {
-    const m = pre[i]!.match(/^(577|578|579),(\d+)$/);
-    if (m) {
-      const code = m[1]!;
-      const count = parseInt(m[2]!, 10);
-      const data = pre.slice(i + 1, i + 1 + count);
-      if (code === "577") names = data.map((l) => l.trim());
-      else if (code === "578")
-        types = data.map((l) => parseInt(l.trim(), 10) || 2);
-      else if (code === "579")
-        positions = data.map((l) => parseInt(l.trim(), 10) || 1);
-      i += 1 + count;
-      continue;
-    }
-    i++;
-  }
+function parseVariables(blocks: Map<string, string[]>): ProcessVariable[] {
+  const names = (blocks.get("577") ?? []).map((l) => l.trim());
+  const types = (blocks.get("578") ?? []).map(
+    (l) => parseInt(l.trim(), 10) || 2,
+  );
+  const positions = (blocks.get("579") ?? []).map(
+    (l) => parseInt(l.trim(), 10) || 1,
+  );
 
   return names.map((name, idx) => {
     const proType = types[idx] ?? 2;
@@ -161,15 +189,11 @@ function parseVariables(lines: string[]): ProcessVariable[] {
   });
 }
 
-function parseDataSource(lines: string[]): DataSource {
-  const get = (code: string): string | undefined => {
-    for (const line of lines) {
-      if (line.startsWith(`${code},`)) return stripQuotes(lineValue(line));
-    }
-    return undefined;
-  };
+function parseDataSource(fields: HeaderFields): DataSource {
+  const { scalars, blocks } = fields;
+  const get = (code: string): string => scalars.get(code) ?? "";
 
-  const proType = (get("562") ?? "NULL").toUpperCase();
+  const proType = (get("562") || "NULL").toUpperCase();
   const TYPE_MAP: Record<string, DataSource["type"]> = {
     NULL: "None",
     VIEW: "TM1CubeView",
@@ -181,55 +205,68 @@ function parseDataSource(lines: string[]): DataSource {
 
   if (restType === "None") return { type: "None" };
 
-  const dsName = get("585") ?? "";
-  const viewSubset = get("570") ?? "";
+  // 586 = DataSourceNameForServer, 585 = DataSourceNameForClient (verified
+  // against .pro files TM1 wrote itself). Files written by this serializer
+  // before that was known only carry 585, hence the fallback in both slots.
+  const server = get("586") || get("585");
+  const client = get("585") || server;
 
   if (restType === "TM1CubeView") {
     return {
       type: restType,
-      dataSourceNameForServer: dsName,
-      dataSourceNameForClient: dsName,
-      view: viewSubset,
+      dataSourceNameForServer: server,
+      dataSourceNameForClient: client,
+      view: get("570"),
     };
   }
   if (restType === "TM1DimensionSubset") {
     return {
       type: restType,
-      dataSourceNameForServer: dsName,
-      dataSourceNameForClient: dsName,
-      subset: viewSubset,
+      dataSourceNameForServer: server,
+      dataSourceNameForClient: client,
+      // 571 holds the subset; 570 is the fallback for our own older files.
+      subset: get("571") || get("570"),
     };
   }
 
   const ds: DataSource = {
     type: restType,
-    dataSourceNameForServer: dsName,
-    dataSourceNameForClient: dsName,
+    dataSourceNameForServer: server,
+    dataSourceNameForClient: client,
   };
   if (restType === "ASCII") {
-    ds.asciiDelimiterChar = get("567") ?? ",";
-    ds.asciiQuoteCharacter = get("568") ?? '"';
-    ds.asciiDecimalSeparator = get("588") ?? ".";
-    ds.asciiThousandSeparator = get("589") ?? ",";
-    const headerVal = get("569");
+    ds.asciiDelimiterChar = scalars.get("567") ?? ",";
+    ds.asciiQuoteCharacter = scalars.get("568") ?? '"';
+    ds.asciiDecimalSeparator = scalars.get("588") ?? ".";
+    ds.asciiThousandSeparator = scalars.get("589") ?? ",";
+    const headerVal = scalars.get("569");
     if (headerVal !== undefined)
       ds.asciiHeaderRecords = parseInt(headerVal, 10) || 0;
   }
   if (restType === "ODBC") {
     const user = get("564");
     if (user) ds.userName = user;
+    const query = (blocks.get("566") ?? []).join("\n");
+    if (query.length > 0) ds.query = query;
+    // 565 holds the password as a server-encrypted blob that is worthless
+    // anywhere else — it is deliberately not carried into the datasource.
   }
   return ds;
 }
 
 export function parseProFile(content: string): ParsedPro {
-  const lines = content.split("\n").map((l) => l.replace(/\r$/, ""));
+  const lines = content
+    // TM1 writes .pro files with a UTF-8 BOM.
+    .replace(/^\uFEFF/, "")
+    .split("\n")
+    .map((l) => l.replace(/\r$/, ""));
+  const fields = parseHeaderFields(lines);
   const sections = parseSections(lines);
   return {
     name: parseProcessName(lines),
     ...sections,
-    parameters: parseParameters(lines),
-    variables: parseVariables(lines),
-    dataSource: parseDataSource(lines),
+    parameters: parseParameters(fields.blocks),
+    variables: parseVariables(fields.blocks),
+    dataSource: parseDataSource(fields),
   };
 }

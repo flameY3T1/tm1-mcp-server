@@ -74,14 +74,19 @@ function serializeDataSource(ds: DataSource | undefined): string[] {
     TM1Process: "TM1PROCESS",
   };
   const lines: string[] = [];
-  lines.push(`562,${REVERSE_TYPE_MAP[ds.type]}`);
-  const dsName = ds.dataSourceNameForServer ?? ds.dataSourceNameForClient ?? "";
-  lines.push(`585,${quote(dsName)}`);
+  lines.push(`562,${quote(REVERSE_TYPE_MAP[ds.type])}`);
+  // 586 = DataSourceNameForServer, 585 = DataSourceNameForClient — this is the
+  // slot order TM1 itself writes; each falls back to the other when unset.
+  const server = ds.dataSourceNameForServer ?? ds.dataSourceNameForClient ?? "";
+  const client = ds.dataSourceNameForClient ?? server;
+  lines.push(`586,${quote(server)}`);
+  lines.push(`585,${quote(client)}`);
 
   if (ds.type === "TM1CubeView") {
     lines.push(`570,${quote(ds.view ?? "")}`);
   } else if (ds.type === "TM1DimensionSubset") {
-    lines.push(`570,${quote(ds.subset ?? "")}`);
+    // 571 is the subset slot; 570 holds view names.
+    lines.push(`571,${quote(ds.subset ?? "")}`);
   } else if (ds.type === "ASCII") {
     if (ds.asciiDelimiterChar !== undefined)
       lines.push(`567,${quote(ds.asciiDelimiterChar)}`);
@@ -95,6 +100,15 @@ function serializeDataSource(ds: DataSource | undefined): string[] {
       lines.push(`589,${quote(ds.asciiThousandSeparator)}`);
   } else if (ds.type === "ODBC") {
     if (ds.userName) lines.push(`564,${quote(ds.userName)}`);
+    // 566 is a counted block: header with the line count, then the SQL. TM1
+    // writes "566,0" when there is no query. The password (565) stays out —
+    // TM1 stores it as a server-encrypted blob, useless and unsafe to carry.
+    const queryLines =
+      ds.query !== undefined && ds.query.length > 0
+        ? ds.query.split(/\r?\n/)
+        : [];
+    lines.push(`566,${queryLines.length}`);
+    lines.push(...queryLines);
   }
   return lines;
 }
@@ -104,16 +118,19 @@ function serializeSection(
   body: string | undefined,
 ): string[] {
   const text = body ?? "";
-  const out = [`${code},`];
-  if (text.length > 0) {
-    for (const line of text.split("\n")) out.push(line);
-  }
-  return out;
+  const bodyLines = text.length > 0 ? text.split(/\r?\n/) : [];
+  // Line count in the header, like TM1: it keeps code that looks like a header
+  // line (e.g. a literal "930,0") inside the section on re-read.
+  return [`${code},${bodyLines.length}`, ...bodyLines];
 }
 
 // Serialize a TM1 process back to a .pro file body. Round-trip safe with parseProFile().
-// Format omits headers TM1 itself adds (601 version, 559 etc.) — these are only required
-// when re-uploading via legacy TM1 .pro tooling, not for repo round-trip via tm1_import_pro_file.
+// Line codes follow what TM1 writes itself (562/564/566/570/571/585/586, counted
+// sections), so files TM1 wrote parse back losslessly. Still omitted are the headers
+// TM1 adds but that carry no portable information: 601 (version), 559, 565 (the
+// server-encrypted password blob), 592, 593-598, 599, 800/801, 928, 603. They are only
+// required when re-uploading via legacy TM1 .pro tooling, not for repo round-trip via
+// tm1_import_pro_file.
 export function serializeToPro(input: ProcessSerializeInput): string {
   const lines: string[] = [];
   lines.push(`602,${quote(input.name)}`);
