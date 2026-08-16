@@ -61,6 +61,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`includeDataSourcePassword` on both export tools carries the ODBC password.** Off by default,
+  and it requires `writeToFile`/`writeToDir`, so the credential goes to a file and never into the
+  response the model sees. `.pro` writes it to slot 565, the Git `.json` keeps the `password` field
+  and reports `credentialsOmitted: false`. Verified against 11.8: export a process, delete it,
+  re-import, and the stored credential is bit-identical (`W0br6scX06nUHxVZQrQC+g==` before and
+  after) — TM1 recognises its own ciphertext and stores it unchanged rather than encrypting it a
+  second time.
+
+  What it is worth depends on the target, and both facts were measured, not assumed. On 11.8 the
+  value is a ciphertext **bound to one server**: the same plain text yields
+  `W0br6scX06nUHxVZQrQC+g==` on one instance and `5QUCtEDCEjECPJ1HIYDlVQ==` on another, so it
+  restores a process on its own instance but is useless for moving one elsewhere — for that, supply
+  the plain password via `dataSourcePassword` on import. On v12 the API returns the password **in
+  plain text**, so an exported file there holds a usable credential; both tools say so in their
+  descriptions. Without the flag nothing changes: the datasource still carries only a `[redacted]`
+  marker, and that marker is now kept out of the file as well.
+
 - **`tm1_import_pro_file` takes a `dataSourcePassword`.** A `.pro` stores the ODBC password only as
   a server-encrypted blob, so an imported ODBC process arrived with its DSN, user and query but no
   credential, and there was no way to supply one in the same call — `tm1_import_process_from_git`

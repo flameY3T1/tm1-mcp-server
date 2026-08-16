@@ -339,8 +339,21 @@ describe("pro-serializer: datasource fields", () => {
     expect(parseProFile(out).dataSource.query).toBe("SELECT 1\n\nFROM T\n");
   });
 
-  it("never writes the ODBC password", () => {
-    const out = serializeToPro({
+  it("writes no password slot unless the datasource carries one", () => {
+    // The export tools only put a password into the datasource when the caller
+    // opted in, so an ordinary export never reaches slot 565.
+    const redacted = serializeToPro({
+      ...base,
+      dataSource: {
+        type: "ODBC",
+        dataSourceNameForServer: "D",
+        userName: "u",
+        password: "",
+      },
+    });
+    expect(redacted).not.toContain("565,");
+
+    const optedIn = serializeToPro({
       ...base,
       dataSource: {
         type: "ODBC",
@@ -349,7 +362,7 @@ describe("pro-serializer: datasource fields", () => {
         password: "s3cret",
       },
     });
-    expect(out).not.toContain("s3cret");
+    expect(optedIn).toContain(`565,"s3cret"`);
   });
 
   it("writes section line counts and survives code that looks like a header", () => {

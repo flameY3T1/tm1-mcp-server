@@ -254,7 +254,10 @@ export const ExportProcessToProResultSchema = z.object({
   parameterCount: z.number().int(),
   variableCount: z.number().int(),
   dataSourceType: z.string(),
-  content: z.string(),
+  credentialsIncluded: z.boolean(),
+  // Omitted when credentials were exported — the body then only exists on disk
+  // so the password cannot reach the caller or the model.
+  content: z.string().optional(),
 });
 
 export const ExportProcessToGitResultSchema = z.object({

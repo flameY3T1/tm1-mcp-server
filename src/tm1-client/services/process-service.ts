@@ -639,7 +639,20 @@ export class ProcessService {
    * Get the data source configuration of a TI process.
    * GET /api/v1/Processes('{name}') and extract the DataSource field.
    */
-  async getDataSource(processName: string): Promise<DataSource> {
+  /**
+   * Read a process datasource. The ODBC password is redacted by default so it
+   * cannot reach the caller or the model; `includeSecrets` returns it verbatim
+   * and is meant for export paths that write straight to a file.
+   *
+   * Measured on 11.8: the value on the wire is a server-bound ciphertext
+   * (`W0br…==`) that TM1 stores unchanged when written back, so it survives a
+   * round trip on the same instance but decrypts to nothing on another one.
+   * TM1 v12 returns the password in plain text.
+   */
+  async getDataSource(
+    processName: string,
+    opts?: { includeSecrets?: boolean },
+  ): Promise<DataSource> {
     const path = `/api/v1/Processes('${enc(processName)}')`;
     const response = await this.http.request<{
       DataSource: {
@@ -713,7 +726,13 @@ export class ProcessService {
       // Never surface the ODBC datasource password to the caller/LLM — return a
       // presence marker so the field stays observable without leaking the credential.
       ...(ds.password !== undefined
-        ? { password: ds.password ? "[redacted]" : "" }
+        ? {
+            password: opts?.includeSecrets
+              ? ds.password
+              : ds.password
+                ? "[redacted]"
+                : "",
+          }
         : {}),
       ...(ds.oDBCConnection !== undefined
         ? { oDBCConnection: ds.oDBCConnection }

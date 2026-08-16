@@ -6,6 +6,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeToPro } from "../../lib/pro-serializer.js";
 import { maskCode, resolveMaskSecrets } from "../../lib/mask-secrets.js";
+import { TM1Error, TM1ErrorCode } from "../../types.js";
 
 export function registerExportProcessToPro(
   server: McpServer,
@@ -35,14 +36,41 @@ export function registerExportProcessToPro(
           "Redact credential literals in the exported code (inline and written file). Masks the password arg of ODBCOpen() and quoted values " +
             "assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
         ),
+      includeDataSourcePassword: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Write the ODBC datasource password into the file (slot 565). Off by default. Requires writeToFile, so the credential never enters the " +
+            "inline response. Measured: on v11 the value is a ciphertext bound to that server — it round-trips on the same instance but is useless " +
+            "on another one; on v12 it is PLAIN TEXT. Do not commit such a file.",
+        ),
     },
-    async ({ processName, writeToFile, maskSecrets }) => {
+    async ({
+      processName,
+      writeToFile,
+      maskSecrets,
+      includeDataSourcePassword,
+    }) => {
+      if (includeDataSourcePassword && !writeToFile) {
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message:
+            "includeDataSourcePassword requires writeToFile — the credential must go to a file, not into the inline response.",
+        });
+      }
       const [code, parameters, variables, dataSource] = await Promise.all([
         tm1Client.processes.getCode(processName),
         tm1Client.processes.getParameters(processName),
         tm1Client.processes.getVariables(processName),
-        tm1Client.processes.getDataSource(processName),
+        tm1Client.processes.getDataSource(processName, {
+          includeSecrets: includeDataSourcePassword === true,
+        }),
       ]);
+
+      // Without the opt-in the service hands back a "[redacted]" marker, which
+      // must not be written into the file as if it were the credential.
+      if (!includeDataSourcePassword) delete dataSource.password;
 
       const mask = resolveMaskSecrets(maskSecrets)
         ? maskCode
@@ -79,7 +107,12 @@ export function registerExportProcessToPro(
               parameterCount: parameters.length,
               variableCount: variables.length,
               dataSourceType: dataSource.type,
-              content: proContent,
+              credentialsIncluded: Boolean(
+                includeDataSourcePassword && dataSource.password,
+              ),
+              // Written to disk only when credentials are in play — otherwise
+              // the caller already has the body and it stays out of the context.
+              ...(includeDataSourcePassword ? {} : { content: proContent }),
             }),
           },
         ],

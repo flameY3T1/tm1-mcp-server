@@ -22,7 +22,7 @@ export function registerExportProcessToGit(
       "Serialize a TM1 process to the tm1-git two-file layout: a '{name}.json' (parameters, variables, datasource) plus a '{name}.ti' (Prolog/Metadata/Data/Epilog as plain code).",
       "The .ti holds the code in TM1's native `Code` representation (#region <Tab> / #endregion, CRLF, empty tabs omitted); the .json holds the structure. Code lives outside the JSON so Git diffs stay readable.",
       "Returns both file bodies (json + ti) inline by default. Pass writeToDir to persist them to disk instead: the code is then written to files and omitted from the response to avoid duplicating it into the context window; only metadata (filenames, counts, writtenTo paths) comes back. Round-trip safe with tm1_import_process_from_git.",
-      "Security: the ODBC datasource password is never written; conn-string credential pairs (PWD=, UID=) in oDBCConnection are masked when maskSecrets is on; credentialsOmitted=true flags when a password was stripped.",
+      "Security: the ODBC datasource password is stripped unless includeDataSourcePassword is set (which also requires writeToDir); conn-string credential pairs (PWD=, UID=) in oDBCConnection are masked when maskSecrets is on; credentialsOmitted=true flags when a password was stripped.",
     ].join(" "),
     {
       processName: z.string().describe("Name of the TI process to export"),
@@ -40,27 +40,52 @@ export function registerExportProcessToGit(
           "Redact credential literals in the exported .ti code (inline and written file) and credential pairs (PWD=, UID=) in the datasource's ODBC connection string in the .json. " +
             "Masks the password arg of ODBCOpen() and quoted values assigned to credential-named identifiers (pPwd, sToken, …). Default: true. Set false only when explicitly auditing credentials.",
         ),
+      includeDataSourcePassword: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          "Write the ODBC datasource password into the .json. Off by default. Requires writeToDir, so the credential never enters the inline response. " +
+            "Measured: on v11 the value is a ciphertext bound to that server — it round-trips on the same instance but is useless on another one; on v12 it is PLAIN TEXT. Do not commit such a file.",
+        ),
     },
-    async ({ processName, writeToDir, maskSecrets }) => {
+    async ({
+      processName,
+      writeToDir,
+      maskSecrets,
+      includeDataSourcePassword,
+    }) => {
+      if (includeDataSourcePassword && !writeToDir) {
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message:
+            "includeDataSourcePassword requires writeToDir — the credential must go to a file, not into the inline response.",
+        });
+      }
       const [codeBlob, parameters, variables, dataSource, deployMeta] =
         await Promise.all([
           tm1Client.processes.getCodeBlob(processName),
           tm1Client.processes.getParameters(processName),
           tm1Client.processes.getVariables(processName),
-          tm1Client.processes.getDataSource(processName),
+          tm1Client.processes.getDataSource(processName, {
+            includeSecrets: includeDataSourcePassword === true,
+          }),
           tm1Client.processes.getDeployMeta(processName),
         ]);
 
       const doMask = resolveMaskSecrets(maskSecrets);
       const mask = doMask ? maskCode : (s: string) => s;
       const ti = mask(codeBlob);
-      const { json, credentialsOmitted } = serializeProcessToGit({
-        name: processName,
-        parameters,
-        variables,
-        dataSource: doMask ? maskDataSourceSecrets(dataSource) : dataSource,
-        hasSecurityAccess: deployMeta.hasSecurityAccess,
-      });
+      const { json, credentialsOmitted } = serializeProcessToGit(
+        {
+          name: processName,
+          parameters,
+          variables,
+          dataSource: doMask ? maskDataSourceSecrets(dataSource) : dataSource,
+          hasSecurityAccess: deployMeta.hasSecurityAccess,
+        },
+        { includePassword: includeDataSourcePassword === true },
+      );
 
       const jsonFileName = `${processName}.json`;
       const tiFileName = `${processName}.ti`;

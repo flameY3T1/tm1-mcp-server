@@ -278,8 +278,13 @@ function parseDataSource(fields: HeaderFields): DataSource {
     if (user) ds.userName = user;
     const query = (blocks.get("566") ?? []).join("\n");
     if (query.length > 0) ds.query = query;
-    // 565 holds the password as a server-encrypted blob that is worthless
-    // anywhere else — it is deliberately not carried into the datasource.
+    // 565 is the password slot. Files TM1 wrote hold its own encoding of the
+    // credential, which is not what the REST API accepts, so only values this
+    // serializer wrote (an exported REST password) are worth carrying — those
+    // are recognisable by the file being in our layout rather than TM1's, i.e.
+    // no 601 version header.
+    const password = get("565");
+    if (password && !scalars.has("601")) ds.password = password;
   }
   return ds;
 }

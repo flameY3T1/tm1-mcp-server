@@ -59,16 +59,23 @@ type Tab = "prolog" | "metadata" | "data" | "epilog";
  * Variables); parameter objects follow OData order (Name, Prompt, Value, Type).
  * Order is cosmetic — parseProcessFromGit reads by key.
  */
-export function serializeProcessToGit(input: GitProcessInput): GitProcessJson {
+export function serializeProcessToGit(
+  input: GitProcessInput,
+  opts?: { includePassword?: boolean },
+): GitProcessJson {
   const { password, ...dataSourceNoPwd } = input.dataSource;
-  const credentialsOmitted = password !== undefined && password !== "";
+  const keepPassword = opts?.includePassword === true && Boolean(password);
+  const credentialsOmitted =
+    !keepPassword && password !== undefined && password !== "";
 
   const json =
     JSON.stringify(
       {
         name: input.name,
         hasSecurityAccess: input.hasSecurityAccess,
-        dataSource: dataSourceNoPwd,
+        dataSource: keepPassword
+          ? { ...dataSourceNoPwd, password }
+          : dataSourceNoPwd,
         parameters: input.parameters.map((p) => ({
           name: p.name,
           ...(p.prompt !== undefined ? { prompt: p.prompt } : {}),

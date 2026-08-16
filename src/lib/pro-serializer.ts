@@ -117,6 +117,12 @@ function serializeDataSource(ds: DataSource | undefined): string[] {
       lines.push(`589,${quote(ds.asciiThousandSeparator)}`);
   } else if (ds.type === "ODBC") {
     if (ds.userName) lines.push(`564,${quote(ds.userName)}`);
+    // 565 is TM1's password slot. It is only filled when the caller explicitly
+    // exported credentials; the value is then what TM1's REST API returned —
+    // a server-bound ciphertext on v11, plain text on v12 — not TM1's own file
+    // encoding, so such a file is for round trips through this server, not for
+    // dropping into a data directory.
+    if (ds.password) lines.push(`565,${quote(ds.password)}`);
     // 566 is a counted block: header with the line count, then the SQL. TM1
     // writes "566,0" when there is no query. The password (565) stays out —
     // TM1 stores it as a server-encrypted blob, useless and unsafe to carry.
