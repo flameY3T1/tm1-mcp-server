@@ -1,5 +1,5 @@
 // Live integration: the ANALYSIS / AUDIT domain. Every read-only analysis and
-// audit tool is exercised end-to-end against the live HRPlan (TM1 11.8) model,
+// audit tool is exercised end-to-end against the configured live model (11.8),
 // through the real tool layer (zod schema → withAnnotations → handler →
 // TM1Client → OData), exactly as an MCP client would call it.
 //

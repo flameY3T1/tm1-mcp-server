@@ -147,6 +147,41 @@ function stripOpt(key: string): string {
   return key.endsWith("?") ? key.slice(0, -1) : key;
 }
 
+/**
+ * Objects with at least this many keys, all carrying the same shape, are read
+ * as maps keyed by model object names rather than as fixed schemas. Eight is
+ * comfortably above TM1's widest same-typed fixed record and far below any
+ * real model's dimension count.
+ */
+const MAP_KEY_THRESHOLD = 8;
+
+/**
+ * Collapse name-keyed maps to a single `*` entry.
+ *
+ * Stripping names from request paths keeps model names out of endpoint keys,
+ * but a payload can carry them as *keys* too: `elementCounts` is a map of
+ * dimension name to count, so recording it verbatim committed 120 real
+ * dimension names of the model it was recorded against. The shape claim worth
+ * keeping is "an object whose values are numbers", and `*` says exactly that
+ * while the names drop out.
+ */
+export function collapseNameKeyedMaps(shape: Shape): Shape {
+  if (typeof shape === "string") return shape;
+  const entries = Object.entries(shape).map(
+    ([k, v]) => [k, collapseNameKeyedMaps(v)] as const,
+  );
+  const values = entries.map(([, v]) => v);
+  const scalars = values.filter((v) => typeof v === "string");
+  const looksLikeMap =
+    entries.length >= MAP_KEY_THRESHOLD &&
+    scalars.length === values.length &&
+    new Set(scalars).size === 1 &&
+    // `[]`/`[]?` is the array marker, never a model name.
+    entries.every(([k]) => !stripOpt(k).endsWith("[]"));
+  if (looksLikeMap) return { "*": scalars[0] };
+  return sortKeys(Object.fromEntries(entries));
+}
+
 function sortKeys(o: Record<string, Shape>): Record<string, Shape> {
   return Object.fromEntries(
     Object.entries(o).sort(([x], [y]) => x.localeCompare(y)),
@@ -262,7 +297,9 @@ export function diffAgainstShape(
     // even express it. Common in service-level fakes built by spreading
     // optional fields.
     if (v === undefined) continue;
-    const entry = byName.get(k);
+    // `*` stands for a map keyed by model object names (see
+    // collapseNameKeyedMaps): any key is allowed, every value must match.
+    const entry = byName.get(k) ?? byName.get("*");
     if (!entry) {
       // OData control information (`@odata.count`, `Elements@odata.nextLink`,
       // …) is protocol, not model: whether the server emits it depends on the
@@ -294,6 +331,9 @@ export function diffAgainstShape(
   if (mode === "exact") {
     for (const k of Object.keys(contract)) {
       if (k.endsWith("?")) continue;
+      // A map's entries are its keys — there is no key literally named `*` to
+      // demand, and an empty map is still a conforming map.
+      if (k === "*") continue;
       const name = k.endsWith("[]") ? k.slice(0, -2) : k;
       if (!(name in payload)) {
         problems.push(

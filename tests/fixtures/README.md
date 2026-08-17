@@ -10,8 +10,14 @@ of that kind.
 A contract records the **structure** of real traffic — key paths, types,
 nullability, optionality — and never its values. That is what lets contracts be
 recorded against real models and still be committed: no cube, dimension,
-process, or server name is captured, because names are values, and object names
-in request paths are replaced with `'*'`.
+process, or server name is captured. Object names in request paths are replaced
+with `'*'`, and names that arrive as *keys* rather than values are collapsed the
+same way — a payload like `elementCounts` is a map of dimension name to count,
+so it is recorded as `{"*": "number"}`. Without that second rule it committed
+120 dimension names of the model it was recorded against; `collapseNameKeyedMaps`
+in `tests/helpers/wire-contract.ts` applies it at merge time, and
+`tests/unit/contract-no-model-names.test.ts` fails if a committed contract ever
+spells such a map out again.
 
 ## The two files
 

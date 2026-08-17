@@ -9,6 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  collapseNameKeyedMaps,
   mergeShapes,
   type ContractFile,
   type Shape,
@@ -67,7 +68,9 @@ export function mergeSpooledContracts(version: string): void {
     recordedAgainst: [...new Set([...versions, version])].sort(),
     recordedAt: new Date().toISOString().slice(0, 10),
     endpoints: Object.fromEntries(
-      [...merged.entries()].sort(([a], [b]) => a.localeCompare(b)),
+      [...merged.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, collapseNameKeyedMaps(v)] as const),
     ),
   };
   writeFileSync(FIXTURE, JSON.stringify(out, null, 2) + "\n");
@@ -106,7 +109,9 @@ export function mergeSpooledServiceContracts(version: string): void {
     recordedAgainst: [...new Set([...versions, version])].sort(),
     recordedAt: new Date().toISOString().slice(0, 10),
     methods: Object.fromEntries(
-      [...merged.entries()].sort(([a], [b]) => a.localeCompare(b)),
+      [...merged.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, collapseNameKeyedMaps(v)] as const),
     ),
   };
   writeFileSync(SERVICE_FIXTURE, JSON.stringify(out, null, 2) + "\n");
