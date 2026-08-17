@@ -44,8 +44,10 @@ export function registerExportProcessToPro(
         .default(false)
         .describe(
           "Write the ODBC datasource password into the file (slot 565). Off by default. Requires writeToFile, so the credential never enters the " +
-            "inline response. Measured: on v11 the value is a ciphertext bound to that server — it round-trips on the same instance but is useless " +
-            "on another one; on v12 it is PLAIN TEXT. Do not commit such a file.",
+            "inline response. Measured: on v11 the value is a ciphertext bound to one RUN of that server — it round-trips on the same instance " +
+            "until the service restarts, after which it aborts the process at connect time, and it is useless on another instance either way. " +
+            "Re-supply the password with tm1_import_pro_file's dataSourcePassword in both cases. On v12 it is PLAIN TEXT and does not expire. " +
+            "Do not commit such a file.",
         ),
     },
     async ({

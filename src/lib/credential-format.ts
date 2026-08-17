@@ -3,13 +3,18 @@
  * per major version, and a boolean "credentials included" flag cannot express
  * it. Measured 2026-08-17 against 11.8.02900.8 and a v12 database:
  *
- * - v11 returns a ciphertext bound to that server. It is deterministic per
- *   instance (the same cleartext always yields the same value) but useless on
- *   another instance, which decrypts it to garbage. Note this is NOT the same
- *   encoding TM1 writes into slot 565 of its own Datadir .pro files — that one
- *   is a longer, non-deterministic representation and cannot be exchanged with
- *   this one in either direction.
- * - v12 returns the plain password.
+ * - v11 returns a ciphertext bound to one *run* of one server. Within a running
+ *   instance it is stable — the same cleartext always yields the same value,
+ *   across processes — but it is useless on another instance, and measured
+ *   2026-08-17 it is equally useless on the same instance after a service
+ *   restart: the same password produced three different values across two
+ *   restarts, and a value carried across one aborts the process at connect time
+ *   with "Unable to open data source". So an exported v11 credential has the
+ *   lifetime of the server run it came from. Note this is NOT the encoding TM1
+ *   writes into slot 565 of its own Datadir .pro files — that one is longer,
+ *   not deterministic even within a run, and cannot be exchanged with this one
+ *   in either direction.
+ * - v12 returns the plain password, which has no such lifetime.
  */
 export type CredentialFormat = "server-encrypted" | "plaintext";
 

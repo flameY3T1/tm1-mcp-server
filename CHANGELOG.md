@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it is a deployment artefact, not a repository one, and already withholds the file body from the
   response whenever credentials are written.
 
+- **An exported v11 ODBC password expires when the server restarts, and the tools now say so.** The
+  credential the v11 REST API hands out was documented as "bound to that server". Measured against
+  11.8.02900.8 across two service restarts, the same cleartext produced three different values, and
+  a value carried across a restart aborts the process at connect time with `Unable to open data
+  source`. It is stable only *within* one server run: inside a run every process with the same
+  password reports the same value, and export → import → execute round-trips. So the lifetime of an
+  exported v11 credential is the lifetime of the server run it came from, on the `.pro` path and the
+  git path alike; `dataSourcePassword` re-supplies it. v12 plain text has no such lifetime.
+
 - **Corrected what the `.pro` tools claim about passwords.** `tm1_import_pro_file` documented that a
   password "is never read from the file", which is wrong: slot 565 *is* read from files written by
   `tm1_export_process_to_pro`, and that is how a password survives an export/import round trip —

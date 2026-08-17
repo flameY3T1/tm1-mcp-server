@@ -44,7 +44,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         .string()
         .optional()
         .describe(
-          "ODBC password to inject, in clear text; it is re-encrypted by the target server. Overrides whatever the file carries. Needed when the .pro came from TM1's own Datadir (its slot 565 encoding is ignored on import) or when deploying to a different instance than the file was exported from, since v11 ciphertext only decrypts on its source server. Ignored for non-ODBC datasources.",
+          "ODBC password to inject, in clear text; it is re-encrypted by the target server. Overrides whatever the file carries. Needed when the .pro came from TM1's own Datadir (its slot 565 encoding is ignored on import), when deploying to a different instance than the file was exported from, or when the source server has restarted since the export — measured on 11.8, a v11 ciphertext only decrypts on the source server and only within the run that produced it. Ignored for non-ODBC datasources.",
         ),
     },
     async ({

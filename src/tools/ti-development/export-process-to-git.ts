@@ -51,7 +51,7 @@ export function registerExportProcessToGit(
         .default(false)
         .describe(
           "Write the ODBC datasource password into the .json. Off by default. Requires writeToDir, so the credential never enters the inline response. " +
-            "Measured: on v11 the value is a ciphertext bound to that server — it round-trips on the same instance but is useless on another one; on v12 it is PLAIN TEXT. Do not commit such a file.",
+            "Measured: on v11 the value is a ciphertext bound to one RUN of that server — it round-trips on the same instance until the service restarts, after which it aborts the process at connect time, and it is useless on another instance either way; re-supply the password with tm1_import_process_from_git's dataSourcePassword in both cases. On v12 it is PLAIN TEXT and does not expire. Do not commit such a file.",
         ),
       allowPlaintextCredential: z
         .boolean()
