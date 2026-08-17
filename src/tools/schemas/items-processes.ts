@@ -254,11 +254,8 @@ export const ExportProcessToProResultSchema = z.object({
   parameterCount: z.number().int(),
   variableCount: z.number().int(),
   dataSourceType: z.string(),
+  // True only on v12, the only version whose credential survives export.
   credentialsIncluded: z.boolean(),
-  // What slot 565 actually holds, because `credentialsIncluded: true` means two
-  // very different things per version: on v11 a server-bound ciphertext, on v12
-  // the plain password. null when no credential was written.
-  credentialFormat: z.enum(["server-encrypted", "plaintext"]).nullable(),
   // Omitted when credentials were exported — the body then only exists on disk
   // so the password cannot reach the caller or the model.
   content: z.string().optional(),
@@ -272,10 +269,6 @@ export const ExportProcessToGitResultSchema = z.object({
   variableCount: z.number().int(),
   dataSourceType: z.string(),
   credentialsOmitted: z.boolean(),
-  // Counterpart to credentialsOmitted: what the written password actually is.
-  // v11 hands out a server-bound ciphertext, v12 the plain password — the flag
-  // alone cannot tell those apart. null when no credential was written.
-  credentialFormat: z.enum(["server-encrypted", "plaintext"]).nullable(),
   hasSecurityAccess: z.boolean(),
   writtenTo: z.object({
     json: z.string().nullable(),

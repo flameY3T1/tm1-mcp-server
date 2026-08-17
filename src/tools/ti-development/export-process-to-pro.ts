@@ -6,7 +6,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeToPro } from "../../lib/pro-serializer.js";
 import { maskCode, resolveMaskSecrets } from "../../lib/mask-secrets.js";
-import { credentialFormatFor } from "../../lib/credential-format.js";
+import { supportsCredentialExport } from "../../lib/credential-format.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 
 export function registerExportProcessToPro(
@@ -43,11 +43,10 @@ export function registerExportProcessToPro(
         .optional()
         .default(false)
         .describe(
-          "Write the ODBC datasource password into the file (slot 565). Off by default. Requires writeToFile, so the credential never enters the " +
-            "inline response. Measured: on v11 the value is a ciphertext bound to one RUN of that server — it round-trips on the same instance " +
-            "until the service restarts, after which it aborts the process at connect time, and it is useless on another instance either way. " +
-            "Re-supply the password with tm1_import_pro_file's dataSourcePassword in both cases. On v12 it is PLAIN TEXT and does not expire. " +
-            "Do not commit such a file.",
+          "Write the ODBC datasource password into the file (slot 565). Off by default, and v12 ONLY — on v11 it is refused, because the " +
+            "credential v11 hands out expires with the server run and would leave a file that looks complete and fails at connect time; clone " +
+            "with tm1_copy_process instead, or deploy with tm1_import_pro_file's dataSourcePassword. On v12 the value written is the PLAIN " +
+            "password. Requires writeToFile, so it never enters the inline response. Do not commit such a file.",
         ),
     },
     async ({
@@ -61,6 +60,18 @@ export function registerExportProcessToPro(
           code: TM1ErrorCode.VALIDATION_ERROR,
           message:
             "includeDataSourcePassword requires writeToFile — the credential must go to a file, not into the inline response.",
+        });
+      }
+      // See src/lib/credential-format.ts: a v11 credential is scoped to one
+      // server run, so an exported one rots without any visible sign.
+      if (
+        includeDataSourcePassword &&
+        !supportsCredentialExport(tm1Client.version)
+      ) {
+        throw new TM1Error({
+          code: TM1ErrorCode.VALIDATION_ERROR,
+          message:
+            "includeDataSourcePassword is v12-only. On v11 the exported credential stops working when the TM1 service restarts, and the file gives no sign of it. To clone a process with its password inside this instance use tm1_copy_process; to deploy elsewhere or later, export without the password and pass dataSourcePassword to tm1_import_pro_file.",
         });
       }
       const [code, parameters, variables, dataSource] = await Promise.all([
@@ -116,9 +127,6 @@ export function registerExportProcessToPro(
               variableCount: variables.length,
               dataSourceType: dataSource.type,
               credentialsIncluded,
-              credentialFormat: credentialsIncluded
-                ? credentialFormatFor(tm1Client.version)
-                : null,
               // Written to disk only when credentials are in play — otherwise
               // the caller already has the body and it stays out of the context.
               ...(includeDataSourcePassword ? {} : { content: proContent }),

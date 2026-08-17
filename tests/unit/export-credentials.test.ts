@@ -3,10 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../src/tm1-client.js";
 import { registerExportProcessToPro } from "../../src/tools/ti-development/export-process-to-pro.js";
 import { registerExportProcessToGit } from "../../src/tools/ti-development/export-process-to-git.js";
-import {
-  credentialFormatFor,
-  isPlaintextCredential,
-} from "../../src/lib/credential-format.js";
+import { supportsCredentialExport } from "../../src/lib/credential-format.js";
 import { serializeProcessToGit } from "../../src/lib/git-process.js";
 import { serializeToPro } from "../../src/lib/pro-serializer.js";
 import { parseProFile } from "../../src/lib/pro-parser.js";
@@ -80,7 +77,8 @@ describe("credential export is opt-in", () => {
   });
 
   it("keeps the body out of the response when credentials are included", async () => {
-    const { cb, secretsAsked } = captureProExport();
+    // v12: the only version that exports a credential at all.
+    const { cb, secretsAsked } = captureProExport(12);
     // resolveLocalPath rejects unless TM1_LOCAL_FILE_ROOT is configured, so the
     // call fails at the write step — after the secret decision under test.
     await expect(
@@ -96,32 +94,34 @@ describe("credential export is opt-in", () => {
     expect(secretsAsked).toEqual([true]);
   });
 
-  it("reports no credential format when nothing was written", async () => {
-    const { cb } = captureProExport();
-    const res = await cb({ processName: "P" }, {});
-    const payload: Record<string, unknown> = JSON.parse(res.content[0].text);
-    expect(payload.credentialFormat).toBeNull();
+  it("refuses to export a credential on v11, whose value expires with the run", async () => {
+    const { cb, secretsAsked } = captureProExport(11);
+    await expect(
+      cb(
+        {
+          processName: "P",
+          includeDataSourcePassword: true,
+          writeToFile: "/tmp/p.pro",
+        },
+        {},
+      ),
+    ).rejects.toThrow(/v12-only/);
+    // Refused before the datasource is fetched, so no secret is even read.
+    expect(secretsAsked).toEqual([]);
   });
 });
 
-// `credentialsIncluded: true` means a server-bound ciphertext on v11 and the
-// password itself on v12. Callers cannot act on that difference unless the
-// response names it.
-describe("credential format is reported per version", () => {
-  it("calls the v11 value server-encrypted", () => {
-    expect(credentialFormatFor(11)).toBe("server-encrypted");
-    expect(isPlaintextCredential(11)).toBe(false);
+describe("credential export is v12-only", () => {
+  it("says no for v11", () => {
+    expect(supportsCredentialExport(11)).toBe(false);
   });
 
-  it("calls the v12 value plaintext", () => {
-    expect(credentialFormatFor(12)).toBe("plaintext");
-    expect(isPlaintextCredential(12)).toBe(true);
+  it("says yes for v12, whose value is the password itself", () => {
+    expect(supportsCredentialExport(12)).toBe(true);
   });
 });
 
-// The git layout exists to be committed, so a plain-text password there is a
-// different proposition than one in a deployment artefact.
-describe("git export gates plain-text credentials", () => {
+describe("git export refuses credentials on v11", () => {
   function captureGitExport(version: 11 | 12): ToolCb {
     const processes = {
       getCodeBlob: async () => "#region Prolog\nsVal = 'x';\n#endregion Prolog",
@@ -149,22 +149,7 @@ describe("git export gates plain-text credentials", () => {
     return cb;
   }
 
-  it("refuses on v12 until the caller acknowledges it", async () => {
-    await expect(
-      captureGitExport(12)(
-        {
-          processName: "P",
-          includeDataSourcePassword: true,
-          writeToDir: "/tmp/out",
-        },
-        {},
-      ),
-    ).rejects.toThrow(/allowPlaintextCredential/);
-  });
-
-  it("does not gate v11, whose ciphertext is bound to its source server", async () => {
-    // resolveLocalPath rejects without TM1_LOCAL_FILE_ROOT, so the call still
-    // fails — but at the write step, past the gate under test.
+  it("refuses on v11 and names the two working alternatives", async () => {
     await expect(
       captureGitExport(11)(
         {
@@ -174,16 +159,17 @@ describe("git export gates plain-text credentials", () => {
         },
         {},
       ),
-    ).rejects.toThrow(/TM1_LOCAL_FILE_ROOT/);
+    ).rejects.toThrow(/tm1_copy_process[\s\S]*dataSourcePassword/);
   });
 
-  it("lets v12 through once acknowledged", async () => {
+  it("lets v12 through, whose value is the password itself", async () => {
+    // resolveLocalPath rejects without TM1_LOCAL_FILE_ROOT, so the call still
+    // fails — but at the write step, past the gate under test.
     await expect(
       captureGitExport(12)(
         {
           processName: "P",
           includeDataSourcePassword: true,
-          allowPlaintextCredential: true,
           writeToDir: "/tmp/out",
         },
         {},
@@ -191,11 +177,10 @@ describe("git export gates plain-text credentials", () => {
     ).rejects.toThrow(/TM1_LOCAL_FILE_ROOT/);
   });
 
-  it("leaves the gate shut for exports that carry no credential", async () => {
-    const res = await captureGitExport(12)({ processName: "P" }, {});
+  it("does not stand in the way of an export without credentials", async () => {
+    const res = await captureGitExport(11)({ processName: "P" }, {});
     const payload: Record<string, unknown> = JSON.parse(res.content[0].text);
     expect(payload.credentialsOmitted).toBe(true);
-    expect(payload.credentialFormat).toBeNull();
   });
 });
 

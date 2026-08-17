@@ -1,32 +1,24 @@
 /**
- * What a datasource password exported from TM1 actually is — the answer differs
- * per major version, and a boolean "credentials included" flag cannot express
- * it. Measured 2026-08-17 against 11.8.02900.8 and a v12 database:
+ * Whether exporting a datasource password to a file is worth offering at all,
+ * which turns on what the REST API actually hands out. Measured 2026-08-17
+ * against 11.8.02900.8 and a v12 database:
  *
  * - v11 returns a ciphertext bound to one *run* of one server. Within a running
- *   instance it is stable — the same cleartext always yields the same value,
- *   across processes — but it is useless on another instance, and measured
- *   2026-08-17 it is equally useless on the same instance after a service
- *   restart: the same password produced three different values across two
- *   restarts, and a value carried across one aborts the process at connect time
- *   with "Unable to open data source". So an exported v11 credential has the
- *   lifetime of the server run it came from. Note this is NOT the encoding TM1
- *   writes into slot 565 of its own Datadir .pro files — that one is longer,
- *   not deterministic even within a run, and cannot be exchanged with this one
- *   in either direction.
+ *   instance it is stable — the same cleartext yields the same value across
+ *   processes — but it is useless on another instance, and equally useless on
+ *   the same instance after a service restart: the same password produced three
+ *   different values across two restarts, and a value carried across one aborts
+ *   the process at connect time with "Unable to open data source". Nothing
+ *   fixes that from our side, because the durable form (slot 565 of TM1's own
+ *   Datadir .pro, a longer encoding that is not even deterministic within a run)
+ *   is never exposed over REST.
  * - v12 returns the plain password, which has no such lifetime.
+ *
+ * So a v11 export can only carry a credential through a window in which
+ * tm1_copy_process would have worked anyway, and fails silently outside it —
+ * the file still looks complete. Export therefore refuses on v11 and points at
+ * tm1_copy_process (to clone now) or dataSourcePassword (to deploy later).
  */
-export type CredentialFormat = "server-encrypted" | "plaintext";
-
-export function credentialFormatFor(version: 11 | 12): CredentialFormat {
-  return version === 12 ? "plaintext" : "server-encrypted";
-}
-
-/**
- * True when an exported credential is the password itself rather than a
- * server-bound ciphertext — i.e. when writing it to disk leaks a usable secret
- * instead of an instance-local artefact.
- */
-export function isPlaintextCredential(version: 11 | 12): boolean {
-  return credentialFormatFor(version) === "plaintext";
+export function supportsCredentialExport(version: 11 | 12): boolean {
+  return version === 12;
 }

@@ -9,25 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Exported ODBC credentials now say what they are, and the git layout asks before taking a
-  plain-text one.** `credentialsIncluded: true` meant two different things depending on the server:
-  measured against 11.8.02900.8 the exported password is a ciphertext bound to that instance, while
-  a v12 database returns the password itself. Both export tools now report `credentialFormat`
-  (`"server-encrypted"` | `"plaintext"` | `null`), and because the tm1-git two-file layout exists to
-  be committed, `tm1_export_process_to_git` refuses `includeDataSourcePassword` on v12 unless
-  `allowPlaintextCredential` is also set. v11 stays ungated — its ciphertext does not decrypt
-  anywhere but on the server it came from. `tm1_export_process_to_pro` is unchanged in behaviour:
-  it is a deployment artefact, not a repository one, and already withholds the file body from the
-  response whenever credentials are written.
+- **`includeDataSourcePassword` is v12-only; on v11 both export tools now refuse it.** The
+  credential the v11 REST API hands out is scoped to one *run* of one server, not to the server.
+  Measured against 11.8.02900.8 across two service restarts: the same cleartext produced three
+  different values, and a value carried across a restart aborts the process at connect time with
+  `Unable to open data source` — on the `.pro` path and the git path alike, with the same file
+  working again once `dataSourcePassword` supplies the password. Nothing fixes that from this side,
+  because the durable form (slot 565 of TM1's own Datadir `.pro`) is never exposed over REST.
 
-- **An exported v11 ODBC password expires when the server restarts, and the tools now say so.** The
-  credential the v11 REST API hands out was documented as "bound to that server". Measured against
-  11.8.02900.8 across two service restarts, the same cleartext produced three different values, and
-  a value carried across a restart aborts the process at connect time with `Unable to open data
-  source`. It is stable only *within* one server run: inside a run every process with the same
-  password reports the same value, and export → import → execute round-trips. So the lifetime of an
-  exported v11 credential is the lifetime of the server run it came from, on the `.pro` path and the
-  git path alike; `dataSourcePassword` re-supplies it. v12 plain text has no such lifetime.
+  So on v11 the flag could only carry a credential through a window in which `tm1_copy_process`
+  would have worked anyway, and outside that window it failed with no visible sign — the exported
+  file still looks complete. It now refuses and names the two paths that do work: `tm1_copy_process`
+  to clone a process with its password inside one instance, `dataSourcePassword` to deploy anywhere
+  else or later. On v12 the exported value is the plain password, which has no such lifetime, so the
+  flag stays — still opt-in and still requiring a file target, so the credential never enters the
+  response.
 
 - **Corrected what the `.pro` tools claim about passwords.** `tm1_import_pro_file` documented that a
   password "is never read from the file", which is wrong: slot 565 *is* read from files written by

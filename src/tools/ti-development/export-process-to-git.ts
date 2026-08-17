@@ -3,10 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../tm1-client.js";
-import {
-  credentialFormatFor,
-  isPlaintextCredential,
-} from "../../lib/credential-format.js";
+import { supportsCredentialExport } from "../../lib/credential-format.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeProcessToGit } from "../../lib/git-process.js";
@@ -27,7 +24,7 @@ export function registerExportProcessToGit(
       "The .ti holds the code in TM1's native `Code` representation (#region <Tab> / #endregion, CRLF, empty tabs omitted); the .json holds the structure. Code lives outside the JSON so Git diffs stay readable.",
       "Returns both file bodies (json + ti) inline by default. Pass writeToDir to persist them to disk instead: the code is then written to files and omitted from the response to avoid duplicating it into the context window; only metadata (filenames, counts, writtenTo paths) comes back. Round-trip safe with tm1_import_process_from_git.",
       "Security: the ODBC datasource password is stripped unless includeDataSourcePassword is set (which also requires writeToDir); conn-string credential pairs (PWD=, UID=) in oDBCConnection are masked when maskSecrets is on; credentialsOmitted=true flags when a password was stripped.",
-      "On v12 the exported password is the plain password, and this layout exists to be committed — so that combination additionally requires allowPlaintextCredential. credentialFormat reports which of the two you got.",
+      "includeDataSourcePassword is v12-only: what v11 hands out expires with the server run, so exporting it would produce a file that looks complete and fails later.",
     ].join(" "),
     {
       processName: z.string().describe("Name of the TI process to export"),
@@ -50,15 +47,7 @@ export function registerExportProcessToGit(
         .optional()
         .default(false)
         .describe(
-          "Write the ODBC datasource password into the .json. Off by default. Requires writeToDir, so the credential never enters the inline response. " +
-            "Measured: on v11 the value is a ciphertext bound to one RUN of that server — it round-trips on the same instance until the service restarts, after which it aborts the process at connect time, and it is useless on another instance either way; re-supply the password with tm1_import_process_from_git's dataSourcePassword in both cases. On v12 it is PLAIN TEXT and does not expire. Do not commit such a file.",
-        ),
-      allowPlaintextCredential: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe(
-          "Acknowledge writing a plain-text password. Only consulted on v12, where the exported credential IS the password — this layout is meant to be committed, so the plain value is withheld until you say so explicitly. Ignored on v11, whose ciphertext is bound to the source server and worthless elsewhere.",
+          "Write the ODBC datasource password into the .json. Off by default, and v12 ONLY — on v11 it is refused, because the credential v11 hands out expires with the server run and would leave a .json that looks complete and fails at connect time; clone with tm1_copy_process instead, or deploy with tm1_import_process_from_git's dataSourcePassword. On v12 the value written is the PLAIN password, in a layout meant for version control — requires writeToDir, and do not commit the result.",
         ),
     },
     async ({
@@ -66,7 +55,6 @@ export function registerExportProcessToGit(
       writeToDir,
       maskSecrets,
       includeDataSourcePassword,
-      allowPlaintextCredential,
     }) => {
       if (includeDataSourcePassword && !writeToDir) {
         throw new TM1Error({
@@ -75,18 +63,16 @@ export function registerExportProcessToGit(
             "includeDataSourcePassword requires writeToDir — the credential must go to a file, not into the inline response.",
         });
       }
-      // v12 hands out the password itself, and these files exist to be
-      // committed. v11's ciphertext is instance-bound, so it does not get the
-      // same gate — see src/lib/credential-format.ts for the measurements.
+      // See src/lib/credential-format.ts: a v11 credential is scoped to one
+      // server run, so an exported one rots without any visible sign.
       if (
         includeDataSourcePassword &&
-        isPlaintextCredential(tm1Client.version) &&
-        allowPlaintextCredential !== true
+        !supportsCredentialExport(tm1Client.version)
       ) {
         throw new TM1Error({
           code: TM1ErrorCode.VALIDATION_ERROR,
           message:
-            "includeDataSourcePassword on v12 would write the plain password into a file meant for version control. Pass allowPlaintextCredential=true to accept that, or export via tm1_export_process_to_pro and re-supply the password with tm1_import_pro_file's dataSourcePassword instead.",
+            "includeDataSourcePassword is v12-only. On v11 the exported credential stops working when the TM1 service restarts, and the .json gives no sign of it. To clone a process with its password inside this instance use tm1_copy_process; to deploy elsewhere or later, export without the password and pass dataSourcePassword to tm1_import_process_from_git.",
         });
       }
       const [codeBlob, parameters, variables, dataSource, deployMeta] =
@@ -113,10 +99,6 @@ export function registerExportProcessToGit(
         },
         { includePassword: includeDataSourcePassword === true },
       );
-      const credentialWritten =
-        includeDataSourcePassword === true &&
-        !credentialsOmitted &&
-        Boolean(dataSource.password);
 
       const jsonFileName = `${processName}.json`;
       const tiFileName = `${processName}.ti`;
@@ -164,12 +146,6 @@ export function registerExportProcessToGit(
               variableCount: variables.length,
               dataSourceType: dataSource.type,
               credentialsOmitted,
-              // Non-null only when a credential really landed in the file:
-              // credentialsOmitted alone is also false for processes that never
-              // had a password (non-ODBC, or ODBC without one).
-              credentialFormat: credentialWritten
-                ? credentialFormatFor(tm1Client.version)
-                : null,
               hasSecurityAccess: deployMeta.hasSecurityAccess,
               writtenTo,
               // Echo the file bodies inline only when NOT persisting to disk. With

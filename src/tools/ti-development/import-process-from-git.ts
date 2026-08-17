@@ -52,7 +52,7 @@ export function registerImportProcessFromGit(
         .string()
         .optional()
         .describe(
-          "ODBC password to re-inject, in clear text; it is re-encrypted by the target server. Overrides whatever the .json carries. Export omits the password unless includeDataSourcePassword was set, and even then the v11 value it writes is bound to one run of the source server — measured on 11.8, it stops working after that server restarts and never worked on another instance. Ignored for non-ODBC datasources.",
+          "ODBC password to re-inject, in clear text; the target server encrypts it. Overrides whatever the .json carries. Export omits the password unless includeDataSourcePassword was set, which is possible on v12 only — so on v11 this is the only way to deploy a working ODBC process. Ignored for non-ODBC datasources.",
         ),
       preflight: z
         .boolean()

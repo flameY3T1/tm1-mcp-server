@@ -10,7 +10,7 @@ import { withToolHint } from "../error-format.js";
 export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_import_pro_file",
-    "Parse a TM1 .pro file (Tabs / Parameters / Variables / DataSource) and deploy the process in one call. Provide either filePath (absolute path on the MCP host) or content (the .pro file body as string). Modes: 'create' (fail if exists), 'update' (fail if missing), 'upsert' (default — create or update). Whether an ODBC password comes along depends on who wrote the file: from a file written by tm1_export_process_to_pro it is carried over, from TM1's own Datadir .pro it is dropped (TM1 encodes slot 565 differently there and that encoding cannot be replayed over REST) — pass dataSourcePassword to supply it in that case, or when deploying to a different instance than the file came from.",
+    "Parse a TM1 .pro file (Tabs / Parameters / Variables / DataSource) and deploy the process in one call. Provide either filePath (absolute path on the MCP host) or content (the .pro file body as string). Modes: 'create' (fail if exists), 'update' (fail if missing), 'upsert' (default — create or update). A .pro carries an ODBC password only when it came from tm1_export_process_to_pro against a v12 database, which writes it in clear; TM1's own Datadir .pro encodes slot 565 in a form that cannot be replayed over REST, and v11 exports never contain a password at all. Pass dataSourcePassword in every other case.",
     {
       filePath: z
         .string()
@@ -44,7 +44,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         .string()
         .optional()
         .describe(
-          "ODBC password to inject, in clear text; it is re-encrypted by the target server. Overrides whatever the file carries. Needed when the .pro came from TM1's own Datadir (its slot 565 encoding is ignored on import), when deploying to a different instance than the file was exported from, or when the source server has restarted since the export — measured on 11.8, a v11 ciphertext only decrypts on the source server and only within the run that produced it. Ignored for non-ODBC datasources.",
+          "ODBC password to inject, in clear text; the target server encrypts it. Overrides whatever the file carries. This is the normal way to deploy an ODBC process: a .pro from TM1's own Datadir has its slot 565 ignored (that encoding cannot be replayed over REST), and a v11 export never carries a password. Ignored for non-ODBC datasources.",
         ),
     },
     async ({
