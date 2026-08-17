@@ -26,3 +26,6 @@ CLAUDE.md
 
 # Live-run reports: real model names, server output, timings.
 .live-reports/
+
+# TM1_LOCAL_FILE_ROOT sandbox: .pro/.ti round-trip scratch, may hold credentials.
+.local-files/
