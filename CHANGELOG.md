@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Exported ODBC credentials now say what they are, and the git layout asks before taking a
+  plain-text one.** `credentialsIncluded: true` meant two different things depending on the server:
+  measured against 11.8.02900.8 the exported password is a ciphertext bound to that instance, while
+  a v12 database returns the password itself. Both export tools now report `credentialFormat`
+  (`"server-encrypted"` | `"plaintext"` | `null`), and because the tm1-git two-file layout exists to
+  be committed, `tm1_export_process_to_git` refuses `includeDataSourcePassword` on v12 unless
+  `allowPlaintextCredential` is also set. v11 stays ungated — its ciphertext does not decrypt
+  anywhere but on the server it came from. `tm1_export_process_to_pro` is unchanged in behaviour:
+  it is a deployment artefact, not a repository one, and already withholds the file body from the
+  response whenever credentials are written.
+
+- **Corrected what the `.pro` tools claim about passwords.** `tm1_import_pro_file` documented that a
+  password "is never read from the file", which is wrong: slot 565 *is* read from files written by
+  `tm1_export_process_to_pro`, and that is how a password survives an export/import round trip —
+  measured end to end against 11.8, including a negative control (same file with slot 565 removed
+  aborts on connect). What is ignored is slot 565 in TM1's *own* Datadir `.pro` files, which use a
+  different, non-deterministic encoding that cannot be replayed over REST.
+
+  `tm1_export_process_to_pro` now also states that its output is not a Datadir drop-in. TM1 does
+  load such a file at startup and rewrites it in its own dialect, but it decodes slot 565 with its
+  own scheme: an exported password becomes garbage that TM1 then persists, leaving a process that
+  looks configured and fails at runtime.
+
 - **`tm1_write_cells` writes a whole batch in three requests instead of three per cell.** Each cell
   had its own cellset, PATCH and delete — 120 requests for 40 cells, measured. TM1py (and tm1npm,
   which ports it) build one cellset over every target coordinate and PATCH the cell array once;

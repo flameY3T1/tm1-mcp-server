@@ -6,6 +6,7 @@ import type { TM1Client } from "../../tm1-client.js";
 import { resolveLocalPath } from "../local-file.js";
 import { serializeToPro } from "../../lib/pro-serializer.js";
 import { maskCode, resolveMaskSecrets } from "../../lib/mask-secrets.js";
+import { credentialFormatFor } from "../../lib/credential-format.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 
 export function registerExportProcessToPro(
@@ -19,6 +20,7 @@ export function registerExportProcessToPro(
       "Fetches code (Prolog/Metadata/Data/Epilog), parameters, variables, and datasource in parallel.",
       "Returns the .pro content inline by default; pass writeToFile to also persist to an absolute path on the MCP host.",
       "Round-trip safe with tm1_import_pro_file — useful for syncing live server state into a Git repo.",
+      "NOT a drop-in replacement for the .pro file in TM1's Datadir: the output omits TM1's BOM, its '601' version header and CRLF line endings. Measured on 11.8: TM1 does load such a file at startup and rewrites it in its own dialect, but it decodes slot 565 with its own scheme — a password written here becomes garbage that TM1 then persists, so the process looks configured and fails at runtime. Deploy via tm1_import_pro_file, not by copying into the Datadir.",
     ].join(" "),
     {
       processName: z.string().describe("Name of the TI process to export"),
@@ -72,6 +74,10 @@ export function registerExportProcessToPro(
       // must not be written into the file as if it were the credential.
       if (!includeDataSourcePassword) delete dataSource.password;
 
+      const credentialsIncluded = Boolean(
+        includeDataSourcePassword && dataSource.password,
+      );
+
       const mask = resolveMaskSecrets(maskSecrets)
         ? maskCode
         : (s: string) => s;
@@ -107,9 +113,10 @@ export function registerExportProcessToPro(
               parameterCount: parameters.length,
               variableCount: variables.length,
               dataSourceType: dataSource.type,
-              credentialsIncluded: Boolean(
-                includeDataSourcePassword && dataSource.password,
-              ),
+              credentialsIncluded,
+              credentialFormat: credentialsIncluded
+                ? credentialFormatFor(tm1Client.version)
+                : null,
               // Written to disk only when credentials are in play — otherwise
               // the caller already has the body and it stays out of the context.
               ...(includeDataSourcePassword ? {} : { content: proContent }),

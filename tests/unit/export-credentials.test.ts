@@ -2,6 +2,11 @@ import { describe, it, expect } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { TM1Client } from "../../src/tm1-client.js";
 import { registerExportProcessToPro } from "../../src/tools/ti-development/export-process-to-pro.js";
+import { registerExportProcessToGit } from "../../src/tools/ti-development/export-process-to-git.js";
+import {
+  credentialFormatFor,
+  isPlaintextCredential,
+} from "../../src/lib/credential-format.js";
 import { serializeProcessToGit } from "../../src/lib/git-process.js";
 import { serializeToPro } from "../../src/lib/pro-serializer.js";
 import { parseProFile } from "../../src/lib/pro-parser.js";
@@ -13,7 +18,10 @@ type ToolCb = (
 
 // The ODBC password is a server-bound ciphertext on v11 and plain text on v12,
 // so it only leaves the server when the caller asks for it AND names a file.
-function captureProExport(): { cb: ToolCb; secretsAsked: boolean[] } {
+function captureProExport(version: 11 | 12 = 11): {
+  cb: ToolCb;
+  secretsAsked: boolean[];
+} {
   const secretsAsked: boolean[] = [];
   const processes = {
     getCode: async () => ({
@@ -45,7 +53,10 @@ function captureProExport(): { cb: ToolCb; secretsAsked: boolean[] } {
       cb = handler;
     },
   } as unknown as McpServer;
-  registerExportProcessToPro(server, { processes } as unknown as TM1Client);
+  registerExportProcessToPro(server, {
+    processes,
+    version,
+  } as unknown as TM1Client);
   if (!cb) throw new Error("handler not registered");
   return { cb, secretsAsked };
 }
@@ -83,6 +94,108 @@ describe("credential export is opt-in", () => {
       ),
     ).rejects.toThrow();
     expect(secretsAsked).toEqual([true]);
+  });
+
+  it("reports no credential format when nothing was written", async () => {
+    const { cb } = captureProExport();
+    const res = await cb({ processName: "P" }, {});
+    const payload: Record<string, unknown> = JSON.parse(res.content[0].text);
+    expect(payload.credentialFormat).toBeNull();
+  });
+});
+
+// `credentialsIncluded: true` means a server-bound ciphertext on v11 and the
+// password itself on v12. Callers cannot act on that difference unless the
+// response names it.
+describe("credential format is reported per version", () => {
+  it("calls the v11 value server-encrypted", () => {
+    expect(credentialFormatFor(11)).toBe("server-encrypted");
+    expect(isPlaintextCredential(11)).toBe(false);
+  });
+
+  it("calls the v12 value plaintext", () => {
+    expect(credentialFormatFor(12)).toBe("plaintext");
+    expect(isPlaintextCredential(12)).toBe(true);
+  });
+});
+
+// The git layout exists to be committed, so a plain-text password there is a
+// different proposition than one in a deployment artefact.
+describe("git export gates plain-text credentials", () => {
+  function captureGitExport(version: 11 | 12): ToolCb {
+    const processes = {
+      getCodeBlob: async () => "#region Prolog\nsVal = 'x';\n#endregion Prolog",
+      getParameters: async () => [],
+      getVariables: async () => [],
+      getDataSource: async () => ({
+        type: "ODBC" as const,
+        dataSourceNameForServer: "SALES_DWH",
+        userName: "etl_reader",
+        password: "W0br6scX06nUHxVZQrQC+g==",
+      }),
+      getDeployMeta: async () => ({ hasSecurityAccess: false }),
+    };
+    let cb: ToolCb | undefined;
+    const server = {
+      tool: (_n: string, _d: string, _s: unknown, handler: ToolCb) => {
+        cb = handler;
+      },
+    } as unknown as McpServer;
+    registerExportProcessToGit(server, {
+      processes,
+      version,
+    } as unknown as TM1Client);
+    if (!cb) throw new Error("handler not registered");
+    return cb;
+  }
+
+  it("refuses on v12 until the caller acknowledges it", async () => {
+    await expect(
+      captureGitExport(12)(
+        {
+          processName: "P",
+          includeDataSourcePassword: true,
+          writeToDir: "/tmp/out",
+        },
+        {},
+      ),
+    ).rejects.toThrow(/allowPlaintextCredential/);
+  });
+
+  it("does not gate v11, whose ciphertext is bound to its source server", async () => {
+    // resolveLocalPath rejects without TM1_LOCAL_FILE_ROOT, so the call still
+    // fails — but at the write step, past the gate under test.
+    await expect(
+      captureGitExport(11)(
+        {
+          processName: "P",
+          includeDataSourcePassword: true,
+          writeToDir: "/tmp/out",
+        },
+        {},
+      ),
+    ).rejects.toThrow(/TM1_LOCAL_FILE_ROOT/);
+  });
+
+  it("lets v12 through once acknowledged", async () => {
+    await expect(
+      captureGitExport(12)(
+        {
+          processName: "P",
+          includeDataSourcePassword: true,
+          allowPlaintextCredential: true,
+          writeToDir: "/tmp/out",
+        },
+        {},
+      ),
+    ).rejects.toThrow(/TM1_LOCAL_FILE_ROOT/);
+  });
+
+  it("leaves the gate shut for exports that carry no credential", async () => {
+    const res = await captureGitExport(12)({ processName: "P" }, {});
+    const payload: Record<string, unknown> = JSON.parse(res.content[0].text);
+    expect(payload.credentialsOmitted).toBe(true);
+    expect(payload.credentialFormat).toBeNull();
   });
 });
 

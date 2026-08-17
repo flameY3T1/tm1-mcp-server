@@ -365,6 +365,7 @@ describe("OUTPUT_SCHEMA_MAP", () => {
       variableCount: 3,
       dataSourceType: "ASCII",
       credentialsOmitted: false,
+      credentialFormat: null,
       hasSecurityAccess: false,
       writtenTo: { json: null, ti: null },
       json: '{\n  "name": "Load.Sales",\n  "parameters": [],\n  "variables": [],\n  "dataSource": { "type": "ASCII" }\n}\n',

@@ -10,7 +10,7 @@ import { withToolHint } from "../error-format.js";
 export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
   server.tool(
     "tm1_import_pro_file",
-    "Parse a TM1 .pro file (Tabs / Parameters / Variables / DataSource) and deploy the process in one call. Provide either filePath (absolute path on the MCP host) or content (the .pro file body as string). Modes: 'create' (fail if exists), 'update' (fail if missing), 'upsert' (default — create or update). An ODBC datasource arrives without its password — TM1 stores that server-encrypted and it is not portable — so pass dataSourcePassword to re-supply it.",
+    "Parse a TM1 .pro file (Tabs / Parameters / Variables / DataSource) and deploy the process in one call. Provide either filePath (absolute path on the MCP host) or content (the .pro file body as string). Modes: 'create' (fail if exists), 'update' (fail if missing), 'upsert' (default — create or update). Whether an ODBC password comes along depends on who wrote the file: from a file written by tm1_export_process_to_pro it is carried over, from TM1's own Datadir .pro it is dropped (TM1 encodes slot 565 differently there and that encoding cannot be replayed over REST) — pass dataSourcePassword to supply it in that case, or when deploying to a different instance than the file came from.",
     {
       filePath: z
         .string()
@@ -44,7 +44,7 @@ export function registerImportProFile(server: McpServer, tm1Client: TM1Client) {
         .string()
         .optional()
         .describe(
-          "ODBC password to re-inject. A .pro carries the password only as a server-encrypted blob, which is not portable, so it is never read from the file. Ignored for non-ODBC datasources.",
+          "ODBC password to inject, in clear text; it is re-encrypted by the target server. Overrides whatever the file carries. Needed when the .pro came from TM1's own Datadir (its slot 565 encoding is ignored on import) or when deploying to a different instance than the file was exported from, since v11 ciphertext only decrypts on its source server. Ignored for non-ODBC datasources.",
         ),
     },
     async ({

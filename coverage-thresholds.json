@@ -13,10 +13,10 @@
     "target = informational only, never fails a build."
   ],
   "floors": {
-    "lines": 64,
-    "statements": 64,
-    "functions": 58,
-    "branches": 54
+    "lines": 66,
+    "statements": 65,
+    "functions": 60,
+    "branches": 57
   },
   "slack": 5,
   "headroomPoints": 2,
