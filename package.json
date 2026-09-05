@@ -81,7 +81,7 @@
     "pino": "^10.3.1",
     "safe-regex": "^2.1.1",
     "undici": "^7.29.0",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
