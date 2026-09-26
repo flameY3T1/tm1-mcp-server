@@ -76,12 +76,12 @@
     "ip-address": "^10.4.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.30.1",
     "dotenv": "^17.4.1",
     "pino": "^10.3.1",
     "safe-regex": "^2.1.1",
     "undici": "^7.29.0",
-    "zod": "4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
