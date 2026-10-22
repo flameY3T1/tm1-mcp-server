@@ -1,0 +1,11 @@
+# Reviewed gitleaks findings, all false positives (2026-10-22):
+# env-var names in src/config.ts and tests/unit/load-env.test.ts, and a
+# server-bound v11 ODBC ciphertext fixture in tests/unit/export-credentials.test.ts.
+98f9c0c4a3c572460ab7c68c63ed73e7603b25b6:tests/unit/export-credentials.test.ts:generic-api-key:139
+62c4156ed0a25ff90341927ca1024a4f4cf25890:src/config.ts:generic-api-key:327
+8c200885f7bfd9b5d47518832a9321a3872f789b:tests/unit/export-credentials.test.ts:generic-api-key:134
+3ad81822e7b469f2686d9adfab6f4538d985e641:tests/unit/export-credentials.test.ts:generic-api-key:94
+d74f3eeaaf0f1ee87c55b2e822f813ae7b726cd4:tests/unit/load-env.test.ts:generic-api-key:13
+tests/unit/load-env.test.ts:generic-api-key:13
+tests/unit/export-credentials.test.ts:generic-api-key:141
+tests/unit/export-credentials.test.ts:generic-api-key:214
