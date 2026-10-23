@@ -11,3 +11,8 @@
 export function escapeMdxName(s: string): string {
   return s.replace(/]/g, "]]");
 }
+
+/** Quote `s` as an MDX string literal; a `"` inside doubles to `""`. */
+export function mdxString(s: string): string {
+  return `"${s.replace(/"/g, '""')}"`;
+}

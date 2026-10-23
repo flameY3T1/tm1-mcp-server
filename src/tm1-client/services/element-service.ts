@@ -6,7 +6,7 @@
 // through CellService for the underlying MDX read and cellset PATCH.
 //
 // See docs/ARCHITECTURE.md for the layering.
-import { mapSettledWithConcurrency } from "../../lib/concurrency.js";
+import { mapWithConcurrency } from "../../lib/concurrency.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import type {
   ElementAttributeValue,
@@ -23,7 +23,7 @@ import type {
 import type { CellService } from "./cell-service.js";
 import { rethrowIfSystemic } from "./fallback.js";
 import { odataKey } from "./odata-page.js";
-import { escapeMdxName } from "../../lib/mdx.js";
+import { escapeMdxName, mdxString } from "../../lib/mdx.js";
 
 // Max in-flight per-element REST calls within a single bulkUpsert pass. Bounds
 // pressure on TM1's worker pool (mirrors the cap the feeder-audit fan-out uses)
@@ -90,6 +90,15 @@ function throwFirstFailure(
   }
   if (firstError) throw firstError;
 }
+
+/** One `searchElements` match and the field whose value contained the term. */
+export type ElementSearchHit = {
+  name: string;
+  type: string;
+  level: number;
+  matchedOn: string;
+  matchedValue: string;
+};
 
 export class ElementService {
   constructor(
@@ -636,7 +645,7 @@ export class ElementService {
     // keeps constant pressure on TM1's worker pool. Each unit returns its
     // type-change (or null); we collect them index-aligned AFTER settle so
     // typeChanges stays in stable element order regardless of completion order.
-    const pass1 = await mapSettledWithConcurrency(
+    const pass1 = await mapWithConcurrency(
       elements,
       BULK_UPSERT_CONCURRENCY,
       async (
@@ -693,13 +702,9 @@ export class ElementService {
     // Pass barrier: surface the first pass-1 failure (in element order) BEFORE
     // any consolidation write. Pass 2 references leaves via Components, so it
     // must not start until every leaf has settled — concurrency is safe within
-    // a pass but NOT across this barrier. Rejecting here preserves the prior
+    // a pass but NOT across this barrier. Awaiting pass 1 preserves the prior
     // "bulkUpsert throws if any element failed" contract.
-    const typeChanges: Array<{ name: string; from: string; to: string }> = [];
-    for (const r of pass1) {
-      if (r.status === "rejected") throw r.reason;
-      if (r.value) typeChanges.push(r.value);
-    }
+    const typeChanges = pass1.filter((c) => c !== null);
 
     // Pass 2: Set components for consolidated elements.
     // PATCH {Components:[...]} is FULL-REPLACE, not append (verified live vs
@@ -714,7 +719,7 @@ export class ElementService {
       (el) =>
         el.type === "Consolidated" && el.components && el.components.length > 0,
     );
-    const pass2 = await mapSettledWithConcurrency(
+    await mapWithConcurrency(
       consolidated,
       BULK_UPSERT_CONCURRENCY,
       async (el): Promise<void> => {
@@ -728,28 +733,19 @@ export class ElementService {
         await this.http.request<void>("PATCH", path, body);
       },
     );
-    for (const r of pass2) {
-      if (r.status === "rejected") throw r.reason;
-    }
 
     // Pass 3: the weights, for the same reason as the $batch path — TM1 takes
     // `Weight` in the Components link and ignores it, so every edge lands at 1
     // until it is PATCHed on the Edge entity. Runs after pass 2 because the
     // edge has to exist first.
-    const pass3 = await mapSettledWithConcurrency(
-      consolidated,
-      BULK_UPSERT_CONCURRENCY,
-      (el) =>
-        this.applyEdgeWeights(
-          dimensionName,
-          hierarchyName,
-          el.name,
-          el.components!,
-        ),
+    await mapWithConcurrency(consolidated, BULK_UPSERT_CONCURRENCY, (el) =>
+      this.applyEdgeWeights(
+        dimensionName,
+        hierarchyName,
+        el.name,
+        el.components!,
+      ),
     );
-    for (const r of pass3) {
-      if (r.status === "rejected") throw r.reason;
-    }
 
     return { typeChanges };
   }
@@ -794,16 +790,12 @@ export class ElementService {
     searchTerm: string,
     topN: number,
     stringAttributes: readonly string[] = [],
-  ): Promise<{
-    total: number;
-    elements: Array<{
-      name: string;
-      type: string;
-      level: number;
-      matchedOn: string;
-      matchedValue: string;
-    }>;
-  }> {
+  ): Promise<{ total: number; elements: ElementSearchHit[] }> {
+    type Member = {
+      Name: string;
+      Attributes?: Record<string, unknown>;
+      Element: { Type: string; Level: number };
+    };
     const attrs = (await this.listAttributes(dimensionName, hierarchyName))
       .filter(
         (a) =>
@@ -812,23 +804,26 @@ export class ElementService {
       )
       .map((a) => a.name);
     const term = searchTerm.toLowerCase();
-    const member = `[${escapeMdxName(dimensionName)}].[${escapeMdxName(hierarchyName)}].CurrentMember`;
-    // MDX string literals escape `"` by doubling it.
-    const lit = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    const tests = [
-      `${member}.Name`,
-      ...attrs.map((a) => `${member}.Properties(${lit(a)})`),
-    ].map((expr) => `INSTR(1, LCASE(${expr}), ${lit(term)}) > 0`);
-    const mdx = `{FILTER(TM1SUBSETALL([${escapeMdxName(dimensionName)}].[${escapeMdxName(hierarchyName)}]), ${tests.join(" OR ")})}`;
+    const hierarchy = `[${escapeMdxName(dimensionName)}].[${escapeMdxName(hierarchyName)}]`;
+    const member = `${hierarchy}.CurrentMember`;
+    // One list drives both the server-side FILTER and the client-side report
+    // of which field matched, so the two cannot drift apart.
+    const fields = [
+      { label: "Name", mdx: `${member}.Name`, read: (m: Member) => m.Name },
+      ...attrs.map((a) => ({
+        label: a,
+        mdx: `${member}.Properties(${mdxString(a)})`,
+        // Attributes carries only non-empty values.
+        read: (m: Member) => String(m.Attributes?.[a] ?? ""),
+      })),
+    ];
+    const tests = fields.map(
+      (f) => `INSTR(1, LCASE(${f.mdx}), ${mdxString(term)}) > 0`,
+    );
+    const mdx = `{FILTER(TM1SUBSETALL(${hierarchy}), ${tests.join(" OR ")})}`;
     const response = await this.http.request<{
       Cardinality: number;
-      Tuples: Array<{
-        Members: Array<{
-          Name: string;
-          Attributes?: Record<string, unknown>;
-          Element: { Type: string; Level: number };
-        }>;
-      }>;
+      Tuples: Array<{ Members: Member[] }>;
     }>(
       "POST",
       `/api/v1/ExecuteMDXSetExpression?$select=Cardinality&$expand=Tuples($top=${topN};$expand=Members($select=Name,Attributes;$expand=Element($select=Type,Level)))`,
@@ -836,25 +831,17 @@ export class ElementService {
     );
     const elements = response.Tuples.map((t) => {
       const m = t.Members[0]!;
-      const base = {
+      // The server proved some field matches. If LCASE and toLowerCase
+      // disagree (non-ASCII case folding), report the name rather than guess.
+      const hit =
+        fields.find((f) => f.read(m).toLowerCase().includes(term)) ??
+        fields[0]!;
+      return {
         name: m.Name,
         type: m.Element.Type,
         level: m.Element.Level,
-      };
-      if (m.Name.toLowerCase().includes(term)) {
-        return { ...base, matchedOn: "Name", matchedValue: m.Name };
-      }
-      // Attributes carries only non-empty values; the server already
-      // proved one of them matches.
-      const hit = attrs.find((a) =>
-        String(m.Attributes?.[a] ?? "")
-          .toLowerCase()
-          .includes(term),
-      );
-      return {
-        ...base,
-        matchedOn: hit ?? "Name",
-        matchedValue: hit ? String(m.Attributes![hit]) : m.Name,
+        matchedOn: hit.label,
+        matchedValue: hit.read(m),
       };
     });
     return { total: response.Cardinality, elements };

@@ -27,3 +27,20 @@ export async function mapSettledWithConcurrency<T, R>(
   await Promise.all(workers);
   return results;
 }
+
+/**
+ * `mapSettledWithConcurrency` for callers that need every item to succeed:
+ * resolves to the values in item order, or rejects with the first failure in
+ * item order once every call has settled.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const settled = await mapSettledWithConcurrency(items, limit, fn);
+  return settled.map((r) => {
+    if (r.status === "rejected") throw r.reason;
+    return r.value;
+  });
+}
