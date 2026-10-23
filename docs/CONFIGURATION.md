@@ -86,6 +86,11 @@ What is enforced, before any request is sent:
   keeps sandboxes per user, not per application, so a planning app or a person
   using the same account may have sandboxes of their own; the prefix keeps the
   server off them. Create, discard and delete obey the same rule.
+- Control cubes (names starting with `}`: `}CubeSecurity`, `}ElementAttributes_…`
+  and the like) are refused, even into a sandbox. TM1 accepts such a write into a
+  sandbox, and publishing the sandbox then carries it into the model: measured on
+  TM1 12, `}CubeSecurity` set to `WRITE` in a sandbox became `WRITE` in base on
+  publish, while a compare over the data cube showed no difference.
 - On a cube with the `Sandboxes` dimension (`EnableSandboxDimension=true`), a
   left-out `Sandboxes` coordinate is bound to the target sandbox, and a cell
   naming a different one (`Base` included) is refused.

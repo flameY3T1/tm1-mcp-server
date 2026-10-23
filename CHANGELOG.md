@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   starts with `TM1_SANDBOX_PREFIX` (default `mcp-`). Base data, and sandboxes that other
   applications keep under the same account, cannot be written. On a cube with the `Sandboxes`
   dimension a left-out coordinate is bound to the target sandbox and a different one is refused.
+  Control cubes (`}…`) are refused even into a sandbox, since publishing would carry a staged
+  security or attribute change into the model.
   Publishing stays `readwrite`-only.
 - **Sandbox tools:** `tm1_list_sandboxes`, `tm1_create_sandbox`, `tm1_compare_sandbox` (the cells
   that differ between base and a sandbox, matched by coordinate, so `NON EMPTY` queries compare

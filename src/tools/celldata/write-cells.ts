@@ -7,7 +7,10 @@ import { MutationResultSchema } from "../schemas/items.js";
 import { defineTool } from "../define-tool.js";
 import { memberRef } from "./member-ref.js";
 import { resolveCellAddress, sandboxPosition } from "../../lib/cell-address.js";
-import { resolveWriteSandbox } from "../../lib/sandbox-policy.js";
+import {
+  requireModelCube,
+  resolveWriteSandbox,
+} from "../../lib/sandbox-policy.js";
 
 export const registerWriteCells = defineTool({
   name: "tm1_write_cells",
@@ -16,7 +19,7 @@ export const registerWriteCells = defineTool({
     "IMPORTANT: TI processes are the standard path for data loads — use this tool only for ad-hoc writes or when explicitly requested.",
     "Leaf (N-level) coordinates only. Every coordinate is checked before anything is sent and a consolidated one aborts the whole call: writing to a C element is not how TM1 data is loaded, and whether the server would even accept it depends on the account's rights. Aggregate values come from the consolidation, not from a write.",
     "Name every cube dimension, in any order: a dimension left out would land on its default member, so the call is refused. Only Sandboxes may be left out; it is then bound to Base (or to `sandbox`) and reported as sandboxDefaulted.",
-    "With `sandbox` the write lands in that sandbox and base data is untouched. With TM1_MODE=sandbox a sandbox named with TM1_SANDBOX_PREFIX is required.",
+    "With `sandbox` the write lands in that sandbox and base data is untouched. With TM1_MODE=sandbox a sandbox named with TM1_SANDBOX_PREFIX is required, and control cubes (}…) are refused.",
     "Before: tm1_check_writable_coords to validate that target coordinates are leaf-level and addressable.",
     "Related: tm1_clear_cube for bulk wipe, tm1_get_cell_value to read back, tm1_execute_process for production data loads.",
   ],
@@ -67,6 +70,7 @@ export const registerWriteCells = defineTool({
     // Where the write lands. In sandbox mode this refuses base data and any
     // sandbox outside the prefix, before a single request goes out.
     const target = resolveWriteSandbox(tm1Client, sandbox);
+    requireModelCube(tm1Client, cubeName);
     for (const c of givenCells) {
       if (c.elements.length !== given.length) {
         throw new TM1Error({

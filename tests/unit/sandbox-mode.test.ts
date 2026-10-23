@@ -425,3 +425,33 @@ describe("compare matches cells by coordinate", () => {
     expect(diffCells(base, sand)).toEqual([]);
   });
 });
+
+describe("control cubes in sandbox mode", () => {
+  // Measured on TM1 12: }CubeSecurity written into a sandbox reached base on
+  // publish, while a compare over the data cube showed no difference.
+  const SEC = {
+    cubeName: "}CubeSecurity",
+    dimensions: ["}Cubes", "}Groups"],
+    cells: [{ elements: ["Sales", "Viewers"], value: "WRITE" }],
+    sandbox: "mcp-whatif",
+    confirm: "}CubeSecurity",
+  };
+
+  it("refuses a control-cube write even into a managed sandbox", async () => {
+    const { handler, writeCells } = writeCellsHandler(SANDBOX, [
+      "}Cubes",
+      "}Groups",
+    ]);
+    await expect(handler(SEC)).rejects.toThrow(/control cube/);
+    expect(writeCells).not.toHaveBeenCalled();
+  });
+
+  it("leaves readwrite free to write control cubes", async () => {
+    const { handler, writeCells } = writeCellsHandler(READWRITE, [
+      "}Cubes",
+      "}Groups",
+    ]);
+    await handler(SEC);
+    expect(writeCells).toHaveBeenCalledTimes(1);
+  });
+});

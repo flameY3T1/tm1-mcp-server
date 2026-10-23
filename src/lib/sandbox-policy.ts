@@ -89,6 +89,26 @@ export function resolveWriteSandbox(
   return name;
 }
 
+/**
+ * Refuse, in sandbox mode, a write to a control cube (`}CubeSecurity`,
+ * `}ElementAttributes_…`, `}ClientGroups` …). TM1 accepts such a write into a
+ * sandbox, and publishing the sandbox later carries it into the model — so an
+ * agent could stage a rights or metadata change that a review of the data
+ * cubes never shows. Measured on TM1 12: `}CubeSecurity` set to WRITE in a
+ * sandbox became WRITE in base on publish.
+ */
+export function requireModelCube(
+  ctx: SandboxPolicyContext,
+  cubeName: string,
+): void {
+  if (ctx.mode !== "sandbox" || !cubeName.startsWith("}")) return;
+  throw new TM1Error({
+    code: TM1ErrorCode.PERMISSION_DENIED,
+    message: `TM1_MODE=sandbox: "${cubeName}" is a control cube; security, attributes and other model metadata are not writable in this mode, not even into a sandbox. Nothing was sent.`,
+    hint: "Write data cubes only. Changes to control cubes need TM1_MODE=readwrite, where they are visible as what they are.",
+  });
+}
+
 /** Append TM1's `!sandbox` query parameter to a REST path, if a sandbox is set. */
 export function withSandboxParam(path: string, sandbox?: string): string {
   if (sandbox === undefined) return path;

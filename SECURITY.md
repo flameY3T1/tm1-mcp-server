@@ -42,8 +42,9 @@ instance over the TM1 REST API. Keep the following in mind before reporting:
   opt in with `TM1_MODE=readwrite`. Enabling `readwrite` against production by
   choice is not a vulnerability.
 - **`TM1_MODE=sandbox` confines cell writes to sandboxes named with
-  `TM1_SANDBOX_PREFIX`.** A write that reaches base data, or a sandbox without
-  the prefix, while the server runs in sandbox mode is in scope. The prefix is a
+  `TM1_SANDBOX_PREFIX`, and refuses control cubes.** A write that reaches base
+  data, a sandbox without the prefix, or a control cube (`}…`) while the server
+  runs in sandbox mode is in scope. The prefix is a
   naming convention: a person who names a sandbox with it by hand hands it to
   the server, and that is not a vulnerability.
 - **HTTP transport binds loopback (`127.0.0.1`) by default.** Setting
