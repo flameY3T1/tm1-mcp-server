@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { z } from "zod";
 import { stubContractCheckedFetch } from "../helpers/contract-fetch.js";
 import type pino from "pino";
 import type { FnSpy } from "../helpers/spy-types.js";
 import { TM1Client } from "../../src/tm1-client.js";
 import { SessionManager } from "../../src/session-manager.js";
 import type { TM1Config } from "../../src/config.js";
+import { registerSearchElements } from "../../src/tools/metadata/search-elements.js";
 
 const mockLogger = {
   info: vi.fn(),
@@ -197,6 +199,109 @@ describe("ElementService.searchElements", () => {
         matchedOn: "Site",
         matchedValue: "Ab Ville",
       },
+    ]);
+  });
+});
+
+describe("tm1_search_elements tool", () => {
+  type Handler = (args: Record<string, unknown>) => Promise<unknown>;
+
+  function setup(results: Record<string, { total: number; names: string[] }>) {
+    let handler: Handler | null = null;
+    let schema: Record<string, z.ZodTypeAny> = {};
+    const server = {
+      tool: (
+        _name: string,
+        _desc: string,
+        input: Record<string, z.ZodTypeAny>,
+        cb: Handler,
+      ) => {
+        schema = input;
+        handler = cb;
+      },
+    };
+    const searchElements = vi.fn(async (dim: string) => ({
+      total: results[dim].total,
+      elements: results[dim].names.map((name) => ({
+        name,
+        type: "Numeric",
+        level: 0,
+        matchedOn: "Name",
+        matchedValue: name,
+      })),
+    }));
+    const tm1 = {
+      cubes: { getDimensionNames: vi.fn(async () => Object.keys(results)) },
+      elements: { searchElements },
+    };
+    registerSearchElements(
+      server as unknown as Parameters<typeof registerSearchElements>[0],
+      tm1 as unknown as Parameters<typeof registerSearchElements>[1],
+    );
+    // Parse like the SDK does, so defaults and min(1) apply.
+    const call = (args: Record<string, unknown>) =>
+      handler!(z.object(schema).parse(args)).then(
+        (r) =>
+          JSON.parse(
+            (r as { content: Array<{ text: string }> }).content[0].text,
+          ) as {
+            dimensions: Array<{
+              dimension: string;
+              total: number;
+              truncated: boolean;
+            }>;
+          },
+      );
+    return { call, schema, searchElements };
+  }
+
+  it("rejects both or neither of cubeName and dimensionName", async () => {
+    const { call } = setup({ Region: { total: 0, names: [] } });
+    await expect(call({ searchTerm: "x" })).rejects.toThrow("exactly one");
+    await expect(
+      call({ searchTerm: "x", cubeName: "Sales", dimensionName: "Region" }),
+    ).rejects.toThrow("exactly one");
+  });
+
+  it("rejects an empty cubeName instead of searching a dimension called undefined", () => {
+    const { schema } = setup({});
+    expect(() =>
+      z.object(schema).parse({ searchTerm: "x", cubeName: "" }),
+    ).toThrow();
+  });
+
+  it("searches every cube dimension and drops the ones without hits", async () => {
+    const { call, searchElements } = setup({
+      Region: { total: 3, names: ["North", "South"] },
+      Product: { total: 0, names: [] },
+    });
+    const r = await call({ searchTerm: "o", cubeName: "Sales", topN: 2 });
+    expect(searchElements).toHaveBeenCalledTimes(2);
+    expect(r.dimensions).toEqual([
+      expect.objectContaining({
+        dimension: "Region",
+        total: 3,
+        truncated: true,
+      }),
+    ]);
+  });
+
+  it("keeps a single dimension without hits", async () => {
+    const { call, searchElements } = setup({ Region: { total: 0, names: [] } });
+    const r = await call({ searchTerm: "zz", dimensionName: "Region" });
+    expect(searchElements).toHaveBeenCalledWith(
+      "Region",
+      "Region",
+      "zz",
+      10,
+      undefined,
+    );
+    expect(r.dimensions).toEqual([
+      expect.objectContaining({
+        dimension: "Region",
+        total: 0,
+        truncated: false,
+      }),
     ]);
   });
 });

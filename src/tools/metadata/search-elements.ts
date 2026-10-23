@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
-import { mapSettledWithConcurrency } from "../../lib/concurrency.js";
+import { mapWithConcurrency } from "../../lib/concurrency.js";
+import type { ElementSearchHit } from "../../tm1-client/services/element-service.js";
 import {
   FORMAT_SCHEMA,
   payloadResponse,
@@ -30,12 +31,14 @@ export const registerSearchElements = defineTool({
       .describe("Text to look for, case-insensitive substring."),
     cubeName: z
       .string()
+      .min(1)
       .optional()
       .describe(
         "Search all dimensions of this cube. Give cubeName or dimensionName.",
       ),
     dimensionName: z
       .string()
+      .min(1)
       .optional()
       .describe("Search only this dimension. Give cubeName or dimensionName."),
     hierarchyName: z
@@ -72,50 +75,48 @@ export const registerSearchElements = defineTool({
     },
     tm1Client,
   ) => {
-    if ((cubeName === undefined) === (dimensionName === undefined)) {
+    let targets: ReadonlyArray<readonly [string, string]>;
+    if (cubeName !== undefined && dimensionName === undefined) {
+      targets = (await tm1Client.cubes.getDimensionNames(cubeName)).map(
+        (d) => [d, d] as const,
+      );
+    } else if (dimensionName !== undefined && cubeName === undefined) {
+      targets = [[dimensionName, hierarchyName ?? dimensionName]];
+    } else {
       throw new TM1Error({
         code: TM1ErrorCode.VALIDATION_ERROR,
         message: "Provide exactly one of cubeName or dimensionName",
       });
     }
-    const targets = cubeName
-      ? (await tm1Client.cubes.getDimensionNames(cubeName)).map(
-          (d) => [d, d] as const,
-        )
-      : [[dimensionName!, hierarchyName ?? dimensionName!] as const];
-    const settled = await mapSettledWithConcurrency(targets, 4, ([dim, hier]) =>
-      tm1Client.elements.searchElements(
-        dim,
-        hier,
-        searchTerm,
-        topN,
-        attributes,
-      ),
+    const dimensions = await mapWithConcurrency(
+      targets,
+      4,
+      async ([dimension, hierarchy]) => {
+        const { total, elements } = await tm1Client.elements.searchElements(
+          dimension,
+          hierarchy,
+          searchTerm,
+          topN,
+          attributes,
+        );
+        return {
+          dimension,
+          hierarchy,
+          total,
+          truncated: total > elements.length,
+          elements,
+        };
+      },
     );
-    const dimensions = settled.map((r, i) => {
-      if (r.status === "rejected") throw r.reason;
-      const [dimension, hierarchy] = targets[i]!;
-      return {
-        dimension,
-        hierarchy,
-        total: r.value.total,
-        truncated: r.value.total > r.value.elements.length,
-        elements: r.value.elements,
-      };
-    });
     // Cube-wide, a dimension without hits only costs tokens.
     const result = {
       searchTerm,
-      dimensions: cubeName ? dimensions.filter((d) => d.total > 0) : dimensions,
+      dimensions:
+        cubeName !== undefined
+          ? dimensions.filter((d) => d.total > 0)
+          : dimensions,
     };
-    type Row = {
-      dimension: string;
-      name: string;
-      type: string;
-      level: number;
-      matchedOn: string;
-      matchedValue: string;
-    };
+    type Row = ElementSearchHit & { dimension: string };
     const columns = columnsOf<Row>([
       "dimension",
       "name",

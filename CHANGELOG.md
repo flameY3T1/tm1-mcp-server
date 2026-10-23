@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`sandbox` argument** on `tm1_write_cells`, `tm1_execute_mdx` and `tm1_get_cell_value`: every
   request of the call carries TM1's `!sandbox` parameter, including the cellset delete.
 
+### Fixed
+
+- **`tm1_search_elements`:** an empty `cubeName` or `dimensionName` is now rejected as invalid input.
+  Before, `cubeName: ""` slipped past the "exactly one of" check and searched a dimension named
+  `undefined`, which failed with a misleading not-found error.
+
 ## [6.1.0] - 2026-10-15
 
 ### Added
