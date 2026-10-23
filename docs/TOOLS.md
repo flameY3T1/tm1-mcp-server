@@ -12,14 +12,16 @@ the model sees. Working JSON payloads for the main flows are in
 Two things the raw list does not show:
 
 - **No single server exposes all of them.** `TM1_MODE=readonly` (the default)
-  registers read tools only. Version also gates a few: `tm1_list_threads`,
+  registers read tools only; `TM1_MODE=sandbox` adds `tm1_write_cells` and the
+  sandbox tools except `tm1_publish_sandbox`, writing only into sandboxes named
+  with `TM1_SANDBOX_PREFIX`. Version also gates a few: `tm1_list_threads`,
   `tm1_cancel_thread`, `tm1_save_data`, `tm1_unload_cube`, `tm1_get_message_log`,
   `tm1_get_audit_log` and `tm1_get_transaction_log` are v11-only, `tm1_list_jobs`
   and `tm1_cancel_job` are v12-only.
-- **Seventeen tools require a `confirm` argument** that repeats the target name
+- **Twenty tools require a `confirm` argument** that repeats the target name
   verbatim — every `delete_*` and `clear_*`, plus `tm1_execute_process`,
-  `tm1_execute_chore`, `tm1_write_cells`, `tm1_set_cube_rules` and
-  `tm1_upload_file`. It is misuse protection against a mis-fired call, not
+  `tm1_execute_chore`, `tm1_write_cells`, `tm1_set_cube_rules`,
+  `tm1_upload_file`, `tm1_discard_sandbox` and `tm1_publish_sandbox`. It is misuse protection against a mis-fired call, not
   access control.
 
 ## Categories
@@ -36,6 +38,7 @@ Two things the raw list does not show:
 | `scheduling`           | chore CRUD, execute now, activate/deactivate                                                                                                                                                      |
 | `security`             | client and group CRUD, group assignment                                                                                                                                                           |
 | `operations`           | server info and state, message / transaction / audit logs, error logs, threads (v11) or jobs (v12), sessions, save data (v11), cube stats                                                         |
+| `sandboxes`            | list, create, compare with base, discard, delete and publish sandboxes; with `TM1_MODE=sandbox` the only place writes may land                                                                    |
 | `fileops`              | list, search, read, upload and delete server-side files                                                                                                                                           |
 | `analysis`             | process callgraph (tree, summary mode, global fan-in/fan-out ranking), object usage, chore graph, data-flow trace, naming / complexity / feeder audits, v12-readiness scan, orphan dimensions     |
 
@@ -48,7 +51,7 @@ datasource (562-589).
 
 <!-- TOOLS-AUTOGEN:START -->
 
-## Tools (114)
+## Tools (120)
 
 ### analysis (10)
 
@@ -141,6 +144,15 @@ datasource (562-589).
 - `tm1_list_sessions` — List active sessions on the TM1 server with their associated user and threads
 - `tm1_list_threads` — List active threads on the TM1 server (running processes, chores, MDX queries, etc.)
 - `tm1_save_data` — Persist in-memory cube data to disk: SaveDataAll (all cubes) or CubeSaveData when `cube` is given
+
+### sandboxes (6)
+
+- `tm1_compare_sandbox` — Answer 'what has this sandbox changed?': run the same MDX on base data and in the sandbox and list the cells that differ (base, sandbox, change)
+- `tm1_create_sandbox` — Create a sandbox: a private copy-on-write layer over base data for what-if writes
+- `tm1_delete_sandbox` — Delete a sandbox and every change in it
+- `tm1_discard_sandbox` — Throw away every change in a sandbox but keep the sandbox itself
+- `tm1_list_sandboxes` — List the signed-in user's sandboxes with their state (active, loaded, queued)
+- `tm1_publish_sandbox` — Publish a sandbox: merge its changes into base data
 
 ### scheduling (5)
 

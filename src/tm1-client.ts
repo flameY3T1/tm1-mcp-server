@@ -20,6 +20,7 @@ import { SecurityService } from "./tm1-client/services/security-service.js";
 import { ServerService } from "./tm1-client/services/server-service.js";
 import { MonitoringService } from "./tm1-client/services/monitoring-service.js";
 import { FileService } from "./tm1-client/services/file-service.js";
+import { SandboxService } from "./tm1-client/services/sandbox-service.js";
 import { registerCallgraphCacheInvalidation } from "./lib/callgraph/tm1-adapter.js";
 
 export class TM1Client {
@@ -52,6 +53,7 @@ export class TM1Client {
   readonly server: ServerService;
   readonly monitoring: MonitoringService;
   readonly files: FileService;
+  readonly sandboxes: SandboxService;
 
   constructor(
     config: TM1Config,
@@ -96,11 +98,22 @@ export class TM1Client {
     this.server = new ServerService(this.http);
     this.monitoring = new MonitoringService(this.http);
     this.files = new FileService(this.http);
+    this.sandboxes = new SandboxService(this.http);
   }
 
   /** The configured TM1 major version (11 or 12). Fixed for this connection. */
   get version(): 11 | 12 {
     return this.config.version;
+  }
+
+  /** TM1_MODE. Tools that write consult it through ./lib/sandbox-policy.ts. */
+  get mode(): TM1Config["mode"] {
+    return this.config.mode;
+  }
+
+  /** TM1_SANDBOX_PREFIX: the sandboxes this server manages in sandbox mode. */
+  get sandboxPrefix(): string {
+    return this.config.sandboxPrefix;
   }
 
   /**

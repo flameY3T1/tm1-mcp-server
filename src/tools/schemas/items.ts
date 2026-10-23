@@ -20,3 +20,4 @@ export * from "./items-security.js";
 export * from "./items-monitoring.js";
 export * from "./items-fileops.js";
 export * from "./items-analysis.js";
+export * from "./items-sandboxes.js";

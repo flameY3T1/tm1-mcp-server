@@ -68,6 +68,9 @@ const CONFIRM_REQUIRED = [
   "tm1_write_cells",
   "tm1_set_cube_rules",
   "tm1_upload_file",
+  "tm1_discard_sandbox",
+  "tm1_delete_sandbox",
+  "tm1_publish_sandbox",
 ];
 
 describe("confirmation-guard coverage", () => {

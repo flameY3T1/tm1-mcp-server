@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CellValueSchema } from "../schemas/items.js";
 import { READ_ONLY } from "../annotations.js";
 import { defineTool } from "../define-tool.js";
+import { cleanSandboxName } from "../../lib/sandbox-policy.js";
 export const registerGetCellValue = defineTool({
   name: "tm1_get_cell_value",
   description: [
@@ -18,11 +19,19 @@ export const registerGetCellValue = defineTool({
     elements: z
       .array(z.string())
       .describe(
-        "One element per cube dimension, in cube order. Sandboxes may be left out (bound to Base).",
+        "One element per cube dimension, in cube order. Sandboxes may be left out (bound to Base, or to `sandbox`).",
       ),
+    sandbox: z
+      .string()
+      .optional()
+      .describe("Read from this sandbox instead of base data"),
   },
-  handler: async ({ cubeName, elements }, tm1Client) => {
-    const value = await tm1Client.cells.getValue(cubeName, elements);
+  handler: async ({ cubeName, elements, sandbox }, tm1Client) => {
+    const value = await tm1Client.cells.getValue(
+      cubeName,
+      elements,
+      cleanSandboxName(sandbox),
+    );
     return {
       content: [{ type: "text" as const, text: JSON.stringify({ value }) }],
     };

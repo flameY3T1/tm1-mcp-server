@@ -63,6 +63,13 @@ export interface ToolSpec<I extends ZodRawShape> {
    */
   enabled?: (tm1Client: TM1Client) => boolean;
   /**
+   * Set on a writing tool that confines itself to a sandbox when the server
+   * runs with TM1_MODE=sandbox (the handler enforces it through
+   * ../lib/sandbox-policy.ts). Only such tools, besides the read-only ones,
+   * are registered in sandbox mode; every other writing tool is left out.
+   */
+  sandboxScoped?: true;
+  /**
    * Handler. Receives the parsed args, the shared TM1 client, and the SDK's
    * per-call extra (abort signal, request metadata).
    */
@@ -77,6 +84,8 @@ export interface ToolSpec<I extends ZodRawShape> {
 export interface ResolvedSpec {
   name: string;
   annotations: Tm1ToolAnnotations;
+  /** See ToolSpec.sandboxScoped. */
+  sandboxScoped?: true;
   /** Already widened — hand straight to the SDK. */
   outputSchema?: ZodRawShape | ZodTypeAny;
 }
@@ -128,6 +137,7 @@ export function defineTool<I extends ZodRawShape>(
   SPECS.set(spec.name, {
     name: spec.name,
     annotations: spec.annotations,
+    ...(spec.sandboxScoped ? { sandboxScoped: true as const } : {}),
     // Built conditionally: exactOptionalPropertyTypes rejects an explicit
     // `outputSchema: undefined` for an optional property.
     ...(outputSchema === undefined ? {} : { outputSchema }),

@@ -138,6 +138,11 @@ async function main(): Promise<void> {
       "TM1_MODE=readonly — write and destructive tools will not be registered",
     );
   }
+  if (config.mode === "sandbox") {
+    logger.info(
+      `TM1_MODE=sandbox — writes go only into sandboxes named "${config.sandboxPrefix}…"; base data is read-only`,
+    );
+  }
 
   // Branch on transport. stdio is the default for local MCP-client setups
   // (Claude Code, Claude Desktop) and gets one long-lived server. http
