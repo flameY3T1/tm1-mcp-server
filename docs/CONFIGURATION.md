@@ -62,6 +62,47 @@ has optional top-level fields, because it must accept both shapes and MCP output
 schemas cannot express a union. Responses are still validated strictly — the
 server picks the matching strict shape per response before answering.
 
+## Sandbox mode — `TM1_MODE=sandbox`
+
+`readonly` lets an agent look; `readwrite` lets it change anything the TM1
+account can. `sandbox` sits between them: the agent may write data, but only
+into a TM1 sandbox, so a proposed change can be reviewed before it reaches base
+data.
+
+```env
+TM1_MODE=sandbox
+# TM1_SANDBOX_PREFIX=mcp-   # default
+```
+
+What is registered: every read-only tool, plus the writing tools whose spec is
+`sandboxScoped` — `tm1_write_cells`, `tm1_create_sandbox`,
+`tm1_discard_sandbox` and `tm1_delete_sandbox`. Every other writing tool is
+left out, `tm1_publish_sandbox` included.
+
+What is enforced, before any request is sent:
+
+- `tm1_write_cells` must name a `sandbox`; a write to base data is refused.
+- The sandbox must start with `TM1_SANDBOX_PREFIX` (case-insensitive). TM1
+  keeps sandboxes per user, not per application, so a planning app or a person
+  using the same account may have sandboxes of their own; the prefix keeps the
+  server off them. Create, discard and delete obey the same rule.
+- On a cube with the `Sandboxes` dimension (`EnableSandboxDimension=true`), a
+  left-out `Sandboxes` coordinate is bound to the target sandbox, and a cell
+  naming a different one (`Base` included) is refused.
+
+The typical round trip: `tm1_create_sandbox` → `tm1_write_cells` with
+`sandbox` → `tm1_compare_sandbox` (lists the cells that differ from base, with
+the change) → a person decides, and either publishes with a `readwrite` server
+(`tm1_publish_sandbox`) or throws it away (`tm1_discard_sandbox`,
+`tm1_delete_sandbox`).
+
+Reads can look inside a sandbox in every mode: `tm1_execute_mdx` and
+`tm1_get_cell_value` take an optional `sandbox`.
+
+The prefix is a naming convention, not ownership. Someone who creates
+`mcp-something` by hand hands it to the server. That is the price of staying
+stateless; there is no registry to keep in step between processes.
+
 ## Secrets — `TM1_ALLOW_UNMASKED_SECRETS`
 
 Credential masking is on by default everywhere it applies. Several tools take a
