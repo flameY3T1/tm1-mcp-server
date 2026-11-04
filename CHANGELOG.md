@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Before, `cubeName: ""` slipped past the "exactly one of" check and searched a dimension named
   `undefined`, which failed with a misleading not-found error.
 
+### Security
+
+- `undici` raised to 8.12.3. Among the fixed advisories is GHSA-2m5v-pch6-74hx, a TLS certificate
+  validation bypass through dropped `tls` options in `Agent`; the TM1 dispatcher builds exactly such
+  an `Agent`.
+- `@modelcontextprotocol/sdk` raised to 1.32.2 (GHSA-22jm-h49p-29qw, GHSA-6prh-2h8m-c8cw,
+  GHSA-46jr-4wx8-v453, GHSA-rvq5-wwqv-78pq) and `zod` to 4.6.7 (memory exhaustion on oversized
+  constrained collections). Transitive dependencies of the HTTP transport raised as well:
+  `body-parser` 2.4.0, `qs` 6.17.1, `hono` 4.13.16, `@hono/node-server` 2.1.6, `fast-uri` 4.2.3,
+  `ip-address` 10.7.6. `npm audit --omit=dev` reports no vulnerabilities.
+
 ## [6.1.0] - 2026-10-15
 
 ### Added
