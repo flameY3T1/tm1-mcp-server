@@ -6,11 +6,12 @@
 // the tool surface, not unit mocks.
 //
 // Opt-in: requires TM1_BASE_URL + TM1_USER in the environment (loaded from
-// .env via dotenv). When absent, LIVE_ENABLED is false and suites skip.
+// .env only when TM1_BASE_URL is unset, see load-env.ts). When absent,
+// LIVE_ENABLED is false and suites skip.
 //
 // Everything this harness creates lives under the SANDBOX prefix so a stray
 // run can never touch real model objects, and sweepSandbox() removes leftovers.
-import "dotenv/config";
+import "./load-env.js";
 import { z, type ZodRawShape } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadConfig, type TM1Config } from "../../src/config.js";
