@@ -148,7 +148,7 @@ describe.skipIf(!LIVE_ENABLED)("live: ignored datasource columns", () => {
     const exported = await h.ok("tm1_export_process_to_git", {
       processName: SRC,
     });
-    expect(JSON.parse(exported.json.json).variablesUIData).toEqual(UI_DATA);
+    expect(JSON.parse(exported.json.json).VariablesUIData).toEqual(UI_DATA);
 
     await h.ok("tm1_import_process_from_git", {
       jsonContent: exported.json.json,

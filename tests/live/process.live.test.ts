@@ -256,8 +256,8 @@ describe.skipIf(!LIVE_ENABLED)("live: process (TI development)", () => {
       // 3. Retarget the exported JSON to a second process name and import
       // fresh — the canonical git-roundtrip path.
       const retargeted = (exp1.json.json as string).replace(
-        `"name": "${PROC_GIT_SRC}"`,
-        `"name": "${PROC_GIT_DST}"`,
+        `"Name": "${PROC_GIT_SRC}"`,
+        `"Name": "${PROC_GIT_DST}"`,
       );
       const imp = await h.ok("tm1_import_process_from_git", {
         jsonContent: retargeted,
