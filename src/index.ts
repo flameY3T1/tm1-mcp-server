@@ -49,9 +49,8 @@ export interface BuiltMcpServer {
    * this: the registry holds its listener on an emitter the server knows
    * nothing about, so closing the server leaves it subscribed forever.
    *
-   * The stateless HTTP transport builds one server per request, so skipping
-   * this leaks a listener (and the whole server object graph it closes over)
-   * on every single call. Must be invoked by every transport teardown path.
+   * Only the stdio build has a registry; for the stateless HTTP build this is
+   * a no-op. Must still be invoked by every transport teardown path.
    */
   dispose: () => void;
 }
@@ -61,6 +60,9 @@ function buildMcpServer(
   config: TM1Config,
   logger: pino.Logger,
 ): BuiltMcpServer {
+  // Stateless HTTP drops the server when the response closes, so a subscription
+  // could never be notified. Only stdio advertises and accepts subscriptions.
+  const pushCapable = config.transport === "stdio";
   const server = new McpServer(
     {
       name: NAME,
@@ -69,7 +71,7 @@ function buildMcpServer(
     {
       capabilities: {
         tools: { listChanged: true },
-        resources: { listChanged: true, subscribe: true },
+        resources: { listChanged: true, subscribe: pushCapable },
         prompts: { listChanged: true },
         logging: {},
       },
@@ -95,8 +97,10 @@ function buildMcpServer(
 
   // R2-05: install subscribe/unsubscribe handlers and bridge HTTP-layer mutation
   // events to notifications/resources/updated for subscribers of tm1://server/state.
-  const subscriptions = new SubscriptionRegistry(server, logger);
-  subscriptions.install();
+  const subscriptions = pushCapable
+    ? new SubscriptionRegistry(server, logger)
+    : undefined;
+  subscriptions?.install();
 
   // Register MCP Prompts (parameterised workflow templates surfaced as slash-commands).
   registerAllPrompts(server);
@@ -105,7 +109,7 @@ function buildMcpServer(
   return {
     server,
     dispose: () => {
-      subscriptions.dispose();
+      subscriptions?.dispose();
     },
   };
 }

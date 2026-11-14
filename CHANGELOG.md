@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request that timed out, lost its connection or got a 5xx answered with "failed at runtime … check
   syntax before re-running" while the process could still be executing. The hint now says the
   outcome is unknown and points at `tm1_list_threads` / `tm1_list_jobs`.
+- **The HTTP transport no longer advertises resource subscriptions.** It is stateless, so a
+  `resources/subscribe` call was acknowledged and then dropped with the request. HTTP now reports
+  `subscribe: false` and answers the call with "Method not found"; stdio is unchanged.
 - **`tm1_search_elements`:** an empty `cubeName` or `dimensionName` is now rejected as invalid input.
   Before, `cubeName: ""` slipped past the "exactly one of" check and searched a dimension named
   `undefined`, which failed with a misleading not-found error.

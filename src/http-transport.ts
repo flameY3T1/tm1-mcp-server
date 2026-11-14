@@ -18,8 +18,9 @@ import type { TM1Config } from "./config.js";
 // This is cheap: registration is pure in-memory wiring with no I/O, and the shared
 // TM1 client (captured by the buildServer closure) is not rebuilt.
 //
-// Consequence: there is no standing server->client stream, so subscribe/logging
-// notifications are not delivered over HTTP. That is acceptable for the intended
+// Consequence: there is no standing server->client stream, so logging
+// notifications are not delivered over HTTP, and the HTTP build does not offer
+// resource subscriptions at all (index.ts). That is acceptable for the intended
 // deployment (one process per TM1 identity; stdio remains the push-capable default).
 //
 // Per MCP best practices: bind 127.0.0.1 by default and enable DNS-rebinding
