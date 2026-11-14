@@ -17,18 +17,35 @@ interface Call {
   body?: unknown;
 }
 
-function makeService(opts: { failPatch?: (body: unknown) => boolean } = {}) {
+// What TM1 11.8 answers to a bulk PATCH holding a consolidated cell (measured
+// 2026-11-14): HTTP 400, and nothing in the chunk is written.
+const refused = () =>
+  new TM1Error({
+    code: TM1ErrorCode.TM1_ERROR,
+    message: "CubeCellWriteStatusElementIsConsolidated",
+    httpStatus: 400,
+  });
+
+function makeService(
+  opts: {
+    failPatch?: (body: unknown) => boolean;
+    patchError?: () => TM1Error;
+    /** Error for the n-th ExecuteMDX (0-based), if any. */
+    mdxError?: (n: number) => TM1Error | undefined;
+  } = {},
+) {
   const calls: Call[] = [];
   let cellsetSeq = 0;
   const http = contractCheckedHttp({
     request: vi.fn(async (method: string, path: string, body?: unknown) => {
       calls.push({ method, path, body });
-      if (path === "/api/v1/ExecuteMDX") return { ID: `cs${cellsetSeq++}` };
+      if (path === "/api/v1/ExecuteMDX") {
+        const err = opts.mdxError?.(cellsetSeq);
+        if (err) throw err;
+        return { ID: `cs${cellsetSeq++}` };
+      }
       if (method === "PATCH" && opts.failPatch?.(body)) {
-        throw new TM1Error({
-          code: TM1ErrorCode.TM1_ERROR,
-          message: "CubeCellWriteStatusElementIsConsolidated",
-        });
+        throw (opts.patchError ?? refused)();
       }
       return undefined;
     }),
@@ -150,12 +167,7 @@ describe("CellService.writeCells — bulk cellset", () => {
           await new Promise((r) => setTimeout(r, 1));
           inFlight--;
           if (path === "/api/v1/ExecuteMDX") return { ID: "cs" };
-          if (method === "PATCH" && failBulk(body)) {
-            throw new TM1Error({
-              code: TM1ErrorCode.TM1_ERROR,
-              message: "CubeCellWriteStatusElementIsConsolidated",
-            });
-          }
+          if (method === "PATCH" && failBulk(body)) throw refused();
           return undefined;
         }),
       } as unknown as TM1HttpClient);
@@ -186,6 +198,107 @@ describe("CellService.writeCells — bulk cellset", () => {
       await expect(
         svc.writeCells("Sales", ["Product", "Measure"], [cell("P1", 1)]),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when the bulk outcome is unknown", () => {
+    // The server never said no: the chunk may be committed or still running.
+    // Re-sending it cell by cell would replay a write the HTTP layer refuses
+    // to retry (reproduced live: 3 PATCHes for 2 cells, call returned OK).
+    const unknown: Array<[string, () => TM1Error]> = [
+      [
+        "a lost connection",
+        () =>
+          new TM1Error({
+            code: TM1ErrorCode.CONNECTION_FAILED,
+            message: "fetch failed",
+          }),
+      ],
+      [
+        "a timeout",
+        () =>
+          new TM1Error({
+            code: TM1ErrorCode.LOCK_TIMEOUT,
+            message: "timed out after 30000ms",
+          }),
+      ],
+      [
+        "a 500",
+        () =>
+          new TM1Error({
+            code: TM1ErrorCode.TM1_ERROR,
+            message: "Internal Server Error",
+            httpStatus: 500,
+          }),
+      ],
+    ];
+
+    it.each(unknown)("does not replay the chunk after %s", async (_n, mk) => {
+      const { svc, calls } = makeService({
+        failPatch: (b) => Array.isArray(b),
+        patchError: mk,
+      });
+      let caught: unknown;
+      try {
+        await svc.writeCells(
+          "Sales",
+          ["Product", "Measure"],
+          [cell("P1", 1), cell("P2", 2)],
+        );
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(1);
+      expect(caught).toBeInstanceOf(TM1Error);
+      const err = caught as TM1Error;
+      expect(err.code).toBe(mk().code);
+      expect(err.message).toMatch(/outcome unknown/);
+      expect(JSON.parse(err.details ?? "{}")).toEqual({
+        written: 0,
+        unknown: { fromIndex: 0, toIndex: 1 },
+        notAttempted: 0,
+      });
+      // The cellset is still released.
+      expect(calls.at(-1)?.method).toBe("DELETE");
+    });
+  });
+
+  describe("when a later chunk cannot be built", () => {
+    const cells501 = Array.from({ length: 501 }, (_, i) => cell(`P${i}`, i));
+    const noMember = () =>
+      new TM1Error({
+        code: TM1ErrorCode.TM1_ERROR,
+        message: '"nope" : member not found (rte 81)',
+        httpStatus: 400,
+      });
+
+    it("reports the chunks that are already committed", async () => {
+      // Reproduced live: 500 cells committed, the error said nothing of them.
+      const { svc } = makeService({
+        mdxError: (n) => (n === 1 ? noMember() : undefined),
+      });
+      let caught: unknown;
+      try {
+        await svc.writeCells("Sales", ["Product", "Measure"], cells501);
+      } catch (e) {
+        caught = e;
+      }
+      const err = caught as TM1Error;
+      expect(err.message).toMatch(/partially applied/);
+      expect(err.message).toMatch(/500 written/);
+      expect(err.message).toContain("member not found");
+      const details = JSON.parse(err.details ?? "{}");
+      expect(details.written).toBe(500);
+      expect(details.failed).toEqual([]);
+      expect(details.notAttempted).toBe(1);
+    });
+
+    it("passes the server's error through when nothing was written yet", async () => {
+      const { svc } = makeService({ mdxError: () => noMember() });
+      await expect(
+        svc.writeCells("Sales", ["Product", "Measure"], cells501),
+      ).rejects.toThrow(/^"nope" : member not found \(rte 81\)$/);
     });
   });
 });

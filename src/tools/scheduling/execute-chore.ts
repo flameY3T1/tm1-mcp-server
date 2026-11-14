@@ -3,6 +3,7 @@ import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 import { DESTRUCTIVE } from "../annotations.js";
 import { ChoreResultSchema } from "../schemas/items.js";
 import { defineTool } from "../define-tool.js";
+import { isOutcomeUnknown, unknownOutcomeHint } from "../error-format.js";
 
 export const registerExecuteChore = defineTool({
   name: "tm1_execute_chore",
@@ -33,10 +34,16 @@ export const registerExecuteChore = defineTool({
     // Runs every chained process; undoing the call does not undo the writes.
     // Guards against accidental invocation — not a security control.
     requireConfirm(confirm, choreName, "chore");
-    const result = await tm1Client.chores.execute(choreName, {
-      signal: extra?.signal,
-      ...(timeoutMs ? { timeoutMs } : {}),
-    });
+    const result = await tm1Client.chores
+      .execute(choreName, {
+        signal: extra?.signal,
+        ...(timeoutMs ? { timeoutMs } : {}),
+      })
+      .catch((err: unknown) => {
+        if (isOutcomeUnknown(err))
+          err.hintOverride = unknownOutcomeHint(tm1Client.version, "chore");
+        throw err;
+      });
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result) }],
       // Same rule as tm1_execute_process: a chore that ran and reported failure

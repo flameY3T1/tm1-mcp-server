@@ -155,4 +155,45 @@ describe("tm1_execute_process abort handling (M2)", () => {
     expect(caught).toBeInstanceOf(TM1Error);
     expect((caught as TM1Error).hint).toContain("tm1_diagnose_process_error");
   });
+
+  it.each([
+    ["LOCK_TIMEOUT", undefined],
+    ["CONNECTION_FAILED", undefined],
+    ["TM1_ERROR", 502],
+  ] as const)(
+    "does not call a %s a runtime failure (F7)",
+    async (code, httpStatus) => {
+      // Reproduced live: a 1 s timeout on a 4 s process answered "failed at
+      // runtime ... check syntax before re-running" while the TI was running.
+      const cb = captureHandler(async () => {
+        throw new TM1Error({ code, message: "no answer", httpStatus });
+      });
+      let caught: unknown;
+      try {
+        await cb({ processName: "Long.Process", confirm: "Long.Process" }, {});
+      } catch (e) {
+        caught = e;
+      }
+      const err = caught as TM1Error;
+      expect(err.code).toBe(code);
+      expect(err.hint).toContain("may or may not have started");
+      expect(err.hint).toContain("tm1_list_threads");
+      expect(err.hint).not.toContain("failed at runtime");
+    },
+  );
+
+  it("keeps the runtime hint when TM1 answered with an error", async () => {
+    const cb = captureHandler(async () => {
+      throw new TM1Error({
+        code: "TM1_ERROR",
+        message: "bad parameter",
+        httpStatus: 400,
+      });
+    });
+    await expect(
+      cb({ processName: "Bad.Process", confirm: "Bad.Process" }, {}),
+    ).rejects.toMatchObject({
+      hint: expect.stringContaining("tm1_diagnose_process_error"),
+    });
+  });
 });

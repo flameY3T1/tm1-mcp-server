@@ -154,4 +154,27 @@ export async function withToolHint<T>(p: Promise<T>, hint: string): Promise<T> {
   }
 }
 
+// True when TM1 never said whether it ran the call: no answer at all (timeout,
+// lost or refused connection) or a 5xx. Deliberately narrow — an error raised
+// before anything was sent (validation, confirm) has neither mark.
+export function isOutcomeUnknown(err: unknown): err is TM1Error {
+  if (!(err instanceof TM1Error)) return false;
+  if (err.httpStatus !== undefined) return err.httpStatus >= 500;
+  return (
+    err.code === TM1ErrorCode.LOCK_TIMEOUT ||
+    err.code === TM1ErrorCode.CONNECTION_FAILED
+  );
+}
+
+// Recovery hint for an execution whose outcome is unknown. v11 exposes server
+// threads, v12 jobs.
+export function unknownOutcomeHint(
+  version: 11 | 12,
+  what: "process" | "chore",
+): string {
+  const monitor = version === 12 ? "tm1_list_jobs" : "tm1_list_threads";
+  const cancel = version === 12 ? "tm1_cancel_job" : "tm1_cancel_thread";
+  return `TM1 did not answer — the ${what} was NOT confirmed failed: it may or may not have started and may still be executing. Use ${monitor} to check for it and ${cancel} to stop it, and inspect its results before running it again. Do NOT blindly re-run: that risks a duplicate execution.`;
+}
+
 export type { UniformErrorPayload, McpToolResult };

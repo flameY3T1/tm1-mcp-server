@@ -30,6 +30,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`tm1_write_cells` no longer replays a chunk whose outcome is unknown.** A timeout, a lost
+  connection or a 5xx on the bulk write used to start the cell-by-cell fallback, re-sending up to
+  500 cells that might already be committed or still running — and then reported success. The
+  fallback now runs only when TM1 refused the chunk (4xx). Otherwise the call fails with the
+  original error code and `details` holding `written`, the `unknown` index range and
+  `notAttempted`.
+- **`tm1_write_cells` reports committed chunks when a later chunk cannot be built.** A wrong
+  element name in cell 501 failed with the bare server error although the first 500 cells were
+  already written. The error now carries the usual `written` / `failed` / `notAttempted` split.
+- **`tm1_execute_process` and `tm1_execute_chore` no longer call a timeout a runtime failure.** A
+  request that timed out, lost its connection or got a 5xx answered with "failed at runtime … check
+  syntax before re-running" while the process could still be executing. The hint now says the
+  outcome is unknown and points at `tm1_list_threads` / `tm1_list_jobs`.
 - **`tm1_search_elements`:** an empty `cubeName` or `dimensionName` is now rejected as invalid input.
   Before, `cubeName: ""` slipped past the "exactly one of" check and searched a dimension named
   `undefined`, which failed with a misleading not-found error.

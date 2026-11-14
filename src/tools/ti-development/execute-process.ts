@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
-import { withToolHint } from "../error-format.js";
+import {
+  isOutcomeUnknown,
+  unknownOutcomeHint,
+  withToolHint,
+} from "../error-format.js";
 import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 import { DESTRUCTIVE } from "../annotations.js";
 import { ProcessResultSchema } from "../schemas/items.js";
@@ -108,6 +112,9 @@ export const registerExecuteProcess = defineTool({
           hint: abortHint(tm1Client.version),
         });
       }
+      // A timeout or lost connection is no runtime failure either.
+      if (isOutcomeUnknown(err))
+        err.hintOverride = unknownOutcomeHint(tm1Client.version, "process");
       throw err;
     } finally {
       if (heartbeatTimer !== undefined) clearInterval(heartbeatTimer);
