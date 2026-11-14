@@ -112,6 +112,7 @@ import { registerSaveData } from "./operations/save-data.js";
 // File operations tools
 import { registerListFiles } from "./fileops/list-files.js";
 import { registerGetFileContent } from "./fileops/get-file-content.js";
+import { registerReadServerFile } from "./fileops/read-server-file.js";
 import { registerUploadFile } from "./fileops/upload-file.js";
 import { registerDeleteFile } from "./fileops/delete-file.js";
 import { registerSearchFiles } from "./fileops/search-files.js";
@@ -263,6 +264,7 @@ const REGISTRARS: ToolRegistrar[] = [
   // File operations
   registerListFiles,
   registerGetFileContent,
+  registerReadServerFile,
   registerUploadFile,
   registerDeleteFile,
   registerSearchFiles,

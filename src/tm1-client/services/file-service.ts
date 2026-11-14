@@ -20,6 +20,7 @@
 //   - DELETE on a folder removes what it contains.
 //
 // See docs/ARCHITECTURE.md for the layering.
+import { randomUUID } from "node:crypto";
 import type { TM1HttpClient } from "../http.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
 import { rethrowIfSystemic } from "./fallback.js";
@@ -445,6 +446,130 @@ export class FileService {
         buildUrl("Blobs"),
       );
       return r.value.map((f) => f.Name);
+    }
+  }
+
+  /**
+   * Read a text file from the server's file system through TI — v11 only.
+   *
+   * v11 `Contents('Blobs')` lists only files uploaded through REST (stored as
+   * `<name>.blb` in the data directory); a file written by `ASCIIOutput`/
+   * `TextOutput` or dropped into the data directory is a 404 there, root or
+   * subfolder, even when it is named `<name>.blb` (measured 11.8, 2026-11-08
+   * and 2026-11-14). `ErrorLogFiles`, however, serves every
+   * `TM1ProcessError_*.log` in the logging directory byte for byte and deletes
+   * it on DELETE. So an unbound process takes the file as its ASCII source and
+   * copies each record into such a file, which is then fetched and removed.
+   *
+   * The source is set up so TI does not reinterpret the line: quote character
+   * empty (quotes stay in the text) and DEL as delimiter (one variable = whole
+   * line). Measured 11.8, 2026-11-14: the copy equals the source byte for byte
+   * except that empty lines are not records and are dropped; 20000-character
+   * lines survive; ANSI bytes pass through unchanged, hence the decode
+   * fallback; an empty source creates no copy at all. A file with a UTF-8 BOM
+   * is read as Unicode and copied as ANSI: right for cp1252 characters, lossy
+   * beyond them.
+   *
+   * The path goes into the JSON data source, never into TI code, so it cannot
+   * inject statements.
+   */
+  async readViaTi(
+    path: string,
+    maxLines: number,
+  ): Promise<{
+    lines: string[];
+    truncated: boolean;
+    encoding: "utf-8" | "windows-1252";
+  }> {
+    const copy = `TM1ProcessError_mcpread_${randomUUID()}.log`;
+    const copyUrl = `/api/v1/ErrorLogFiles('${copy}')`;
+    const body = {
+      Process: {
+        Name: "}tm1-mcp-read-file",
+        HasSecurityAccess: false,
+        PrologProcedure: `n = 0;\nDatasourceASCIIQuoteCharacter = '';\nvOut = GetProcessErrorFileDirectory | '${copy}';`,
+        MetadataProcedure: "",
+        // One record more than asked for tells a cut file from a complete one.
+        DataProcedure: `n = n + 1;\nIF(n > ${maxLines + 1});\nProcessBreak;\nENDIF;\nASCIIOutput(vOut, vLine);`,
+        EpilogProcedure: "",
+        DataSource: {
+          Type: "ASCII",
+          dataSourceNameForServer: path,
+          dataSourceNameForClient: path,
+          asciiDelimiterType: "Character",
+          asciiDelimiterChar: "\u007f",
+          asciiQuoteCharacter: "",
+          asciiHeaderRecords: 0,
+          asciiDecimalSeparator: ".",
+          asciiThousandSeparator: ",",
+        },
+        Variables: [
+          {
+            Name: "vLine",
+            Type: "String",
+            Position: 1,
+            StartByte: 0,
+            EndByte: 0,
+          },
+        ],
+      },
+    };
+    let copyExists = true;
+    try {
+      const r = await this.http.request<{
+        ProcessExecuteStatusCode?: string;
+        ErrorLogFile?: { Filename?: string } | null;
+      }>("POST", "/api/v1/ExecuteProcessWithReturn?$expand=ErrorLogFile", body);
+      const status = r?.ProcessExecuteStatusCode;
+      if (status !== "CompletedSuccessfully") {
+        const logName = r?.ErrorLogFile?.Filename;
+        const logUrl = `/api/v1/ErrorLogFiles('${odataKey(logName ?? "")}')`;
+        const log = logName
+          ? await this.http.requestRaw("GET", `${logUrl}/Content`)
+          : "";
+        // The log of this throwaway process is in `details`; do not keep it.
+        if (logName)
+          await this.http
+            .request<void>("DELETE", logUrl)
+            .catch(() => undefined);
+        throw new TM1Error({
+          code: TM1ErrorCode.NOT_FOUND,
+          message: `TI could not read "${path}" (status ${status ?? "missing"})`,
+          details: log.slice(0, 1000),
+          hint: "Use the path as TI sees it: absolute on the server (e.g. C:\\TM1\\data\\export.csv) or relative to the data directory.",
+          endpoint: path,
+        });
+      }
+      let bytes: Buffer;
+      try {
+        bytes = await this.http.requestRawBytes("GET", `${copyUrl}/Content`);
+      } catch (err) {
+        // No record, no copy: the source is empty.
+        if (err instanceof TM1Error && err.code === TM1ErrorCode.NOT_FOUND) {
+          copyExists = false;
+          return { lines: [], truncated: false, encoding: "utf-8" };
+        }
+        throw err;
+      }
+      let text: string;
+      let encoding: "utf-8" | "windows-1252" = "utf-8";
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch {
+        text = new TextDecoder("windows-1252").decode(bytes);
+        encoding = "windows-1252";
+      }
+      const lines = text.split("\r\n");
+      lines.pop(); // ASCIIOutput ends every record with CRLF
+      return {
+        lines: lines.slice(0, maxLines),
+        truncated: lines.length > maxLines,
+        encoding,
+      };
+    } finally {
+      // Never leave the copy in the logging directory.
+      if (copyExists)
+        await this.http.request<void>("DELETE", copyUrl).catch(() => undefined);
     }
   }
 

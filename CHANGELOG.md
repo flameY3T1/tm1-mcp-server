@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`tm1_read_server_file`** (v11, `TM1_MODE=readwrite` only): reads a text file from the server's
+  file system through TI — for exports written by `ASCIIOutput`, which v11 `Blobs` does not list.
+  Empty lines are not returned. It runs an unbound TI process and can open any file the TM1 service
+  account can, which is why it is not part of the readonly tool set.
 - **`TM1_MODE=sandbox`:** a third mode between `readonly` and `readwrite`. It registers the read
   tools plus the tools marked `sandboxScoped` (`tm1_write_cells`, `tm1_create_sandbox`,
   `tm1_discard_sandbox`, `tm1_delete_sandbox`), and every write must go into a sandbox whose name

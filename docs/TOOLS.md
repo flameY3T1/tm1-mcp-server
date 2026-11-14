@@ -51,7 +51,7 @@ datasource (562-589).
 
 <!-- TOOLS-AUTOGEN:START -->
 
-## Tools (120)
+## Tools (121)
 
 ### analysis (10)
 
@@ -94,11 +94,12 @@ datasource (562-589).
 - `tm1_update_element` — Update an existing element in a TM1 dimension hierarchy (name, type, or components)
 - `tm1_update_element_attribute_value` — Set a single attribute value on an element by writing to the }ElementAttributes_{Dim} control cube
 
-### fileops (5)
+### fileops (6)
 
 - `tm1_delete_file` — Delete a file from the TM1 server's blob/file storage
 - `tm1_get_file_content` — Read the content of a file from the TM1 server's data directory
 - `tm1_list_files` — List files in the TM1 server's data directory (blob/file storage)
+- `tm1_read_server_file` — Read a text file from the TM1 server's file system as TI sees it — e.g
 - `tm1_search_files` — Search file names in the TM1 server's blob/file storage by prefix and/or substring
 - `tm1_upload_file` — Upload (create or update) a file in the TM1 server's blob/file storage
 
