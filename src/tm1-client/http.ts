@@ -27,9 +27,14 @@ function isSafeHttpMethod(method: string): boolean {
   return method === "GET" || method === "HEAD";
 }
 
-// Per-call overrides for the global config defaults. timeoutMs caps long-running
-// execute_mdx/process/chore; signal forwards an MCP-side AbortSignal (R2-03) so
-// `notifications/cancelled` from a client terminates the in-flight fetch.
+// Per-call overrides for the global config defaults. timeoutMs is how long TM1
+// may stay SILENT, not a cap on the whole call: it bounds the wait for the
+// response headers (a TI run or an MDX set evaluation happens entirely there)
+// and then every gap between two body chunks. A result that keeps streaming
+// never times out, however large — measured on 11.8, a 455 MB cellset takes
+// 15 s of body after 70 ms to the headers. signal forwards an MCP-side
+// AbortSignal (R2-03) so `notifications/cancelled` from a client terminates
+// the in-flight fetch.
 export interface RequestOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
@@ -137,16 +142,23 @@ export class TM1HttpClient {
 
       try {
         const cookie = await this.sessionManager.ensureSession();
-        const response = await this.executeRequest(
+        // 401 is decided on the status alone; every other body is read here,
+        // while the request's deadline and cancel signal still apply.
+        const read = async (r: Response): Promise<{ value: T } | undefined> =>
+          r.status === 401
+            ? undefined
+            : { value: await this.handleResponse<T>(r, path) };
+        const first = await this.executeRequest(
           url,
           method,
           cookie,
           body,
           opts?.timeoutMs,
           opts?.signal,
+          read,
         );
 
-        if (response.status === 401) {
+        if (first === undefined) {
           this.logger.warn(
             { endpoint: path },
             "Received 401, re-authenticating",
@@ -155,16 +167,17 @@ export class TM1HttpClient {
           // already rotated the session short-circuits to the fresh cookie
           // instead of forcing another logout+login (staggered-401 churn).
           const newCookie = await this.sessionManager.authenticate(cookie);
-          const retryResponse = await this.executeRequest(
+          const retried = await this.executeRequest(
             url,
             method,
             newCookie,
             body,
             opts?.timeoutMs,
             opts?.signal,
+            read,
           );
 
-          if (retryResponse.status === 401) {
+          if (retried === undefined) {
             throw new TM1Error({
               code: TM1ErrorCode.AUTH_FAILED,
               message: "Authentication failed after re-authentication attempt",
@@ -173,18 +186,16 @@ export class TM1HttpClient {
             });
           }
 
-          const retryResult = await this.handleResponse<T>(retryResponse, path);
           if (!isSafeMethod) {
             tm1Events.emit("mutation", { method, path });
           }
-          return retryResult;
+          return retried.value;
         }
 
-        const result = await this.handleResponse<T>(response, path);
         if (!isSafeMethod) {
           tm1Events.emit("mutation", { method, path });
         }
-        return result;
+        return first.value;
       } catch (error) {
         if (error instanceof TM1Error) {
           throw error;
@@ -243,7 +254,7 @@ export class TM1HttpClient {
     path: string,
     opts?: RequestOptions,
   ): Promise<string> {
-    return (await this.fetchRaw(method, path, opts)).text();
+    return this.fetchRaw(method, path, opts, (r) => r.text());
   }
 
   /**
@@ -260,15 +271,17 @@ export class TM1HttpClient {
     path: string,
     opts?: RequestOptions,
   ): Promise<Buffer> {
-    const res = await this.fetchRaw(method, path, opts);
-    return Buffer.from(await res.arrayBuffer());
+    return this.fetchRaw(method, path, opts, async (r) =>
+      Buffer.from(await r.arrayBuffer()),
+    );
   }
 
-  private async fetchRaw(
+  private async fetchRaw<T>(
     method: string,
     path: string,
-    opts?: RequestOptions,
-  ): Promise<Response> {
+    opts: RequestOptions | undefined,
+    onOk: (r: Response) => Promise<T>,
+  ): Promise<T> {
     const url = `${this.config.baseUrl}${this.profile.resolveApiPath(path)}`;
     const effectiveTimeout = opts?.timeoutMs ?? this.config.requestTimeoutMs;
     const cookie = await this.sessionManager.ensureSession();
@@ -294,6 +307,7 @@ export class TM1HttpClient {
           undefined,
           effectiveTimeout,
           opts?.signal,
+          rawReader(onOk),
         );
       },
       cookie,
@@ -302,18 +316,16 @@ export class TM1HttpClient {
     );
 
     if (!response.ok) {
-      let body = "";
-      try {
-        body = await response.text();
-      } catch {
-        /* ignore */
-      }
-      throw this.classifyHttpError(response.status, path, body || undefined);
+      throw this.classifyHttpError(
+        response.status,
+        path,
+        response.errorBody || undefined,
+      );
     }
     if (!isSafeHttpMethod(method)) {
       tm1Events.emit("mutation", { method, path });
     }
-    return response;
+    return response.value;
   }
 
   /**
@@ -350,6 +362,7 @@ export class TM1HttpClient {
           body,
           effectiveTimeout,
           opts?.signal,
+          rawReader(() => Promise.resolve(undefined)),
         ),
       cookie,
       path,
@@ -357,13 +370,11 @@ export class TM1HttpClient {
     );
 
     if (!response.ok) {
-      let errBody = "";
-      try {
-        errBody = await response.text();
-      } catch {
-        /* ignore */
-      }
-      throw this.classifyHttpError(response.status, path, errBody || undefined);
+      throw this.classifyHttpError(
+        response.status,
+        path,
+        response.errorBody || undefined,
+      );
     }
     if (!isSafeHttpMethod(method)) {
       tm1Events.emit("mutation", { method, path });
@@ -373,15 +384,24 @@ export class TM1HttpClient {
   /**
    * Low-level single fetch with timeout + AbortSignal wiring.
    * Does NOT handle 401, retries, or error classification — callers own that.
+   *
+   * `read` consumes the response INSIDE the deadline. fetch() resolves once the
+   * headers are in; a body read after this method returned had no timeout and
+   * no cancel, and the dispatcher's own bodyTimeout is off on purpose —
+   * measured: every request path hung on a server that stalled mid-body.
+   *
+   * The timer restarts at the headers and at every body chunk, so it measures
+   * silence (see RequestOptions.timeoutMs).
    */
-  private async sendOnce(
+  private async sendOnce<R>(
     url: string,
     method: string,
     headers: Record<string, string>,
     body: string | Uint8Array | undefined,
     timeoutMs: number,
-    externalSignal?: AbortSignal,
-  ): Promise<Response> {
+    externalSignal: AbortSignal | undefined,
+    read: (response: Response) => Promise<R>,
+  ): Promise<R> {
     const controller = new AbortController();
     const timeout = setTimeout(
       () =>
@@ -390,13 +410,23 @@ export class TM1HttpClient {
     );
     const unlink = linkAbortSignals(controller, externalSignal);
     try {
-      return await tm1Fetch(url, {
+      const response = await tm1Fetch(url, {
         method,
         headers,
         body,
         signal: controller.signal,
         dispatcher: getTm1Dispatcher(this.config),
       } as unknown as RequestInit);
+      timeout.refresh();
+      return await read(watchBody(response, () => timeout.refresh()));
+    } catch (err) {
+      // A read cut off by our deadline or the caller's cancel can surface as a
+      // transport error. Report the cause we know, or a GET would be retried
+      // as a network blip.
+      if (controller.signal.aborted && !(err instanceof TM1Error)) {
+        throw controller.signal.reason;
+      }
+      throw err;
     } finally {
       clearTimeout(timeout);
       unlink();
@@ -409,13 +439,13 @@ export class TM1HttpClient {
    * On 401: calls sessionManager.authenticate() and retries once with the new cookie.
    * The caller is responsible for obtaining the initial cookie via ensureSession().
    */
-  private async withReauth(
-    send: (cookie: string) => Promise<Response>,
+  private async withReauth<T>(
+    send: (cookie: string) => Promise<RawOutcome<T>>,
     initialCookie: string,
     path: string,
     effectiveTimeout: number,
-  ): Promise<Response> {
-    let response: Response;
+  ): Promise<RawOutcome<T>> {
+    let response: RawOutcome<T>;
     try {
       response = await send(initialCookie);
     } catch (err) {
@@ -446,14 +476,15 @@ export class TM1HttpClient {
     return response;
   }
 
-  private async executeRequest(
+  private async executeRequest<R>(
     url: string,
     method: string,
     cookie: string,
-    body?: unknown,
-    timeoutMs?: number,
-    externalSignal?: AbortSignal,
-  ): Promise<Response> {
+    body: unknown,
+    timeoutMs: number | undefined,
+    externalSignal: AbortSignal | undefined,
+    read: (response: Response) => Promise<R>,
+  ): Promise<R> {
     const headers: Record<string, string> = {
       Cookie: this.sessionManager.cookieHeader(cookie),
       Accept: "application/json",
@@ -483,6 +514,7 @@ export class TM1HttpClient {
       serializedBody,
       timeoutMs ?? this.config.requestTimeoutMs,
       externalSignal,
+      read,
     );
   }
 
@@ -752,6 +784,45 @@ function odataErrorText(parsed: unknown): string | undefined {
     if (typeof value === "string") return value;
   }
   return undefined;
+}
+
+// Report every body chunk as it passes. Answers without a body stream (204,
+// 304, unit-test doubles) are handed through untouched.
+function watchBody(response: Response, onChunk: () => void): Response {
+  if (!response.body) return response;
+  const body = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        onChunk();
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+/** What a raw/binary request read from its response inside the deadline. */
+type RawOutcome<T> =
+  | { ok: true; status: number; value: T }
+  | { ok: false; status: number; errorBody?: string };
+
+// 401 is left unread for the re-auth; an error body is best-effort.
+function rawReader<T>(onOk: (r: Response) => Promise<T>) {
+  return async (r: Response): Promise<RawOutcome<T>> => {
+    if (r.ok) return { ok: true, status: r.status, value: await onOk(r) };
+    if (r.status === 401) return { ok: false, status: 401 };
+    let errorBody = "";
+    try {
+      errorBody = await r.text();
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, status: r.status, errorBody };
+  };
 }
 
 function isTimeoutError(error: unknown): boolean {

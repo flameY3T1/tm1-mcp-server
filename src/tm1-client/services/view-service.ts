@@ -122,7 +122,7 @@ export class ViewService {
       // Cellsets are session-scoped and never auto-expire while keep-alive holds
       // the session open; free the read-path cellset best-effort so it doesn't
       // leak TM1 server memory indefinitely (mirrors TM1py's delete_cellset).
-      await freeCellset(this.http, response.ID, opts);
+      await freeCellset(this.http, response.ID);
     }
   }
 

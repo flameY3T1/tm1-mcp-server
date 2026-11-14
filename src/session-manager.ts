@@ -30,13 +30,22 @@ async function withTimeout<T>(
   try {
     return await fn(controller.signal);
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
+    // Only this timer aborts the controller, so an aborted signal IS the
+    // timeout, however the interrupted fetch or body read reports it.
+    if (controller.signal.aborted) {
       throw new TimeoutError(label, ms);
     }
     throw err;
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Consume the body to release the connection — inside withTimeout, so a body
+// that stalls after the headers cannot outlive the deadline.
+async function drained(response: Response): Promise<Response> {
+  await response.text();
+  return response;
 }
 
 export class SessionManager {
@@ -146,11 +155,8 @@ export class SessionManager {
           body: loginReq.body,
           signal,
           dispatcher: getTm1Dispatcher(this.config),
-        } as unknown as RequestInit),
+        } as unknown as RequestInit).then(drained),
     );
-
-    // Always consume body to release connection
-    await response.text();
 
     if (response.status === 401 || response.status === 403) {
       this.rejectedLogin = new TM1Error({
@@ -228,7 +234,7 @@ export class SessionManager {
             },
             signal,
             dispatcher: getTm1Dispatcher(this.config),
-          } as unknown as RequestInit),
+          } as unknown as RequestInit).then(drained),
       );
     } catch (err) {
       if (err instanceof TimeoutError) {
@@ -244,9 +250,6 @@ export class SessionManager {
       }
       throw err;
     }
-
-    // Always consume body to release connection
-    await response.text();
 
     if (response.status === 401) {
       this.logger.warn("Session expired during keep-alive, re-authenticating");
@@ -343,25 +346,19 @@ export class SessionManager {
       // Bound the logout request — authenticate() calls logout() first, so a
       // hung DELETE (slow/unreachable server) would otherwise block re-auth
       // indefinitely. On timeout we still clear the cookie below.
-      const response = await withTimeout(
-        this.config.requestTimeoutMs,
-        "Logout",
-        (signal) =>
-          tm1Fetch(url, {
-            method: "DELETE",
-            headers: {
-              Cookie: this.cookieHeader(cookie),
-              "User-Agent": USER_AGENT,
-              "TM1-SessionContext": USER_AGENT,
-              "TM1-Session-Context": USER_AGENT,
-            },
-            dispatcher: getTm1Dispatcher(this.config),
-            signal,
-          } as unknown as RequestInit),
+      await withTimeout(this.config.requestTimeoutMs, "Logout", (signal) =>
+        tm1Fetch(url, {
+          method: "DELETE",
+          headers: {
+            Cookie: this.cookieHeader(cookie),
+            "User-Agent": USER_AGENT,
+            "TM1-SessionContext": USER_AGENT,
+            "TM1-Session-Context": USER_AGENT,
+          },
+          dispatcher: getTm1Dispatcher(this.config),
+          signal,
+        } as unknown as RequestInit).then(drained),
       );
-
-      // Consume body to release connection
-      await response.text();
 
       this.sessionCookie = null;
       this.logger.info("Logged out from TM1");

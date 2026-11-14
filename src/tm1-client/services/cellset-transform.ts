@@ -3,7 +3,7 @@
 // on the other.
 import { withSandboxParam } from "../../lib/sandbox-policy.js";
 import type { CellValue, MdxAxis, MdxResult } from "../../types.js";
-import type { RequestOptions, TM1HttpClient } from "../http.js";
+import type { TM1HttpClient } from "../http.js";
 
 // TM1 escaping: `]` inside a bracketed identifier is doubled. Cellset IDs are
 // server-generated GUIDs so this is defensive, but keeps the pattern uniform.
@@ -16,10 +16,15 @@ function encId(id: string): string {
 // leaves one behind leaks TM1 server memory indefinitely (mirrors TM1py's
 // delete_cellset). Never throws: cleanup failure must not turn a successful
 // read into an error.
+//
+// Deliberately takes no RequestOptions: the caller's signal is often already
+// aborted when cleanup runs, and a DELETE carrying it is never sent — measured,
+// the cellset then stayed on the server. Cleanup gets its own short budget.
+const FREE_CELLSET_TIMEOUT_MS = 10000;
+
 export async function freeCellset(
   http: TM1HttpClient,
   id: string | undefined,
-  opts?: RequestOptions,
   sandbox?: string,
 ): Promise<void> {
   if (!id) return;
@@ -29,10 +34,11 @@ export async function freeCellset(
       "DELETE",
       withSandboxParam(`/api/v1/Cellsets('${encId(id)}')`, sandbox),
       undefined,
-      opts,
+      { timeoutMs: FREE_CELLSET_TIMEOUT_MS },
     );
-  } catch {
+  } catch (err) {
     // cleanup best-effort
+    http.logger.warn({ cellsetId: id, err }, "Could not release cellset");
   }
 }
 

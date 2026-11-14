@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The request timeout and a client cancel now also cover the response body.** Both used to end
+  when the response headers arrived; a body that stalled afterwards hung the call for good, on every
+  request path and on login. The body is now read inside the deadline, and the timer restarts at the
+  headers and at every body chunk. `timeoutMs` / `TM1_REQUEST_TIMEOUT` therefore mean "how long TM1
+  may stay silent": they bound the wait for the headers (a TI run or an MDX set evaluation happens
+  there) and each gap in the body. A large result that keeps streaming is not cut off.
+- **Cellsets are released after a cancelled read.** The cleanup `DELETE` inherited the caller's
+  already-aborted signal and was never sent, leaving the cellset in the TM1 session. It now runs
+  with its own 10 s budget, and a failed release is logged.
 - **`tm1_write_cells` no longer replays a chunk whose outcome is unknown.** A timeout, a lost
   connection or a 5xx on the bulk write used to start the cell-by-cell fallback, re-sending up to
   500 cells that might already be committed or still running — and then reported success. The

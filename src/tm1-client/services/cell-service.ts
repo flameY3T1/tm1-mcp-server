@@ -141,7 +141,7 @@ export class CellService {
     } finally {
       // Free the session-scoped cellset best-effort so single-value reads don't
       // leak TM1 server memory while keep-alive holds the session open.
-      await freeCellset(this.http, cellsetResponse.ID, undefined, sandbox);
+      await freeCellset(this.http, cellsetResponse.ID, sandbox);
     }
   }
 
@@ -194,7 +194,7 @@ export class CellService {
       // Cellsets are session-scoped and never auto-expire while keep-alive holds
       // the session open, so a read that leaves them behind leaks TM1 server
       // memory indefinitely. Free it best-effort (mirrors TM1py's delete_cellset).
-      await freeCellset(this.http, response.ID, opts, sandbox);
+      await freeCellset(this.http, response.ID, sandbox);
     }
   }
 

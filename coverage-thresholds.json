@@ -20,10 +20,10 @@
     "2026-09-26: deleting the unused rule linter (687 lines, ~12% covered) lifted every metric past the slack; floors raised to the ratchet's numbers."
   ],
   "floors": {
-    "lines": 72,
-    "statements": 71,
-    "functions": 65,
-    "branches": 62
+    "lines": 74,
+    "statements": 73,
+    "functions": 68,
+    "branches": 64
   },
   "slack": 5,
   "headroomPoints": 2,
@@ -31,6 +31,6 @@
     "lines": 75,
     "statements": 75,
     "functions": 70,
-    "branches": 62
+    "branches": 64
   }
 }
