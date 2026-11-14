@@ -52,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request that timed out, lost its connection or got a 5xx answered with "failed at runtime … check
   syntax before re-running" while the process could still be executing. The hint now says the
   outcome is unknown and points at `tm1_list_threads` / `tm1_list_jobs`.
+- **A slow or unreachable TM1 no longer delays MCP startup.** The server waited for the TM1 login
+  before it started its transport, so `initialize` and `tools/list` hung for up to
+  `TM1_REQUEST_TIMEOUT`. The login now runs in the background; a tool call that arrives first shares
+  it.
+- **Keep-alive and the `connected` flag now survive a failed first login.** When TM1 was down at
+  startup and a later tool call logged in, no keep-alive ran and `tm1_get_server_state` kept
+  reporting `connected: false`. While TM1 stays unreachable the keep-alive timer retries the login
+  every `TM1_KEEP_ALIVE_INTERVAL`; rejected credentials still stop all further attempts.
 - **The HTTP transport no longer advertises resource subscriptions.** It is stateless, so a
   `resources/subscribe` call was acknowledged and then dropped with the request. HTTP now reports
   `subscribe: false` and answers the call with "Method not found"; stdio is unchanged.

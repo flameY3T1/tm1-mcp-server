@@ -24,8 +24,6 @@ import { SandboxService } from "./tm1-client/services/sandbox-service.js";
 import { registerCallgraphCacheInvalidation } from "./lib/callgraph/tm1-adapter.js";
 
 export class TM1Client {
-  private connected = false;
-
   // Transport is HELD, not inherited. Because TM1Client no longer `extends`
   // TM1HttpClient, its public type does not expose `request()/requestRaw()/
   // requestBinary()`, so a tool typed on TM1Client cannot call raw REST — that
@@ -117,13 +115,15 @@ export class TM1Client {
   }
 
   /**
-   * Authenticate and start the keep-alive timer.
+   * Start the keep-alive timer and authenticate.
    */
   async connect(): Promise<void> {
     this.logger.info("Connecting to TM1 server");
-    await this.sessionManager.authenticate();
+    // Timer first: when this login fails, a later tool call logs in through
+    // ensureSession() and nothing else would start the keep-alive. A rejected
+    // login (401/403) stops the timer again inside authenticate().
     this.sessionManager.startKeepAlive();
-    this.connected = true;
+    await this.sessionManager.authenticate();
     this.logger.info("Connected to TM1 server");
   }
 
@@ -134,11 +134,11 @@ export class TM1Client {
     this.logger.info("Disconnecting from TM1 server");
     this.sessionManager.stopKeepAlive();
     await this.sessionManager.logout();
-    this.connected = false;
     this.logger.info("Disconnected from TM1 server");
   }
 
+  /** True while a TM1 session is held, however it was obtained. */
   isConnected(): boolean {
-    return this.connected;
+    return this.sessionManager.isSessionActive();
   }
 }

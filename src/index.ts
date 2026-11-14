@@ -123,20 +123,6 @@ async function main(): Promise<void> {
   const sessionManager = new SessionManager(config, logger);
   const tm1Client = new TM1Client(config, sessionManager, logger);
 
-  // Try to connect to TM1, but don't block MCP server startup.
-  // request() calls ensureSession() on every tool invocation, so a tool call
-  // will retry auth if the initial connect failed. Keeps Claude able to list
-  // tools and report a meaningful error instead of crashing the whole process.
-  try {
-    await tm1Client.connect();
-    logger.info("TM1 client connected");
-  } catch (err) {
-    logger.warn(
-      { err },
-      "Initial TM1 connection failed — server will retry on first tool call",
-    );
-  }
-
   if (config.mode === "readonly") {
     logger.info(
       "TM1_MODE=readonly — write and destructive tools will not be registered",
@@ -171,6 +157,19 @@ async function main(): Promise<void> {
         })();
   logger.info(
     `MCP server configured (mode: ${config.mode}, transport: ${config.transport})`,
+  );
+
+  // Log in to TM1 in the background, after the transport is up: a TM1 that is
+  // slow or down must not delay initialize and tools/list. A tool call that
+  // arrives first shares this login (authenticate() dedupes), and one that
+  // arrives after a failed login retries it through ensureSession().
+  tm1Client.connect().then(
+    () => logger.info("TM1 client connected"),
+    (err: unknown) =>
+      logger.warn(
+        { err },
+        "Initial TM1 connection failed — server will retry on first tool call",
+      ),
   );
 
   // Graceful shutdown — ensure TM1 session is always cleaned up.

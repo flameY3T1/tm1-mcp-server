@@ -107,7 +107,16 @@ describe("TM1Client", () => {
 
       expect(sessionManager.authenticate).toHaveBeenCalledOnce();
       expect(sessionManager.startKeepAlive).toHaveBeenCalledOnce();
-      expect(lifecycleClient.isConnected()).toBe(true);
+    });
+
+    it("starts keep-alive even when the login fails", async () => {
+      vi.mocked(sessionManager.authenticate).mockRejectedValue(
+        new Error("connect ECONNREFUSED"),
+      );
+
+      await expect(lifecycleClient.connect()).rejects.toThrow("ECONNREFUSED");
+
+      expect(sessionManager.startKeepAlive).toHaveBeenCalledOnce();
     });
   });
 
@@ -126,9 +135,12 @@ describe("TM1Client", () => {
       expect(lifecycleClient.isConnected()).toBe(false);
     });
 
-    it("should return true after connect", async () => {
-      await lifecycleClient.connect();
+    it("follows the session, however it was obtained", () => {
+      const active = vi.spyOn(sessionManager, "isSessionActive");
+      active.mockReturnValue(true);
       expect(lifecycleClient.isConnected()).toBe(true);
+      active.mockReturnValue(false);
+      expect(lifecycleClient.isConnected()).toBe(false);
     });
   });
 

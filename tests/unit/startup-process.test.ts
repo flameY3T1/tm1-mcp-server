@@ -100,6 +100,47 @@ const INIT_PARAMS = {
 };
 
 describe("process startup", () => {
+  it("answers initialize while TM1 stays silent", async () => {
+    // Accepts the connection and never answers: the login stays open.
+    const tm1Port = await listen(net.createServer(() => {}));
+    const client = stdioClient(start(tm1Port));
+
+    const startedAt = Date.now();
+    const response = await client.initialize();
+
+    expect(Date.now() - startedAt).toBeLessThan(REQUEST_TIMEOUT_MS / 2);
+    expect(response.result?.capabilities?.resources?.subscribe).toBe(true);
+  }, 30000);
+
+  it("runs keep-alive for a session that a tool call opened after a failed first login", async () => {
+    const urls: string[] = [];
+    let requests = 0;
+    const tm1Port = await listen(
+      http.createServer((req, res) => {
+        requests++;
+        urls.push(req.url ?? "");
+        if (requests === 1) {
+          req.socket.destroy();
+          return;
+        }
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Set-Cookie": "TM1SessionId=fakesession; Path=/",
+        });
+        res.end(JSON.stringify({ value: [] }));
+      }),
+    );
+    const client = stdioClient(start(tm1Port));
+    await client.initialize();
+    while (requests === 0) await sleep(20);
+
+    await client.call("tools/call", { name: "tm1_list_cubes", arguments: {} });
+    const seen = urls.length;
+    while (!urls.slice(seen).some((u) => u.includes("ActiveSession"))) {
+      await sleep(20);
+    }
+  }, 30000);
+
   it("does not offer resource subscriptions over stateless HTTP", async () => {
     const tm1Port = await listen(net.createServer(() => {}));
     const probe = net.createServer();
