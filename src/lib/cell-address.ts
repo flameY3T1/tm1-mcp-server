@@ -31,17 +31,19 @@ export function sandboxPosition(cubeDimensions: readonly string[]): number {
  * Positional counterpart of resolveCellAddress, for tools that take one
  * element per cube dimension (get_cell_value, check_writable_coords without
  * `dimensions`). A coordinate exactly one short on a cube with `Sandboxes`
- * is read as "Sandboxes left out" and gets `Base` at its position; anything
- * else returns undefined and the caller's count check refuses it as before.
+ * is read as "Sandboxes left out" and gets `Base` at its position — or
+ * `fill`, when the caller addresses a named sandbox; anything else returns
+ * undefined and the caller's count check refuses it as before.
  */
 export function bindLeftOutSandbox(
   cubeDimensions: readonly string[],
   elements: readonly string[],
+  fill: string = BASE_SANDBOX,
 ): string[] | undefined {
   if (elements.length !== cubeDimensions.length - 1) return undefined;
   const pos = sandboxPosition(cubeDimensions);
   if (pos < 0) return undefined;
-  return [...elements.slice(0, pos), BASE_SANDBOX, ...elements.slice(pos)];
+  return [...elements.slice(0, pos), fill, ...elements.slice(pos)];
 }
 
 export interface ResolvedAddress {

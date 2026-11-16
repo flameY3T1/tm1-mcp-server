@@ -1,3 +1,5 @@
+import { SANDBOX_PREFIX_PATTERN } from "./lib/sandbox-policy.js";
+
 export interface TM1Config {
   baseUrl: string;
   user: string;
@@ -36,7 +38,15 @@ export interface TM1Config {
   // listing. Default: "readonly" — write/destructive tools are opt-in via
   // TM1_MODE=readwrite, so an unconfigured server cannot mutate or delete TM1
   // objects by accident.
-  mode: "readwrite" | "readonly";
+  //
+  // "sandbox" sits between the two: the read tools plus the tools whose spec
+  // is `sandboxScoped`, and those write only into a sandbox whose name starts
+  // with `sandboxPrefix` — never into base data, never into a sandbox another
+  // application of the same account owns. Publishing stays readwrite-only.
+  mode: "readwrite" | "sandbox" | "readonly";
+  // Name prefix of the sandboxes the server may create, write, discard and
+  // delete in sandbox mode (TM1_SANDBOX_PREFIX, default "mcp-").
+  sandboxPrefix: string;
   // How a successful tool result is put on the wire.
   //
   //   "legacy" (default) — the JSON body ships BOTH ways: as content[0].text and
@@ -77,7 +87,7 @@ export interface TM1Config {
 
 const VALID_LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 const VALID_TRANSPORTS = ["stdio", "http"] as const;
-const VALID_MODES = ["readwrite", "readonly"] as const;
+const VALID_MODES = ["readwrite", "sandbox", "readonly"] as const;
 const VALID_RESPONSE_MODES = ["legacy", "structured"] as const;
 const VALID_AUTH_MODES = [
   "s2s",
@@ -288,10 +298,19 @@ export function loadConfig(): TM1Config {
   const modeRaw = (process.env.TM1_MODE ?? "readonly").trim().toLowerCase();
   if (!VALID_MODES.includes(modeRaw as (typeof VALID_MODES)[number])) {
     throw new Error(
-      `Invalid TM1_MODE: "${process.env.TM1_MODE}". Expected "readwrite" or "readonly".`,
+      `Invalid TM1_MODE: "${process.env.TM1_MODE}". Expected "readwrite", "sandbox" or "readonly".`,
     );
   }
   const mode = modeRaw as TM1Config["mode"];
+
+  // The prefix is what keeps sandbox mode off sandboxes it did not create, so
+  // it may not be empty, and it must itself be a legal sandbox name.
+  const sandboxPrefix = (process.env.TM1_SANDBOX_PREFIX ?? "mcp-").trim();
+  if (sandboxPrefix === "" || !SANDBOX_PREFIX_PATTERN.test(sandboxPrefix)) {
+    throw new Error(
+      `Invalid TM1_SANDBOX_PREFIX: "${process.env.TM1_SANDBOX_PREFIX}". Use letters, digits, "-", "_" or "." (not empty).`,
+    );
+  }
 
   // Same parse shape as TM1_MODE: case-insensitive, unknown value throws at
   // startup rather than silently picking a wire format the operator did not ask
@@ -409,6 +428,7 @@ export function loadConfig(): TM1Config {
     httpAllowedOrigins,
     httpToken,
     mode,
+    sandboxPrefix,
     responseMode,
     version,
     instance,

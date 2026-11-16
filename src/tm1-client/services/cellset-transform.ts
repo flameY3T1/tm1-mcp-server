@@ -1,6 +1,7 @@
 // Shared cellset → MdxResult mapper. Used by both CellService.executeMdx and
 // ViewService.getView; lifted out of TM1Client so neither service has to depend
 // on the other.
+import { withSandboxParam } from "../../lib/sandbox-policy.js";
 import type { CellValue, MdxAxis, MdxResult } from "../../types.js";
 import type { RequestOptions, TM1HttpClient } from "../http.js";
 
@@ -19,12 +20,14 @@ export async function freeCellset(
   http: TM1HttpClient,
   id: string | undefined,
   opts?: RequestOptions,
+  sandbox?: string,
 ): Promise<void> {
   if (!id) return;
   try {
+    // A cellset opened in a sandbox is freed in it too, as TM1py does.
     await http.request<void>(
       "DELETE",
-      `/api/v1/Cellsets('${encId(id)}')`,
+      withSandboxParam(`/api/v1/Cellsets('${encId(id)}')`, sandbox),
       undefined,
       opts,
     );

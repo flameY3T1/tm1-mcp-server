@@ -41,6 +41,12 @@ instance over the TM1 REST API. Keep the following in mind before reporting:
   deletion, cell writes, process execution) are disabled unless you explicitly
   opt in with `TM1_MODE=readwrite`. Enabling `readwrite` against production by
   choice is not a vulnerability.
+- **`TM1_MODE=sandbox` confines cell writes to sandboxes named with
+  `TM1_SANDBOX_PREFIX`, and refuses control cubes.** A write that reaches base
+  data, a sandbox without the prefix, or a control cube (`}…`) while the server
+  runs in sandbox mode is in scope. The prefix is a
+  naming convention: a person who names a sandbox with it by hand hands it to
+  the server, and that is not a vulnerability.
 - **HTTP transport binds loopback (`127.0.0.1`) by default.** Setting
   `TM1_MCP_HTTP_HOST=0.0.0.0` exposes the server and its TM1 credentials to the
   network; only do so behind a reverse proxy with its own auth. A self-inflicted
@@ -69,10 +75,11 @@ worth stating plainly:
   whose TM1 rights already match what the agent should be able to do — the
   server enforces no per-caller authorization of its own.
 - **The confirmation guards are misuse protection, not access control.**
-  Seventeen tools require a `confirm` argument repeating the target name
+  Twenty tools require a `confirm` argument repeating the target name
   verbatim: every `delete_*` and `clear_*`, plus `tm1_remove_client_group`,
   `tm1_execute_process`, `tm1_execute_chore`, `tm1_write_cells`,
-  `tm1_set_cube_rules` and `tm1_upload_file`. Anything that can call such a
+  `tm1_set_cube_rules`, `tm1_upload_file`, `tm1_discard_sandbox` and
+  `tm1_publish_sandbox`. Anything that can call such a
   tool can also supply its `confirm` value — the guard only stops an
   auto-approving client firing an irreversible action without naming the
   target.

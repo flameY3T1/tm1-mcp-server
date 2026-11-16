@@ -16,7 +16,7 @@ Engine (rerooted REST, `s2s` auth live-validated) and Planning Analytics SaaS 12
 
 ## Features
 
-114 tools across 12 categories — every one listed in
+120 tools across 13 categories — every one listed in
 [docs/TOOLS.md](docs/TOOLS.md), with working JSON payloads in
 [docs/EXAMPLES.md](docs/EXAMPLES.md). Past plain CRUD over the REST API:
 
@@ -87,7 +87,7 @@ TM1_USER=admin
 TM1_PASSWORD=your-password
 TM1_SSL_REJECT_UNAUTHORIZED=false
 TM1_VERSION=11.8
-TM1_MODE=readonly                   # readonly (default) | readwrite
+TM1_MODE=readonly                   # readonly (default) | sandbox | readwrite
 # TM1_RESPONSE_MODE=structured      # legacy (default) | structured
 # TM1_LOCAL_FILE_ROOT=/srv/tm1-git  # optional; enables host-disk file params
 ```
@@ -106,6 +106,13 @@ host-disk file access.
 > `TM1_MODE=readwrite` explicitly to enable the full lifecycle (cell writes,
 > cube/dimension/process deletion, TI execution), and never point a `readwrite`
 > server at production without reviewing the write path first.
+>
+> **In between: `TM1_MODE=sandbox`.** The read tools plus `tm1_write_cells` and
+> the sandbox tools, with every write confined to a TM1 sandbox whose name starts
+> with `TM1_SANDBOX_PREFIX` (default `mcp-`). The agent can try a change and
+> show it with `tm1_compare_sandbox`; base data stays untouched, and publishing
+> the sandbox is left to a person or a `readwrite` server.
+> [Details](docs/CONFIGURATION.md#sandbox-mode--tm1_modesandbox).
 
 Host-disk file access is default-off in the same spirit: the `.pro` and git
 tools accept inline content, and touch host paths only once
@@ -177,7 +184,7 @@ security notes and the `autoApprove` allowlist:
 
 <!-- TOOLS-AUTOGEN:START -->
 
-## Tools (114)
+## Tools (120)
 
 Names and one-line descriptions: [docs/TOOLS.md](docs/TOOLS.md).
 
@@ -190,12 +197,13 @@ Names and one-line descriptions: [docs/TOOLS.md](docs/TOOLS.md).
 | metadata | 10 |
 | model-building | 9 |
 | operations | 15 |
+| sandboxes | 6 |
 | scheduling | 5 |
 | security | 8 |
 | subsets | 5 |
 | ti-development | 21 |
 | views | 4 |
-| **Total** | **114** |
+| **Total** | **120** |
 
 <!-- TOOLS-AUTOGEN:END -->
 

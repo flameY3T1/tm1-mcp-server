@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`TM1_MODE=sandbox`:** a third mode between `readonly` and `readwrite`. It registers the read
+  tools plus the tools marked `sandboxScoped` (`tm1_write_cells`, `tm1_create_sandbox`,
+  `tm1_discard_sandbox`, `tm1_delete_sandbox`), and every write must go into a sandbox whose name
+  starts with `TM1_SANDBOX_PREFIX` (default `mcp-`). Base data, and sandboxes that other
+  applications keep under the same account, cannot be written. On a cube with the `Sandboxes`
+  dimension a left-out coordinate is bound to the target sandbox and a different one is refused.
+  Control cubes (`}…`) are refused even into a sandbox, since publishing would carry a staged
+  security or attribute change into the model.
+  Publishing stays `readwrite`-only.
+- **Sandbox tools:** `tm1_list_sandboxes`, `tm1_create_sandbox`, `tm1_compare_sandbox` (the cells
+  that differ between base and a sandbox, matched by coordinate, so `NON EMPTY` queries compare
+  correctly), `tm1_discard_sandbox`, `tm1_delete_sandbox` and `tm1_publish_sandbox`.
+- **`sandbox` argument** on `tm1_write_cells`, `tm1_execute_mdx` and `tm1_get_cell_value`: every
+  request of the call carries TM1's `!sandbox` parameter, including the cellset delete.
+
 ## [6.1.0] - 2026-10-15
 
 ### Added

@@ -44,6 +44,7 @@ function makeV12Config(): TM1Config {
     httpPort: 0,
     httpAllowedOrigins: [],
     mode: "readonly",
+    sandboxPrefix: "mcp-",
     responseMode: "structured",
     version: 12,
     instance: "tm1",

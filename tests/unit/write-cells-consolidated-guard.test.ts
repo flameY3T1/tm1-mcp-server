@@ -228,9 +228,12 @@ describe("tm1_write_cells address resolution", () => {
       cells: [CELL(["Amount", "Berlin", "Jan"])],
       confirm: "Sales",
     });
-    expect(writeCells).toHaveBeenCalledWith("Sales", CUBE, [
-      { elements: ["Berlin", "Jan", "Amount"], value: 42 },
-    ]);
+    expect(writeCells).toHaveBeenCalledWith(
+      "Sales",
+      CUBE,
+      [{ elements: ["Berlin", "Jan", "Amount"], value: 42 }],
+      undefined,
+    );
   });
 
   it("binds a left-out Sandboxes dimension to Base and says so", async () => {
@@ -245,6 +248,7 @@ describe("tm1_write_cells address resolution", () => {
       "Sales",
       [...CUBE, "Sandboxes"],
       [{ elements: ["Berlin", "Jan", "Amount", "Base"], value: 42 }],
+      undefined,
     );
     expect(JSON.stringify(res)).toContain('"sandboxDefaulted":"Base"');
   });

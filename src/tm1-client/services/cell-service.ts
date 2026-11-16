@@ -16,6 +16,7 @@ import type { RequestOptions, TM1HttpClient } from "../http.js";
 import { escapeMdxName } from "../../lib/mdx.js";
 import { mapSettledWithConcurrency } from "../../lib/concurrency.js";
 import { bindLeftOutSandbox } from "../../lib/cell-address.js";
+import { withSandboxParam } from "../../lib/sandbox-policy.js";
 import { freeCellset, transformCellsetResponse } from "./cellset-transform.js";
 import { odataKey } from "./odata-page.js";
 
@@ -66,8 +67,14 @@ export class CellService {
    * empty axis collapses the cellset. Put the first element on COLUMNS and
    * the rest in WHERE to force a 1-cell cellset. Each element is qualified
    * with its dimension to avoid name collisions in control cubes.
+   *
+   * With `sandbox`, the value is read from that sandbox instead of base data.
    */
-  async getValue(cubeName: string, elements: string[]): Promise<CellValue> {
+  async getValue(
+    cubeName: string,
+    elements: string[],
+    sandbox?: string,
+  ): Promise<CellValue> {
     if (elements.length === 0) {
       return null;
     }
@@ -78,8 +85,8 @@ export class CellService {
       Dimensions: Array<{ Name: string }>;
     }>("GET", cubePath);
     const dims = cubeMeta.Dimensions.map((d) => d.Name);
-    // Sandboxes left out → Base, as tm1_write_cells does.
-    elements = bindLeftOutSandbox(dims, elements) ?? elements;
+    // Sandboxes left out → Base (or the sandbox read), as tm1_write_cells does.
+    elements = bindLeftOutSandbox(dims, elements, sandbox) ?? elements;
     if (elements.length !== dims.length) {
       throw new Error(
         `Cube '${cubeName}' has ${dims.length} dimension(s) (${dims.join(", ")}) but ${elements.length} element(s) were given`,
@@ -109,7 +116,10 @@ export class CellService {
       Cells?: Array<{ Value: CellValue; FormattedValue: string }>;
     }>(
       "POST",
-      "/api/v1/ExecuteMDX?$expand=Cells($select=Value,FormattedValue)",
+      withSandboxParam(
+        "/api/v1/ExecuteMDX?$expand=Cells($select=Value,FormattedValue)",
+        sandbox,
+      ),
       { MDX: mdx },
     );
 
@@ -131,14 +141,15 @@ export class CellService {
     } finally {
       // Free the session-scoped cellset best-effort so single-value reads don't
       // leak TM1 server memory while keep-alive holds the session open.
-      await freeCellset(this.http, cellsetResponse.ID);
+      await freeCellset(this.http, cellsetResponse.ID, undefined, sandbox);
     }
   }
 
   /**
    * Execute an MDX query and return structured cells + axes. Supports
    * pagination via top/skip on the Cells expand. opts.timeoutMs overrides the
-   * 30s default for heavy queries.
+   * 30s default for heavy queries. With `sandbox`, the cellset is evaluated in
+   * that sandbox instead of base data.
    * POST /api/v1/ExecuteMDX
    */
   async executeMdx(
@@ -146,6 +157,7 @@ export class CellService {
     top?: number,
     skip?: number,
     opts?: RequestOptions,
+    sandbox?: string,
   ): Promise<MdxResult> {
     let cellsExpand = "Cells($select=Value,FormattedValue";
     if (top !== undefined) {
@@ -158,7 +170,10 @@ export class CellService {
 
     const axesExpand =
       "Axes($expand=Tuples($expand=Members($select=Name;$expand=Hierarchy($select=Name))))";
-    const path = `/api/v1/ExecuteMDX?$expand=${cellsExpand},${axesExpand}`;
+    const path = withSandboxParam(
+      `/api/v1/ExecuteMDX?$expand=${cellsExpand},${axesExpand}`,
+      sandbox,
+    );
 
     const response = await this.http.request<{
       ID: string;
@@ -179,7 +194,7 @@ export class CellService {
       // Cellsets are session-scoped and never auto-expire while keep-alive holds
       // the session open, so a read that leaves them behind leaks TM1 server
       // memory indefinitely. Free it best-effort (mirrors TM1py's delete_cellset).
-      await freeCellset(this.http, response.ID, opts);
+      await freeCellset(this.http, response.ID, opts, sandbox);
     }
   }
 
@@ -199,11 +214,16 @@ export class CellService {
    *
    * Prefer TI processes for reproducible data loads. Use this REST path only
    * for ad-hoc / debugging writes.
+   *
+   * With `sandbox`, every request of the write carries `!sandbox=<name>`: the
+   * cellset is opened in the sandbox, so the PATCH lands there and base data
+   * is untouched.
    */
   async writeCells(
     cubeName: string,
     dimensions: string[],
     cells: Array<{ elements: string[]; value: number | string }>,
+    sandbox?: string,
   ): Promise<void> {
     if (cells.length === 0) return;
 
@@ -242,21 +262,24 @@ export class CellService {
       const mdx = `SELECT {${tupleOf(c)}} ON COLUMNS FROM [${cube}]`;
       const cellset = await this.http.request<{ ID: string }>(
         "POST",
-        "/api/v1/ExecuteMDX",
+        withSandboxParam("/api/v1/ExecuteMDX", sandbox),
         { MDX: mdx },
       );
       const id = cellset.ID;
       try {
         await this.http.request<void>(
           "PATCH",
-          `/api/v1/Cellsets('${odataKey(id)}')/Cells(0)`,
+          withSandboxParam(
+            `/api/v1/Cellsets('${odataKey(id)}')/Cells(0)`,
+            sandbox,
+          ),
           { Value: c.value },
         );
       } finally {
         try {
           await this.http.request<void>(
             "DELETE",
-            `/api/v1/Cellsets('${odataKey(id)}')`,
+            withSandboxParam(`/api/v1/Cellsets('${odataKey(id)}')`, sandbox),
           );
         } catch {
           // cleanup best-effort
@@ -277,13 +300,16 @@ export class CellService {
       let bulkFailed = false;
       const cellset = await this.http.request<{ ID: string }>(
         "POST",
-        "/api/v1/ExecuteMDX",
+        withSandboxParam("/api/v1/ExecuteMDX", sandbox),
         { MDX: mdx },
       );
       try {
         await this.http.request<void>(
           "PATCH",
-          `/api/v1/Cellsets('${odataKey(cellset.ID)}')/Cells`,
+          withSandboxParam(
+            `/api/v1/Cellsets('${odataKey(cellset.ID)}')/Cells`,
+            sandbox,
+          ),
           chunk.map((c, ordinal) => ({ Ordinal: ordinal, Value: c.value })),
         );
         written += chunk.length;
@@ -299,7 +325,10 @@ export class CellService {
         try {
           await this.http.request<void>(
             "DELETE",
-            `/api/v1/Cellsets('${odataKey(cellset.ID)}')`,
+            withSandboxParam(
+              `/api/v1/Cellsets('${odataKey(cellset.ID)}')`,
+              sandbox,
+            ),
           );
         } catch {
           // cleanup best-effort
