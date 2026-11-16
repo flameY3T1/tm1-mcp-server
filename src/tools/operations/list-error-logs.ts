@@ -118,7 +118,7 @@ export const registerListErrorLogs = defineTool({
       .string()
       .optional()
       .describe(
-        "Only logs with LastUpdated >= this ISO timestamp, e.g. '2026-05-01T00:00:00'",
+        "Only logs whose filename timestamp is >= this ISO timestamp, e.g. '2026-05-01T00:00:00'",
       ),
     groupBy: z
       .literal("process")

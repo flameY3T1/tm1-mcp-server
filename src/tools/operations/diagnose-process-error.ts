@@ -34,7 +34,7 @@ export const registerDiagnoseProcessError = defineTool({
       .string()
       .optional()
       .describe(
-        "Only consider logs with LastUpdated >= this ISO timestamp, e.g. '2026-05-04T00:00:00'.",
+        "Only consider logs whose filename timestamp is >= this ISO timestamp, e.g. '2026-05-04T00:00:00'.",
       ),
     maxLogs: z
       .number()
@@ -96,13 +96,12 @@ export const registerDiagnoseProcessError = defineTool({
     },
     tm1Client,
   ) => {
-    const allFiles = await tm1Client.server.listErrorLogFiles({ top: 500 });
+    const allFiles = await tm1Client.server.listErrorLogFiles({
+      since,
+      top: 500,
+    });
     const matching = allFiles
       .filter((f) => matchesProcessName(f.filename, processName))
-      .filter((f) => {
-        if (!since) return true;
-        return !f.lastUpdated || f.lastUpdated >= since;
-      })
       .slice(0, maxLogs);
 
     if (matching.length === 0) {

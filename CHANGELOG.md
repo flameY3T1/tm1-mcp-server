@@ -72,6 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tm1_search_elements`:** an empty `cubeName` or `dimensionName` is now rejected as invalid input.
   Before, `cubeName: ""` slipped past the "exactly one of" check and searched a dimension named
   `undefined`, which failed with a misleading not-found error.
+- **`tm1_diagnose_process_error`: `since` now filters.** It compared against a field the log listing
+  never fills, so every log passed. It now uses the timestamp in the log file name, as
+  `tm1_list_error_logs` does.
 
 ### Security
 
