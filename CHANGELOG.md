@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correctly), `tm1_discard_sandbox`, `tm1_delete_sandbox` and `tm1_publish_sandbox`.
 - **`sandbox` argument** on `tm1_write_cells`, `tm1_execute_mdx` and `tm1_get_cell_value`: every
   request of the call carries TM1's `!sandbox` parameter, including the cellset delete.
+- **The sandbox tools are hidden on a server that has sandboxing switched off.** After each login the
+  server reads `DisableSandboxing` from TM1. With `DisableSandboxing=T` the six sandbox tools leave
+  `tools/list` (stdio sends `notifications/tools/list_changed`) and a call to one is refused. With
+  `TM1_MODE=sandbox` the log then warns that nothing can be written. TM1 12 has no such switch, and
+  a setting that cannot be read leaves the tools visible. The `sandbox` argument stays in place.
 
 ### Fixed
 

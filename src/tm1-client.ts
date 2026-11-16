@@ -97,6 +97,7 @@ export class TM1Client {
     this.monitoring = new MonitoringService(this.http);
     this.files = new FileService(this.http);
     this.sandboxes = new SandboxService(this.http);
+    sessionManager.onLogin = () => void this.readSandboxing();
   }
 
   /** The configured TM1 major version (11 or 12). Fixed for this connection. */
@@ -112,6 +113,40 @@ export class TM1Client {
   /** TM1_SANDBOX_PREFIX: the sandboxes this server manages in sandbox mode. */
   get sandboxPrefix(): string {
     return this.config.sandboxPrefix;
+  }
+
+  /**
+   * Whether the TM1 server has sandboxing switched off, as read after the
+   * last login. `undefined` until then, and when it cannot be read — the
+   * sandbox tools stay visible in that case.
+   */
+  sandboxingDisabled: boolean | undefined;
+
+  /** Called when `sandboxingDisabled` changes. stdio re-checks its tools here. */
+  onSandboxingChange: (() => void) | undefined;
+
+  private async readSandboxing(): Promise<void> {
+    let disabled: boolean;
+    try {
+      disabled = await this.server.isSandboxingDisabled();
+    } catch (err) {
+      this.logger.debug({ err }, "Could not read DisableSandboxing");
+      return;
+    }
+    if (disabled === this.sandboxingDisabled) return;
+    this.sandboxingDisabled = disabled;
+    if (disabled) {
+      const text =
+        "TM1 runs with DisableSandboxing=T — the sandbox tools are hidden";
+      if (this.config.mode === "sandbox") {
+        this.logger.warn(
+          `${text}, so TM1_MODE=sandbox cannot write anything. Set DisableSandboxing=F in tm1s.cfg and restart TM1.`,
+        );
+      } else {
+        this.logger.info(text);
+      }
+    }
+    this.onSandboxingChange?.();
   }
 
   /**

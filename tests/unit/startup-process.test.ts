@@ -141,6 +141,36 @@ describe("process startup", () => {
     }
   }, 30000);
 
+  it("drops the sandbox tools once TM1 reports DisableSandboxing", async () => {
+    const tm1Port = await listen(
+      http.createServer((req, res) => {
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Set-Cookie": "TM1SessionId=fakesession; Path=/",
+        });
+        res.end(
+          JSON.stringify(
+            req.url?.includes("ActiveConfiguration")
+              ? { Administration: { DisableSandboxing: true } }
+              : { value: [] },
+          ),
+        );
+      }),
+    );
+    const client = stdioClient(start(tm1Port, { TM1_MODE: "readwrite" }));
+    await client.initialize();
+
+    const names = async () =>
+      (
+        (await client.call("tools/list", {})).result as unknown as {
+          tools: { name: string }[];
+        }
+      ).tools.map((t) => t.name);
+    // The login runs after the transport is up, so the tools go a moment later.
+    while ((await names()).some((n) => n.includes("sandbox"))) await sleep(20);
+    expect(await names()).toContain("tm1_write_cells");
+  }, 30000);
+
   it("does not offer resource subscriptions over stateless HTTP", async () => {
     const tm1Port = await listen(net.createServer(() => {}));
     const probe = net.createServer();

@@ -301,9 +301,18 @@ const REGISTRARS: ToolRegistrar[] = [
   registerPublishSandbox,
 ];
 
+/**
+ * Registers every tool. The returned function re-checks the `enabled` gates
+ * that depend on TM1 (see ToolSpec.enabled) — call it once TM1 has answered.
+ */
 export function registerAllTools(
   server: McpServer,
   tm1Client: TM1Client,
-): void {
-  for (const register of REGISTRARS) register(server, tm1Client);
+): () => void {
+  const rechecks = REGISTRARS.flatMap(
+    (register) => register(server, tm1Client) ?? [],
+  );
+  return () => {
+    for (const recheck of rechecks) recheck();
+  };
 }

@@ -70,6 +70,7 @@ export const registerCompareSandbox = defineTool({
     "Use before tm1_publish_sandbox, or to review what a sandbox-mode session wrote.",
   ],
   annotations: READ_ONLY,
+  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
   output: SandboxCompareSchema,
   input: {
     sandboxName: z.string().describe("Sandbox to compare with base data"),

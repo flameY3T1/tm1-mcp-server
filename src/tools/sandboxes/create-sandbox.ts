@@ -17,6 +17,7 @@ export const registerCreateSandbox = defineTool({
     "After: tm1_write_cells with sandbox=<name>, then tm1_compare_sandbox to review the change.",
   ],
   annotations: WRITE,
+  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
   sandboxScoped: true,
   output: MutationResultSchema,
   input: {

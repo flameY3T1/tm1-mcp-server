@@ -17,6 +17,7 @@ export const registerPublishSandbox = defineTool({
     "Before: tm1_compare_sandbox to see exactly what will change.",
   ],
   annotations: DESTRUCTIVE,
+  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
   output: MutationResultSchema,
   input: {
     sandboxName: z.string().describe("Sandbox to publish"),

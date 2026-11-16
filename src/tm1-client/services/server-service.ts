@@ -109,6 +109,18 @@ export class ServerService {
   constructor(private readonly http: TM1HttpClient) {}
 
   /**
+   * True when tm1s.cfg sets DisableSandboxing=T. v12 has no such switch and
+   * reports null, which reads as "not disabled".
+   * GET /api/v1/ActiveConfiguration
+   */
+  async isSandboxingDisabled(): Promise<boolean> {
+    const active = await this.http.request<{
+      Administration?: { DisableSandboxing?: boolean | null };
+    }>("GET", "/api/v1/ActiveConfiguration");
+    return active.Administration?.DisableSandboxing === true;
+  }
+
+  /**
    * Fetch TM1 server configuration. Merges /Configuration and
    * /ActiveConfiguration; tolerates ActiveConfiguration being absent on
    * older builds.

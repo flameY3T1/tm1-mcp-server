@@ -14,6 +14,7 @@ export const registerListSandboxes = defineTool({
     "Related: tm1_create_sandbox, tm1_compare_sandbox.",
   ],
   annotations: READ_ONLY,
+  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
   output: pageShapeFor(SandboxItemSchema),
   input: {
     ...PAGINATION_SCHEMA,

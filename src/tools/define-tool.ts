@@ -24,6 +24,7 @@
 //     `additionalProperties: true` without the caller remembering the helper.
 import type {
   McpServer,
+  RegisteredTool,
   ToolCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ZodObject, ZodRawShape, ZodTypeAny } from "zod";
@@ -33,7 +34,11 @@ import { asOutputSchema } from "./schemas/output-schema.js";
 import { markdownCapable } from "./schemas/markdown-capable.js";
 
 /** Registrar shape expected by the REGISTRARS array in ./index.ts. */
-export type ToolRegistrar = (server: McpServer, tm1Client: TM1Client) => void;
+// A registrar may hand back a re-check for its `enabled` gate — see defineTool().
+export type ToolRegistrar = (
+  server: McpServer,
+  tm1Client: TM1Client,
+) => (() => void) | void;
 
 export interface ToolSpec<I extends ZodRawShape> {
   /** Wire name, `tm1_*`. */
@@ -60,6 +65,11 @@ export interface ToolSpec<I extends ZodRawShape> {
    * entirely — it never appears in tools/list. This is deliberately separate
    * from the `requiresVersion` annotation, which is a client-facing HINT and
    * is also carried by tools that stay registered on both generations.
+   *
+   * A gate may also read what TM1 reports after login
+   * (`tm1Client.sandboxingDisabled`). It must then answer true while that is
+   * still unknown: the tool is registered at startup, before the login, and
+   * the registrar's returned re-check hides or shows it afterwards.
    */
   enabled?: (tm1Client: TM1Client) => boolean;
   /**
@@ -152,6 +162,17 @@ export function defineTool<I extends ZodRawShape>(
       args: Parameters<ToolCallback<I>>[0],
       extra: Parameters<ToolCallback<I>>[1],
     ) => spec.handler(args, tm1Client, extra)) as unknown as ToolCallback<I>;
-    server.tool(spec.name, description, spec.input, cb);
+    // undefined when the TM1_MODE filter in ./with-annotations.ts dropped it.
+    const registered = server.tool(spec.name, description, spec.input, cb) as
+      RegisteredTool | undefined;
+    const gate = spec.enabled;
+    if (!gate || !registered) return;
+    return () => {
+      const want = gate(tm1Client);
+      // enable()/disable() notify the client every time, so only on a change.
+      if (registered.enabled === want) return;
+      if (want) registered.enable();
+      else registered.disable();
+    };
   };
 }

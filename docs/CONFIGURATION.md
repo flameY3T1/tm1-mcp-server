@@ -101,6 +101,13 @@ the change) → a person decides, and either publishes with a `readwrite` server
 (`tm1_publish_sandbox`) or throws it away (`tm1_discard_sandbox`,
 `tm1_delete_sandbox`).
 
+**`DisableSandboxing=T`:** a TM1 11 server with this line in `tm1s.cfg` has no
+sandboxes at all. The server reads the setting after each login and then hides
+the six sandbox tools, in every mode. With `TM1_MODE=sandbox` nothing can be
+written in that case, and the log says so. A client that does not follow
+`notifications/tools/list_changed` keeps showing the tools; a call to one is
+refused. If the account may not read the setting, the tools stay visible.
+
 Reads can look inside a sandbox in every mode: `tm1_execute_mdx` and
 `tm1_get_cell_value` take an optional `sandbox`.
 

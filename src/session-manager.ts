@@ -50,6 +50,11 @@ async function drained(response: Response): Promise<Response> {
 
 export class SessionManager {
   private sessionCookie: string | null = null;
+  /**
+   * Called after every successful login, first or re-auth. Must not await TM1:
+   * it runs inside the shared in-flight login.
+   */
+  onLogin: (() => void) | undefined;
   // A PAW gateway (…/api/v0/tm1/<db>) names the session TM1SessionId_<db>
   // and authenticates later requests by its own paSession cookie. Then the
   // session token is the whole "name=value; …" list the login set, sent back
@@ -195,6 +200,7 @@ export class SessionManager {
 
     this.sessionCookie = cookie;
     this.logger.info("Authentication successful, session established");
+    this.onLogin?.();
     return cookie;
   }
 

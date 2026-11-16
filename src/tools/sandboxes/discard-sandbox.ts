@@ -14,6 +14,7 @@ export const registerDiscardSandbox = defineTool({
     "With TM1_MODE=sandbox only sandboxes named with TM1_SANDBOX_PREFIX. Related: tm1_delete_sandbox removes the sandbox too.",
   ],
   annotations: DESTRUCTIVE,
+  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
   sandboxScoped: true,
   output: MutationResultSchema,
   input: {
