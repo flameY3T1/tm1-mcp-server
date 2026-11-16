@@ -19,6 +19,10 @@ interface RefIssue {
   context: string;
 }
 
+// TM1 treats `Total Year`, `totalyear` and `TOTAL YEAR` as one object: names
+// are compared without case and without spaces.
+const nameKey = (name: string): string => name.toLowerCase().replace(/ /g, "");
+
 const TABS = ["prolog", "metadata", "data", "epilog"] as const;
 type Tab = (typeof TABS)[number];
 
@@ -287,22 +291,22 @@ export const registerValidateProcessRefs = defineTool({
     const cubeNames = new Set(
       cubes
         .filter((c) => includeControl || !c.name.startsWith("}"))
-        .map((c) => c.name.toLowerCase()),
+        .map((c) => nameKey(c.name)),
     );
     const dimNames = new Set(
       dims
         .filter((d) => includeControl || !d.name.startsWith("}"))
-        .map((d) => d.name.toLowerCase()),
+        .map((d) => nameKey(d.name)),
     );
 
     const issues: RefIssue[] = [];
     for (const [name, info] of cubeRefs) {
-      if (!cubeNames.has(name.toLowerCase())) {
+      if (!cubeNames.has(nameKey(name))) {
         issues.push({ kind: "cube", name, ...info });
       }
     }
     for (const [name, info] of dimRefs) {
-      if (!dimNames.has(name.toLowerCase())) {
+      if (!dimNames.has(nameKey(name))) {
         issues.push({ kind: "dimension", name, ...info });
       }
     }

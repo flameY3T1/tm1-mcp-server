@@ -200,4 +200,16 @@ describe("tm1_validate_process_refs reference extraction", () => {
     );
     expect(payload.unresolved).toBe(0);
   });
+
+  it("matches names that differ only in case or spaces, as TM1 does", async () => {
+    const cb = captureHandler({
+      cubes: ["SalesPlan"],
+      dimensions: ["Total Year"],
+    });
+    const payload = await run(
+      cb,
+      "nV = CellGetN('sales plan', 'a');\nn = DIMIX('TotalYear', 'x');",
+    );
+    expect(payload.unresolved).toBe(0);
+  });
 });

@@ -77,6 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tm1_list_error_logs` does.
 - **`tm1_validate_process_refs` no longer reports the subset of `SubsetCreateByMDX` as a missing
   cube.** The first argument of that function is the subset name.
+- **`tm1_validate_process_refs` compares names the way TM1 does.** A reference to `Total Year` was
+  reported missing when the server had `TotalYear`: the check ignored case but not spaces.
 
 ### Security
 
