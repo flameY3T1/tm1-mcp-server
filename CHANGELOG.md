@@ -87,6 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   idle timeout, so every server start left one behind. Logout now calls
   `POST /api/v1/ActiveSession/tm1.Close`, and a refused logout is logged as a warning instead of
   as "Logged out".
+- **Object usage and the call graph find dimensions in mixed rule references.** A reference that
+  names some dimensions and leaves others positional, such as `['Year':'2026','Sales']`, yielded
+  no dimension at all. Names with a doubled quote (`'It''s'`) are read correctly as well.
 
 ### Security
 

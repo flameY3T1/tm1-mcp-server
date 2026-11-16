@@ -1,10 +1,6 @@
 import { KNOWN_SIGNATURES } from "./tiSignatures.js";
-import {
-  extractDbCalls,
-  extractBracketRefs,
-  parseBracketDimRefs,
-  validateBracketRefSyntax,
-} from "./rulesLinter.js";
+import { extractDbCalls } from "./rulesLinter.js";
+import { extractBracketLists } from "../feeders/brackets.js";
 import { joinContinuationLines } from "./tiParser.js";
 import {
   buildProcessEnv,
@@ -558,15 +554,13 @@ export function extractRulesReferences(text: string): RawRuleRef[] {
       }
     }
 
-    // [...] → dimension references (only valid syntactic refs)
-    for (const bracket of extractBracketRefs(line)) {
-      if (validateBracketRefSyntax(bracket) !== null) {
-        continue;
-      }
-      if (!bracket.includes("'")) {
-        continue;
-      }
-      for (const { dim } of parseBracketDimRefs(bracket)) {
+    // [...] → dimension references: every qualified entry ('Dim':…), also
+    // next to positional ones (['Year':'2026','Sales']). The comment is cut
+    // off first; neutralizeLine() keeps offsets, so its length is where it starts.
+    const code = line.slice(0, neutralizeLine(line).length);
+    for (const list of extractBracketLists(code)) {
+      for (const { dim } of list.entries) {
+        if (dim === undefined) continue;
         refs.push({
           line: lineIdx,
           section,
