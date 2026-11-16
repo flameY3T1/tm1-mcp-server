@@ -95,6 +95,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dimension names are matched the way TM1 matches them.** `tm1_write_cells` and the other cell
   tools refused a dimension written `costcenter` when the cube has `Cost Center`; names now compare
   without case and without spaces everywhere a tool looks one up.
+- **`tm1_audit_complexity` lints lines that hold several statements.** The lint parsed one statement
+  per line, so on `a=1; b=2;` it saw one assignment, and on an `IF … ELSE … ENDIF` written on one
+  line none. It now splits such lines first, as the metrics already did, and reports the line of
+  the source.
 
 ### Security
 

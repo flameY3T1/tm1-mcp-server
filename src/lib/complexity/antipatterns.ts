@@ -8,7 +8,11 @@
  */
 import { parseTiCode } from "../callgraph/tiParser.js";
 import type { TiStatement } from "../callgraph/types.js";
-import type { ProcessCodeInput, TiTab } from "./process-metrics.js";
+import {
+  splitMultiStatementLines,
+  type ProcessCodeInput,
+  type TiTab,
+} from "./process-metrics.js";
 import { TI_VAR } from "../ti-identifier.js";
 
 export type Severity = "error" | "warn" | "info";
@@ -319,17 +323,27 @@ export function lintProcess(
     TiTab,
     Extract<ReturnType<typeof parseTiCode>, { ok: true }>["ast"]
   >();
+  // The parser reads one statement per line, so a line that packs several
+  // (`IF(x); y=1; ENDIF;`) is split first, as the metrics do. Findings then
+  // carry a line of the split text; `sourceLine` maps it back.
+  const lineOrigins = new Map<TiTab, number[]>();
+  const sourceLine = (tab: TiTab, line: number): number =>
+    (lineOrigins.get(tab)?.[line - 1] ?? line - 1) + 1;
   for (const tab of TABS) {
     const src = code[tab] ?? "";
     if (src.trim() === "") continue;
-    const parsed = parseTiCode(src);
+    const split = splitMultiStatementLines(src);
+    const parsed = parseTiCode(split.text);
     if (!parsed.ok) continue;
     parsedTabs.set(tab, parsed.ast);
+    lineOrigins.set(tab, split.lineOrigin);
   }
 
   // Existing per-tab rules
   for (const [tab, ast] of parsedTabs) {
+    const first = findings.length;
     walk(ast, 0, 0, { process, tab, cellGetDimThreshold, clearProc, findings });
+    for (const f of findings.slice(first)) f.line = sourceLine(tab, f.line);
   }
 
   // dead-assignment: two-pass over all parsed tabs
@@ -357,7 +371,7 @@ export function lintProcess(
       findings.push({
         process,
         tab: c.tab,
-        line: c.line,
+        line: sourceLine(c.tab, c.line),
         rule: "dead-assignment",
         severity: "info",
         snippet: `${c.originalVar} = ...`,

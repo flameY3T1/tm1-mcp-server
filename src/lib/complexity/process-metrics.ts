@@ -160,19 +160,31 @@ const TABS: ReadonlyArray<TiTab> = ["prolog", "metadata", "data", "epilog"];
 // so we normalize by inserting a newline after every top-level `;` (outside
 // of strings and `#` line-comments) before parsing. Raw LOC counts use the
 // original source via classifyLines.
-function splitMultiStatementLines(src: string): string {
+//
+// `lineOrigin[i]` is the 0-based source line that line `i` of `text` came
+// from, so a finding on the split text can report the line the author sees.
+export function splitMultiStatementLines(src: string): {
+  text: string;
+  lineOrigin: number[];
+} {
   let out = "";
   let inString = false;
   let inLineComment = false;
+  let sourceLine = 0;
+  const lineOrigin = [0];
+  const copy = (c: string) => {
+    out += c;
+    if (c === "\n") lineOrigin.push(++sourceLine);
+  };
   for (let i = 0; i < src.length; i++) {
-    const c = src[i];
+    const c = src[i]!;
     if (inLineComment) {
-      out += c;
+      copy(c);
       if (c === "\n") inLineComment = false;
       continue;
     }
     if (inString) {
-      out += c;
+      copy(c);
       if (c === "'") {
         if (src[i + 1] === "'") {
           out += "'";
@@ -198,12 +210,13 @@ function splitMultiStatementLines(src: string): string {
       const next = src[i + 1];
       if (next !== undefined && next !== "\n" && next !== "\r") {
         out += "\n";
+        lineOrigin.push(sourceLine);
       }
       continue;
     }
-    out += c;
+    copy(c);
   }
-  return out;
+  return { text: out, lineOrigin };
 }
 
 function classifyLines(src: string): {
@@ -295,7 +308,7 @@ export function computeTabMetrics(
 ): TabMetrics {
   const w = resolveWeights(weights);
   const counts = classifyLines(src);
-  const parseRes = parseTiCode(splitMultiStatementLines(src));
+  const parseRes = parseTiCode(splitMultiStatementLines(src).text);
   const acc = { branches: 0, maxNesting: 0 };
   const cost = { loopCost: 0, ifCost: 0, hotInLoop: 0 };
   let parseError = false;
