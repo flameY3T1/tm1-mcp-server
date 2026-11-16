@@ -16,15 +16,14 @@
 //
 // Ported from the ffschrattenecker/tm1-mcp-server fork (d2ad818).
 import { TM1Error, TM1ErrorCode } from "../types.js";
+import { tm1NameEquals, tm1NameKey } from "./tm1-name.js";
 
 export const SANDBOX_DIMENSION = "Sandboxes";
 export const BASE_SANDBOX = "Base";
 
 /** Index of the cube's `Sandboxes` dimension, or -1. */
 export function sandboxPosition(cubeDimensions: readonly string[]): number {
-  return cubeDimensions.findIndex(
-    (d) => d.toLowerCase() === SANDBOX_DIMENSION.toLowerCase(),
-  );
+  return cubeDimensions.findIndex((d) => tm1NameEquals(d, SANDBOX_DIMENSION));
 }
 
 /**
@@ -61,13 +60,13 @@ export function resolveCellAddress(
   given: readonly string[],
   outcome = "Nothing was written.",
 ): ResolvedAddress {
-  const byLower = new Map(cubeDimensions.map((d, i) => [d.toLowerCase(), i]));
+  const byKey = new Map(cubeDimensions.map((d, i) => [tm1NameKey(d), i]));
   const positions: number[] = [];
   const unknown: string[] = [];
   const duplicate: string[] = [];
   const seen = new Set<number>();
   for (const name of given) {
-    const pos = byLower.get(name.toLowerCase());
+    const pos = byKey.get(tm1NameKey(name));
     if (pos === undefined) unknown.push(name);
     else if (seen.has(pos)) duplicate.push(name);
     else seen.add(pos);

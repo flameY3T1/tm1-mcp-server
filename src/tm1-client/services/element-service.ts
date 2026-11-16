@@ -24,6 +24,7 @@ import type { CellService } from "./cell-service.js";
 import { rethrowIfSystemic } from "./fallback.js";
 import { odataKey } from "./odata-page.js";
 import { escapeMdxName, mdxString } from "../../lib/mdx.js";
+import { tm1NameEquals } from "../../lib/tm1-name.js";
 
 // Max in-flight per-element REST calls within a single bulkUpsert pass. Bounds
 // pressure on TM1's worker pool (mirrors the cap the feeder-audit fan-out uses)
@@ -929,8 +930,7 @@ export class ElementService {
     // error (no attribute at all means no attribute cube). TM1 matches
     // attribute names ignoring case and spaces, so compare the same way.
     const attrs = await this.listAttributes(dimensionName, hierarchyName);
-    const key = (n: string) => n.replace(/\s/g, "").toLowerCase();
-    if (!attrs.some((a) => key(a.name) === key(attributeName))) {
+    if (!attrs.some((a) => tm1NameEquals(a.name, attributeName))) {
       throw new TM1Error({
         code: TM1ErrorCode.NOT_FOUND,
         message:

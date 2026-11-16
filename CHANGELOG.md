@@ -92,6 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no dimension at all. Names with a doubled quote (`'It''s'`) are read correctly as well.
 - **TI names with a quote are followed.** A doubled quote inside a TI literal (`'it''s'`) made the
   call graph and data flow drop the call or treat the variable as unknown.
+- **Dimension names are matched the way TM1 matches them.** `tm1_write_cells` and the other cell
+  tools refused a dimension written `costcenter` when the cube has `Cost Center`; names now compare
+  without case and without spaces everywhere a tool looks one up.
 
 ### Security
 

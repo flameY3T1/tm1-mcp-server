@@ -9,6 +9,7 @@ import {
 } from "../../lib/callgraph/variableEnv.js";
 import { READ_ONLY } from "../annotations.js";
 import { ValidateProcessRefsResultSchema } from "../schemas/items.js";
+import { tm1NameKey } from "../../lib/tm1-name.js";
 import { defineTool } from "../define-tool.js";
 
 interface RefIssue {
@@ -18,10 +19,6 @@ interface RefIssue {
   line: number;
   context: string;
 }
-
-// TM1 treats `Total Year`, `totalyear` and `TOTAL YEAR` as one object: names
-// are compared without case and without spaces.
-const nameKey = (name: string): string => name.toLowerCase().replace(/ /g, "");
 
 const TABS = ["prolog", "metadata", "data", "epilog"] as const;
 type Tab = (typeof TABS)[number];
@@ -291,22 +288,22 @@ export const registerValidateProcessRefs = defineTool({
     const cubeNames = new Set(
       cubes
         .filter((c) => includeControl || !c.name.startsWith("}"))
-        .map((c) => nameKey(c.name)),
+        .map((c) => tm1NameKey(c.name)),
     );
     const dimNames = new Set(
       dims
         .filter((d) => includeControl || !d.name.startsWith("}"))
-        .map((d) => nameKey(d.name)),
+        .map((d) => tm1NameKey(d.name)),
     );
 
     const issues: RefIssue[] = [];
     for (const [name, info] of cubeRefs) {
-      if (!cubeNames.has(nameKey(name))) {
+      if (!cubeNames.has(tm1NameKey(name))) {
         issues.push({ kind: "cube", name, ...info });
       }
     }
     for (const [name, info] of dimRefs) {
-      if (!dimNames.has(nameKey(name))) {
+      if (!dimNames.has(tm1NameKey(name))) {
         issues.push({ kind: "dimension", name, ...info });
       }
     }
