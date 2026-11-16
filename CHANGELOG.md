@@ -99,6 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per line, so on `a=1; b=2;` it saw one assignment, and on an `IF … ELSE … ENDIF` written on one
   line none. It now splits such lines first, as the metrics already did, and reports the line of
   the source.
+- **`tm1_validate_process_refs` reads a doubled quote in a name.** `CellGetN('Owner''s Plan', …)`
+  was cut at the first quote and reported as a missing cube `Owner`.
 
 ### Security
 

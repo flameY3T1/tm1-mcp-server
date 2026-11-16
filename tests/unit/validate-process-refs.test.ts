@@ -212,4 +212,20 @@ describe("tm1_validate_process_refs reference extraction", () => {
     );
     expect(payload.unresolved).toBe(0);
   });
+
+  it("reads '' inside a name as one quote", async () => {
+    const cb = captureHandler({
+      cubes: ["Owner's Plan"],
+      dimensions: ["Owner's Region"],
+    });
+    const payload = await run(
+      cb,
+      "n = CellGetN('Owner''s Plan', 'a');\nn = DIMIX('Owner''s Region', 'x');",
+    );
+    expect(payload.unresolved).toBe(0);
+    expect(payload.cubeRefsScanned).toBe(1);
+
+    const missing = await run(cb, "n = CellGetN('Owner''s Budget', 'a');");
+    expect(missing.issues[0].name).toBe("Owner's Budget");
+  });
 });

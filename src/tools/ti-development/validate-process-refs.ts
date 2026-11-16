@@ -29,11 +29,13 @@ const CUBE_ARG1_FNS =
 const DIM_ARG1_FNS =
   "DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DimIx|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN";
 
+// A quote inside a TI literal is written twice ('it''s'); scanCode() unescapes it.
+const LITERAL = `'((?:[^']|'')+)'`;
 const CUBE_FN_RE = new RegExp(
-  `\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*'([^']+)'`,
+  `\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*${LITERAL}`,
   "gi",
 );
-const DIM_FN_RE = new RegExp(`\\b(${DIM_ARG1_FNS})\\s*\\(\\s*'([^']+)'`, "gi");
+const DIM_FN_RE = new RegExp(`\\b(${DIM_ARG1_FNS})\\s*\\(\\s*${LITERAL}`, "gi");
 
 // Arg-1 passed as a bare identifier (sCube = 'x'; CellGetN(sCube, ...)) —
 // resolved through the per-process variable env; unresolvable identifiers
@@ -133,7 +135,7 @@ function scanCode(
     regex.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = regex.exec(ln)) !== null) {
-      const name = resolveName ? resolveName(m[2]!) : m[2]!;
+      const name = resolveName ? resolveName(m[2]!) : m[2]!.replace(/''/g, "'");
       if (name && !found.has(name)) {
         found.set(name, { tab, line: i + 1, context: ln.trim().slice(0, 200) });
       }
