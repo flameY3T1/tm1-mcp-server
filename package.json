@@ -55,10 +55,11 @@
     "lint:tool-registration": "node scripts/check-tool-registration.mjs",
     "lint:input-naming": "node scripts/check-no-bare-name-input.mjs",
     "lint:mutation-envelope": "node scripts/check-mutation-envelope.mjs",
+    "lint:model-names": "node scripts/check-no-model-names.mjs",
     "lint:format": "prettier --check .",
     "format": "prettier --write .",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
-    "verify": "npm run audit:prod && npm run typecheck && npm run typecheck:tests && npm run lint:no-flat-api && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:input-naming && npm run lint:mutation-envelope && npm run lint:format && npm run lint:eslint && npm run coverage:check",
+    "verify": "npm run audit:prod && npm run typecheck && npm run typecheck:tests && npm run lint:no-flat-api && npm run lint:output-schema-budget && npm run lint:tool-registration && npm run lint:input-naming && npm run lint:model-names && npm run lint:mutation-envelope && npm run lint:format && npm run lint:eslint && npm run coverage:check",
     "tools:list": "node scripts/gen-tool-list.mjs",
     "tools:update-readme": "node scripts/gen-tool-list.mjs --write-readme",
     "lint:eslint": "eslint ."

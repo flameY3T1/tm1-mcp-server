@@ -192,6 +192,10 @@ Conventions for new tests, so the class is self-evident:
 - Describe what you changed, why, and how you verified it.
 - Never commit real customer object names, server hostnames, or credentials —
   use synthetic or redacted values in tests and docs.
+  `npm run lint:model-names` (part of `verify`) checks this against a list of
+  real names kept in `docs/internal/model-names/names.txt`. That file is
+  gitignored and exists only where someone created it; without it the gate is
+  skipped, so it does not replace your own care.
 
 ## Releasing
 
