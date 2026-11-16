@@ -440,6 +440,45 @@ describe("SessionManager", () => {
     });
   });
 
+  describe("logout()", () => {
+    it("waits for an in-flight login and deletes the session it opens", async () => {
+      let resolveLogin!: (res: Response) => void;
+      const heldLogin = new Promise<Response>((resolve) => {
+        resolveLogin = resolve;
+      });
+      fetchSpy
+        .mockImplementationOnce(() => heldLogin)
+        .mockResolvedValueOnce(mockFetchResponse({ ok: true })); // DELETE
+
+      const sm = new SessionManager(makeConfig(), mockLogger);
+      const authPromise = sm.authenticate();
+      const logoutPromise = sm.logout();
+
+      resolveLogin(
+        mockFetchResponse({ ok: true, setCookie: "TM1SessionId=late; Path=/" }),
+      );
+      await Promise.all([authPromise, logoutPromise]);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      const [, deleteOpts] = fetchSpy.mock.calls[1] as [
+        string,
+        { method: string; headers: Record<string, string> },
+      ];
+      expect(deleteOpts.method).toBe("DELETE");
+      expect(deleteOpts.headers.Cookie).toBe("TM1SessionId=late");
+      expect(sm.isSessionActive()).toBe(false);
+    });
+
+    it("does not wait on a failed login", async () => {
+      fetchSpy.mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+      const sm = new SessionManager(makeConfig(), mockLogger);
+      const authPromise = sm.authenticate().catch(() => undefined);
+      await sm.logout();
+      await authPromise;
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("keepAlive()", () => {
     it("clears the session cookie on keep-alive timeout to force re-auth", async () => {
       // Initial auth succeeds.

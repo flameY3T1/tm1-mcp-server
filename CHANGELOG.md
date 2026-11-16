@@ -79,6 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cube.** The first argument of that function is the subset name.
 - **`tm1_validate_process_refs` compares names the way TM1 does.** A reference to `Total Year` was
   reported missing when the server had `TotalYear`: the check ignored case but not spaces.
+- **Shutdown during the startup login no longer skips the logout.** `logout()` returned at once when
+  no session was held yet, and the login that was still running then opened one that nobody closed.
+  It now waits for that login first.
 
 ### Security
 

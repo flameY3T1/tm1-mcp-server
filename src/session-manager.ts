@@ -128,7 +128,7 @@ export class SessionManager {
     // orphaned sessions accumulating on the TM1 server across re-auths.
     if (this.sessionCookie) {
       try {
-        await this.logout();
+        await this.endSession();
       } catch (err) {
         this.logger.warn(
           { err },
@@ -340,6 +340,14 @@ export class SessionManager {
    * DELETE /api/v1/ActiveSession
    */
   async logout(): Promise<void> {
+    // Shutdown can land while the startup login is still in flight; wait for it
+    // so the session it opens is deleted too.
+    if (this.authInFlight) await this.authInFlight.catch(() => undefined);
+    await this.endSession();
+  }
+
+  /** Delete the held session; no-op without one. Used by logout() and re-auth. */
+  private async endSession(): Promise<void> {
     const cookie = this.sessionCookie;
     if (!cookie) {
       return;
@@ -349,7 +357,7 @@ export class SessionManager {
     this.logger.info("Logging out from TM1");
 
     try {
-      // Bound the logout request — authenticate() calls logout() first, so a
+      // Bound the logout request — authenticate() calls endSession() first, so a
       // hung DELETE (slow/unreachable server) would otherwise block re-auth
       // indefinitely. On timeout we still clear the cookie below.
       await withTimeout(this.config.requestTimeoutMs, "Logout", (signal) =>
