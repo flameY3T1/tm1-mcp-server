@@ -446,6 +446,23 @@ describe("control cubes in sandbox mode", () => {
     expect(writeCells).not.toHaveBeenCalled();
   });
 
+  // Measured on TM1 11 and 12: the server ignores spaces in a name, so
+  // `Cubes(' }ClientGroups')` and `FROM [ }ClientGroups]` reach the control cube.
+  it("refuses a control cube named with a leading space", async () => {
+    const { handler, writeCells } = writeCellsHandler(SANDBOX, [
+      "}Cubes",
+      "}Groups",
+    ]);
+    await expect(
+      handler({
+        ...SEC,
+        cubeName: " }CubeSecurity",
+        confirm: " }CubeSecurity",
+      }),
+    ).rejects.toThrow(/control cube/);
+    expect(writeCells).not.toHaveBeenCalled();
+  });
+
   it("leaves readwrite free to write control cubes", async () => {
     const { handler, writeCells } = writeCellsHandler(READWRITE, [
       "}Cubes",

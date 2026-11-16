@@ -13,6 +13,7 @@
 // "mcp-…" by hand hands it to the server. That is the trade for staying
 // stateless — no registry file to keep, lose or share between processes.
 import { TM1Error, TM1ErrorCode } from "../types.js";
+import { tm1NameKey } from "./tm1-name.js";
 
 /** What TM1_SANDBOX_PREFIX may contain. Kept narrow: it is matched case-insensitively. */
 export const SANDBOX_PREFIX_PATTERN = /^[A-Za-z0-9._-]+$/;
@@ -113,7 +114,9 @@ export function requireModelCube(
   ctx: SandboxPolicyContext,
   cubeName: string,
 ): void {
-  if (ctx.mode !== "sandbox" || !cubeName.startsWith("}")) return;
+  // Keyed as the server keys names: it ignores spaces, so ` }CubeSecurity`
+  // is the same cube.
+  if (ctx.mode !== "sandbox" || !tm1NameKey(cubeName).startsWith("}")) return;
   throw new TM1Error({
     code: TM1ErrorCode.PERMISSION_DENIED,
     message: `TM1_MODE=sandbox: "${cubeName}" is a control cube; security, attributes and other model metadata are not writable in this mode, not even into a sandbox. Nothing was sent.`,
