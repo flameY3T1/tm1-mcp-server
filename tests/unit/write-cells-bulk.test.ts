@@ -191,6 +191,56 @@ describe("CellService.writeCells — bulk cellset", () => {
       ).rejects.toThrow(/partially applied/);
     });
 
+    it("reports a per-cell write TM1 never answered as unknown, not failed", async () => {
+      // The bulk PATCH is refused (400); the per-cell PATCH then gets no
+      // answer. That cell may be committed, so it must not be listed as
+      // failed with an invitation to re-send it.
+      const { svc } = makeService({
+        failPatch: () => true,
+        patchError: (() => {
+          let n = 0;
+          return () =>
+            n++ === 0
+              ? refused()
+              : new TM1Error({
+                  code: TM1ErrorCode.LOCK_TIMEOUT,
+                  message: "Request timed out",
+                });
+        })(),
+      });
+      const err = await svc
+        .writeCells("Sales", ["Product", "Measure"], [cell("P1", 1)])
+        .catch((e: unknown) => e as TM1Error);
+      expect(err).toBeInstanceOf(TM1Error);
+      const details = JSON.parse((err as TM1Error).details!);
+      expect(details.failed).toEqual([]);
+      expect(details.unknown).toEqual([
+        { elements: ["P1", "M"], error: "Request timed out" },
+      ]);
+      expect((err as TM1Error).hint).toMatch(/[Rr]ead .* back/);
+      expect((err as TM1Error).hint).not.toMatch(/harmless/);
+    });
+
+    it("keeps a cell whose cellset could not be built as failed", async () => {
+      // Nothing was sent for that cell: the failure is certain.
+      const { svc } = makeService({
+        failPatch: (b) => Array.isArray(b),
+        mdxError: (n) =>
+          n === 1
+            ? new TM1Error({
+                code: TM1ErrorCode.LOCK_TIMEOUT,
+                message: "Request timed out",
+              })
+            : undefined,
+      });
+      const err = await svc
+        .writeCells("Sales", ["Product", "Measure"], [cell("P1", 1)])
+        .catch((e: unknown) => e as TM1Error);
+      const details = JSON.parse((err as TM1Error).details!);
+      expect(details.failed).toHaveLength(1);
+      expect(details.unknown).toBeUndefined();
+    });
+
     it("reports what landed and what did not", async () => {
       // Only the bulk PATCH fails; the per-cell retries succeed, so the report
       // must not claim a failure that the fallback resolved.

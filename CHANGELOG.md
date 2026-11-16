@@ -105,6 +105,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   literal (`CellGetS('}ElementAttributes_' | sDim, …)`) was checked as if the literal were the whole
   name. And the object of `CubeExists` / `DimensionExists` was reported missing, although asking
   whether it exists is the point of the call.
+- **`tm1_write_cells` no longer calls an unanswered per-cell write failed.** When TM1 refuses a bulk
+  write, the cells are sent one by one. A cell whose write then timed out or lost its connection
+  was listed as `failed` with the advice to re-send it, although it may be committed. Such cells
+  are now listed as `unknown`, and the hint asks for a read-back first.
 
 ### Security
 
