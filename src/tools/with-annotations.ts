@@ -3,7 +3,7 @@ import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z, type ZodRawShape, type ZodTypeAny } from "zod";
 import { slimJsonSchema } from "../lib/slim-json-schema.js";
-import { specFor } from "./define-tool.js";
+import { isToolUnavailable, specFor } from "./define-tool.js";
 import { strictVariants } from "./schemas/markdown-capable.js";
 import {
   formatTm1ErrorResult,
@@ -53,13 +53,19 @@ function isMarkdownPayload(value: unknown): boolean {
 }
 
 // Rewrite a tools/list response so every advertised schema is slimmed.
-function slimToolsListResult(result: unknown): unknown {
+// Tools whose `unavailable` gate names a reason are left out.
+function slimToolsListResult(
+  result: unknown,
+  hidden: (name: unknown) => boolean,
+): unknown {
   if (!result || typeof result !== "object") return result;
   const listing = result as { tools?: unknown };
   if (!Array.isArray(listing.tools)) return result;
   // Array.isArray widens an `unknown` to `any[]`; name the element type so the
   // map below stays checked.
-  const tools = listing.tools as unknown[];
+  const tools = (listing.tools as unknown[]).filter(
+    (entry) => !hidden((entry as { name?: unknown } | null)?.name),
+  );
   return {
     ...listing,
     tools: tools.map((entry) => {
@@ -101,7 +107,7 @@ function slimToolsListResult(result: unknown): unknown {
 //
 // The SDK installs that handler in the McpServer CONSTRUCTOR when the options
 // declare `capabilities.tools` — before anything here can run. That case is
-// refused up front instead of shipping an unslimmed list unnoticed.
+// refused up front instead of shipping an unfiltered list unnoticed.
 function installToolsListSlimming(server: McpServer): void {
   const lowLevel = server.server as unknown as {
     setRequestHandler: (
@@ -113,7 +119,7 @@ function installToolsListSlimming(server: McpServer): void {
     server.server.assertCanSetRequestHandler("tools/list");
   } catch {
     throw new Error(
-      "tools/list was installed before withAnnotations() ran, so schema slimming would be off. " +
+      "tools/list was installed before withAnnotations() ran, so schema slimming and the `unavailable` filter would be off. " +
         "Do not declare `capabilities.tools` on the McpServer — the SDK adds it on the first registration.",
     );
   }
@@ -124,7 +130,11 @@ function installToolsListSlimming(server: McpServer): void {
       return;
     }
     originalSetRequestHandler(schema, async (...args: unknown[]) =>
-      slimToolsListResult(await handler(...args)),
+      slimToolsListResult(
+        await handler(...args),
+        (name) =>
+          typeof name === "string" && isToolUnavailable(server.server, name),
+      ),
     );
   };
 }

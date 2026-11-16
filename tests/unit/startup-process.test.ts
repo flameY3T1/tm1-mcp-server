@@ -158,7 +158,12 @@ describe("process startup", () => {
       }),
     );
     const client = stdioClient(start(tm1Port, { TM1_MODE: "readwrite" }));
-    await client.initialize();
+    const init = await client.initialize();
+    // Not declared in the server options (see buildMcpServer); the SDK adds it.
+    expect(
+      (init.result?.capabilities as { tools?: { listChanged?: boolean } }).tools
+        ?.listChanged,
+    ).toBe(true);
 
     const names = async () =>
       (
@@ -169,8 +174,7 @@ describe("process startup", () => {
     // The login runs after the transport is up, so the tools go a moment later.
     while ((await names()).some((n) => n.includes("sandbox"))) await sleep(20);
     expect(await names()).toContain("tm1_write_cells");
-    // The wrap in withAnnotations() slims the schemas; the real process must
-    // apply it too.
+    // The same wrap slims the schemas; the real process must apply it too.
     expect(
       JSON.stringify((await client.call("tools/list", {})).result),
     ).not.toContain("$schema");

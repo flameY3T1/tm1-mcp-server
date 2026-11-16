@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import type pino from "pino";
 import { withAnnotations } from "../../src/tools/with-annotations.js";
 import { registerAllTools } from "../../src/tools/index.js";
@@ -37,15 +36,8 @@ const fakeClient = (sandboxingDisabled: boolean | undefined) =>
 
 async function connect(tm1Client: TM1Client) {
   const server = new McpServer({ name: "t", version: "0" });
-  const recheck = registerAllTools(
-    withAnnotations(server, logger, "readwrite"),
-    tm1Client,
-  );
+  registerAllTools(withAnnotations(server, logger, "readwrite"), tm1Client);
   const client = new Client({ name: "c", version: "0" });
-  let listChanged = 0;
-  client.setNotificationHandler(ToolListChangedNotificationSchema, () => {
-    listChanged++;
-  });
   const [a, b] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(a), client.connect(b)]);
   const sandboxTools = async () =>
@@ -53,7 +45,7 @@ async function connect(tm1Client: TM1Client) {
       .map((t) => t.name)
       .filter((n) => n.includes("sandbox"))
       .sort();
-  return { client, recheck, sandboxTools, listChanged: () => listChanged };
+  return { client, sandboxTools };
 }
 
 describe("sandbox tools follow DisableSandboxing", () => {
@@ -64,36 +56,31 @@ describe("sandbox tools follow DisableSandboxing", () => {
     }
   });
 
-  it("hides them on a running stdio server once TM1 reports it disabled", async () => {
+  it("hides them once TM1 reports it disabled, and a call says why", async () => {
     const tm1Client = fakeClient(undefined);
-    const { client, recheck, sandboxTools, listChanged } =
-      await connect(tm1Client);
-
-    recheck();
-    expect(listChanged()).toBe(0);
+    const { client, sandboxTools } = await connect(tm1Client);
 
     tm1Client.sandboxingDisabled = true;
-    recheck();
-    await vi.waitFor(() => expect(listChanged()).toBeGreaterThan(0));
     expect(await sandboxTools()).toEqual([]);
+    // Other tools are untouched.
+    expect((await client.listTools()).tools.length).toBeGreaterThan(50);
+
+    // A client that kept the old list still gets a reason, not a bare refusal.
     const res = await client.callTool({
       name: "tm1_list_sandboxes",
       arguments: {},
     });
     expect(res.isError).toBe(true);
-
-    // A second check without a change stays silent.
-    const before = listChanged();
-    recheck();
-    await new Promise((r) => setTimeout(r, 10));
-    expect(listChanged()).toBe(before);
+    const text = (res.content as { text: string }[])[0]?.text;
+    expect(text).toContain("tm1_list_sandboxes is not available");
+    expect(text).toContain("DisableSandboxing=T");
+    expect(text).toContain("UNSUPPORTED_OPERATION");
 
     tm1Client.sandboxingDisabled = false;
-    recheck();
     expect(await sandboxTools()).toEqual(SANDBOX_TOOLS);
   });
 
-  it("leaves them out of a server built after TM1 reported it disabled (HTTP)", async () => {
+  it("covers a server built after TM1 reported it disabled (HTTP)", async () => {
     const { sandboxTools } = await connect(fakeClient(true));
     expect(await sandboxTools()).toEqual([]);
   });

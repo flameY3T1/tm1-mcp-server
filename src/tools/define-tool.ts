@@ -24,21 +24,17 @@
 //     `additionalProperties: true` without the caller remembering the helper.
 import type {
   McpServer,
-  RegisteredTool,
   ToolCallback,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ZodObject, ZodRawShape, ZodTypeAny } from "zod";
 import type { TM1Client } from "../tm1-client.js";
+import { TM1Error, TM1ErrorCode } from "../types.js";
 import type { Tm1ToolAnnotations } from "./annotations.js";
 import { asOutputSchema } from "./schemas/output-schema.js";
 import { markdownCapable } from "./schemas/markdown-capable.js";
 
 /** Registrar shape expected by the REGISTRARS array in ./index.ts. */
-// A registrar may hand back a re-check for its `enabled` gate — see defineTool().
-export type ToolRegistrar = (
-  server: McpServer,
-  tm1Client: TM1Client,
-) => (() => void) | void;
+export type ToolRegistrar = (server: McpServer, tm1Client: TM1Client) => void;
 
 export interface ToolSpec<I extends ZodRawShape> {
   /** Wire name, `tm1_*`. */
@@ -65,13 +61,16 @@ export interface ToolSpec<I extends ZodRawShape> {
    * entirely — it never appears in tools/list. This is deliberately separate
    * from the `requiresVersion` annotation, which is a client-facing HINT and
    * is also carried by tools that stay registered on both generations.
-   *
-   * A gate may also read what TM1 reports after login
-   * (`tm1Client.sandboxingDisabled`). It must then answer true while that is
-   * still unknown: the tool is registered at startup, before the login, and
-   * the registrar's returned re-check hides or shows it afterwards.
    */
   enabled?: (tm1Client: TM1Client) => boolean;
+  /**
+   * Runtime gate, asked on every tools/list and on every call: the reason the
+   * tool cannot be used right now, or undefined. Unlike `enabled` it may read
+   * what TM1 reports after login (`tm1Client.sandboxingDisabled`), which is
+   * unknown when the tools are registered. The tool stays registered:
+   * tools/list leaves it out, and a call answers with the reason.
+   */
+  unavailable?: (tm1Client: TM1Client) => string | undefined;
   /**
    * Set on a writing tool that confines itself to a sandbox when the server
    * runs with TM1_MODE=sandbox (the handler enforces it through
@@ -104,6 +103,21 @@ export interface ResolvedSpec {
 // call runs. That is strictly before registerAllTools() executes, because the
 // import graph resolves first — so the Proxy always finds the spec.
 const SPECS = new Map<string, ResolvedSpec>();
+
+// Per MCP server (keyed by its low-level Server): the runtime gates of the
+// tools registered on it. Read by the tools/list filter in ./with-annotations.ts.
+const UNAVAILABLE = new WeakMap<
+  object,
+  Map<string, () => string | undefined>
+>();
+
+/** True when the tool's `unavailable` gate currently names a reason. */
+export function isToolUnavailable(
+  lowLevelServer: object,
+  name: string,
+): boolean {
+  return UNAVAILABLE.get(lowLevelServer)?.get(name)?.() !== undefined;
+}
 
 export function specFor(name: string): ResolvedSpec | undefined {
   return SPECS.get(name);
@@ -155,24 +169,30 @@ export function defineTool<I extends ZodRawShape>(
 
   return (server, tm1Client) => {
     if (spec.enabled && !spec.enabled(tm1Client)) return;
+    const unavailable = spec.unavailable;
+    const why = unavailable ? () => unavailable(tm1Client) : undefined;
+    if (why) {
+      const gates =
+        UNAVAILABLE.get(server.server) ??
+        new Map<string, () => string | undefined>();
+      UNAVAILABLE.set(server.server, gates.set(spec.name, why));
+    }
     // ToolCallback<I> is a conditional type over an unresolved generic, so TS
     // cannot check the lambda against it — the cast asserts what the
     // ToolSpec.handler signature already pins down (same args, same return).
     const cb = ((
       args: Parameters<ToolCallback<I>>[0],
       extra: Parameters<ToolCallback<I>>[1],
-    ) => spec.handler(args, tm1Client, extra)) as unknown as ToolCallback<I>;
-    // undefined when the TM1_MODE filter in ./with-annotations.ts dropped it.
-    const registered = server.tool(spec.name, description, spec.input, cb) as
-      RegisteredTool | undefined;
-    const gate = spec.enabled;
-    if (!gate || !registered) return;
-    return () => {
-      const want = gate(tm1Client);
-      // enable()/disable() notify the client every time, so only on a change.
-      if (registered.enabled === want) return;
-      if (want) registered.enable();
-      else registered.disable();
-    };
+    ) => {
+      const reason = why?.();
+      if (reason !== undefined) {
+        throw new TM1Error({
+          code: TM1ErrorCode.UNSUPPORTED_OPERATION,
+          message: `${spec.name} is not available: ${reason}`,
+        });
+      }
+      return spec.handler(args, tm1Client, extra);
+    }) as unknown as ToolCallback<I>;
+    server.tool(spec.name, description, spec.input, cb);
   };
 }

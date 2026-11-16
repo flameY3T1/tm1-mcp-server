@@ -7,6 +7,7 @@ import { TM1Error, TM1ErrorCode } from "../../types.js";
 import {
   cleanSandboxName,
   requireManagedSandbox,
+  sandboxingOff,
 } from "../../lib/sandbox-policy.js";
 
 export const registerCreateSandbox = defineTool({
@@ -17,7 +18,7 @@ export const registerCreateSandbox = defineTool({
     "After: tm1_write_cells with sandbox=<name>, then tm1_compare_sandbox to review the change.",
   ],
   annotations: WRITE,
-  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
+  unavailable: sandboxingOff,
   sandboxScoped: true,
   output: MutationResultSchema,
   input: {

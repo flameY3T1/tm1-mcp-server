@@ -122,7 +122,7 @@ export class TM1Client {
    */
   sandboxingDisabled: boolean | undefined;
 
-  /** Called when `sandboxingDisabled` changes. stdio re-checks its tools here. */
+  /** Called when `sandboxingDisabled` changes. stdio announces a new tool list. */
   onSandboxingChange: (() => void) | undefined;
 
   private async readSandboxing(): Promise<void> {
@@ -133,8 +133,10 @@ export class TM1Client {
       this.logger.debug({ err }, "Could not read DisableSandboxing");
       return;
     }
-    if (disabled === this.sandboxingDisabled) return;
+    // Unknown counts as "not disabled", so a first `false` changes nothing.
+    const changed = disabled !== (this.sandboxingDisabled ?? false);
     this.sandboxingDisabled = disabled;
+    if (!changed) return;
     if (disabled) {
       const text =
         "TM1 runs with DisableSandboxing=T — the sandbox tools are hidden";

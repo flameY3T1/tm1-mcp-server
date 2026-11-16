@@ -53,12 +53,6 @@ export interface BuiltMcpServer {
    * a no-op. Must still be invoked by every transport teardown path.
    */
   dispose: () => void;
-  /**
-   * Re-check the tools whose `enabled` gate depends on TM1 (ToolSpec.enabled).
-   * Only stdio needs it: an HTTP build is made per request and reads the
-   * current value while registering.
-   */
-  recheckTools: () => void;
 }
 
 function buildMcpServer(
@@ -90,7 +84,7 @@ function buildMcpServer(
   // annotation hint from ANNOTATION_MAP without editing call sites. In readonly
   // mode the proxy silently drops write/destructive tools so they never appear
   // in the tool listing — no autoApprove lists needed.
-  const recheckTools = registerAllTools(
+  registerAllTools(
     withAnnotations(server, logger, config.mode, config.responseMode),
     tm1Client,
   );
@@ -116,7 +110,6 @@ function buildMcpServer(
 
   return {
     server,
-    recheckTools,
     dispose: () => {
       subscriptions?.dispose();
     },
@@ -162,7 +155,9 @@ async function main(): Promise<void> {
       : await (async () => {
           const built = buildMcpServer(tm1Client, config, logger);
           stdioDispose = built.dispose;
-          tm1Client.onSandboxingChange = built.recheckTools;
+          // The sandbox tools come and go with it; see ToolSpec.unavailable.
+          tm1Client.onSandboxingChange = () =>
+            built.server.sendToolListChanged();
           return startStdioTransport(built.server, logger);
         })();
   logger.info(

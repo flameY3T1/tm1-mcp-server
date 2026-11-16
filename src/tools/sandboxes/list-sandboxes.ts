@@ -4,7 +4,7 @@ import { SandboxItemSchema } from "../schemas/items.js";
 import { READ_ONLY } from "../annotations.js";
 import { defineTool } from "../define-tool.js";
 import { pageShapeFor } from "../schemas/common.js";
-import { isManagedSandbox } from "../../lib/sandbox-policy.js";
+import { isManagedSandbox, sandboxingOff } from "../../lib/sandbox-policy.js";
 
 export const registerListSandboxes = defineTool({
   name: "tm1_list_sandboxes",
@@ -14,7 +14,7 @@ export const registerListSandboxes = defineTool({
     "Related: tm1_create_sandbox, tm1_compare_sandbox.",
   ],
   annotations: READ_ONLY,
-  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
+  unavailable: sandboxingOff,
   output: pageShapeFor(SandboxItemSchema),
   input: {
     ...PAGINATION_SCHEMA,

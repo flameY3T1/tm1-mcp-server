@@ -17,6 +17,18 @@ import { TM1Error, TM1ErrorCode } from "../types.js";
 /** What TM1_SANDBOX_PREFIX may contain. Kept narrow: it is matched case-insensitively. */
 export const SANDBOX_PREFIX_PATTERN = /^[A-Za-z0-9._-]+$/;
 
+/**
+ * `unavailable` gate of the sandbox tools: the reason when the TM1 server has
+ * sandboxing switched off. Unknown (before login, or not readable) counts as on.
+ */
+export function sandboxingOff(tm1: {
+  readonly sandboxingDisabled: boolean | undefined;
+}): string | undefined {
+  return tm1.sandboxingDisabled === true
+    ? "this TM1 server runs with DisableSandboxing=T, so it has no sandboxes. Set DisableSandboxing=F in tm1s.cfg and restart TM1 to use them."
+    : undefined;
+}
+
 /** The mode and prefix a policy check needs; TM1Client provides both. */
 export interface SandboxPolicyContext {
   readonly mode: "readwrite" | "sandbox" | "readonly";

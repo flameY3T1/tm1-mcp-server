@@ -5,7 +5,7 @@ import { SandboxCompareSchema } from "../schemas/items.js";
 import { READ_ONLY } from "../annotations.js";
 import { defineTool } from "../define-tool.js";
 import { TM1Error, TM1ErrorCode } from "../../types.js";
-import { cleanSandboxName } from "../../lib/sandbox-policy.js";
+import { cleanSandboxName, sandboxingOff } from "../../lib/sandbox-policy.js";
 
 type Cell = { coordinates: string[]; value: CellValue };
 
@@ -70,7 +70,7 @@ export const registerCompareSandbox = defineTool({
     "Use before tm1_publish_sandbox, or to review what a sandbox-mode session wrote.",
   ],
   annotations: READ_ONLY,
-  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
+  unavailable: sandboxingOff,
   output: SandboxCompareSchema,
   input: {
     sandboxName: z.string().describe("Sandbox to compare with base data"),

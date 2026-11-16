@@ -4,7 +4,10 @@ import { actionResponse } from "../format.js";
 import { DESTRUCTIVE } from "../annotations.js";
 import { MutationResultSchema } from "../schemas/items.js";
 import { defineTool } from "../define-tool.js";
-import { requireManagedSandbox } from "../../lib/sandbox-policy.js";
+import {
+  requireManagedSandbox,
+  sandboxingOff,
+} from "../../lib/sandbox-policy.js";
 
 export const registerDiscardSandbox = defineTool({
   name: "tm1_discard_sandbox",
@@ -14,7 +17,7 @@ export const registerDiscardSandbox = defineTool({
     "With TM1_MODE=sandbox only sandboxes named with TM1_SANDBOX_PREFIX. Related: tm1_delete_sandbox removes the sandbox too.",
   ],
   annotations: DESTRUCTIVE,
-  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
+  unavailable: sandboxingOff,
   sandboxScoped: true,
   output: MutationResultSchema,
   input: {

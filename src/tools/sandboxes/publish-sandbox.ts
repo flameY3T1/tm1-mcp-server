@@ -3,6 +3,7 @@ import { CONFIRM_SCHEMA, requireConfirm } from "../confirm.js";
 import { actionResponse } from "../format.js";
 import { DESTRUCTIVE } from "../annotations.js";
 import { MutationResultSchema } from "../schemas/items.js";
+import { sandboxingOff } from "../../lib/sandbox-policy.js";
 import { defineTool } from "../define-tool.js";
 
 // Deliberately NOT sandboxScoped: publishing writes base data, which is
@@ -17,7 +18,7 @@ export const registerPublishSandbox = defineTool({
     "Before: tm1_compare_sandbox to see exactly what will change.",
   ],
   annotations: DESTRUCTIVE,
-  enabled: (tm1Client) => tm1Client.sandboxingDisabled !== true,
+  unavailable: sandboxingOff,
   output: MutationResultSchema,
   input: {
     sandboxName: z.string().describe("Sandbox to publish"),
