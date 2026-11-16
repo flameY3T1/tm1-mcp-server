@@ -82,6 +82,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shutdown during the startup login no longer skips the logout.** `logout()` returned at once when
   no session was held yet, and the login that was still running then opened one that nobody closed.
   It now waits for that login first.
+- **Logout now ends the TM1 session.** It sent `DELETE /api/v1/ActiveSession`, which TM1 11.8 and
+  12.5 answer with `400 DELETE not supported on this resource!`. The session stayed open until its
+  idle timeout, so every server start left one behind. Logout now calls
+  `POST /api/v1/ActiveSession/tm1.Close`, and a refused logout is logged as a warning instead of
+  as "Logged out".
 
 ### Security
 

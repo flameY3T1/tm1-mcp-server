@@ -346,36 +346,54 @@ export class SessionManager {
     await this.endSession();
   }
 
-  /** Delete the held session; no-op without one. Used by logout() and re-auth. */
+  /**
+   * End the held session; no-op without one. Used by logout() and re-auth.
+   * POST /api/v1/ActiveSession/tm1.Close — the only call that ends a session.
+   * `DELETE /api/v1/ActiveSession` answers 400 "DELETE not supported on this
+   * resource!" on 11.8 and 12.5 and leaves the session open.
+   */
   private async endSession(): Promise<void> {
     const cookie = this.sessionCookie;
     if (!cookie) {
       return;
     }
 
-    const url = `${this.config.baseUrl}${this.profile.resolveApiPath("/api/v1/ActiveSession")}`;
+    const url = `${this.config.baseUrl}${this.profile.resolveApiPath("/api/v1/ActiveSession/tm1.Close")}`;
     this.logger.info("Logging out from TM1");
 
     try {
       // Bound the logout request — authenticate() calls endSession() first, so a
-      // hung DELETE (slow/unreachable server) would otherwise block re-auth
+      // hung request (slow/unreachable server) would otherwise block re-auth
       // indefinitely. On timeout we still clear the cookie below.
-      await withTimeout(this.config.requestTimeoutMs, "Logout", (signal) =>
-        tm1Fetch(url, {
-          method: "DELETE",
-          headers: {
-            Cookie: this.cookieHeader(cookie),
-            "User-Agent": USER_AGENT,
-            "TM1-SessionContext": USER_AGENT,
-            "TM1-Session-Context": USER_AGENT,
-          },
-          dispatcher: getTm1Dispatcher(this.config),
-          signal,
-        } as unknown as RequestInit).then(drained),
+      const response = await withTimeout(
+        this.config.requestTimeoutMs,
+        "Logout",
+        (signal) =>
+          tm1Fetch(url, {
+            method: "POST",
+            body: "{}",
+            headers: {
+              "Content-Type": "application/json",
+              Cookie: this.cookieHeader(cookie),
+              "User-Agent": USER_AGENT,
+              "TM1-SessionContext": USER_AGENT,
+              "TM1-Session-Context": USER_AGENT,
+            },
+            dispatcher: getTm1Dispatcher(this.config),
+            signal,
+          } as unknown as RequestInit).then(drained),
       );
 
       this.sessionCookie = null;
-      this.logger.info("Logged out from TM1");
+      // A 401 means the session was already gone, which is the goal.
+      if (response.ok || response.status === 401) {
+        this.logger.info("Logged out from TM1");
+      } else {
+        this.logger.warn(
+          { status: response.status },
+          "TM1 refused the logout; the session stays open until it times out",
+        );
+      }
     } catch (error) {
       this.logger.error({ err: error }, "Error during logout");
       this.sessionCookie = null;

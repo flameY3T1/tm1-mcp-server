@@ -448,7 +448,7 @@ describe("SessionManager", () => {
       });
       fetchSpy
         .mockImplementationOnce(() => heldLogin)
-        .mockResolvedValueOnce(mockFetchResponse({ ok: true })); // DELETE
+        .mockResolvedValueOnce(mockFetchResponse({ ok: true })); // tm1.Close
 
       const sm = new SessionManager(makeConfig(), mockLogger);
       const authPromise = sm.authenticate();
@@ -460,13 +460,36 @@ describe("SessionManager", () => {
       await Promise.all([authPromise, logoutPromise]);
 
       expect(fetchSpy).toHaveBeenCalledTimes(2);
-      const [, deleteOpts] = fetchSpy.mock.calls[1] as [
+      const [closeUrl, closeOpts] = fetchSpy.mock.calls[1] as [
         string,
         { method: string; headers: Record<string, string> },
       ];
-      expect(deleteOpts.method).toBe("DELETE");
-      expect(deleteOpts.headers.Cookie).toBe("TM1SessionId=late");
+      // DELETE /ActiveSession is refused by TM1 and leaves the session open.
+      expect(closeUrl).toBe(
+        "https://tm1server:8010/api/v1/ActiveSession/tm1.Close",
+      );
+      expect(closeOpts.method).toBe("POST");
+      expect(closeOpts.headers.Cookie).toBe("TM1SessionId=late");
       expect(sm.isSessionActive()).toBe(false);
+    });
+
+    it("says so when TM1 refuses the logout", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(
+          mockFetchResponse({
+            ok: true,
+            setCookie: "TM1SessionId=tok; Path=/",
+          }),
+        )
+        .mockResolvedValueOnce(mockFetchResponse({ ok: false, status: 400 }));
+      const sm = new SessionManager(makeConfig(), mockLogger);
+      await sm.authenticate();
+      vi.mocked(mockLogger.warn).mockClear();
+      await sm.logout();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        { status: 400 },
+        expect.stringContaining("refused the logout"),
+      );
     });
 
     it("does not wait on a failed login", async () => {
