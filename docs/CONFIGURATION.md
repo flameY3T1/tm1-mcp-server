@@ -107,7 +107,9 @@ the six sandbox tools, in every mode. With `TM1_MODE=sandbox` nothing can be
 written in that case, and the log says so. A client that does not follow
 `notifications/tools/list_changed` keeps showing the tools; a call to one
 answers `UNSUPPORTED_OPERATION` and names `DisableSandboxing=T` as the reason.
-If the account may not read the setting, the tools stay visible.
+Any TM1 user can read the setting, admin or not. TM1 applies a change to
+that line while it runs; this server sees it at its next login, so reconnect
+it after changing the line.
 
 Reads can look inside a sandbox in every mode: `tm1_execute_mdx` and
 `tm1_get_cell_value` take an optional `sandbox`.

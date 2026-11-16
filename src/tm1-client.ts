@@ -118,7 +118,9 @@ export class TM1Client {
   /**
    * Whether the TM1 server has sandboxing switched off, as read after the
    * last login. `undefined` until then, and when it cannot be read — the
-   * sandbox tools stay visible in that case.
+   * sandbox tools stay visible in that case. TM1 applies a changed
+   * DisableSandboxing while it runs and keeps the session, so a change is
+   * seen only after the next login.
    */
   sandboxingDisabled: boolean | undefined;
 
@@ -142,7 +144,7 @@ export class TM1Client {
         "TM1 runs with DisableSandboxing=T — the sandbox tools are hidden";
       if (this.config.mode === "sandbox") {
         this.logger.warn(
-          `${text}, so TM1_MODE=sandbox cannot write anything. Set DisableSandboxing=F in tm1s.cfg and restart TM1.`,
+          `${text}, so TM1_MODE=sandbox cannot write anything. Set DisableSandboxing=F in tm1s.cfg, then reconnect this server.`,
         );
       } else {
         this.logger.info(text);

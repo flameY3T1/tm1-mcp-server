@@ -75,6 +75,7 @@ describe("sandbox tools follow DisableSandboxing", () => {
     expect(text).toContain("tm1_list_sandboxes is not available");
     expect(text).toContain("DisableSandboxing=T");
     expect(text).toContain("UNSUPPORTED_OPERATION");
+    expect(text).not.toContain("server version");
 
     tm1Client.sandboxingDisabled = false;
     expect(await sandboxTools()).toEqual(SANDBOX_TOOLS);

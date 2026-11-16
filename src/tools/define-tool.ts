@@ -189,6 +189,8 @@ export function defineTool<I extends ZodRawShape>(
         throw new TM1Error({
           code: TM1ErrorCode.UNSUPPORTED_OPERATION,
           message: `${spec.name} is not available: ${reason}`,
+          // Replaces the code's default hint, which blames the TM1 version.
+          hint: "Retrying cannot succeed until the cause named in the message is fixed.",
         });
       }
       return spec.handler(args, tm1Client, extra);

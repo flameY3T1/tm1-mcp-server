@@ -109,15 +109,18 @@ export class ServerService {
   constructor(private readonly http: TM1HttpClient) {}
 
   /**
-   * True when tm1s.cfg sets DisableSandboxing=T. v12 has no such switch and
-   * reports null, which reads as "not disabled".
-   * GET /api/v1/ActiveConfiguration
+   * True when tm1s.cfg sets DisableSandboxing=T. Read from /Configuration
+   * because every user may read it; /ActiveConfiguration answers a non-admin
+   * with ObjectSecurityNoAdminRights. v12 has no such switch and no such
+   * field, which reads as "not disabled".
+   * GET /api/v1/Configuration
    */
   async isSandboxingDisabled(): Promise<boolean> {
-    const active = await this.http.request<{
-      Administration?: { DisableSandboxing?: boolean | null };
-    }>("GET", "/api/v1/ActiveConfiguration");
-    return active.Administration?.DisableSandboxing === true;
+    const cfg = await this.http.request<{ DisableSandboxing?: boolean }>(
+      "GET",
+      "/api/v1/Configuration",
+    );
+    return cfg.DisableSandboxing === true;
   }
 
   /**

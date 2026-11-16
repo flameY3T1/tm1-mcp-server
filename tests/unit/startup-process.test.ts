@@ -150,8 +150,8 @@ describe("process startup", () => {
         });
         res.end(
           JSON.stringify(
-            req.url?.includes("ActiveConfiguration")
-              ? { Administration: { DisableSandboxing: true } }
+            req.url?.endsWith("/api/v1/Configuration")
+              ? { DisableSandboxing: true }
               : { value: [] },
           ),
         );

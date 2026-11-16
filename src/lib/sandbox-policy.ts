@@ -25,7 +25,7 @@ export function sandboxingOff(tm1: {
   readonly sandboxingDisabled: boolean | undefined;
 }): string | undefined {
   return tm1.sandboxingDisabled === true
-    ? "this TM1 server runs with DisableSandboxing=T, so it has no sandboxes. Set DisableSandboxing=F in tm1s.cfg and restart TM1 to use them."
+    ? "this TM1 server runs with DisableSandboxing=T, so it has no sandboxes. To use them, set DisableSandboxing=F in tm1s.cfg and reconnect this MCP server."
     : undefined;
 }
 
