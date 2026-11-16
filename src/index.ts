@@ -76,7 +76,9 @@ function buildMcpServer(
     },
     {
       capabilities: {
-        tools: { listChanged: true },
+        // No `tools` entry: declaring it makes the SDK install tools/list in
+        // the constructor, ahead of the wrap in withAnnotations(). The SDK
+        // adds `tools: { listChanged: true }` itself on the first registration.
         resources: { listChanged: true, subscribe: pushCapable },
         prompts: { listChanged: true },
         logging: {},

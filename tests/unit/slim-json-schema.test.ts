@@ -222,6 +222,19 @@ describe("tools/list advertises slimmed schemas", () => {
     ).toBe(false);
   });
 
+  it("refuses a server whose tools/list was installed before the wrap", () => {
+    // Declaring the capability makes the SDK install tools/list in the
+    // constructor. The real server did exactly that, and slimming was off
+    // without any test noticing.
+    const server = new McpServer(
+      { name: "test", version: "0.0.0" },
+      { capabilities: { tools: { listChanged: true } } },
+    );
+    expect(() => withAnnotations(server, mockLogger, "readwrite")).toThrow(
+      /capabilities\.tools/,
+    );
+  });
+
   it("control: an unwrapped server still ships the sentinels (SDK shape check)", async () => {
     const server = new McpServer({ name: "test", version: "0.0.0" });
     server.registerTool(

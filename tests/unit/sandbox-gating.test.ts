@@ -36,10 +36,7 @@ const fakeClient = (sandboxingDisabled: boolean | undefined) =>
   ({ version: 11, sandboxingDisabled }) as unknown as TM1Client;
 
 async function connect(tm1Client: TM1Client) {
-  const server = new McpServer(
-    { name: "t", version: "0" },
-    { capabilities: { tools: { listChanged: true } } },
-  );
+  const server = new McpServer({ name: "t", version: "0" });
   const recheck = registerAllTools(
     withAnnotations(server, logger, "readwrite"),
     tm1Client,

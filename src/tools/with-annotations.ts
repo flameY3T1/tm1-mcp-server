@@ -98,6 +98,10 @@ function slimToolsListResult(result: unknown): unknown {
 // would simply reappear on the wire. tests/unit/slim-json-schema.test.ts does a
 // real end-to-end tools/list over an in-memory transport and fails loudly in
 // that case.
+//
+// The SDK installs that handler in the McpServer CONSTRUCTOR when the options
+// declare `capabilities.tools` — before anything here can run. That case is
+// refused up front instead of shipping an unslimmed list unnoticed.
 function installToolsListSlimming(server: McpServer): void {
   const lowLevel = server.server as unknown as {
     setRequestHandler: (
@@ -105,6 +109,14 @@ function installToolsListSlimming(server: McpServer): void {
       handler: (...args: unknown[]) => unknown,
     ) => void;
   };
+  try {
+    server.server.assertCanSetRequestHandler("tools/list");
+  } catch {
+    throw new Error(
+      "tools/list was installed before withAnnotations() ran, so schema slimming would be off. " +
+        "Do not declare `capabilities.tools` on the McpServer — the SDK adds it on the first registration.",
+    );
+  }
   const originalSetRequestHandler = lowLevel.setRequestHandler.bind(lowLevel);
   lowLevel.setRequestHandler = (schema, handler) => {
     if (schema !== ListToolsRequestSchema) {
