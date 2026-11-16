@@ -23,14 +23,19 @@ interface RefIssue {
 const TABS = ["prolog", "metadata", "data", "epilog"] as const;
 type Tab = (typeof TABS)[number];
 
+// CubeExists and DimensionExists are left out on purpose: they ask whether the
+// object is there, so a name that is not there is the expected case, not a
+// broken reference (`IF(CubeExists(sTgt) = 0); CubeCreate(…)`).
 const CUBE_ARG1_FNS =
-  "CellGetN|CellGetS|CellIsUpdateable|CubeExists|ViewExists|ViewCreate|ViewDestroy|ViewZeroOut|CubeClearData|ViewSubsetAssign|DBR|DBS|DBSS|CubeProcessFeeders|CubeUnload|CubeLockOverride|CubeSetLogChanges";
+  "CellGetN|CellGetS|CellIsUpdateable|ViewExists|ViewCreate|ViewDestroy|ViewZeroOut|CubeClearData|ViewSubsetAssign|DBR|DBS|DBSS|CubeProcessFeeders|CubeUnload|CubeLockOverride|CubeSetLogChanges";
 
 const DIM_ARG1_FNS =
-  "DimensionExists|HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DimIx|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN";
+  "HierarchyExists|SubsetExists|SubsetCreate|SubsetDestroy|DimensionElementInsertDirect|DimensionElementComponentAdd|DimensionElementDelete|DimensionElementPrincipalName|DimSiz|DimNm|DimIx|DType|ElementType|ElementLevel|ElementWeight|HierarchyName|AttrS|AttrN";
 
 // A quote inside a TI literal is written twice ('it''s'); scanCode() unescapes it.
-const LITERAL = `'((?:[^']|'')+)'`;
+// The literal has to be the whole argument: in `'}ElementAttributes_' | sDim`
+// it is only the start of a name built at run time, which cannot be checked.
+const LITERAL = `'((?:[^']|'')+)'(?=\\s*[,)])`;
 const CUBE_FN_RE = new RegExp(
   `\\b(${CUBE_ARG1_FNS})\\s*\\(\\s*${LITERAL}`,
   "gi",

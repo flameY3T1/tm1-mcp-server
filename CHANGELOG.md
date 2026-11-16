@@ -101,6 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the source.
 - **`tm1_validate_process_refs` reads a doubled quote in a name.** `CellGetN('Owner''s Plan', …)`
   was cut at the first quote and reported as a missing cube `Owner`.
+- **`tm1_validate_process_refs` drops two false alarms.** A first argument that only starts with a
+  literal (`CellGetS('}ElementAttributes_' | sDim, …)`) was checked as if the literal were the whole
+  name. And the object of `CubeExists` / `DimensionExists` was reported missing, although asking
+  whether it exists is the point of the call.
 
 ### Security
 

@@ -228,4 +228,28 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const missing = await run(cb, "n = CellGetN('Owner''s Budget', 'a');");
     expect(missing.issues[0].name).toBe("Owner's Budget");
   });
+
+  it("skips a first argument that only starts with a literal", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: [] });
+    const payload = await run(
+      cb,
+      "s = CellGetS('}ElementAttributes_' | sDim, vEl, 'Alias');\nn = DIMIX('zzPrefix_' | sSuffix, 'x');",
+    );
+    expect(payload.unresolved).toBe(0);
+  });
+
+  it("still checks a literal first argument that ends the call", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: [] });
+    const payload = await run(cb, "IF(ViewExists('zzGone', 'v') = 1);\nENDIF;");
+    expect(payload.issues[0].name).toBe("zzGone");
+  });
+
+  it("does not report the object of an existence probe", async () => {
+    const cb = captureHandler({ cubes: [], dimensions: [] });
+    const payload = await run(
+      cb,
+      "sTgt = 'zzClone';\nIF(CubeExists(sTgt) = 0);\nENDIF;\nIF(DimensionExists('zzNewDim') = 0);\nENDIF;",
+    );
+    expect(payload.unresolved).toBe(0);
+  });
 });
