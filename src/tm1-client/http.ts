@@ -409,6 +409,7 @@ export class TM1HttpClient {
       timeoutMs,
     );
     const unlink = linkAbortSignals(controller, externalSignal);
+    let watched: Response | undefined;
     try {
       const response = await tm1Fetch(url, {
         method,
@@ -418,7 +419,8 @@ export class TM1HttpClient {
         dispatcher: getTm1Dispatcher(this.config),
       } as unknown as RequestInit);
       timeout.refresh();
-      return await read(watchBody(response, () => timeout.refresh()));
+      watched = watchBody(response, () => timeout.refresh());
+      return await read(watched);
     } catch (err) {
       // A read cut off by our deadline or the caller's cancel can surface as a
       // transport error. Report the cause we know, or a GET would be retried
@@ -430,6 +432,13 @@ export class TM1HttpClient {
     } finally {
       clearTimeout(timeout);
       unlink();
+      // A body the reader left alone (a 401 before the re-auth, the answer to
+      // an upload) holds its connection once the deadline is gone — measured
+      // against undici with a 1 MB body. Not awaited: a hanging body must not
+      // delay the re-auth.
+      if (watched && !watched.bodyUsed) {
+        void watched.body?.cancel().catch(() => undefined);
+      }
     }
   }
 

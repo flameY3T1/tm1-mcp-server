@@ -109,6 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   write, the cells are sent one by one. A cell whose write then timed out or lost its connection
   was listed as `failed` with the advice to re-send it, although it may be committed. Such cells
   are now listed as `unknown`, and the hint asks for a read-back first.
+- **A response body nobody reads is released.** The body of a 401 before the re-login, and the
+  answer to a file upload, kept their connection open when the body was large or unfinished — a
+  gateway's login page, for example.
 
 ### Security
 
