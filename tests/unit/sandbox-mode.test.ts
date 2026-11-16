@@ -282,6 +282,41 @@ describe("tm1_write_cells in sandbox mode", () => {
     },
   );
 
+  it.each([
+    "[mcp-whatif]",
+    "[Sandboxes].[mcp-whatif]",
+    "[Sandboxes].[Sandboxes].[MCP-WhatIf]",
+  ])("accepts the target sandbox written as %s", async (ref) => {
+    const dims = [...CUBE, "Sandboxes"];
+    const { handler, writeCells } = writeCellsHandler(SANDBOX, dims);
+    await handler({
+      ...ARGS,
+      dimensions: dims,
+      cells: [{ elements: ["Berlin", "Jan", ref], value: 42 }],
+      sandbox: "mcp-whatif",
+    });
+    expect(writeCells).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    "[Sandboxes].[Sandboxes].[Base]",
+    "[Sandboxes].[Proposal-1]",
+    "[Region].[Region].[mcp-whatif]",
+    "[Sandboxes].[Other].[mcp-whatif]",
+  ])("refuses the qualified reference %s", async (ref) => {
+    const dims = [...CUBE, "Sandboxes"];
+    const { handler, writeCells } = writeCellsHandler(SANDBOX, dims);
+    await expect(
+      handler({
+        ...ARGS,
+        dimensions: dims,
+        cells: [{ elements: ["Berlin", "Jan", ref], value: 42 }],
+        sandbox: "mcp-whatif",
+      }),
+    ).rejects.toThrow(/targets sandbox "mcp-whatif"/);
+    expect(writeCells).not.toHaveBeenCalled();
+  });
+
   it("still writes base data in readwrite mode", async () => {
     const { handler, writeCells } = writeCellsHandler(READWRITE, CUBE);
     await handler(ARGS);
