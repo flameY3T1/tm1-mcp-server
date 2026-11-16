@@ -50,20 +50,20 @@ async function run(cb: ToolCb, prolog: string) {
 
 describe("tm1_validate_process_refs reference extraction", () => {
   it("flags a DIMIX reference to a missing dimension (prod-sweep gap)", async () => {
-    const cb = captureHandler({ cubes: [], dimensions: ["Konten"] });
+    const cb = captureHandler({ cubes: [], dimensions: ["zzAccounts"] });
     const payload = await run(
       cb,
-      "IF(DIMIX('Vertrieb_Positionen', vsKonten)=0);\n  itemskip;\nENDIF;",
+      "IF(DIMIX('zzSalesItems', vsAccount)=0);\n  itemskip;\nENDIF;",
     );
     expect(payload.dimensionRefsScanned).toBe(1);
     expect(payload.unresolved).toBe(1);
-    expect(payload.issues[0].name).toBe("Vertrieb_Positionen");
+    expect(payload.issues[0].name).toBe("zzSalesItems");
     expect(payload.issues[0].kind).toBe("dimension");
   });
 
   it("resolves DIMIX against an existing dimension", async () => {
-    const cb = captureHandler({ cubes: [], dimensions: ["Konten"] });
-    const payload = await run(cb, "nIx = DIMIX('Konten', 'KTO 1');");
+    const cb = captureHandler({ cubes: [], dimensions: ["zzAccounts"] });
+    const payload = await run(cb, "nIx = DIMIX('zzAccounts', 'A 1');");
     expect(payload.dimensionRefsScanned).toBe(1);
     expect(payload.unresolved).toBe(0);
   });
@@ -72,10 +72,10 @@ describe("tm1_validate_process_refs reference extraction", () => {
     const cb = captureHandler({ cubes: ["Reporting"], dimensions: [] });
     const payload = await run(
       cb,
-      "CellIncrementN(vnWert, 'Planung_Vertrieb', psJahr, vsMonate, vsKonten);",
+      "CellIncrementN(nValue, 'zzSalesPlan', pYear, vMonth, vsAccount);",
     );
     expect(payload.cubeRefsScanned).toBe(1);
-    expect(payload.issues[0].name).toBe("Planung_Vertrieb");
+    expect(payload.issues[0].name).toBe("zzSalesPlan");
     expect(payload.issues[0].kind).toBe("cube");
   });
 
@@ -161,10 +161,10 @@ describe("tm1_validate_process_refs reference extraction", () => {
   });
 
   it("resolves DIMIX with a literal-bound variable", async () => {
-    const cb = captureHandler({ cubes: [], dimensions: ["Konten"] });
+    const cb = captureHandler({ cubes: [], dimensions: ["zzAccounts"] });
     const payload = await run(
       cb,
-      "sDim = 'GoneDim';\nnIx = DIMIX(sDim, 'KTO 1');",
+      "sDim = 'GoneDim';\nnIx = DIMIX(sDim, 'A 1');",
     );
     expect(payload.dimensionRefsScanned).toBe(1);
     expect(payload.issues[0].name).toBe("GoneDim");
