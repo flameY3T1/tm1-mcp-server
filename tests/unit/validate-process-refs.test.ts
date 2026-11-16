@@ -191,4 +191,13 @@ describe("tm1_validate_process_refs reference extraction", () => {
     expect(payload.unresolved).toBe(1);
     expect(payload.issues[0].name).toBe("GoneCube");
   });
+
+  it("does not read the subset name of SubsetCreateByMDX as a cube", async () => {
+    const cb = captureHandler({ cubes: ["Sales"], dimensions: ["Region"] });
+    const payload = await run(
+      cb,
+      "SubsetCreateByMDX('zzNorthOnly', '{[Region].Members}');",
+    );
+    expect(payload.unresolved).toBe(0);
+  });
 });

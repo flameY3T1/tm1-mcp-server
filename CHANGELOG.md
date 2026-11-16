@@ -75,6 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tm1_diagnose_process_error`: `since` now filters.** It compared against a field the log listing
   never fills, so every log passed. It now uses the timestamp in the log file name, as
   `tm1_list_error_logs` does.
+- **`tm1_validate_process_refs` no longer reports the subset of `SubsetCreateByMDX` as a missing
+  cube.** The first argument of that function is the subset name.
 
 ### Security
 
