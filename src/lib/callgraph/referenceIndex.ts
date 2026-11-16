@@ -201,14 +201,9 @@ export function elementKey(dimension: string, element: string): string {
 }
 
 export function extractStringLiteral(arg: string): string | null {
-  const t = arg.trim();
-  if (t.startsWith("'") && t.endsWith("'") && t.length >= 3) {
-    const inner = t.slice(1, -1);
-    if (!inner.includes("'")) {
-      return inner;
-    }
-  }
-  return null;
+  // A quote inside a TI literal is written twice: 'it''s'.
+  const m = /^'((?:[^']|'')+)'$/.exec(arg.trim());
+  return m ? m[1]!.replace(/''/g, "'") : null;
 }
 
 const SECTION_MARKER_RE = /^57[2345],\d*$/;

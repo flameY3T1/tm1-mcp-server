@@ -34,7 +34,8 @@ export interface ProcessEnv {
   vars: Map<string, VarBinding>;
 }
 
-const STRING_LITERAL_RE = /^'([^']*)'$/;
+// A quote inside a TI literal is written twice: 'it''s'.
+const STRING_LITERAL_RE = /^'((?:[^']|'')*)'$/;
 const NUMERIC_LITERAL_RE = /^-?\d+(?:\.\d+)?$/;
 const IDENTIFIER_RE = new RegExp(`^${TI_VAR}$`);
 
@@ -90,7 +91,7 @@ export function resolveExpression(expr: string, env: ProcessEnv): VarBinding {
   // String literal
   const strM = STRING_LITERAL_RE.exec(e);
   if (strM) {
-    return { kind: "literal", value: strM[1]! };
+    return { kind: "literal", value: strM[1]!.replace(/''/g, "'") };
   }
 
   // Numeric literal
