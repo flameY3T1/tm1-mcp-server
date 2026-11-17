@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING: `tm1_upload_file` no longer replaces an existing Applications document by default.**
   With `container: "applications"` an upload onto a document that is already there is refused with
   `CONFLICT`; pass `overwrite: true` to replace it. The `files` container replaces as before.
+- **`tm1_sample_cells` with `includeStrings` no longer scans tuple by tuple.** It used a `<> ""`
+  `FILTER`, which costs time for every tuple of the unpinned dimensions whether it matches or not
+  (51 s for 16 million tuples on 11.8) and is not shortened by `maxCells`. It now uses `NONEMPTY`,
+  which returned the same rows in milliseconds for stored and for fed rule-calculated strings in
+  every comparison on 11.8 and v12. The one case only the old scan found was a rule-calculated
+  string without a feeder, on v11: zero suppression skips unfed cells by design, as it does for
+  numbers, so that is a feeder to fix (`tm1_check_feeders`) and no longer something a sample shows.
 
 ### Added
 

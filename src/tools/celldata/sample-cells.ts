@@ -18,7 +18,7 @@ export const registerSampleCells = defineTool({
   description: [
     "Return up to maxCells populated cells from a cube without guessing coordinates — builds a NON EMPTY CROSSJOIN MDX over the cube's dimensions and HEAD-limits it.",
     "For sanity-checks after a clone, finding non-zero cells, or debugging empty views. maxCells=0 means unlimited (WARNING: large cubes may return millions — filter first).",
-    "NON EMPTY targets numeric cells; set includeStrings=true for String value fields.",
+    "By default only leaf cells are sampled; set includeStrings=true for String value fields, which can also sit on consolidations.",
   ],
   annotations: READ_ONLY,
   output: SampleCellsResultSchema,
@@ -57,7 +57,7 @@ export const registerSampleCells = defineTool({
       .optional()
       .default(false)
       .describe(
-        'Set true to sample String value fields. Swaps NON EMPTY for a `<> ""` FILTER and scans all members incl. consolidations (string values don\'t roll up, so they can sit on C). Requires the column/measure to resolve to a single element — pin it via filters or axisDimension.',
+        "Set true to sample String value fields. Scans all members incl. consolidations (string values don't roll up, so they can sit on C). Requires the column/measure to resolve to a single element — pin it via filters or axisDimension.",
       ),
   },
   handler: async (
@@ -102,8 +102,8 @@ export const registerSampleCells = defineTool({
     const hint =
       cells.length === 0
         ? includeStrings
-          ? "No populated cells found — cube may be empty or current filters exclude data."
-          : "No populated cells found — cube may be empty, all-consolidated, or current filters exclude data. If the value field is a String type, NON EMPTY cannot detect it: retry with includeStrings=true."
+          ? "No populated cells found — cube may be empty or current filters exclude data. A rule-calculated cell without a feeder never shows up in a sample: check feeders with tm1_check_feeders, or read the cell with tm1_get_cell_value."
+          : "No populated cells found — cube may be empty, all-consolidated, or current filters exclude data. A String value on a consolidation is not sampled by default: retry with includeStrings=true. A rule-calculated cell without a feeder never shows up in a sample: check feeders with tm1_check_feeders."
         : undefined;
 
     const elapsedMs = Date.now() - startedAt;

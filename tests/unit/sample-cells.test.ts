@@ -156,7 +156,7 @@ describe("buildSampleCellsMdx", () => {
     ).toThrow(/Filter dimension 'Foo'/);
   });
 
-  it('includeStrings: swaps NON EMPTY for a <> "" FILTER on the pinned measure', () => {
+  it("includeStrings: keeps NONEMPTY, which finds stored and fed strings without a per-tuple scan", () => {
     const r = buildSampleCellsMdx({
       cubeName: "Cube_X",
       dimensions: baseDims,
@@ -165,10 +165,9 @@ describe("buildSampleCellsMdx", () => {
       leavesOnly: true,
       includeStrings: true,
     });
-    expect(r.mdx).not.toContain("NONEMPTY");
-    expect(r.mdx).toContain("FILTER(");
-    expect(r.mdx).toContain('[Cube_X].([Measure].[KPI_1])<>""');
-    expect(r.mdx).toContain("HEAD(FILTER(");
+    expect(r.mdx).not.toContain("FILTER(");
+    expect(r.mdx).toContain("HEAD(NONEMPTY(");
+    expect(r.mdx).toContain(",{[Measure].[KPI_1]}),5)");
   });
 
   it("includeStrings: scans all members incl. consolidations (ignores leavesOnly)", () => {
@@ -184,7 +183,7 @@ describe("buildSampleCellsMdx", () => {
     expect(r.mdx).toContain("{TM1SUBSETALL([Version])}");
   });
 
-  it("includeStrings: rejects a multi-member column (predicate needs a single measure cell)", () => {
+  it("includeStrings: rejects a multi-member column", () => {
     expect(() =>
       buildSampleCellsMdx({
         cubeName: "Cube_X",

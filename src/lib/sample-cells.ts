@@ -21,11 +21,10 @@ export interface SampleCellsBuildArgs {
   /** If true, restrict unfiltered dims to leaf members (level 0). */
   leavesOnly: boolean;
   /**
-   * If true, sample string-valued cells: drop the NON EMPTY numeric suppression
-   * in favour of a `<> ""` FILTER, and include consolidations on unfiltered dims
-   * (overrides leavesOnly) because string values do not consolidate and may sit
-   * directly on C elements. Requires the column/measure to resolve to a single
-   * element. Default false (numeric NON EMPTY behaviour).
+   * If true, sample string-valued cells: include consolidations on unfiltered
+   * dims (overrides leavesOnly) because string values do not consolidate and may
+   * sit directly on C elements. Requires the column/measure to resolve to a
+   * single element. Default false.
    */
   includeStrings?: boolean | undefined;
 }
@@ -144,26 +143,26 @@ export function buildSampleCellsMdx(
     rowExpr = rowSets.reduce((acc, s) => `CROSSJOIN(${acc},${s})`);
   }
 
-  let rowAxisExpr: string;
-  if (includeStrings) {
-    // NON EMPTY suppression can hide string cells on some TM1 versions, and never
-    // surfaces strings on consolidations. Filter on a non-blank string value
-    // instead. Needs a single measure cell to reference.
-    if (columnMembers.length !== 1) {
-      throw new Error(
-        `includeStrings requires the column/measure to resolve to a single element; ` +
-          `pin it via filters['${columnDim}']='<element>' or axisDimension (got ${columnMembers.length} members).`,
-      );
-    }
-    const filterExpr = `FILTER(${rowExpr},[${escapeMdxName(cubeName)}].(${columnMembers[0]})<>"")`;
-    rowAxisExpr = maxCells > 0 ? `HEAD(${filterExpr},${maxCells})` : filterExpr;
-  } else {
-    // TM1's NONEMPTY(set, filterSet) is a set function. Plain "NON EMPTY <set>"
-    // is an axis modifier and is rejected as a syntax error inside HEAD().
-    const nonEmptyExpr = `NONEMPTY(${rowExpr},${columnSet})`;
-    rowAxisExpr =
-      maxCells > 0 ? `HEAD(${nonEmptyExpr},${maxCells})` : nonEmptyExpr;
+  if (includeStrings && columnMembers.length !== 1) {
+    throw new Error(
+      `includeStrings requires the column/measure to resolve to a single element; ` +
+        `pin it via filters['${columnDim}']='<element>' or axisDimension (got ${columnMembers.length} members).`,
+    );
   }
+
+  // Strings take the same NONEMPTY as numbers. A `<> ""` FILTER stood here for
+  // includeStrings until 2026-11-17: it returned the same rows for stored and
+  // for fed rule-calculated strings (measured on 11.8 and v12, and on 103
+  // string measures of existing cubes), but tested every tuple of the row set —
+  // ~3 s per million on 11.8, not cut short by HEAD. What it found beyond
+  // NONEMPTY was a rule-calculated string without a feeder, on v11 only; zero
+  // suppression skips unfed cells by design, for numbers just the same.
+  //
+  // TM1's NONEMPTY(set, filterSet) is a set function. Plain "NON EMPTY <set>"
+  // is an axis modifier and is rejected as a syntax error inside HEAD().
+  const nonEmptyExpr = `NONEMPTY(${rowExpr},${columnSet})`;
+  const rowAxisExpr =
+    maxCells > 0 ? `HEAD(${nonEmptyExpr},${maxCells})` : nonEmptyExpr;
 
   const whereClause =
     whereParts.length > 0 ? ` WHERE (${whereParts.join(",")})` : "";
