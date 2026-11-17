@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING: `tm1_upload_file` no longer replaces an existing Applications document by default.**
   With `container: "applications"` an upload onto a document that is already there is refused with
   `CONFLICT`; pass `overwrite: true` to replace it. The `files` container replaces as before.
-- **`tm1_sample_cells` with `includeStrings` no longer scans tuple by tuple.** It used a `<> ""`
+- **BREAKING: `tm1_sample_cells` with `includeStrings` no longer scans tuple by tuple.** It used a `<> ""`
   `FILTER`, which costs time for every tuple of the unpinned dimensions whether it matches or not
   (51 s for 16 million tuples on 11.8) and is not shortened by `maxCells`. It now uses `NONEMPTY`,
   which returned the same rows in milliseconds for stored and for fed rule-calculated strings in
@@ -21,10 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers, so that is a feeder to fix (`tm1_check_feeders`) and no longer something a sample shows.
 - **A timed-out MDX or view read is cancelled on the server.** TM1 finishes a request it has
   received whatever the client does: a query that ran into the client timeout kept its thread busy
-  (observed: 30 minutes, blocking a process behind it). Every MDX read and view execution
-  (`tm1_execute_mdx`, `tm1_sample_cells`, `tm1_get_view`, `tm1_compare_sandbox`,
-  `tm1_get_cube_stats`, `tm1_trace_data_flow`, attribute-value reads) now runs as an asynchronous
-  operation (`Prefer: respond-async`) and is cancelled when it times out or the client aborts. The `LOCK_TIMEOUT` error gains `cancelled: true|false`. 11.8
+  (observed: 30 minutes, blocking a process behind it). The cellset reads and view executions behind
+  `tm1_execute_mdx`, `tm1_sample_cells`, `tm1_get_view`, `tm1_compare_sandbox`,
+  `tm1_get_cube_stats`, `tm1_trace_data_flow` and the attribute-value reads now run as an asynchronous
+  operation (`Prefer: respond-async`) and are cancelled when they time out or the client aborts.
+  Single-cell reads (`tm1_get_cell_value`) run as before. The `LOCK_TIMEOUT` error gains `cancelled: true|false`. 11.8
   stops the work within milliseconds; v12 accepts the cancel but may still run a scan to its end,
   and the hint says so. Each of these reads costs two extra round trips.
 

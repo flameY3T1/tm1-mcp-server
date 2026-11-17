@@ -3,7 +3,13 @@
 // a text read of the file would pass with Buffer.from("payload").
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  promises as fsPromises,
+  rmSync,
+  truncateSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { z, type ZodRawShape } from "zod";
@@ -126,6 +132,24 @@ describe("tm1_upload_file, sourcePath and verification", () => {
       }),
     ).rejects.toThrow(/exactly one of content or sourcePath/);
     expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("refuses an oversized sourcePath by its size, without loading it", async () => {
+    // Sparse: 33 MB on paper, nothing on disk.
+    const src = path.join(dir, "big.bin");
+    writeFileSync(src, "");
+    truncateSync(src, 33 * 1024 * 1024);
+    const read = vi.spyOn(fsPromises, "readFile");
+    const { run, upload } = setup(async () => BINARY);
+    const out = await run({
+      fileName: "big.bin",
+      sourcePath: src,
+      confirm: "big.bin",
+    });
+    expect(out).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(read).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
+    read.mockRestore();
   });
 
   it("refuses a sourcePath outside the root", async () => {

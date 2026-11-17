@@ -22,7 +22,7 @@ export const registerUploadFile = defineTool({
     "Auto-falls back from v12 (Files) to v11 (Blobs) container.",
     "v11: subfolders not supported — use a flat file name. v12: nested paths OK if folders exist.",
     "container='applications' writes into the Applications tree instead, which nests on both versions. The parent folder must already exist there too, and v11 takes a document only inside a folder, not at the root. A document that already exists there is only replaced with overwrite=true.",
-    "The upload is read back and compared by SHA-256: verified=false means the server does not hold the bytes that were sent.",
+    "The upload is read back and compared by SHA-256: verified=false means the read-back differed or failed, so the upload is unconfirmed.",
     `Hard max size: ${HARD_MAX_BYTES} bytes (32 MB).`,
   ],
   annotations: IDEMPOTENT_WRITE,
@@ -77,35 +77,42 @@ export const registerUploadFile = defineTool({
         message: "Provide exactly one of content or sourcePath",
       });
     }
-    const bytes =
-      sourcePath !== undefined
-        ? await fs.readFile(resolveLocalPath(sourcePath, "sourcePath"))
-        : Buffer.from(content ?? "", encoding === "base64" ? "base64" : "utf8");
-
-    if (bytes.byteLength > HARD_MAX_BYTES) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify(
-              {
-                code: "VALIDATION_ERROR",
-                message: `File too large: ${bytes.byteLength} bytes (hard max ${HARD_MAX_BYTES})`,
-                hint: "Split the file or upload a smaller subset. Multipart upload is not yet supported.",
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      };
+    const tooLarge = (size: number) => ({
+      isError: true as const,
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(
+            {
+              code: "VALIDATION_ERROR",
+              message: `File too large: ${size} bytes (hard max ${HARD_MAX_BYTES})`,
+              hint: "Split the file or upload a smaller subset. Multipart upload is not yet supported.",
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    });
+    let bytes: Buffer;
+    if (sourcePath !== undefined) {
+      const resolved = resolveLocalPath(sourcePath, "sourcePath");
+      // Asked before the read: a file of any size would be loaded whole first.
+      const { size } = await fs.stat(resolved);
+      if (size > HARD_MAX_BYTES) return tooLarge(size);
+      bytes = await fs.readFile(resolved);
+    } else {
+      bytes = Buffer.from(
+        content ?? "",
+        encoding === "base64" ? "base64" : "utf8",
+      );
     }
+    if (bytes.byteLength > HARD_MAX_BYTES) return tooLarge(bytes.byteLength);
 
     const result = await withToolHint(
       tm1Client.files.upload(fileName, bytes, container, overwrite),
       container === "applications"
-        ? "The parent folder must already exist. v11 refuses a document directly under the Applications root — name a folder in fileName."
+        ? "A document that already exists is only replaced with overwrite=true. The parent folder must already exist. v11 refuses a document directly under the Applications root — name a folder in fileName."
         : "If parent folder is missing, create it on TM1 v12 before retrying. v11 supports root only.",
     );
 
