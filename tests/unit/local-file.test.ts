@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { resolveLocalPath } from "../../src/tools/local-file.js";
@@ -142,6 +148,21 @@ describe("resolveLocalPath symlink confinement", () => {
     expect(() => resolveLocalPath(path.join(root, "link", "evil.pro"))).toThrow(
       /escapes/,
     );
+  });
+
+  it("rejects a link inside the root whose target does not exist yet", () => {
+    // realpath fails on it like on a missing file, but a write follows the
+    // link and creates the target outside the root.
+    symlinkSync(path.join(outside, "new.txt"), path.join(root, "dangling"));
+    expect(() => resolveLocalPath(path.join(root, "dangling"))).toThrow(
+      /symbolic link that cannot be resolved/,
+    );
+  });
+
+  it("still resolves a path below a regular file, leaving the error to the read", () => {
+    writeFileSync(path.join(root, "f.txt"), "x");
+    const target = path.join(root, "f.txt", "x");
+    expect(resolveLocalPath(target)).toBe(target);
   });
 
   it("still accepts a normal (not-yet-existing) path inside the root", () => {

@@ -66,6 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A host path through a symbolic link whose target does not exist is refused.** Below
+  `TM1_LOCAL_FILE_ROOT` such a link passed the containment check as a file still to be created, and
+  the write then followed it to a target outside the root. Affects every tool that writes to a host
+  path (`writeToFile`, `directory`).
 - **The request timeout and a client cancel now also cover the response body.** Both used to end
   when the response headers arrived; a body that stalled afterwards hung the call for good, on every
   request path and on login. The body is now read inside the deadline, and the timer restarts at the
