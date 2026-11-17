@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every comparison on 11.8 and v12. The one case only the old scan found was a rule-calculated
   string without a feeder, on v11: zero suppression skips unfed cells by design, as it does for
   numbers, so that is a feeder to fix (`tm1_check_feeders`) and no longer something a sample shows.
+- **A timed-out MDX or view read is cancelled on the server.** TM1 finishes a request it has
+  received whatever the client does: a query that ran into the client timeout kept its thread busy
+  (observed: 30 minutes, blocking a process behind it). Every MDX read and view execution
+  (`tm1_execute_mdx`, `tm1_sample_cells`, `tm1_get_view`, `tm1_compare_sandbox`,
+  `tm1_get_cube_stats`, `tm1_trace_data_flow`, attribute-value reads) now runs as an asynchronous
+  operation (`Prefer: respond-async`) and is cancelled when it times out or the client aborts. The `LOCK_TIMEOUT` error gains `cancelled: true|false`. 11.8
+  stops the work within milliseconds; v12 accepts the cancel but may still run a scan to its end,
+  and the hint says so. Each of these reads costs two extra round trips.
 
 ### Added
 

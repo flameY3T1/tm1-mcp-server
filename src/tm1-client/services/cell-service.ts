@@ -186,7 +186,7 @@ export class CellService {
           }>;
         }>;
       }>;
-    }>("POST", path, { MDX: mdx }, opts);
+    }>("POST", path, { MDX: mdx }, { ...opts, cancellable: true });
 
     try {
       return transformCellsetResponse(response);

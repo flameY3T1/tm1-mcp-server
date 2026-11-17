@@ -16,6 +16,14 @@ import { maskSecretValues } from "../lib/mask-secrets.js";
 const MAX_NETWORK_RETRIES = 3;
 const BACKOFF_BASE_MS = 1000;
 const USER_AGENT = `${NAME}/${VERSION}`;
+// Polling an asynchronous request: first look after 10 ms, then doubling up to
+// one a second. A fast query costs one or two extra round trips, a slow one
+// ~1/s.
+const POLL_START_MS = 10;
+const POLL_MAX_MS = 1000;
+// How long the cancel of a timed-out request may itself take.
+const CANCEL_TIMEOUT_MS = 5000;
+const ASYNC_ROOT = "/api/v1/_async";
 
 // R2-22: any successful mutating HTTP call invalidates the callgraph
 // reference-index cache. Cheap (Map.clear()) and rebuild is lazy on next
@@ -43,6 +51,13 @@ export interface RequestOptions {
   // timeout means "too much data", not a transient blip — retrying just
   // multiplies the wait. Default: retries enabled for safe methods.
   retry?: boolean;
+  // Run the request as an asynchronous operation (`Prefer: respond-async`) and
+  // cancel it on the server when it times out or the caller aborts. Without
+  // this a request TM1 has received runs to its end whatever the client does —
+  // a timed-out MDX kept a thread busy for 30 minutes and blocked a process
+  // behind it. For reads with real server-side work only: it costs two extra
+  // round trips (poll, release).
+  cancellable?: boolean;
 }
 
 // Link an external AbortSignal (e.g. from RequestHandlerExtra.signal) to a
@@ -124,8 +139,134 @@ export class TM1HttpClient {
     body?: unknown,
     opts?: RequestOptions,
   ): Promise<T> {
+    if (opts?.cancellable) {
+      return this.requestCancellable<T>(method, path, body, opts);
+    }
+    return this.exchange<T>(method, path, body, opts, (r) =>
+      this.handleResponse<T>(r, path),
+    );
+  }
+
+  /**
+   * The request as an asynchronous operation, measured on 11.8 and v12
+   * (2026-11-17): `Prefer: respond-async` answers 202 with
+   * `Location: _async('<id>')` at once. GET on that handle is 202 while TM1
+   * works and then ALWAYS 200 — the real status is in the `asyncresult` header,
+   * the body is the one a plain request returns. DELETE cancels a running
+   * operation and frees a finished one, which otherwise stays on the server.
+   *
+   * 11.8 stops the work within milliseconds of the DELETE. v12 accepts it and
+   * may still run a scan to its end, so a cancel there is never reported as
+   * "stopped".
+   */
+  private async requestCancellable<T>(
+    method: string,
+    path: string,
+    body: unknown,
+    opts: RequestOptions,
+  ): Promise<T> {
+    const timeoutMs = opts.timeoutMs ?? this.config.requestTimeoutMs;
+    const started = Date.now();
+    const start = await this.exchange<{ handle: string } | { value: T }>(
+      method,
+      path,
+      body,
+      opts,
+      async (r) => {
+        // Location is relative to the request: `_async('<id>')` after
+        // ExecuteMDX, `../../_async('<id>')` after a view's tm1.Execute. The
+        // handle itself always sits directly under the API root.
+        const id = /_async\('[^']*'\)$/.exec(r.headers.get("location") ?? "");
+        // A server that ignores the preference answers the request itself.
+        return r.status === 202 && id
+          ? { handle: `${ASYNC_ROOT}${id[0].slice("_async".length)}` }
+          : { value: await this.handleResponse<T>(r, path) };
+      },
+      { Prefer: "respond-async" },
+    );
+    if ("value" in start) return start.value;
+
+    const { handle } = start;
+    const release = (): Promise<number> =>
+      this.exchange<number>(
+        "DELETE",
+        handle,
+        undefined,
+        { timeoutMs: CANCEL_TIMEOUT_MS },
+        (r) => Promise.resolve(r.status),
+      ).catch(() => 0);
+
+    for (
+      let delay = POLL_START_MS;
+      ;
+      delay = Math.min(delay * 2, POLL_MAX_MS)
+    ) {
+      let step: { pending: true } | { value: T };
+      try {
+        step = await this.exchange<{ pending: true } | { value: T }>(
+          "GET",
+          handle,
+          undefined,
+          { timeoutMs, ...(opts.signal ? { signal: opts.signal } : {}) },
+          async (r) => {
+            if (r.status === 202) return { pending: true };
+            const asyncResult = r.headers.get("asyncresult");
+            if (asyncResult === null) {
+              // This answer is about the handle, not about the operation:
+              // judged against the original path it read as "view not found".
+              throw new TM1Error({
+                code: TM1ErrorCode.TM1_ERROR,
+                message: `TM1 lost the asynchronous operation for ${path} (HTTP ${r.status} on its handle); the result is unknown`,
+                httpStatus: r.status,
+                endpoint: handle,
+              });
+            }
+            const status = parseInt(asyncResult, 10) || r.status;
+            return { value: await this.handleResponse<T>(r, path, status) };
+          },
+        );
+      } catch (err) {
+        // The caller aborted, the poll failed, or the result is an error:
+        // either way the operation is of no further use to anyone.
+        void release();
+        throw err;
+      }
+      if ("value" in step) {
+        void release();
+        return step.value;
+      }
+      if (Date.now() - started >= timeoutMs) {
+        const cancelled = (await release()) === 204;
+        const listTool =
+          this.version === 12 ? "tm1_list_jobs" : "tm1_list_threads";
+        throw new TM1Error({
+          code: TM1ErrorCode.LOCK_TIMEOUT,
+          message: `Request to ${path} timed out after ${timeoutMs}ms`,
+          endpoint: path,
+          cancelled,
+          hint: !cancelled
+            ? `The cancel was not confirmed, so the query may still be running on the server — check ${listTool} and cancel it there before retrying.`
+            : this.version === 12
+              ? `TM1 accepted the cancel, but v12 can run a scan to its end before it stops — check ${listTool} before retrying, and narrow the query (filters, fewer members).`
+              : "The query was cancelled on the server. Narrow it (filters, fewer members) before retrying.",
+        });
+      }
+      await sleep(delay);
+    }
+  }
+
+  private async exchange<T>(
+    method: string,
+    path: string,
+    body: unknown,
+    opts: RequestOptions | undefined,
+    readBody: (response: Response) => Promise<T>,
+    extraHeaders?: Record<string, string>,
+  ): Promise<T> {
     const url = `${this.config.baseUrl}${this.profile.resolveApiPath(path)}`;
     const isSafeMethod = isSafeHttpMethod(method);
+    // Releasing an asynchronous handle changes nothing in the model.
+    const isMutation = !isSafeMethod && !path.startsWith(ASYNC_ROOT);
     const allowRetry = opts?.retry !== false;
     const maxAttempts = isSafeMethod && allowRetry ? MAX_NETWORK_RETRIES : 0;
     let lastError: unknown;
@@ -145,9 +286,7 @@ export class TM1HttpClient {
         // 401 is decided on the status alone; every other body is read here,
         // while the request's deadline and cancel signal still apply.
         const read = async (r: Response): Promise<{ value: T } | undefined> =>
-          r.status === 401
-            ? undefined
-            : { value: await this.handleResponse<T>(r, path) };
+          r.status === 401 ? undefined : { value: await readBody(r) };
         const first = await this.executeRequest(
           url,
           method,
@@ -156,6 +295,7 @@ export class TM1HttpClient {
           opts?.timeoutMs,
           opts?.signal,
           read,
+          extraHeaders,
         );
 
         if (first === undefined) {
@@ -175,6 +315,7 @@ export class TM1HttpClient {
             opts?.timeoutMs,
             opts?.signal,
             read,
+            extraHeaders,
           );
 
           if (retried === undefined) {
@@ -186,13 +327,13 @@ export class TM1HttpClient {
             });
           }
 
-          if (!isSafeMethod) {
+          if (isMutation) {
             tm1Events.emit("mutation", { method, path });
           }
           return retried.value;
         }
 
-        if (!isSafeMethod) {
+        if (isMutation) {
           tm1Events.emit("mutation", { method, path });
         }
         return first.value;
@@ -493,6 +634,7 @@ export class TM1HttpClient {
     timeoutMs: number | undefined,
     externalSignal: AbortSignal | undefined,
     read: (response: Response) => Promise<R>,
+    extraHeaders?: Record<string, string>,
   ): Promise<R> {
     const headers: Record<string, string> = {
       Cookie: this.sessionManager.cookieHeader(cookie),
@@ -501,6 +643,7 @@ export class TM1HttpClient {
       "User-Agent": USER_AGENT,
       "TM1-SessionContext": USER_AGENT,
       "TM1-Session-Context": USER_AGENT,
+      ...extraHeaders,
     };
 
     const isWriteMethod =
@@ -530,25 +673,25 @@ export class TM1HttpClient {
   private async handleResponse<T>(
     response: Response,
     endpoint: string,
+    // The status to judge by. An asynchronous result arrives as HTTP 200
+    // whatever happened; its real status is in a header.
+    status: number = response.status,
   ): Promise<T> {
-    if (response.ok) {
+    if (status >= 200 && status < 300) {
       const text = await response.text();
-      if (response.status === 204 || !text) {
+      if (status === 204 || !text) {
         return undefined as T;
       }
-      this.logger.debug(
-        { endpoint, status: response.status },
-        "Request successful",
-      );
+      this.logger.debug({ endpoint, status }, "Request successful");
       try {
         return JSON.parse(text) as T;
       } catch {
         throw new TM1Error({
           code: TM1ErrorCode.TM1_ERROR,
           message:
-            `TM1 returned a non-JSON response body (status ${response.status}) for ${endpoint}. ` +
+            `TM1 returned a non-JSON response body (status ${status}) for ${endpoint}. ` +
             `This usually means a proxy or gateway returned HTML/text instead of the TM1 REST API.`,
-          httpStatus: response.status,
+          httpStatus: status,
           endpoint,
         });
       }
@@ -566,11 +709,8 @@ export class TM1HttpClient {
       /* ignore parse errors */
     }
 
-    const error = this.classifyHttpError(response.status, endpoint, details);
-    this.logger.error(
-      { endpoint, status: response.status, code: error.code },
-      error.message,
-    );
+    const error = this.classifyHttpError(status, endpoint, details);
+    this.logger.error({ endpoint, status, code: error.code }, error.message);
     throw error;
   }
 
