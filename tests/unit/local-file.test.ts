@@ -72,6 +72,26 @@ describe("resolveLocalPath", () => {
       /escapes/,
     );
   });
+
+  it("accepts a path inside any of several ;-separated roots", () => {
+    const second = path.resolve("/srv/projects");
+    // Trailing separator and padding are how a hand-edited .env looks.
+    process.env.TM1_LOCAL_FILE_ROOT = `${ROOT} ; ${second};`;
+    expect(resolveLocalPath(path.join(second, "alpha", "load.pro"))).toBe(
+      path.join(second, "alpha", "load.pro"),
+    );
+    expect(resolveLocalPath(path.join(ROOT, "x.pro"))).toBe(
+      path.join(ROOT, "x.pro"),
+    );
+  });
+
+  it("rejects a path outside every root and names them all", () => {
+    const second = path.resolve("/srv/projects");
+    process.env.TM1_LOCAL_FILE_ROOT = `${ROOT};${second}`;
+    expect(() => resolveLocalPath("/etc/passwd")).toThrow(
+      new RegExp(`escapes.*${ROOT}; ${second}`),
+    );
+  });
 });
 
 // A symlink placed INSIDE the root that points outside it passes the lexical
@@ -113,6 +133,15 @@ describe("resolveLocalPath symlink confinement", () => {
     expect(() =>
       resolveLocalPath(path.join(root, "link"), "directory"),
     ).toThrow(/escapes/);
+  });
+
+  it("rejects a symlink from one root into a directory that is no root", () => {
+    const other = path.join(base, "other");
+    mkdirSync(other);
+    process.env.TM1_LOCAL_FILE_ROOT = `${root};${other}`;
+    expect(() => resolveLocalPath(path.join(root, "link", "evil.pro"))).toThrow(
+      /escapes/,
+    );
   });
 
   it("still accepts a normal (not-yet-existing) path inside the root", () => {

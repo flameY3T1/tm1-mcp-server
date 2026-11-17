@@ -44,13 +44,21 @@ function realpathNearestExisting(p: string): string {
  *
  * When the root IS configured, the resolved absolute path must stay within it; any
  * `..` traversal or absolute escape is rejected. Returns the resolved absolute path.
+ * The variable may name several roots separated by `;` — a path inside any one
+ * of them is accepted.
  */
 export function resolveLocalPath(
   inputPath: string,
   paramName = "filePath",
 ): string {
-  const root = process.env[ROOT_ENV]?.trim();
-  if (!root) {
+  // `;` separates several roots on every platform: `:` is part of a Windows
+  // drive letter, so path.delimiter would not read the same on both.
+  const roots = (process.env[ROOT_ENV] ?? "")
+    .split(";")
+    .map((r) => r.trim())
+    .filter((r) => r !== "")
+    .map((r) => path.resolve(r));
+  if (roots.length === 0) {
     throw new TM1Error({
       code: TM1ErrorCode.VALIDATION_ERROR,
       message:
@@ -64,33 +72,37 @@ export function resolveLocalPath(
       message: `${paramName} must be absolute: ${inputPath}`,
     });
   }
-  const resolvedRoot = path.resolve(root);
   const resolved = path.resolve(inputPath);
-  const rel = path.relative(resolvedRoot, resolved);
-  if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
+  const allowed = roots.join("; ");
+  if (!roots.some((root) => isWithin(root, resolved))) {
     throw new TM1Error({
       code: TM1ErrorCode.VALIDATION_ERROR,
-      message: `${paramName} escapes the allowed ${ROOT_ENV} directory (${resolvedRoot}): ${inputPath}`,
+      message: `${paramName} escapes the allowed ${ROOT_ENV} directory (${allowed}): ${inputPath}`,
     });
   }
   // Symlink-safe second check: the lexical check above is bypassable by a
   // symlink placed INSIDE the root that points outside it. Compare real paths
   // instead — and realpath the root too, since the root itself may
   // legitimately be a symlink (e.g. /tmp on some systems).
-  const realRoot = realpathNearestExisting(resolvedRoot);
   const realResolved = realpathNearestExisting(resolved);
-  const relReal = path.relative(realRoot, realResolved);
   if (
-    relReal === ".." ||
-    relReal.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(relReal)
+    !roots.some((root) => isWithin(realpathNearestExisting(root), realResolved))
   ) {
     throw new TM1Error({
       code: TM1ErrorCode.VALIDATION_ERROR,
       message:
-        `${paramName} escapes the allowed ${ROOT_ENV} directory (${resolvedRoot}) ` +
+        `${paramName} escapes the allowed ${ROOT_ENV} directory (${allowed}) ` +
         `after resolving symlinks: ${inputPath}`,
     });
   }
   return resolved;
+}
+
+function isWithin(root: string, target: string): boolean {
+  const rel = path.relative(root, target);
+  return !(
+    rel === ".." ||
+    rel.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(rel)
+  );
 }

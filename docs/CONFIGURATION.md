@@ -134,11 +134,21 @@ Tools that read or write files on the host running the server —
 `tm1_validate_process_refs`, and the git export/import pair — are **disabled by
 default**. Set `TM1_LOCAL_FILE_ROOT` to an absolute directory to enable
 host-path parameters; every supplied path must resolve inside that root (path
-traversal is rejected).
+traversal and symlinks leading out of it are rejected).
 
 ```env
 TM1_LOCAL_FILE_ROOT=/srv/tm1-git    # optional; enables host-disk file params
 ```
+
+Several directories are separated by `;` (on every platform, since `:` is part
+of a Windows drive letter). A path is accepted when it lies inside any one of
+them:
+
+```env
+TM1_LOCAL_FILE_ROOT=/srv/tm1-git;/home/me/projects
+```
+
+A directory whose own name contains `;` cannot be used as a root.
 
 The git tools also work without it, via inline content:
 

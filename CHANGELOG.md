@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`TM1_LOCAL_FILE_ROOT` takes several directories**, separated by `;`. A host path is accepted
+  when it lies inside any one of them.
+
 - **`tm1_read_server_file`** (v11, `TM1_MODE=readwrite` only): reads a text file from the server's
   file system through TI — for exports written by `ASCIIOutput`, which v11 `Blobs` does not list.
   Empty lines are not returned. It runs an unbound TI process and can open any file the TM1 service

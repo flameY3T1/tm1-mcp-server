@@ -116,8 +116,8 @@ host-disk file access.
 
 Host-disk file access is default-off in the same spirit: the `.pro` and git
 tools accept inline content, and touch host paths only once
-`TM1_LOCAL_FILE_ROOT` names an allowed directory (paths outside it, and `..`
-traversal, are rejected).
+`TM1_LOCAL_FILE_ROOT` names an allowed directory, or several separated by `;`
+(paths outside them, and `..` traversal, are rejected).
 
 ## Security model
 
