@@ -117,6 +117,27 @@ describe("FileService, applications container", () => {
     });
   });
 
+  it("refuses an existing document without overwrite, before any write", async () => {
+    const { svc, calls } = makeService();
+    await expect(
+      svc.upload("Reports/sheet.xlsx", Buffer.from("x"), "applications", false),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(calls.some((c) => c.method !== "GET")).toBe(false);
+  });
+
+  it("replaces an existing document with overwrite", async () => {
+    const { svc, calls } = makeService();
+    const res = await svc.upload(
+      "Reports/sheet.xlsx",
+      Buffer.from("x"),
+      "applications",
+      true,
+    );
+    expect(res).toEqual({ created: false, root: "Applications" });
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+    expect(calls.at(-1)?.method).toBe("PUT");
+  });
+
   it("deletes by resolved ID, not by name", async () => {
     const { svc, calls } = makeService();
     await svc.delete("Reports/sheet.xlsx", "applications");

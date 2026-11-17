@@ -284,13 +284,15 @@ export class FileService {
     fileName: string,
     content: Uint8Array,
     container: FileContainer = "files",
+    // Applications only: false refuses a document that is already there.
+    overwrite = true,
   ): Promise<{ created: boolean; root: "Files" | "Blobs" | "Applications" }> {
     const parts = splitPath(fileName);
     if (parts.length === 0) {
       throw new Error("upload: empty file name");
     }
     if (container === "applications")
-      return this.uploadToApplications(parts, content);
+      return this.uploadToApplications(parts, content, overwrite);
     // parts.length > 0 is guarded above
     const leaf = parts[parts.length - 1]!;
     const parentSegs = parts
@@ -583,6 +585,7 @@ export class FileService {
   private async uploadToApplications(
     parts: string[],
     content: Uint8Array,
+    overwrite: boolean,
   ): Promise<{ created: boolean; root: "Applications" }> {
     const leaf = parts[parts.length - 1]!;
     const parentParts = parts.slice(0, -1);
@@ -595,6 +598,14 @@ export class FileService {
       throw new TM1Error({
         code: TM1ErrorCode.UNSUPPORTED_OPERATION,
         message: `'${leaf}' already exists as a ${existing.kind} and is not a document`,
+        endpoint: parentUrl,
+      });
+    }
+    if (existing !== undefined && !overwrite) {
+      throw new TM1Error({
+        code: TM1ErrorCode.CONFLICT,
+        message: `Document '${leaf}' already exists in the Applications tree`,
+        hint: "Pass overwrite=true to replace its content.",
         endpoint: parentUrl,
       });
     }

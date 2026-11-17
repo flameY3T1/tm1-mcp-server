@@ -15,6 +15,10 @@
 // sandbox group is created — group assign/remove reuses an existing group and
 // is fully reversed in the same test (and afterAll).
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import {
   getHarness,
   LIVE_ENABLED,
@@ -27,6 +31,14 @@ const PREFIX = `${SANDBOX}_OPS`;
 const FILE_NAME = `${PREFIX}_FILE.txt`;
 const FILE_BODY = `${PREFIX} synthetic live-test blob\nline2\nline3\n`;
 const CLIENT_NAME = `${PREFIX}_CLIENT`;
+// 11.8 refuses a document directly under the Applications root ("Failed to
+// create document."), so the document goes into a folder of its own.
+const DOC_DIR = `${PREFIX}_DIR`;
+const DOC_NAME = `${DOC_DIR}/${PREFIX}_DOC.xlsm`;
+const APPS = "/api/v1/Contents('Applications')/Contents";
+type RawHttp = {
+  request: (method: string, url: string, body?: unknown) => Promise<unknown>;
+};
 
 describe.skipIf(!LIVE_ENABLED)(
   "live: ops / monitoring / security / files",
@@ -42,6 +54,11 @@ describe.skipIf(!LIVE_ENABLED)(
       h = await getHarness();
     });
 
+    // No tool creates an Applications folder, so the fixture reaches past the
+    // service layer for this one request.
+    const rawHttp = (): RawHttp =>
+      (h.client as unknown as { http: RawHttp }).http;
+
     afterAll(async () => {
       // Each step independently try/caught — teardown must be idempotent.
       try {
@@ -49,6 +66,12 @@ describe.skipIf(!LIVE_ENABLED)(
           fileName: FILE_NAME,
           confirm: FILE_NAME,
         });
+      } catch {
+        /* already gone */
+      }
+      try {
+        // Deleting the folder takes the document with it.
+        await rawHttp().request("DELETE", `${APPS}('${DOC_DIR}')`);
       } catch {
         /* already gone */
       }
@@ -267,6 +290,75 @@ describe.skipIf(!LIVE_ENABLED)(
         fileName: FILE_NAME,
       });
       expect(after.isError).toBe(true);
+    });
+
+    it("APPLICATIONS document: sourcePath up -> writeToFile down, byte-identical", async () => {
+      // Bytes that are not valid UTF-8, so a text decode anywhere on the way
+      // would change the hash.
+      const bytes = Buffer.from(
+        Array.from({ length: 4096 }, (_, i) => (i * 131 + 7) % 256),
+      );
+      const sha256 = createHash("sha256").update(bytes).digest("hex");
+      const dir = mkdtempSync(path.join(os.tmpdir(), "tm1-live-doc-"));
+      const prevRoot = process.env.TM1_LOCAL_FILE_ROOT;
+      process.env.TM1_LOCAL_FILE_ROOT = dir;
+      try {
+        const src = path.join(dir, "up.xlsm");
+        const dst = path.join(dir, "down.xlsm");
+        writeFileSync(src, bytes);
+        await rawHttp().request("POST", APPS, {
+          "@odata.type": "#ibm.tm1.api.v1.Folder",
+          Name: DOC_DIR,
+        });
+        const upload = {
+          fileName: DOC_NAME,
+          sourcePath: src,
+          container: "applications",
+          confirm: DOC_NAME,
+        };
+
+        const up = await h.ok("tm1_upload_file", upload);
+        expect(up.json).toMatchObject({
+          success: true,
+          created: true,
+          bytesUploaded: bytes.byteLength,
+          sha256,
+          verified: true,
+        });
+
+        const get = await h.ok("tm1_get_file_content", {
+          fileName: DOC_NAME,
+          container: "applications",
+          writeToFile: dst,
+        });
+        expect(get.json).toEqual({
+          fileName: DOC_NAME,
+          totalBytes: bytes.byteLength,
+          writtenTo: dst,
+          sha256,
+        });
+        expect(readFileSync(dst).equals(bytes)).toBe(true);
+
+        // An existing document is refused by default and replaced on request.
+        const again = await h.call("tm1_upload_file", upload);
+        expect(again.isError).toBe(true);
+        expect(again.json.code).toBe("CONFLICT");
+        const replaced = await h.ok("tm1_upload_file", {
+          ...upload,
+          overwrite: true,
+        });
+        expect(replaced.json).toMatchObject({ updated: true, verified: true });
+
+        await h.ok("tm1_delete_file", {
+          fileName: DOC_NAME,
+          container: "applications",
+          confirm: DOC_NAME,
+        });
+      } finally {
+        if (prevRoot === undefined) delete process.env.TM1_LOCAL_FILE_ROOT;
+        else process.env.TM1_LOCAL_FILE_ROOT = prevRoot;
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
     // ---- Negative path ------------------------------------------------------

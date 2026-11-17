@@ -1,4 +1,8 @@
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { z } from "zod";
+import { resolveLocalPath } from "../local-file.js";
 import { FileContentResultSchema } from "../schemas/items.js";
 import { READ_ONLY } from "../annotations.js";
 import { defineTool } from "../define-tool.js";
@@ -15,6 +19,7 @@ export const registerGetFileContent = defineTool({
     "Auto-falls back from v12 (Files) to v11 (Blobs) container. Set container='applications' to read a document out of the Applications tree; a folder or a view reference there carries no content and is refused by name.",
     "encoding='base64' returns the bytes untouched — use it for spreadsheets and other binaries, which a text read would corrupt.",
     "Response is truncated to maxBytes (default 256 KB) to keep MCP messages small.",
+    "writeToFile saves the whole file to the MCP host instead and returns only its path, size and SHA-256 — the way to fetch a spreadsheet without passing its bytes through the conversation.",
   ],
   annotations: READ_ONLY,
   output: FileContentResultSchema,
@@ -51,13 +56,42 @@ export const registerGetFileContent = defineTool({
       .describe(
         "If set, only return the first N lines (overrides byte truncation).",
       ),
+    writeToFile: z
+      .string()
+      .optional()
+      .describe(
+        "Absolute host path to write the file to, byte-for-byte and never truncated (maxBytes, headLines and encoding do not apply; an existing file is replaced). The response then carries no content. Disabled unless TM1_LOCAL_FILE_ROOT is set; the path must resolve within one of its directories.",
+      ),
   },
   handler: async (
-    { fileName, maxBytes, headLines, container, encoding },
+    { fileName, maxBytes, headLines, container, encoding, writeToFile },
     tm1Client,
   ) => {
+    // Confine the path before the download, so a refused path costs no request.
+    const target =
+      writeToFile === undefined
+        ? undefined
+        : resolveLocalPath(writeToFile, "writeToFile");
     const bytes = await tm1Client.files.getContentBytes(fileName, container);
     const totalBytes = bytes.byteLength;
+
+    if (target !== undefined) {
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, bytes);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              fileName,
+              totalBytes,
+              writtenTo: target,
+              sha256: createHash("sha256").update(bytes).digest("hex"),
+            }),
+          },
+        ],
+      };
+    }
 
     let body: string;
     let truncated = false;

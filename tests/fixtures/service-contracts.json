@@ -1,6 +1,6 @@
 {
   "recordedAgainst": ["11.8.02900.8"],
-  "recordedAt": "2026-09-26",
+  "recordedAt": "2026-11-17",
   "methods": {
     "batch.execute": {
       "[]": {
@@ -86,7 +86,10 @@
       }
     },
     "cubes.checkRule": {
-      "[]": "unknown"
+      "[]": {
+        "lineNumber": "number",
+        "message": "string"
+      }
     },
     "cubes.exists": "boolean",
     "cubes.getAllRules": {
@@ -338,6 +341,31 @@
     "processes.getDeployMeta": {
       "hasSecurityAccess": "boolean"
     },
+    "processes.getGitHeader": {
+      "DataSource": {
+        "asciiDecimalSeparator?": "string",
+        "asciiDelimiterChar?": "string",
+        "asciiDelimiterType?": "string",
+        "asciiHeaderRecords?": "number",
+        "asciiQuoteCharacter?": "string",
+        "asciiThousandSeparator?": "string",
+        "dataSourceNameForClient?": "string",
+        "dataSourceNameForServer?": "string",
+        "Type": "string"
+      },
+      "HasSecurityAccess": "boolean",
+      "Name": "string",
+      "Parameters[]": "unknown",
+      "UIData": "string",
+      "Variables[]": {
+        "EndByte": "number",
+        "Name": "string",
+        "Position": "number",
+        "StartByte": "number",
+        "Type": "string"
+      },
+      "VariablesUIData[]": "string"
+    },
     "processes.getParameters": {
       "[]": {
         "defaultValue": "number|string",
@@ -345,6 +373,10 @@
         "prompt": "string",
         "type": "string"
       }
+    },
+    "processes.getUIData": {
+      "uiData": "string",
+      "variablesUIData[]": "string"
     },
     "processes.getVariableLayout": {
       "ignoredColumns[]": {

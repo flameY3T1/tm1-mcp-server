@@ -1,6 +1,6 @@
 {
   "recordedAgainst": ["11.8.02900.8"],
-  "recordedAt": "2026-09-26",
+  "recordedAt": "2026-11-17",
   "endpoints": {
     "DELETE /api/v1/Chores('*') !404": {
       "error": {
@@ -339,6 +339,7 @@
       "@odata.context": "string",
       "value[]": {
         "@odata.type": "string",
+        "ID?": "string",
         "Name": "string"
       }
     },
@@ -358,6 +359,14 @@
       "error": {
         "code": "string",
         "message": "string"
+      }
+    },
+    "GET /api/v1/Contents('*')/Contents('*')/Contents": {
+      "@odata.context": "string",
+      "value[]": {
+        "@odata.type": "string",
+        "ID": "string",
+        "Name": "string"
       }
     },
     "GET /api/v1/Cubes": {
@@ -648,6 +657,7 @@
     },
     "GET /api/v1/ErrorLogFiles": {
       "@odata.context": "string",
+      "@odata.count?": "number",
       "value[]": {
         "Filename": "string"
       }
@@ -993,17 +1003,24 @@
       "@odata.context": "string",
       "@odata.type": "string",
       "Attributes": {},
-      "Content@odata.mediaContentType": "string",
+      "Content@odata.mediaContentType?": "string",
       "ID": "string",
-      "LastUpdated": "string",
+      "LastUpdated?": "string",
       "Name": "string",
-      "Size": "number"
+      "Size?": "number"
     },
     "POST /api/v1/Contents('*')/Contents !404": {
       "error": {
         "code": "string",
         "message": "string"
       }
+    },
+    "POST /api/v1/Contents('*')/Contents('*')/Contents": {
+      "@odata.context": "string",
+      "@odata.type": "string",
+      "Attributes": {},
+      "ID": "string",
+      "Name": "string"
     },
     "POST /api/v1/Cubes": {
       "@odata.context": "string",
@@ -1029,7 +1046,10 @@
     },
     "POST /api/v1/Cubes('*')/tm1.CheckRules": {
       "@odata.context": "string",
-      "value[]": "unknown"
+      "value[]": {
+        "LineNumber": "number",
+        "Message": "string"
+      }
     },
     "POST /api/v1/Cubes('*')/tm1.TraceCellCalculation": {
       "@odata.context": "string",

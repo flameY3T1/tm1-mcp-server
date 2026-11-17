@@ -131,10 +131,11 @@ its report, just redacted.
 
 Tools that read or write files on the host running the server —
 `tm1_import_pro_file`, `tm1_install_pro_bundle`, `tm1_diff_process_with_file`,
-`tm1_validate_process_refs`, and the git export/import pair — are **disabled by
-default**. Set `TM1_LOCAL_FILE_ROOT` to an absolute directory to enable
-host-path parameters; every supplied path must resolve inside that root (path
-traversal and symlinks leading out of it are rejected).
+`tm1_validate_process_refs`, the git export/import pair, and the `sourcePath` /
+`writeToFile` parameters of `tm1_upload_file` and `tm1_get_file_content` — are
+**disabled by default**. Set `TM1_LOCAL_FILE_ROOT` to an absolute directory to
+enable host-path parameters; every supplied path must resolve inside that root
+(path traversal and symlinks leading out of it are rejected).
 
 ```env
 TM1_LOCAL_FILE_ROOT=/srv/tm1-git    # optional; enables host-disk file params

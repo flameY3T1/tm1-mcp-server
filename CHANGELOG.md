@@ -7,8 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: `tm1_upload_file` no longer replaces an existing Applications document by default.**
+  With `container: "applications"` an upload onto a document that is already there is refused with
+  `CONFLICT`; pass `overwrite: true` to replace it. The `files` container replaces as before.
+
 ### Added
 
+- **Binary files without the bytes in the conversation.** `tm1_upload_file` takes `sourcePath` (a
+  file on the MCP host, sent byte-for-byte) as an alternative to `content`, and
+  `tm1_get_file_content` takes `writeToFile`, which saves the whole file untruncated and answers
+  with path, size and SHA-256 instead of the content. Both need `TM1_LOCAL_FILE_ROOT`.
+- **`tm1_upload_file` verifies what it wrote:** the upload is read back and compared by SHA-256,
+  reported as `sha256` and `verified`.
 - **`TM1_LOCAL_FILE_ROOT` takes several directories**, separated by `;`. A host path is accepted
   when it lies inside any one of them.
 
