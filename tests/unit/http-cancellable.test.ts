@@ -26,7 +26,12 @@ const pending = () => new Response(null, { status: 202 });
 const result = (asyncresult: string, body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { asyncresult } });
 
-type Call = { method: string; url: string; prefer: string | undefined };
+type Call = {
+  method: string;
+  url: string;
+  prefer: string | undefined;
+  init: RequestInit;
+};
 
 function setup(
   version: 11 | 12,
@@ -49,6 +54,7 @@ function setup(
         method: init.method ?? "GET",
         url: url.replace("https://tm1server:8010", ""),
         prefer: (init.headers as Record<string, string>).Prefer,
+        init,
       };
       calls.push(call);
       return answer(call, calls.length);
@@ -261,6 +267,65 @@ describe("TM1HttpClient, cancellable request", () => {
     });
   });
 
+  // A poll that never answers ends by its own deadline, not between two polls.
+  const hangUntilAbort = (init: RequestInit) =>
+    new Promise<Response>((_, reject) => {
+      init.signal?.addEventListener("abort", () =>
+        reject(init.signal?.reason as Error),
+      );
+    });
+
+  it.each([
+    [204, true, /accepted the cancel.*tm1_list_jobs/],
+    [500, false, /may still be running.*tm1_list_jobs/],
+  ])(
+    "reports the cancel outcome when the poll itself hangs (DELETE %i)",
+    async (deleteStatus, cancelled, hint) => {
+      const { withToolHint } = await import("../../src/tools/error-format.js");
+      const { client, calls } = setup(
+        12,
+        (c) =>
+          c.method === "POST"
+            ? accepted()
+            : c.method === "DELETE"
+              ? new Response(deleteStatus === 204 ? null : "{}", {
+                  status: deleteStatus,
+                })
+              : hangUntilAbort(c.init),
+        120,
+      );
+      await expect(
+        withToolHint(run(client), "MDX execution failed. Common causes: …"),
+      ).rejects.toMatchObject({
+        code: "LOCK_TIMEOUT",
+        cancelled,
+        hint: expect.stringMatching(hint),
+      });
+      expect(calls.at(-1)).toMatchObject({ method: "DELETE" });
+    },
+  );
+
+  it("gives a hanging poll the rest of the budget, not a new one", async () => {
+    vi.useFakeTimers();
+    const { client, calls } = setup(
+      11,
+      (c) =>
+        c.method === "POST"
+          ? new Promise<Response>((r) => setTimeout(() => r(accepted()), 8000))
+          : c.method === "DELETE"
+            ? new Response(null, { status: 204 })
+            : hangUntilAbort(c.init),
+      10000,
+    );
+    const outcome = expect(run(client)).rejects.toMatchObject({
+      cancelled: true,
+    });
+    // 8 s to the handle, then the 5 s floor instead of another 10 s.
+    await vi.advanceTimersByTimeAsync(13100);
+    expect(calls.at(-1)).toMatchObject({ method: "DELETE" });
+    await outcome;
+  });
+
   it("cancels on the server when the caller aborts", async () => {
     const ac = new AbortController();
     const { client, calls } = setup(11, (c, n) => {
@@ -286,8 +351,11 @@ describe("TM1HttpClient, cancellable request", () => {
       () => new Response(JSON.stringify({ ok: 1 }), { status: 200 }),
     );
     await client.request("POST", "/api/v1/ExecuteMDX", { MDX: "SELECT" });
-    expect(calls).toEqual([
-      { method: "POST", url: "/api/v1/ExecuteMDX", prefer: undefined },
-    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      method: "POST",
+      url: "/api/v1/ExecuteMDX",
+      prefer: undefined,
+    });
   });
 });

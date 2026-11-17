@@ -195,6 +195,22 @@ export class TM1HttpClient {
         { timeoutMs: CANCEL_TIMEOUT_MS },
         (r) => Promise.resolve(r.status),
       ).catch(() => 0);
+    const timedOut = async (): Promise<TM1Error> => {
+      const cancelled = (await release()) === 204;
+      const listTool =
+        this.version === 12 ? "tm1_list_jobs" : "tm1_list_threads";
+      return new TM1Error({
+        code: TM1ErrorCode.LOCK_TIMEOUT,
+        message: `Request to ${path} timed out after ${timeoutMs}ms`,
+        endpoint: path,
+        cancelled,
+        hint: !cancelled
+          ? `The cancel was not confirmed, so the query may still be running on the server — check ${listTool} and cancel it there before retrying.`
+          : this.version === 12
+            ? `TM1 accepted the cancel, but v12 can run a scan to its end before it stops — check ${listTool} before retrying, and narrow the query (filters, fewer members).`
+            : "The query was cancelled on the server. Narrow it (filters, fewer members) before retrying.",
+      });
+    };
 
     for (
       let delay = POLL_START_MS;
@@ -207,7 +223,15 @@ export class TM1HttpClient {
           "GET",
           handle,
           undefined,
-          { timeoutMs, ...(opts.signal ? { signal: opts.signal } : {}) },
+          {
+            // A poll that hangs must not start the budget over. The floor
+            // keeps room for the gaps in the body of a finished result.
+            timeoutMs: Math.min(
+              timeoutMs,
+              Math.max(timeoutMs - (Date.now() - started), CANCEL_TIMEOUT_MS),
+            ),
+            ...(opts.signal ? { signal: opts.signal } : {}),
+          },
           async (r) => {
             if (r.status === 202) return { pending: true };
             const asyncResult = r.headers.get("asyncresult");
@@ -228,6 +252,11 @@ export class TM1HttpClient {
       } catch (err) {
         // The caller aborted, the poll failed, or the result is an error:
         // either way the operation is of no further use to anyone.
+        // LOCK_TIMEOUT only ever comes from our own deadline: a poll that hung
+        // owes the caller the cancel outcome like a budget that ran out.
+        if (err instanceof TM1Error && err.code === TM1ErrorCode.LOCK_TIMEOUT) {
+          throw await timedOut();
+        }
         void release();
         throw err;
       }
@@ -235,22 +264,7 @@ export class TM1HttpClient {
         void release();
         return step.value;
       }
-      if (Date.now() - started >= timeoutMs) {
-        const cancelled = (await release()) === 204;
-        const listTool =
-          this.version === 12 ? "tm1_list_jobs" : "tm1_list_threads";
-        throw new TM1Error({
-          code: TM1ErrorCode.LOCK_TIMEOUT,
-          message: `Request to ${path} timed out after ${timeoutMs}ms`,
-          endpoint: path,
-          cancelled,
-          hint: !cancelled
-            ? `The cancel was not confirmed, so the query may still be running on the server — check ${listTool} and cancel it there before retrying.`
-            : this.version === 12
-              ? `TM1 accepted the cancel, but v12 can run a scan to its end before it stops — check ${listTool} before retrying, and narrow the query (filters, fewer members).`
-              : "The query was cancelled on the server. Narrow it (filters, fewer members) before retrying.",
-        });
-      }
+      if (Date.now() - started >= timeoutMs) throw await timedOut();
       await sleep(delay);
     }
   }
