@@ -89,6 +89,14 @@ function checkDrift(
   if (problems.length > 0) drift.push(`${key}\n    ${problems.join("\n    ")}`);
 }
 
+// A request sent with `Prefer: respond-async` answers 202 without a body; its
+// real answer arrives later on GET _async('<id>'), always as HTTP 200 with the
+// real status in the `asyncresult` header. Keyed by the handle, every such
+// read — MDX, view, their errors — would merge into one shape that pins
+// nothing, so the answer is booked on the request that started the operation.
+const ASYNC_HANDLE = /_async\('[^']*'\)$/;
+const asyncOrigin = new Map<string, { method: string; href: string }>();
+
 globalThis.fetch = async (input: unknown, init?: RequestInit) => {
   const href =
     typeof input === "string"
@@ -102,8 +110,23 @@ globalThis.fetch = async (input: unknown, init?: RequestInit) => {
   );
   try {
     const text = await res.clone().text();
-    if (RECORDING) record(init?.method ?? "GET", href, res.status, text);
-    else checkDrift(init?.method ?? "GET", href, res.status, text);
+    let method = init?.method ?? "GET";
+    let target = href;
+    let status = res.status;
+    const started = ASYNC_HANDLE.exec(res.headers.get("location") ?? "");
+    // A poll that is still pending answers 202 with the same Location; only
+    // the first sighting is the request that started the operation.
+    if (status === 202 && started && !asyncOrigin.has(started[0])) {
+      asyncOrigin.set(started[0], { method, href });
+    }
+    const handle = ASYNC_HANDLE.exec(new URL(href).pathname);
+    const origin = handle && method === "GET" && asyncOrigin.get(handle[0]);
+    if (origin) {
+      status = parseInt(res.headers.get("asyncresult") ?? "", 10) || status;
+      ({ method, href: target } = origin);
+    }
+    if (RECORDING) record(method, target, status, text);
+    else checkDrift(method, target, status, text);
   } catch {
     // Observing must never break the run it observes.
   }
