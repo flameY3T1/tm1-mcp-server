@@ -18,6 +18,7 @@ coverage/
 
 # internal planning/review docs — not for public release
 docs/internal/
+reviews/
 docs/superpowers/
 .superpowers/
 
