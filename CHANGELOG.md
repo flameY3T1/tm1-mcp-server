@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.0] - 2026-11-18
+
 ### Changed
 
 - **BREAKING: `tm1_upload_file` no longer replaces an existing Applications document by default.**
@@ -1327,7 +1329,8 @@ Initial public release.
 - Quality gates: strict typecheck, ESLint, `lint:no-flat-api`,
   annotation-coverage, and tool-registration wiring.
 
-[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v6.1.0...HEAD
+[Unreleased]: https://github.com/flameY3T1/tm1-mcp-server/compare/v7.0.0...HEAD
+[7.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v6.1.0...v7.0.0
 [6.1.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v6.0.0...v6.1.0
 [6.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v5.0.0...v6.0.0
 [5.0.0]: https://github.com/flameY3T1/tm1-mcp-server/compare/v4.0.0...v5.0.0
