@@ -40,6 +40,14 @@ function splitPath(raw: string): string[] {
   return parts;
 }
 
+/** URL of an entry in the 'files' container: the root, then one key per path segment. */
+function filesUrl(root: "Files" | "Blobs", segments: string[]): string {
+  return (
+    `/api/v1/Contents('${root}')` +
+    segments.map((s) => `/Contents('${odataKey(s)}')`).join("")
+  );
+}
+
 /** Which storage tree a file operation addresses. */
 export type FileContainer = "files" | "applications";
 
@@ -164,14 +172,8 @@ export class FileService {
       const { url } = await this.appsResolve(segments);
       return (await this.childrenOf(url)).map((e) => e.name);
     }
-    const buildUrl = (root: string): string => {
-      let url = `/api/v1/Contents('${odataKey(root)}')`;
-      for (const seg of segments) {
-        url += `/Contents('${odataKey(seg)}')`;
-      }
-      url += "/Contents?$select=Name";
-      return url;
-    };
+    const buildUrl = (root: "Files" | "Blobs"): string =>
+      `${filesUrl(root, segments)}/Contents?$select=Name`;
     try {
       const r = await this.http.request<{ value: Array<{ Name: string }> }>(
         "GET",
@@ -213,14 +215,8 @@ export class FileService {
       const { url, entry } = await this.appsResolve(parts);
       return this.http.requestRawBytes("GET", this.appsContentUrl(url, entry));
     }
-    const buildUrl = (root: string): string => {
-      let url = `/api/v1/Contents('${odataKey(root)}')`;
-      for (const p of parts) {
-        url += `/Contents('${odataKey(p)}')`;
-      }
-      url += "/Content";
-      return url;
-    };
+    const buildUrl = (root: "Files" | "Blobs"): string =>
+      `${filesUrl(root, parts)}/Content`;
     try {
       return await this.http.requestRawBytes("GET", buildUrl("Files"));
     } catch (e) {
@@ -248,15 +244,8 @@ export class FileService {
         throw e;
       }
     }
-    const buildUrl = (root: string): string => {
-      const segs = parts
-        .slice(0, -1)
-        .map((s) => `/Contents('${odataKey(s)}')`)
-        .join("");
-      // parts.length > 0 is guarded above
-      const last = parts[parts.length - 1]!;
-      return `/api/v1/Contents('${odataKey(root)}')${segs}/Contents('${odataKey(last)}')?$select=Name`;
-    };
+    const buildUrl = (root: "Files" | "Blobs"): string =>
+      `${filesUrl(root, parts)}?$select=Name`;
     const probe = async (url: string): Promise<boolean> => {
       try {
         await this.http.request("GET", url);
@@ -293,35 +282,29 @@ export class FileService {
     }
     if (container === "applications")
       return this.uploadToApplications(parts, content, overwrite);
-    // parts.length > 0 is guarded above
-    const leaf = parts[parts.length - 1]!;
-    const parentSegs = parts
-      .slice(0, -1)
-      .map((s) => `/Contents('${odataKey(s)}')`)
-      .join("");
 
     const tryRoot = async (
       root: "Files" | "Blobs",
     ): Promise<{ created: boolean; root: "Files" | "Blobs" }> => {
-      const parentUrl = `/api/v1/Contents('${odataKey(root)}')${parentSegs}/Contents`;
-      const contentUrl = `/api/v1/Contents('${odataKey(root)}')${parentSegs}/Contents('${odataKey(leaf)}')/Content`;
+      const url = filesUrl(root, parts);
 
       const existed = await this.exists(fileName).catch(() => false);
       if (!existed) {
-        await this.http.request("POST", parentUrl, {
-          "@odata.type": "#ibm.tm1.api.v1.Document",
-          ID: leaf,
-          Name: leaf,
-        });
+        // parts.length > 0 is guarded above
+        const leaf = parts[parts.length - 1]!;
+        await this.http.request(
+          "POST",
+          `${filesUrl(root, parts.slice(0, -1))}/Contents`,
+          { "@odata.type": "#ibm.tm1.api.v1.Document", ID: leaf, Name: leaf },
+        );
       }
       try {
-        await this.http.requestBinary("PUT", contentUrl, content);
+        await this.http.requestBinary("PUT", `${url}/Content`, content);
       } catch (e) {
         // Same two-request split as the Applications path: an entry this call
         // created and could not fill is removed again, so a failed upload does
         // not leave an empty file under the name.
         if (!existed) {
-          const url = `/api/v1/Contents('${odataKey(root)}')${parentSegs}/Contents('${odataKey(leaf)}')`;
           await this.http.request("DELETE", url).catch(() => undefined);
         }
         throw e;
@@ -386,9 +369,7 @@ export class FileService {
           endpoint: path,
         });
       }
-      parentUrl =
-        "/api/v1/Contents('Files')" +
-        parts.map((p) => `/Contents('${odataKey(p)}')`).join("");
+      parentUrl = filesUrl("Files", parts);
       siblings = await this.childrenOf(parentUrl);
     }
     const existing = siblings.find(
@@ -449,16 +430,12 @@ export class FileService {
       await this.http.request("DELETE", url);
       return;
     }
-    const buildUrl = (root: string): string => {
-      const segs = parts.map((s) => `/Contents('${odataKey(s)}')`).join("");
-      return `/api/v1/Contents('${odataKey(root)}')${segs}`;
-    };
     try {
       // v12 `Files` nests, and DELETE on a folder there removes its content
       // too (measured 2026-11-18). On v11 this read is the 404 that sends the
       // call on to `Blobs`, which has no folders.
       // shortcut: a folder is recognised by @odata.type in this answer (seen on 12.5.9); a build that leaves it out gets the plain DELETE again — then list the parent instead.
-      const url = buildUrl("Files");
+      const url = filesUrl("Files", parts);
       const target = await this.http.request<{ "@odata.type"?: string }>(
         "GET",
         `${url}?$select=Name`,
@@ -473,7 +450,7 @@ export class FileService {
     } catch (e) {
       const code = (e as { code?: string }).code;
       if (code !== "NOT_FOUND") throw e;
-      await this.http.request("DELETE", buildUrl("Blobs"));
+      await this.http.request("DELETE", filesUrl("Blobs", parts));
     }
   }
 
@@ -524,12 +501,8 @@ export class FileService {
       filters.length > 0
         ? `&$filter=${encodeURIComponent(filters.join(" and "))}`
         : "";
-    const buildUrl = (root: string): string => {
-      let url = `/api/v1/Contents('${odataKey(root)}')`;
-      for (const seg of segments) url += `/Contents('${odataKey(seg)}')`;
-      url += `/Contents?$select=Name${filter}`;
-      return url;
-    };
+    const buildUrl = (root: "Files" | "Blobs"): string =>
+      `${filesUrl(root, segments)}/Contents?$select=Name${filter}`;
     try {
       const r = await this.http.request<{ value: Array<{ Name: string }> }>(
         "GET",
