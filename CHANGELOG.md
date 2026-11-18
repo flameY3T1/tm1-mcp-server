@@ -74,6 +74,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An error's own hint is no longer replaced by the tool's general one.** Where the failure is
+  understood at the source — a folder that still holds entries, a view reference asked for its
+  bytes, a transaction-log scan that ran out of time, a request that timed out — that advice now
+  reaches the caller. The tool's hint still fills in where the error brings none.
 - **The `tm1_delete_file` hint no longer calls file names case-sensitive.** TM1 matches them without
   regard to case in both containers, on v11 and v12.
 - **`tm1_delete_file` no longer deletes a v12 folder with everything in it.** In the `files`

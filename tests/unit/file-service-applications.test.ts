@@ -160,6 +160,19 @@ describe("FileService, applications container", () => {
     expect(calls.some((c) => c.method === "DELETE")).toBe(false);
   });
 
+  it("keeps the folder advice through a tool's hint, which fills in where none is set", async () => {
+    const { withToolHint } = await import("../../src/tools/error-format.js");
+    const { svc } = makeService();
+    await expect(
+      withToolHint(svc.delete("Reports", "applications"), "tool hint"),
+    ).rejects.toMatchObject({
+      hint: "Delete the entries first; an empty folder is deleted.",
+    });
+    await expect(
+      withToolHint(svc.delete("Absent", "applications"), "tool hint"),
+    ).rejects.toMatchObject({ hint: "tool hint" });
+  });
+
   it("deletes an empty folder", async () => {
     const { svc, calls } = makeService();
     await svc.delete("Empty", "applications");

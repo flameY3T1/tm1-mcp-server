@@ -144,9 +144,10 @@ export async function withToolHint<T>(p: Promise<T>, hint: string): Promise<T> {
     return await p;
   } catch (err) {
     if (err instanceof TM1Error) {
-      // A timeout that reports its cancel outcome already says what happened
-      // on the server and what to do next; a generic tool hint would hide it.
-      if (err.cancelled === undefined) err.hintOverride = hint;
+      // A hint the error already carries was written where the failure was
+      // understood — a timeout that reports its cancel outcome, a folder that
+      // still holds entries — and the tool's generic one would hide it.
+      err.hintOverride ??= hint;
       throw err;
     }
     throw new TM1Error({

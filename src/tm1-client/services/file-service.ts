@@ -380,9 +380,9 @@ export class FileService {
       if (this.http.version === 11) {
         throw new TM1Error({
           code: TM1ErrorCode.UNSUPPORTED_OPERATION,
-          // In the message, not the hint: the tool replaces the hint with its own.
           message:
-            "TM1 v11 keeps the 'files' container flat: it has no folders. Use a flat file name there, or container='applications' for the tree users see in Architect and PAW.",
+            "TM1 v11 keeps the 'files' container flat: it has no folders",
+          hint: "Use a flat file name there, or container='applications' for the tree users see in Architect and PAW.",
           endpoint: path,
         });
       }
@@ -413,8 +413,8 @@ export class FileService {
   private filledFolder(name: string, count: number, url: string): TM1Error {
     return new TM1Error({
       code: TM1ErrorCode.UNSUPPORTED_OPERATION,
-      // The advice sits in the message: the tool replaces the hint with its own.
-      message: `'${name}' is a folder holding ${count} ${count === 1 ? "entry" : "entries"} — refusing to delete it, because TM1 would delete them with it. Delete the entries first; an empty folder is deleted.`,
+      message: `'${name}' is a folder holding ${count} ${count === 1 ? "entry" : "entries"} — refusing to delete it, because TM1 would delete them with it`,
+      hint: "Delete the entries first; an empty folder is deleted.",
       endpoint: url,
     });
   }
