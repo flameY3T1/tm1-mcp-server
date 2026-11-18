@@ -20,7 +20,7 @@ export const registerUploadFile = defineTool({
     "Use to push CSV, TXT, or other data files that import processes will read.",
     "Provide content as plain text OR base64 (set encoding='base64' for binary), or sourcePath to send a file from the MCP host byte-for-byte — the way to upload a spreadsheet without passing its bytes through the conversation.",
     "Auto-falls back from v12 (Files) to v11 (Blobs) container.",
-    "v11: subfolders not supported — use a flat file name. v12: nested paths OK if folders exist.",
+    "v11: subfolders not supported — use a flat file name. v12: nested paths OK if folders exist (tm1_create_folder).",
     "container='applications' writes into the Applications tree instead, which nests on both versions. The parent folder must already exist there too, and v11 takes a document only inside a folder, not at the root. A document that already exists there is only replaced with overwrite=true.",
     "The upload is read back and compared by SHA-256: verified=false means the read-back differed or failed, so the upload is unconfirmed.",
     `Hard max size: ${HARD_MAX_BYTES} bytes (32 MB).`,
@@ -112,8 +112,8 @@ export const registerUploadFile = defineTool({
     const result = await withToolHint(
       tm1Client.files.upload(fileName, bytes, container, overwrite),
       container === "applications"
-        ? "A document that already exists is only replaced with overwrite=true. The parent folder must already exist. v11 refuses a document directly under the Applications root — name a folder in fileName."
-        : "If parent folder is missing, create it on TM1 v12 before retrying. v11 supports root only.",
+        ? "A document that already exists is only replaced with overwrite=true. The parent folder must already exist (tm1_create_folder with container='applications'). v11 refuses a document directly under the Applications root — name a folder in fileName."
+        : "If parent folder is missing, create it with tm1_create_folder on TM1 v12 before retrying. v11 supports root only.",
     );
 
     // The write is two requests on every route and answers with no body, so

@@ -1,6 +1,6 @@
 {
   "recordedAgainst": ["11.8.02900.8"],
-  "recordedAt": "2026-11-17",
+  "recordedAt": "2026-11-18",
   "methods": {
     "batch.execute": {
       "[]": {
@@ -179,6 +179,9 @@
     },
     "elements.update": {
       "typeChange": "null"
+    },
+    "files.createFolder": {
+      "created": "boolean"
     },
     "files.getContent": "string",
     "files.getContentBytes": {

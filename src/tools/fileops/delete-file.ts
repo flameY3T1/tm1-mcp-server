@@ -14,6 +14,7 @@ export const registerDeleteFile = defineTool({
     "Irreversible — file is removed from Files/Blobs container.",
     "Auto-falls back from v12 (Files) to v11 (Blobs).",
     "Returns NOT_FOUND if file is missing in both containers.",
+    "Also deletes a folder, but only an empty one: a folder that still holds entries is refused, because TM1 would delete them with it.",
     "Safety: pass confirm=<file name verbatim>.",
   ],
   annotations: DESTRUCTIVE,
@@ -30,7 +31,7 @@ export const registerDeleteFile = defineTool({
     requireConfirm(confirm, fileName, "file");
     await withToolHint(
       tm1Client.files.delete(fileName, container),
-      "Verify exact name with tm1_list_files or tm1_search_files. Names are case-sensitive.",
+      "Verify the name with tm1_list_files or tm1_search_files. Case does not matter; the path does.",
     );
     return actionResponse({ success: true, fileName, deleted: true });
   },

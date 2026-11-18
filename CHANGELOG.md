@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`tm1_create_folder` creates a folder, and `tm1_delete_file` removes an empty one.** Until now no
+  tool could, so an upload with `container: "applications"` depended on a folder made in Architect
+  or PAW — and v11 takes no document directly under the root. With `container: "applications"` it
+  works on v11 and v12; with `container: "files"` on v12 only, because v11 keeps that container
+  flat. One level per call, the parent must exist; a folder that is already there is reported with
+  `created: false`. There is no rename: TM1 refuses `PATCH` on a folder and on a file in both containers, on v11
+  and v12.
 - **Binary files without the bytes in the conversation.** `tm1_upload_file` takes `sourcePath` (a
   file on the MCP host, sent byte-for-byte) as an alternative to `content`, and
   `tm1_get_file_content` takes `writeToFile`, which saves the whole file untruncated and answers
@@ -67,6 +74,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `tm1_delete_file` hint no longer calls file names case-sensitive.** TM1 matches them without
+  regard to case in both containers, on v11 and v12.
+- **`tm1_delete_file` no longer deletes a v12 folder with everything in it.** In the `files`
+  container a path that named a folder went to the server as a plain `DELETE`, and v12 removes a
+  folder together with its content. A folder that still holds entries is now refused with
+  `UNSUPPORTED_OPERATION`; an empty one is deleted. The Applications tree already refused folders
+  and now follows the same rule.
 - **A host path through a symbolic link whose target does not exist is refused.** Below
   `TM1_LOCAL_FILE_ROOT` such a link passed the containment check as a file still to be created, and
   the write then followed it to a target outside the root. Affects every tool that writes to a host

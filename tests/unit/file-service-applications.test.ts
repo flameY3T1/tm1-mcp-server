@@ -20,7 +20,11 @@ const entry = (kind: string, id: string, name: string) => ({
 function makeService() {
   const calls: Array<{ method: string; path: string; body?: unknown }> = [];
   const listings: Record<string, unknown[]> = {
-    [`${ROOT}/Contents`]: [entry("Folder", "Reports", "Reports")],
+    [`${ROOT}/Contents`]: [
+      entry("Folder", "Reports", "Reports"),
+      entry("Folder", "Empty", "Empty"),
+    ],
+    [`${ROOT}/Contents('Empty')/Contents`]: [],
     [`${ROOT}/Contents('Reports')/Contents`]: [
       entry("DocumentReference", "sheet.xlsx.blob", "sheet.xlsx"),
       entry("ViewReference", "by_month.view", "by_month"),
@@ -146,14 +150,24 @@ describe("FileService, applications container", () => {
       path: `${ROOT}/Contents('Reports')/Contents('sheet.xlsx.blob')`,
     });
   });
-  it("refuses a folder before the DELETE goes out", async () => {
-    // DELETE on a folder removes its contents too, so this must never reach
-    // the server from the single-file delete path.
+  it("refuses a folder that holds entries before the DELETE goes out", async () => {
+    // DELETE on a folder removes its contents too, so a filled one must never
+    // reach the server.
     const { svc, calls } = makeService();
     await expect(svc.delete("Reports", "applications")).rejects.toThrow(
-      /is a Folder, not a file/,
+      /is a folder holding 2 entries/,
     );
     expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+  });
+
+  it("deletes an empty folder", async () => {
+    const { svc, calls } = makeService();
+    await svc.delete("Empty", "applications");
+    expect(calls.at(-1)).toEqual({
+      method: "DELETE",
+      path: `${ROOT}/Contents('Empty')`,
+      body: undefined,
+    });
   });
 
   it("refuses a view reference in the delete path as well", async () => {
@@ -178,6 +192,120 @@ describe("FileService, applications container", () => {
       path: `${ROOT}/Contents('Reports')/Contents('new.csv.blob')`,
     });
   });
+  it("creates a folder under the resolved parent, once", async () => {
+    const { svc, calls } = makeService();
+    expect(await svc.createFolder("Reports/2026", "applications")).toEqual({
+      created: true,
+    });
+    expect(calls.find((c) => c.method === "POST")).toEqual({
+      method: "POST",
+      path: `${ROOT}/Contents('Reports')/Contents`,
+      body: { "@odata.type": "#ibm.tm1.api.v1.Folder", Name: "2026" },
+    });
+
+    // An existing folder is not posted again, whatever its case.
+    calls.length = 0;
+    expect(await svc.createFolder("reports", "applications")).toEqual({
+      created: false,
+    });
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("refuses a folder where a document holds the name or is the parent", async () => {
+    const { svc, calls } = makeService();
+    await expect(
+      svc.createFolder("Reports/sheet.xlsx", "applications"),
+    ).rejects.toThrow(/already exists as a DocumentReference/);
+    await expect(
+      svc.createFolder("Reports/sheet.xlsx/sub", "applications"),
+    ).rejects.toThrow(/is a DocumentReference, not a folder/);
+    await expect(
+      svc.createFolder("Absent/sub", "applications"),
+    ).rejects.toThrow(/'Absent' not found in the Applications tree/);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  describe("folders in the 'files' container", () => {
+    const FILES = "/api/v1/Contents('Files')";
+    const item = (kind: string, name: string) => ({
+      Name: name,
+      "@odata.type": `#ibm.tm1.api.v1.${kind}`,
+    });
+    function filesService(version: 11 | 12) {
+      const calls: string[] = [];
+      const answers: Record<string, unknown> = {
+        [`GET ${FILES}/Contents?$select=Name`]: {
+          value: [item("Folder", "imports"), item("Document", "a.csv")],
+        },
+        [`GET ${FILES}/Contents('imports')?$select=Name`]: item(
+          "Folder",
+          "imports",
+        ),
+        [`GET ${FILES}/Contents('imports')/Contents?$select=Name`]: {
+          value: [item("Document", "x.csv")],
+        },
+        [`GET ${FILES}/Contents('a.csv')?$select=Name`]: item(
+          "Document",
+          "a.csv",
+        ),
+      };
+      const http = {
+        version,
+        request: vi.fn(async (method: string, path: string) => {
+          calls.push(`${method} ${path}`);
+          if (method !== "GET") return undefined;
+          const hit = answers[`${method} ${path}`];
+          if (hit !== undefined) return hit;
+          throw Object.assign(new Error(`no stub for ${path}`), {
+            code: "NOT_FOUND",
+          });
+        }),
+      } as unknown as TM1HttpClient;
+      return { svc: new FileService(http), calls };
+    }
+
+    it("creates a folder on v12 and leaves an existing one alone", async () => {
+      const { svc, calls } = filesService(12);
+      expect(await svc.createFolder("exports")).toEqual({ created: true });
+      expect(calls.at(-1)).toBe(`POST ${FILES}/Contents`);
+      // v12 answers a second POST of the same name with success, so only the
+      // listing can tell.
+      calls.length = 0;
+      expect(await svc.createFolder("Imports")).toEqual({ created: false });
+      expect(calls.some((c) => c.startsWith("POST"))).toBe(false);
+      await expect(svc.createFolder("a.csv")).rejects.toThrow(
+        /already exists as a Document/,
+      );
+    });
+
+    it("names the flat container on v11 without sending anything", async () => {
+      const { svc, calls } = filesService(11);
+      await expect(svc.createFolder("exports")).rejects.toThrow(
+        /v11 keeps the 'files' container flat/,
+      );
+      expect(calls).toEqual([]);
+    });
+
+    it("refuses to delete a v12 folder that holds entries, deletes a file", async () => {
+      const { svc, calls } = filesService(12);
+      await expect(svc.delete("imports")).rejects.toThrow(
+        /is a folder holding 1 entry/,
+      );
+      expect(calls.some((c) => c.startsWith("DELETE"))).toBe(false);
+      await svc.delete("a.csv");
+      expect(calls.at(-1)).toBe(`DELETE ${FILES}/Contents('a.csv')`);
+    });
+
+    it("falls back to Blobs when Files does not know the name", async () => {
+      const { svc, calls } = filesService(11);
+      await svc.delete("old.csv");
+      expect(calls).toEqual([
+        `GET ${FILES}/Contents('old.csv')?$select=Name`,
+        "DELETE /api/v1/Contents('Blobs')/Contents('old.csv')",
+      ]);
+    });
+  });
+
   it("follows @odata.nextLink when a listing is paged", async () => {
     const calls: string[] = [];
     const page2 = `${ROOT}/Contents?$skiptoken=2`;

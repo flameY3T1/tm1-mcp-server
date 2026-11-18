@@ -54,8 +54,8 @@ describe.skipIf(!LIVE_ENABLED)(
       h = await getHarness();
     });
 
-    // No tool creates an Applications folder, so the fixture reaches past the
-    // service layer for this one request.
+    // Teardown removes the test folder whatever is left in it, which no tool
+    // does, so it reaches past the service layer for that one request.
     const rawHttp = (): RawHttp =>
       (h.client as unknown as { http: RawHttp }).http;
 
@@ -292,6 +292,39 @@ describe.skipIf(!LIVE_ENABLED)(
       expect(after.isError).toBe(true);
     });
 
+    it("FILES folder: v12 nests and keeps a filled folder, v11 names the flat container", async () => {
+      const dir = `${PREFIX}_FDIR`;
+      const sub = `${dir}/sub`;
+      const made = await h.call("tm1_create_folder", { path: dir });
+      if (h.client.version === 11) {
+        expect(made.isError).toBe(true);
+        expect(made.json.code).toBe("UNSUPPORTED_OPERATION");
+        return;
+      }
+      try {
+        expect(made.json).toMatchObject({ created: true, container: "files" });
+        const again = await h.ok("tm1_create_folder", { path: dir });
+        expect(again.json).toMatchObject({ created: false });
+        await h.ok("tm1_create_folder", { path: sub });
+
+        // DELETE on a v12 folder takes its content along, so this refusal is
+        // the only thing between a folder name and everything below it.
+        const filled = await h.call("tm1_delete_file", {
+          fileName: dir,
+          confirm: dir,
+        });
+        expect(filled.isError).toBe(true);
+        expect(filled.json.code).toBe("UNSUPPORTED_OPERATION");
+        const kept = await h.ok("tm1_list_files", { path: dir });
+        expect(kept.json.items).toEqual(["sub"]);
+      } finally {
+        await h.call("tm1_delete_file", { fileName: sub, confirm: sub });
+        await h.call("tm1_delete_file", { fileName: dir, confirm: dir });
+      }
+      const gone = await h.ok("tm1_search_files", { startswith: dir });
+      expect(gone.json.items).toEqual([]);
+    });
+
     it("APPLICATIONS document: sourcePath up -> writeToFile down, byte-identical", async () => {
       // Bytes that are not valid UTF-8, so a text decode anywhere on the way
       // would change the hash.
@@ -306,10 +339,11 @@ describe.skipIf(!LIVE_ENABLED)(
         const src = path.join(dir, "up.xlsm");
         const dst = path.join(dir, "down.xlsm");
         writeFileSync(src, bytes);
-        await rawHttp().request("POST", APPS, {
-          "@odata.type": "#ibm.tm1.api.v1.Folder",
-          Name: DOC_DIR,
-        });
+        const folder = { path: DOC_DIR, container: "applications" };
+        const dir1 = await h.ok("tm1_create_folder", folder);
+        expect(dir1.json).toMatchObject({ success: true, created: true });
+        const dir2 = await h.ok("tm1_create_folder", folder);
+        expect(dir2.json).toMatchObject({ created: false });
         const upload = {
           fileName: DOC_NAME,
           sourcePath: src,
@@ -349,11 +383,26 @@ describe.skipIf(!LIVE_ENABLED)(
         });
         expect(replaced.json).toMatchObject({ updated: true, verified: true });
 
+        // A folder goes only once it is empty.
+        const rmdir = {
+          fileName: DOC_DIR,
+          container: "applications",
+          confirm: DOC_DIR,
+        };
+        const filled = await h.call("tm1_delete_file", rmdir);
+        expect(filled.isError).toBe(true);
+        expect(filled.json.code).toBe("UNSUPPORTED_OPERATION");
         await h.ok("tm1_delete_file", {
           fileName: DOC_NAME,
           container: "applications",
           confirm: DOC_NAME,
         });
+        await h.ok("tm1_delete_file", rmdir);
+        const gone = await h.ok("tm1_search_files", {
+          container: "applications",
+          startswith: DOC_DIR,
+        });
+        expect(gone.json.items).toEqual([]);
       } finally {
         if (prevRoot === undefined) delete process.env.TM1_LOCAL_FILE_ROOT;
         else process.env.TM1_LOCAL_FILE_ROOT = prevRoot;

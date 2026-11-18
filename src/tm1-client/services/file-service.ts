@@ -278,7 +278,7 @@ export class FileService {
    * Tries 'Files' (v12) first, falls back to 'Blobs' (v11).
    *
    * Subfolders only supported on TM1 v12. Caller must ensure parent folders
-   * exist (folder-create not yet exposed).
+   * exist (createFolder).
    */
   async upload(
     fileName: string,
@@ -339,6 +339,93 @@ export class FileService {
   }
 
   /**
+   * Create a folder. The parent must exist.
+   *
+   * A folder that is already there answers created=false. That is decided by
+   * listing the parent, not by the POST: in the Applications tree v11 reports
+   * "already exists" as a plain 400, and v12 `Files` answers a second POST of
+   * the same name with success (measured 2026-11-18).
+   *
+   * The 'files' container nests on v12 only. v11 `Blobs` is flat — the POST of
+   * a Folder is refused there with an empty 400 — so that case is named here
+   * instead of being sent.
+   */
+  async createFolder(
+    path: string,
+    container: FileContainer = "files",
+  ): Promise<{ created: boolean }> {
+    const parts = splitPath(path);
+    const leaf = parts.pop();
+    if (leaf === undefined) {
+      throw new TM1Error({
+        code: TM1ErrorCode.VALIDATION_ERROR,
+        message: "Empty folder path",
+        endpoint: path,
+      });
+    }
+    let parentUrl: string;
+    let siblings: Array<{ name: string; kind: string }>;
+    if (container === "applications") {
+      const { url, entry: parent } = await this.appsResolve(parts);
+      if (parent !== undefined && parent.kind !== "Folder") {
+        throw new TM1Error({
+          code: TM1ErrorCode.UNSUPPORTED_OPERATION,
+          message: `'${parent.name}' is a ${parent.kind}, not a folder`,
+          endpoint: url,
+        });
+      }
+      parentUrl = url;
+      siblings = await this.appsChildren(url);
+    } else {
+      if (this.http.version === 11) {
+        throw new TM1Error({
+          code: TM1ErrorCode.UNSUPPORTED_OPERATION,
+          // In the message, not the hint: the tool replaces the hint with its own.
+          message:
+            "TM1 v11 keeps the 'files' container flat: it has no folders. Use a flat file name there, or container='applications' for the tree users see in Architect and PAW.",
+          endpoint: path,
+        });
+      }
+      parentUrl =
+        "/api/v1/Contents('Files')" +
+        parts.map((p) => `/Contents('${odataKey(p)}')`).join("");
+      const r = await this.http.request<{
+        value: Array<{ Name: string; "@odata.type": string }>;
+      }>("GET", `${parentUrl}/Contents?$select=Name`);
+      siblings = r.value.map((e) => ({
+        name: e.Name,
+        kind: e["@odata.type"].split(".").pop() ?? "",
+      }));
+    }
+    const existing = siblings.find(
+      (e) => e.name.toLowerCase() === leaf.toLowerCase(),
+    );
+    if (existing !== undefined) {
+      if (existing.kind === "Folder") return { created: false };
+      throw new TM1Error({
+        code: TM1ErrorCode.CONFLICT,
+        message: `'${leaf}' already exists as a ${existing.kind}`,
+        endpoint: parentUrl,
+      });
+    }
+    await this.http.request("POST", `${parentUrl}/Contents`, {
+      "@odata.type": "#ibm.tm1.api.v1.Folder",
+      Name: leaf,
+    });
+    return { created: true };
+  }
+
+  /** Refusal for a folder that still holds entries; DELETE would take them along. */
+  private filledFolder(name: string, count: number, url: string): TM1Error {
+    return new TM1Error({
+      code: TM1ErrorCode.UNSUPPORTED_OPERATION,
+      // The advice sits in the message: the tool replaces the hint with its own.
+      message: `'${name}' is a folder holding ${count} ${count === 1 ? "entry" : "entries"} — refusing to delete it, because TM1 would delete them with it. Delete the entries first; an empty folder is deleted.`,
+      endpoint: url,
+    });
+  }
+
+  /**
    * Delete a file from blob/file storage. Tries 'Files' first, then 'Blobs'.
    */
   async delete(
@@ -352,17 +439,16 @@ export class FileService {
     if (container === "applications") {
       const { url, entry } = await this.appsResolve(parts);
       // DELETE on a folder takes everything under it with it (see the header
-      // note). This is the single-file contract, so anything that is not a
-      // document is refused here rather than at the server, where it would
-      // already be gone.
-      if (entry !== undefined && entry.kind !== "DocumentReference") {
+      // note), so a folder goes only when it is empty; decided here rather
+      // than at the server, where the content would already be gone.
+      if (entry?.kind === "Folder") {
+        const count = (await this.appsChildren(url)).length;
+        if (count > 0) throw this.filledFolder(entry.name, count, url);
+      } else if (entry !== undefined && entry.kind !== "DocumentReference") {
         throw new TM1Error({
           code: TM1ErrorCode.UNSUPPORTED_OPERATION,
           message: `'${entry.name}' is a ${entry.kind}, not a file — refusing to delete it`,
-          hint:
-            entry.kind === "Folder"
-              ? "Deleting a folder would delete everything inside it, which this tool does not do. Delete the entries individually, or remove the folder in Architect/PAW."
-              : "Only documents can be deleted here. A ViewReference points at a cube view; remove it with tm1_delete_view.",
+          hint: "Only documents and empty folders can be deleted here. A ViewReference points at a cube view; remove it with tm1_delete_view.",
           endpoint: url,
         });
       }
@@ -374,7 +460,29 @@ export class FileService {
       return `/api/v1/Contents('${odataKey(root)}')${segs}`;
     };
     try {
-      await this.http.request("DELETE", buildUrl("Files"));
+      // v12 `Files` nests, and DELETE on a folder there removes its content
+      // too (measured 2026-11-18). On v11 this read is the 404 that sends the
+      // call on to `Blobs`, which has no folders.
+      // shortcut: a folder is recognised by @odata.type in this answer (seen on 12.5.9); a build that leaves it out gets the plain DELETE again — then list the parent instead.
+      const url = buildUrl("Files");
+      const target = await this.http.request<{ "@odata.type"?: string }>(
+        "GET",
+        `${url}?$select=Name`,
+      );
+      if (target?.["@odata.type"]?.endsWith(".Folder")) {
+        const inside = await this.http.request<{ value: unknown[] }>(
+          "GET",
+          `${url}/Contents?$select=Name`,
+        );
+        if (inside.value.length > 0) {
+          throw this.filledFolder(
+            parts[parts.length - 1]!,
+            inside.value.length,
+            url,
+          );
+        }
+      }
+      await this.http.request("DELETE", url);
     } catch (e) {
       const code = (e as { code?: string }).code;
       if (code !== "NOT_FOUND") throw e;

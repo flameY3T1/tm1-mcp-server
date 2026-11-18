@@ -114,6 +114,7 @@ import { registerListFiles } from "./fileops/list-files.js";
 import { registerGetFileContent } from "./fileops/get-file-content.js";
 import { registerReadServerFile } from "./fileops/read-server-file.js";
 import { registerUploadFile } from "./fileops/upload-file.js";
+import { registerCreateFolder } from "./fileops/create-folder.js";
 import { registerDeleteFile } from "./fileops/delete-file.js";
 import { registerSearchFiles } from "./fileops/search-files.js";
 
@@ -266,6 +267,7 @@ const REGISTRARS: ToolRegistrar[] = [
   registerGetFileContent,
   registerReadServerFile,
   registerUploadFile,
+  registerCreateFolder,
   registerDeleteFile,
   registerSearchFiles,
 
