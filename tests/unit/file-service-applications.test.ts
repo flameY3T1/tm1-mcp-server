@@ -234,14 +234,14 @@ describe("FileService, applications container", () => {
     function filesService(version: 11 | 12) {
       const calls: string[] = [];
       const answers: Record<string, unknown> = {
-        [`GET ${FILES}/Contents?$select=Name`]: {
+        [`GET ${FILES}/Contents?$select=ID,Name`]: {
           value: [item("Folder", "imports"), item("Document", "a.csv")],
         },
         [`GET ${FILES}/Contents('imports')?$select=Name`]: item(
           "Folder",
           "imports",
         ),
-        [`GET ${FILES}/Contents('imports')/Contents?$select=Name`]: {
+        [`GET ${FILES}/Contents('imports')/Contents?$select=ID,Name`]: {
           value: [item("Document", "x.csv")],
         },
         [`GET ${FILES}/Contents('a.csv')?$select=Name`]: item(

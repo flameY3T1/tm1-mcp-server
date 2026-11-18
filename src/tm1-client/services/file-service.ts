@@ -57,14 +57,14 @@ export class FileService {
   constructor(private readonly http: TM1HttpClient) {}
 
   /**
-   * Entries directly under an Applications URL.
+   * Entries directly under a Contents URL, in either container.
    *
    * Follows `@odata.nextLink` if the server sends one. Whether these builds
    * page this endpoint at all was not observed; a missed page here would not
    * just shorten a listing, it would make name resolution answer NOT_FOUND for
    * an entry that exists, so the loop runs either way.
    */
-  private async appsChildren(url: string): Promise<AppsEntry[]> {
+  private async childrenOf(url: string): Promise<AppsEntry[]> {
     const entries: AppsEntry[] = [];
     // v12 leaves `ID` out of this listing unless it is selected (v11 always
     // sends it); without it every entry resolved to Contents('undefined').
@@ -106,7 +106,7 @@ export class FileService {
     let url = APPS_ROOT;
     let entry: AppsEntry | undefined;
     for (const seg of segments) {
-      const children = await this.appsChildren(url);
+      const children = await this.childrenOf(url);
       const lower = seg.toLowerCase();
       const hit =
         children.find((c) => c.name.toLowerCase() === lower) ??
@@ -162,7 +162,7 @@ export class FileService {
     const segments = path ? splitPath(path) : [];
     if (container === "applications") {
       const { url } = await this.appsResolve(segments);
-      return (await this.appsChildren(url)).map((e) => e.name);
+      return (await this.childrenOf(url)).map((e) => e.name);
     }
     const buildUrl = (root: string): string => {
       let url = `/api/v1/Contents('${odataKey(root)}')`;
@@ -364,7 +364,7 @@ export class FileService {
       });
     }
     let parentUrl: string;
-    let siblings: Array<{ name: string; kind: string }>;
+    let siblings: AppsEntry[];
     if (container === "applications") {
       const { url, entry: parent } = await this.appsResolve(parts);
       if (parent !== undefined && parent.kind !== "Folder") {
@@ -375,7 +375,7 @@ export class FileService {
         });
       }
       parentUrl = url;
-      siblings = await this.appsChildren(url);
+      siblings = await this.childrenOf(url);
     } else {
       if (this.http.version === 11) {
         throw new TM1Error({
@@ -389,13 +389,7 @@ export class FileService {
       parentUrl =
         "/api/v1/Contents('Files')" +
         parts.map((p) => `/Contents('${odataKey(p)}')`).join("");
-      const r = await this.http.request<{
-        value: Array<{ Name: string; "@odata.type": string }>;
-      }>("GET", `${parentUrl}/Contents?$select=Name`);
-      siblings = r.value.map((e) => ({
-        name: e.Name,
-        kind: e["@odata.type"].split(".").pop() ?? "",
-      }));
+      siblings = await this.childrenOf(parentUrl);
     }
     const existing = siblings.find(
       (e) => e.name.toLowerCase() === leaf.toLowerCase(),
@@ -442,7 +436,7 @@ export class FileService {
       // note), so a folder goes only when it is empty; decided here rather
       // than at the server, where the content would already be gone.
       if (entry?.kind === "Folder") {
-        const count = (await this.appsChildren(url)).length;
+        const count = (await this.childrenOf(url)).length;
         if (count > 0) throw this.filledFolder(entry.name, count, url);
       } else if (entry !== undefined && entry.kind !== "DocumentReference") {
         throw new TM1Error({
@@ -470,16 +464,9 @@ export class FileService {
         `${url}?$select=Name`,
       );
       if (target?.["@odata.type"]?.endsWith(".Folder")) {
-        const inside = await this.http.request<{ value: unknown[] }>(
-          "GET",
-          `${url}/Contents?$select=Name`,
-        );
-        if (inside.value.length > 0) {
-          throw this.filledFolder(
-            parts[parts.length - 1]!,
-            inside.value.length,
-            url,
-          );
+        const count = (await this.childrenOf(url)).length;
+        if (count > 0) {
+          throw this.filledFolder(parts[parts.length - 1]!, count, url);
         }
       }
       await this.http.request("DELETE", url);
@@ -699,7 +686,7 @@ export class FileService {
     const parentParts = parts.slice(0, -1);
     const { url: parentUrl } = await this.appsResolve(parentParts);
 
-    const existing = (await this.appsChildren(parentUrl)).find(
+    const existing = (await this.childrenOf(parentUrl)).find(
       (e) => e.name.toLowerCase() === leaf.toLowerCase(),
     );
     if (existing !== undefined && existing.kind !== "DocumentReference") {
