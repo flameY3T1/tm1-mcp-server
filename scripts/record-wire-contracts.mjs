@@ -77,7 +77,10 @@ const res = spawnSync(
 // The live suite has known per-version failures; a failing assertion still
 // produced real responses, so a non-zero exit does not invalidate the
 // recording. Surface the code without treating it as fatal.
-if (res.status !== 0) {
+if (flags.has("--verify")) {
+  // Nothing was recorded, so the exit code is the whole result.
+  process.exit(res.status ?? 1);
+} else if (res.status !== 0) {
   console.log(
     `\nlive suite exited ${res.status} — contracts recorded from whatever ran.`,
   );
